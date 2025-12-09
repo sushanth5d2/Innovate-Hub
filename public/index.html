@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Innovate Hub</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/images/icon-192x192.png">
+  <link rel="icon" type="image/png" href="/images/icon-192x192.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    
+    .container {
+      max-width: 400px;
+      padding: 2rem;
+    }
+    
+    .logo {
+      font-family: 'Grand Hotel', cursive;
+      font-size: 3.5rem;
+      margin-bottom: 2rem;
+      background: linear-gradient(45deg, #833AB4, #FD1D1D, #F77737);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      font-weight: 400;
+    }
+    
+    p {
+      color: #8e8e8e;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .button {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: #0095f6;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      margin: 0.5rem;
+      transition: background 0.2s;
+    }
+    
+    .button:hover {
+      background: #0081d6;
+    }
+    
+    .button.secondary {
+      background: transparent;
+      border: 1px solid #262626;
+    }
+    
+    .button.secondary:hover {
+      background: #262626;
+    }
+    
+    .features {
+      margin-top: 3rem;
+      text-align: left;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #833AB4, #FD1D1D);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    
+    .feature-text h3 {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .feature-text p {
+      margin: 0;
+      font-size: 0.875rem;
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Innovate</div>
+    <h1>Welcome to Innovate Hub</h1>
+    <p>Connect with your community, share your passion, and discover amazing content</p>
+    
+    <div>
+      <a href="/login" class="button">Sign In</a>
+      <a href="/register" class="button secondary">Sign Up</a>
+    </div>
+    
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">📱</div>
+        <div class="feature-text">
+          <h3>Stay Connected</h3>
+          <p>Real-time messaging and notifications</p>
+        </div>
+      </div>
+      
+      <div class="feature">
+        <div class="feature-icon">🌐</div>
+        <div class="feature-text">
+          <h3>Join Communities</h3>
+          <p>Connect with like-minded people</p>
+        </div>
+      </div>
+      
+      <div class="feature">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-text">
+          <h3>Discover Events</h3>
+          <p>Never miss out on exciting happenings</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(registration => {
+            console.log('ServiceWorker registered:', registration);
+          })
+          .catch(err => {
+            console.log('ServiceWorker registration failed:', err);
+          });
+      });
+    }
+    
+    // Check if user is already logged in
+    const token = localStorage.getItem('token');
+    if (token) {
+      window.location.href = '/home';
+    }
+  </script>
+</body>
+</html>

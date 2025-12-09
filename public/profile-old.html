@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <div style="display: flex; gap: 2rem; align-items: start;">
+        <div style="text-align: center;">
+          <img id="profile-picture" src="" alt="Profile" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem;">
+          <div id="profile-actions"></div>
+        </div>
+        
+        <div style="flex: 1;">
+          <h1 id="profile-username"></h1>
+          <p id="profile-bio" style="color: var(--text-secondary); margin: 1rem 0;"></p>
+          
+          <div id="profile-details" style="margin: 1rem 0;"></div>
+          
+          <div style="display: flex; gap: 2rem; margin: 1.5rem 0; padding: 1rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+            <div style="text-align: center;">
+              <div style="font-size: 1.5rem; font-weight: 600;" id="posts-count">0</div>
+              <div style="color: var(--text-secondary);">Posts</div>
+            </div>
+            <div style="text-align: center; cursor: pointer;" onclick="showFollowers()">
+              <div style="font-size: 1.5rem; font-weight: 600;" id="followers-count">0</div>
+              <div style="color: var(--text-secondary);">Followers</div>
+            </div>
+            <div style="text-align: center; cursor: pointer;" onclick="showFollowing()">
+              <div style="font-size: 1.5rem; font-weight: 600;" id="following-count">0</div>
+              <div style="color: var(--text-secondary);">Following</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Posts</div>
+      <div id="user-posts"></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    const currentUser = InnovateAPI.getCurrentUser();
+    const userId = window.location.pathname.split('/').pop();
+    const isOwnProfile = currentUser.id == userId;
+
+    async function loadProfile() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${userId}`);
+        const user = data.user;
+
+        document.getElementById('profile-picture').src = InnovateAPI.getUserAvatar(user.profile_picture);
+        document.getElementById('profile-username').textContent = user.username;
+        document.getElementById('profile-bio').textContent = user.bio || 'No bio yet';
+        document.getElementById('posts-count').textContent = user.post_count;
+        document.getElementById('followers-count').textContent = user.followers_count;
+        document.getElementById('following-count').textContent = user.following_count;
+
+        let detailsHTML = '';
+        if (user.skills && user.skills.length > 0) {
+          detailsHTML += `<div><strong>Skills:</strong> ${user.skills.join(', ')}</div>`;
+        }
+        if (user.interests && user.interests.length > 0) {
+          detailsHTML += `<div><strong>Interests:</strong> ${user.interests.join(', ')}</div>`;
+        }
+        if (user.favorite_teams && user.favorite_teams.length > 0) {
+          detailsHTML += `<div><strong>Favorite Teams:</strong> 🏆 ${user.favorite_teams.join(', ')}</div>`;
+        }
+        document.getElementById('profile-details').innerHTML = detailsHTML;
+
+        // Action buttons
+        const actionsContainer = document.getElementById('profile-actions');
+        if (isOwnProfile) {
+          actionsContainer.innerHTML = `
+            <button class="btn btn-primary btn-sm" onclick="editProfile()">Edit Profile</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.location.href='/settings'">Settings</button>
+          `;
+        } else {
+          actionsContainer.innerHTML = `
+            <button class="btn ${user.is_following ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="${user.is_following ? 'unfollow()' : 'follow()'}">
+              ${user.is_following ? 'Following' : 'Follow'}
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="messageUser()">Message</button>
+            <button class="btn btn-outline btn-sm" onclick="blockUser()">${user.is_blocked ? 'Unblock' : 'Block'}</button>
+          `;
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function loadPosts() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${userId}/posts`);
+        const container = document.getElementById('user-posts');
+        container.innerHTML = '';
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No posts yet</div>';
+          return;
+        }
+
+        data.posts.forEach(post => {
+          const div = document.createElement('div');
+          div.className = 'post';
+          div.innerHTML = `
+            <div class="post-content">${post.content || ''}</div>
+            ${post.images && post.images.length > 0 ? `
+              <div class="post-images">
+                ${post.images.map(img => `<img src="${img}" class="post-image" alt="Post image">`).join('')}
+              </div>
+            ` : ''}
+            <div class="post-timestamp">${InnovateAPI.formatDate(post.created_at)}</div>
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      }
+    }
+
+    async function follow() {
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'POST' });
+        InnovateAPI.showAlert('Following user!', 'success');
+        loadProfile();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function unfollow() {
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'DELETE' });
+        InnovateAPI.showAlert('Unfollowed user', 'success');
+        loadProfile();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function messageUser() {
+      window.location.href = `/messages?user=${userId}`;
+    }
+
+    async function blockUser() {
+      if (confirm('Are you sure you want to block this user?')) {
+        try {
+          await InnovateAPI.apiRequest(`/users/${userId}/block`, { method: 'POST' });
+          InnovateAPI.showAlert('User blocked', 'success');
+          loadProfile();
+        } catch (error) {
+          InnovateAPI.showAlert(error.message, 'error');
+        }
+      }
+    }
+
+    function editProfile() {
+      const bio = prompt('Enter your bio:', document.getElementById('profile-bio').textContent);
+      const skills = prompt('Enter your skills (comma separated):');
+      const interests = prompt('Enter your interests (comma separated):');
+      const teams = prompt('Enter your favorite teams (comma separated):');
+
+      if (bio !== null) {
+        updateProfile(bio, skills, interests, teams);
+      }
+    }
+
+    async function updateProfile(bio, skills, interests, teams) {
+      try {
+        const formData = new FormData();
+        formData.append('bio', bio);
+        formData.append('skills', JSON.stringify(skills ? skills.split(',').map(s => s.trim()) : []));
+        formData.append('interests', JSON.stringify(interests ? interests.split(',').map(i => i.trim()) : []));
+        formData.append('favorite_teams', JSON.stringify(teams ? teams.split(',').map(t => t.trim()) : []));
+
+        await InnovateAPI.apiRequest('/users', {
+          method: 'PUT',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('Profile updated!', 'success');
+        loadProfile();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function showFollowers() {
+      alert('Followers list would be shown here');
+    }
+
+    function showFollowing() {
+      alert('Following list would be shown here');
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    loadProfile();
+    loadPosts();
+  </script>
+</body>
+</html>

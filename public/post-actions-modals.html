@@ -1,0 +1,513 @@
+<!-- Enhanced Post Actions Menu Modal -->
+<div id="postActionsModal" class="ig-modal-overlay" style="display: none;" onclick="closePostActionsModal(event)">
+  <div class="ig-modal" onclick="event.stopPropagation()">
+    <div class="ig-modal-header">Post Actions</div>
+    
+    <!-- Viewer Actions -->
+    <div id="viewerActions" style="display: none;">
+      <div class="ig-modal-item" onclick="handleInterested()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+        <span>I'm Interested</span>
+      </div>
+      
+      <div class="ig-modal-item" onclick="handleContactMe()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+        <span>Contact Me</span>
+      </div>
+      
+      <div class="ig-modal-item" onclick="handleGentleReminder()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+        </svg>
+        <span>Gentle Reminder</span>
+      </div>
+      
+      <div class="ig-modal-item" onclick="handleInstantMeeting()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+        </svg>
+        <span>Instant Meeting</span>
+      </div>
+      
+      <div class="ig-modal-item" onclick="handleReport()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
+        </svg>
+        <span>Report</span>
+      </div>
+    </div>
+    
+    <!-- Owner Actions -->
+    <div id="ownerActions" style="display: none;">
+      <div class="ig-modal-item" onclick="handleEditPost()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+        <span>Edit Post</span>
+      </div>
+      
+      <div class="ig-modal-item" onclick="handleArchivePost()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>
+        </svg>
+        <span>Archive</span>
+      </div>
+      
+      <div class="ig-modal-item danger" onclick="handleDeletePost()">
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+        </svg>
+        <span>Delete</span>
+      </div>
+    </div>
+    
+    <div class="ig-modal-item" onclick="closePostActionsModal()">
+      <span>Cancel</span>
+    </div>
+  </div>
+</div>
+
+<!-- Gentle Reminder Modal -->
+<div id="reminderModal" class="ig-modal-overlay" style="display: none;" onclick="closeReminderModal(event)">
+  <div class="ig-modal" onclick="event.stopPropagation()">
+    <div class="ig-modal-header">Set Gentle Reminder</div>
+    <div style="padding: 20px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 500;">Date & Time</label>
+      <input type="datetime-local" id="reminderDate" class="ig-input" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px;">
+      
+      <label style="display: block; margin: 16px 0 8px; font-weight: 500;">Message (Optional)</label>
+      <textarea id="reminderMessage" class="ig-textarea" placeholder="Add a note for this reminder..." rows="3" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; resize: vertical;"></textarea>
+    </div>
+    <div class="ig-modal-item" onclick="submitReminder()" style="color: var(--ig-blue); font-weight: 600;">
+      Set Reminder
+    </div>
+    <div class="ig-modal-item" onclick="closeReminderModal()">
+      Cancel
+    </div>
+  </div>
+</div>
+
+<!-- Instant Meeting Modal -->
+<div id="meetingModal" class="ig-modal-overlay" style="display: none;" onclick="closeMeetingModal(event)">
+  <div class="ig-modal" onclick="event.stopPropagation()">
+    <div class="ig-modal-header">Create Instant Meeting</div>
+    <div style="padding: 20px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 500;">Platform</label>
+      <select id="meetingPlatform" class="ig-input" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 16px;">
+        <option value="google-meet">Google Meet</option>
+        <option value="zoom">Zoom</option>
+        <option value="teams">Microsoft Teams</option>
+        <option value="discord">Discord</option>
+      </select>
+      
+      <label style="display: block; margin-bottom: 8px; font-weight: 500;">Meeting Title</label>
+      <input type="text" id="meetingTitle" class="ig-input" placeholder="Enter meeting title..." style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 16px;">
+      
+      <label style="display: block; margin-bottom: 8px; font-weight: 500;">Date & Time</label>
+      <input type="datetime-local" id="meetingDate" class="ig-input" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 16px;">
+      
+      <label style="display: block; margin-bottom: 8px; font-weight: 500;">Description (Optional)</label>
+      <textarea id="meetingDescription" class="ig-textarea" placeholder="Add meeting details..." rows="3" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; resize: vertical;"></textarea>
+    </div>
+    <div class="ig-modal-item" onclick="submitMeeting()" style="color: var(--ig-blue); font-weight: 600;">
+      Create Meeting
+    </div>
+    <div class="ig-modal-item" onclick="closeMeetingModal()">
+      Cancel
+    </div>
+  </div>
+</div>
+
+<!-- Edit Post Modal -->
+<div id="editPostModal" class="ig-modal-overlay" style="display: none;" onclick="closeEditModal(event)">
+  <div class="ig-modal" onclick="event.stopPropagation()">
+    <div class="ig-modal-header">Edit Post</div>
+    <div style="padding: 20px;">
+      <textarea id="editPostContent" class="ig-textarea" rows="4" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; resize: vertical;"></textarea>
+      
+      <div id="editImagePreview" style="margin-top: 12px;"></div>
+      
+      <label class="ig-button" style="display: inline-block; margin-top: 12px; padding: 8px 16px; background: var(--ig-blue); color: white; border-radius: 8px; cursor: pointer;">
+        <input type="file" id="editPostImages" accept="image/*,video/*" multiple style="display: none;">
+        Add More Media
+      </label>
+    </div>
+    <div class="ig-modal-item" onclick="submitEditPost()" style="color: var(--ig-blue); font-weight: 600;">
+      Save Changes
+    </div>
+    <div class="ig-modal-item" onclick="closeEditModal()">
+      Cancel
+    </div>
+  </div>
+</div>
+
+<style>
+.ig-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ig-modal {
+  background: var(--ig-background);
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.ig-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ig-border);
+  font-weight: 600;
+  text-align: center;
+}
+
+.ig-modal-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ig-border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.2s;
+}
+
+.ig-modal-item:hover {
+  background: var(--ig-hover);
+}
+
+.ig-modal-item:last-child {
+  border-bottom: none;
+}
+
+.ig-modal-item.danger {
+  color: #ed4956;
+}
+
+.ig-modal-item svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.ig-input, .ig-textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--ig-primary-text);
+  background: var(--ig-background);
+}
+
+.ig-input:focus, .ig-textarea:focus {
+  outline: none;
+  border-color: var(--ig-blue) !important;
+}
+</style>
+
+<script>
+let currentPostIdForActions = null;
+let currentPostOwnerId = null;
+
+// Open post actions menu
+function openPostActionsMenu(postId, ownerId) {
+  currentPostIdForActions = postId;
+  currentPostOwnerId = ownerId;
+  
+  const modal = document.getElementById('postActionsModal');
+  const viewerActions = document.getElementById('viewerActions');
+  const ownerActions = document.getElementById('ownerActions');
+  
+  const currentUserId = JSON.parse(localStorage.getItem('user')).id;
+  
+  if (ownerId === currentUserId) {
+    // Show owner actions
+    viewerActions.style.display = 'none';
+    ownerActions.style.display = 'block';
+  } else {
+    // Show viewer actions
+    viewerActions.style.display = 'block';
+    ownerActions.style.display = 'none';
+  }
+  
+  modal.style.display = 'flex';
+}
+
+function closePostActionsModal(event) {
+  if (!event || event.target.id === 'postActionsModal') {
+    document.getElementById('postActionsModal').style.display = 'none';
+  }
+}
+
+// Viewer Actions
+async function handleInterested() {
+  try {
+    await fetch(`/posts/${currentPostIdForActions}/like`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    closePostActionsModal();
+    alert('Post owner has been notified!');
+    loadPosts();
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Failed to send notification');
+  }
+}
+
+async function handleContactMe() {
+  closePostActionsModal();
+  
+  try {
+    await fetch(`/posts/${currentPostIdForActions}/interact`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ type: 'contact' })
+    });
+    
+    // Redirect to messages with the post owner
+    window.location.href = `/messages?user=${currentPostOwnerId}`;
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+function handleGentleReminder() {
+  closePostActionsModal();
+  document.getElementById('reminderModal').style.display = 'flex';
+}
+
+function handleInstantMeeting() {
+  closePostActionsModal();
+  document.getElementById('meetingModal').style.display = 'flex';
+}
+
+function handleReport() {
+  closePostActionsModal();
+  if (confirm('Report this post for violating community guidelines?')) {
+    alert('Thank you for your report. We will review this post.');
+  }
+}
+
+// Owner Actions
+function handleEditPost() {
+  closePostActionsModal();
+  
+  // Get current post content
+  const postEl = document.querySelector(`.ig-post[data-post-id="${currentPostIdForActions}"]`);
+  const content = postEl.querySelector('.ig-caption-text')?.textContent || '';
+  
+  document.getElementById('editPostContent').value = content;
+  document.getElementById('editPostModal').style.display = 'flex';
+}
+
+async function handleArchivePost() {
+  if (confirm('Archive this post? You can restore it later from your profile.')) {
+    try {
+      const response = await fetch(`/posts/${currentPostIdForActions}/archive`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        closePostActionsModal();
+        alert('Post archived successfully!');
+        loadPosts();
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to archive post');
+    }
+  }
+}
+
+async function handleDeletePost() {
+  if (confirm('Are you sure you want to delete this post? This cannot be undone.')) {
+    try {
+      const response = await fetch(`/posts/${currentPostIdForActions}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        closePostActionsModal();
+        alert('Post deleted successfully!');
+        loadPosts();
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to delete post');
+    }
+  }
+}
+
+// Reminder Modal
+function closeReminderModal(event) {
+  if (!event || event.target.id === 'reminderModal') {
+    document.getElementById('reminderModal').style.display = 'none';
+  }
+}
+
+async function submitReminder() {
+  const date = document.getElementById('reminderDate').value;
+  const message = document.getElementById('reminderMessage').value;
+  
+  if (!date) {
+    alert('Please select a date and time');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/posts/${currentPostIdForActions}/reminder`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        reminder_date: date,
+        message: message
+      })
+    });
+    
+    if (response.ok) {
+      closeReminderModal();
+      alert('Reminder set! You can view it in the Events calendar.');
+      document.getElementById('reminderDate').value = '';
+      document.getElementById('reminderMessage').value = '';
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Failed to set reminder');
+  }
+}
+
+// Meeting Modal
+function closeMeetingModal(event) {
+  if (!event || event.target.id === 'meetingModal') {
+    document.getElementById('meetingModal').style.display = 'none';
+  }
+}
+
+async function submitMeeting() {
+  const platform = document.getElementById('meetingPlatform').value;
+  const title = document.getElementById('meetingTitle').value;
+  const date = document.getElementById('meetingDate').value;
+  const description = document.getElementById('meetingDescription').value;
+  
+  if (!title || !date) {
+    alert('Please fill in the title and date');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/posts/${currentPostIdForActions}/meeting`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        platform,
+        title,
+        meeting_date: date,
+        description
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      closeMeetingModal();
+      alert(`Meeting created! Link: ${data.meeting_url}\nCheck the Events page for details.`);
+      
+      // Reset form
+      document.getElementById('meetingTitle').value = '';
+      document.getElementById('meetingDate').value = '';
+      document.getElementById('meetingDescription').value = '';
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Failed to create meeting');
+  }
+}
+
+// Edit Post Modal
+function closeEditModal(event) {
+  if (!event || event.target.id === 'editPostModal') {
+    document.getElementById('editPostModal').style.display = 'none';
+  }
+}
+
+document.getElementById('editPostImages')?.addEventListener('change', (e) => {
+  const preview = document.getElementById('editImagePreview');
+  preview.innerHTML = '';
+  
+  Array.from(e.target.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'max-width: 100%; border-radius: 8px; margin-top: 8px;';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+async function submitEditPost() {
+  const content = document.getElementById('editPostContent').value;
+  const images = document.getElementById('editPostImages').files;
+  
+  const formData = new FormData();
+  formData.append('content', content);
+  
+  for (let file of images) {
+    if (file.type.startsWith('image/')) {
+      formData.append('images', file);
+    } else if (file.type.startsWith('video/')) {
+      formData.append('video', file);
+    }
+  }
+  
+  try {
+    const response = await fetch(`/posts/${currentPostIdForActions}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: formData
+    });
+    
+    if (response.ok) {
+      closeEditModal();
+      alert('Post updated successfully!');
+      loadPosts();
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('Failed to update post');
+  }
+}
+</script>

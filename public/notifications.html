@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Notifications • Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <style>
+    .ig-notification-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ig-border);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .ig-notification-item:hover {
+      background-color: var(--ig-hover);
+    }
+    .ig-notification-item.unread {
+      background-color: rgba(0, 149, 246, 0.05);
+    }
+    .ig-notification-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .ig-notification-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .ig-notification-text {
+      font-size: 14px;
+      color: var(--ig-primary-text);
+      line-height: 1.4;
+    }
+    .ig-notification-username {
+      font-weight: 600;
+    }
+    .ig-notification-time {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      margin-top: 2px;
+    }
+    .ig-notification-action {
+      flex-shrink: 0;
+    }
+    .ig-follow-btn {
+      background-color: var(--ig-blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ig-following-btn {
+      background-color: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      <div></div>
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/home'">
+          <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="ig-main">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <h2 style="font-size: 24px; font-weight: 600;">Notifications</h2>
+      <button class="ig-following-btn" onclick="markAllAsRead()">Mark all read</button>
+    </div>
+
+    <div class="ig-settings-section">
+      <div id="notificationsList">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/search" class="ig-bottom-nav-item">
+      <svg aria-label="Search" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M19 10.5A8.5 8.5 0 1 1 10.5 2a8.5 8.5 0 0 1 8.5 8.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.511" x2="22" y1="16.511" y2="22"></line>
+      </svg>
+    </a>
+    <div class="ig-bottom-nav-item" onclick="window.location.href='/home'">
+      <svg aria-label="New post" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2 12v3.45c0 2.849.698 4.005 1.606 4.944.94.909 2.098 1.608 4.946 1.608h6.896c2.848 0 4.006-.7 4.946-1.608C21.302 19.455 22 18.3 22 15.45V8.552c0-2.849-.698-4.006-1.606-4.945C19.454 2.7 18.296 2 15.448 2H8.552c-2.848 0-4.006.699-4.946 1.607C2.698 4.547 2 5.703 2 8.552Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="6.545" x2="17.455" y1="12.001" y2="12.001"></line>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="12.003" x2="12.003" y1="6.545" y2="17.455"></line>
+      </svg>
+    </div>
+    <a href="/events" class="ig-bottom-nav-item">
+      <svg aria-label="Events" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2.049 7.002 10.38 3.28a3.5 3.5 0 0 1 3.241 0l8.332 3.723a1.5 1.5 0 0 1 .816 1.32v5.024a1.5 1.5 0 0 1-.816 1.32l-8.332 3.723a3.5 3.5 0 0 1-3.24 0l-8.332-3.723a1.5 1.5 0 0 1-.816-1.32v-5.024a1.5 1.5 0 0 1 .816-1.32Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/profile" class="ig-bottom-nav-item" id="bottomProfileLink">
+      <img id="bottomProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+    </a>
+  </nav>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+    InnovateAPI.initSocket();
+
+    const user = InnovateAPI.getCurrentUser();
+    const socket = InnovateAPI.getSocket();
+
+    // Load user info
+    async function loadUserInfo() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        document.getElementById('bottomProfilePic').src = avatar;
+        document.getElementById('bottomProfileLink').href = `/profile/${user.id}`;
+      } catch (error) {
+        console.error('Error loading user info:', error);
+      }
+    }
+
+    // Load notifications
+    async function loadNotifications() {
+      try {
+        const data = await InnovateAPI.apiRequest('/notifications');
+        const list = document.getElementById('notificationsList');
+        list.innerHTML = '';
+
+        if (data.notifications.length === 0) {
+          list.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No Notifications Yet</div>
+              <div style="font-size: 14px;">When someone likes or comments on your posts, you'll see it here.</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.notifications.forEach(notification => {
+          const notifEl = createNotificationElement(notification);
+          list.appendChild(notifEl);
+        });
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+        document.getElementById('notificationsList').innerHTML = 
+          '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading notifications</div>';
+      }
+    }
+
+    // Create notification element
+    function createNotificationElement(notification) {
+      const div = document.createElement('div');
+      div.className = `ig-notification-item ${!notification.is_read ? 'unread' : ''}`;
+      
+      const avatar = InnovateAPI.getUserAvatar(notification.profile_picture);
+      const timeAgo = formatTimeAgo(notification.created_at);
+      
+      let actionButton = '';
+      let notificationText = notification.content;
+      
+      if (notification.type === 'follow') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> started following you.`;
+        actionButton = `
+          <div class="ig-notification-action">
+            <button class="ig-follow-btn" onclick="followUser(${notification.sender_id}, event)">Follow</button>
+          </div>
+        `;
+      } else if (notification.type === 'message') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> sent you a message.`;
+      } else if (notification.type === 'event_invite') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> invited you to an event.`;
+      } else if (notification.type === 'crosspath') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined the same event as you!`;
+      } else if (notification.type === 'community_join') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined your community.`;
+      }
+      
+      div.innerHTML = `
+        <img src="${avatar}" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href='/profile/${notification.sender_id}'">
+        <div class="ig-notification-content" onclick="handleNotificationClick(${notification.id}, '${notification.type}', ${notification.reference_id || 'null'})">
+          <div class="ig-notification-text">${notificationText}</div>
+          <div class="ig-notification-time">${timeAgo}</div>
+        </div>
+        ${actionButton}
+      `;
+      
+      return div;
+    }
+
+    // Format time ago
+    function formatTimeAgo(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      const weeks = Math.floor(diff / 604800000);
+      
+      if (minutes < 1) return 'just now';
+      if (minutes < 60) return `${minutes}m`;
+      if (hours < 24) return `${hours}h`;
+      if (days < 7) return `${days}d`;
+      if (weeks < 4) return `${weeks}w`;
+      return date.toLocaleDateString();
+    }
+
+    // Handle notification click
+    async function handleNotificationClick(notificationId, type, referenceId) {
+      try {
+        await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
+          method: 'PUT'
+        });
+        
+        if (type === 'message') {
+          window.location.href = '/messages';
+        } else if (type === 'event_invite' && referenceId) {
+          window.location.href = `/events/${referenceId}`;
+        } else if (type === 'crosspath' && referenceId) {
+          window.location.href = `/events/${referenceId}`;
+        } else if (referenceId) {
+          window.location.href = `/post/${referenceId}`;
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+
+    // Follow user
+    async function followUser(userId, event) {
+      event.stopPropagation();
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/follow`, {
+          method: 'POST'
+        });
+        
+        const btn = event.target;
+        btn.textContent = 'Following';
+        btn.className = 'ig-following-btn';
+        btn.onclick = (e) => unfollowUser(userId, e);
+      } catch (error) {
+        console.error('Error following user:', error);
+      }
+    }
+
+    // Unfollow user
+    async function unfollowUser(userId, event) {
+      event.stopPropagation();
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/unfollow`, {
+          method: 'POST'
+        });
+        
+        const btn = event.target;
+        btn.textContent = 'Follow';
+        btn.className = 'ig-follow-btn';
+        btn.onclick = (e) => followUser(userId, e);
+      } catch (error) {
+        console.error('Error unfollowing user:', error);
+      }
+    }
+
+    // Mark all as read
+    async function markAllAsRead() {
+      try {
+        await InnovateAPI.apiRequest('/notifications/read-all', {
+          method: 'PUT'
+        });
+        
+        loadNotifications();
+        InnovateAPI.showAlert('All notifications marked as read', 'success');
+      } catch (error) {
+        console.error('Error marking all as read:', error);
+      }
+    }
+
+    // Socket listener for new notifications
+    socket.on('notification', (data) => {
+      loadNotifications();
+    });
+
+    // Initialize
+    loadUserInfo();
+    loadNotifications();
+  </script>
+</body>
+</html>

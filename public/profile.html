@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <button onclick="history.back()" class="icon-button">
+      <i class="fas fa-arrow-left"></i>
+    </button>
+    <span id="profile-username-header" class="top-bar-title"></span>
+    <button onclick="toggleMenu()" class="icon-button">
+      <i class="fas fa-ellipsis-v"></i>
+    </button>
+  </div>
+
+  <!-- Menu Dropdown -->
+  <div id="menu-dropdown" class="dropdown-menu" style="display: none;">
+    <div class="dropdown-item" onclick="shareProfile()">
+      <i class="fas fa-share"></i> Share Profile
+    </div>
+    <div class="dropdown-item" onclick="copyProfileLink()">
+      <i class="fas fa-link"></i> Copy Link
+    </div>
+    <div class="dropdown-item" onclick="reportUser()">
+      <i class="fas fa-flag"></i> Report
+    </div>
+  </div>
+
+  <!-- Profile Content -->
+  <div class="profile-container">
+    <!-- Profile Header -->
+    <div class="profile-header">
+      <div class="profile-avatar-container">
+        <img id="profile-picture" src="" alt="Profile" class="profile-avatar">
+        <button id="add-story-btn" class="add-story-btn" style="display: none;">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+      
+      <div class="profile-stats">
+        <div class="stat">
+          <div class="stat-count" id="posts-count">0</div>
+          <div class="stat-label">posts</div>
+        </div>
+        <div class="stat" onclick="showFollowers()">
+          <div class="stat-count" id="followers-count">0</div>
+          <div class="stat-label">followers</div>
+        </div>
+        <div class="stat" onclick="showFollowing()">
+          <div class="stat-count" id="following-count">0</div>
+          <div class="stat-label">following</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Info -->
+    <div class="profile-info">
+      <div class="profile-name" id="profile-fullname"></div>
+      <div class="profile-bio" id="profile-bio"></div>
+      <div id="profile-details" class="profile-details"></div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="profile-actions" id="profile-actions"></div>
+
+    <!-- Stories Highlights -->
+    <div id="highlights-container" class="highlights-container" style="display: none;">
+      <div class="highlight-item">
+        <div class="highlight-circle">
+          <i class="fas fa-plus"></i>
+        </div>
+        <div class="highlight-label">New</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="profile-tabs">
+      <button class="profile-tab active" onclick="switchTab('posts')">
+        <i class="fas fa-th"></i>
+      </button>
+      <button class="profile-tab" onclick="switchTab('tagged')">
+        <i class="fas fa-user-tag"></i>
+      </button>
+    </div>
+
+    <!-- Posts Grid -->
+    <div id="posts-tab" class="posts-grid">
+      <!-- Posts will be loaded here -->
+    </div>
+
+    <!-- Tagged Posts Grid -->
+    <div id="tagged-tab" class="posts-grid" style="display: none;">
+      <div class="empty-state">
+        <i class="fas fa-user-tag"></i>
+        <p>No tagged posts yet</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="bottom-nav">
+    <a href="/home" class="nav-item">
+      <i class="far fa-home"></i>
+    </a>
+    <a href="/search" class="nav-item">
+      <i class="far fa-search"></i>
+    </a>
+    <a href="/home" class="nav-item">
+      <i class="far fa-plus-square"></i>
+    </a>
+    <a href="/notifications" class="nav-item">
+      <i class="far fa-heart"></i>
+    </a>
+    <a href="/profile" class="nav-item active">
+      <i class="fas fa-user-circle"></i>
+    </a>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div id="edit-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button onclick="closeEditModal()" class="text-button">Cancel</button>
+        <h3>Edit Profile</h3>
+        <button onclick="saveProfile()" class="text-button primary">Done</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-edit-section">
+          <div class="edit-avatar-container">
+            <img id="edit-avatar" src="" alt="Avatar" class="edit-avatar">
+            <button class="change-photo-btn" onclick="changePhoto()">Change Photo</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="edit-fullname" class="form-control" placeholder="Name">
+        </div>
+        
+        <div class="form-group">
+          <label>Bio</label>
+          <textarea id="edit-bio" class="form-control" rows="3" placeholder="Bio" maxlength="150"></textarea>
+          <div class="char-count"><span id="bio-count">0</span>/150</div>
+        </div>
+        
+        <div class="form-group">
+          <label>Skills</label>
+          <input type="text" id="edit-skills" class="form-control" placeholder="e.g. JavaScript, Python, Design">
+        </div>
+        
+        <div class="form-group">
+          <label>Interests</label>
+          <input type="text" id="edit-interests" class="form-control" placeholder="e.g. Gaming, Travel, Music">
+        </div>
+        
+        <div class="form-group">
+          <label>Favorite Teams</label>
+          <input type="text" id="edit-teams" class="form-control" placeholder="e.g. Lakers, Real Madrid">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Followers/Following Modal -->
+  <div id="list-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button onclick="closeListModal()" class="text-button">Close</button>
+        <h3 id="list-title">Followers</h3>
+        <span></span>
+      </div>
+      <div class="modal-body">
+        <div id="users-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    const socket = io();
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const pathParts = window.location.pathname.split('/');
+    const userId = pathParts[pathParts.length - 1] || currentUser.id;
+    const isOwnProfile = currentUser.id == userId;
+    let activeTab = 'posts';
+
+    // Check authentication
+    if (!localStorage.getItem('token')) {
+      window.location.href = '/login';
+    }
+
+    async function loadProfile() {
+      try {
+        const response = await fetch(`/users/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load profile');
+        
+        const data = await response.json();
+        const user = data.user;
+
+        document.getElementById('profile-username-header').textContent = user.username;
+        document.getElementById('profile-picture').src = user.profile_picture || '/images/default-avatar.png';
+        document.getElementById('profile-fullname').textContent = user.username;
+        document.getElementById('profile-bio').textContent = user.bio || 'No bio yet';
+        document.getElementById('posts-count').textContent = user.post_count || 0;
+        document.getElementById('followers-count').textContent = user.followers_count || 0;
+        document.getElementById('following-count').textContent = user.following_count || 0;
+
+        // Profile details
+        let detailsHTML = '';
+        if (user.skills && user.skills.length > 0) {
+          detailsHTML += `<div><i class="fas fa-code"></i> ${user.skills.join(', ')}</div>`;
+        }
+        if (user.interests && user.interests.length > 0) {
+          detailsHTML += `<div><i class="fas fa-heart"></i> ${user.interests.join(', ')}</div>`;
+        }
+        if (user.favorite_teams && user.favorite_teams.length > 0) {
+          detailsHTML += `<div><i class="fas fa-trophy"></i> ${user.favorite_teams.join(', ')}</div>`;
+        }
+        document.getElementById('profile-details').innerHTML = detailsHTML;
+
+        // Action buttons
+        const actionsContainer = document.getElementById('profile-actions');
+        if (isOwnProfile) {
+          document.getElementById('add-story-btn').style.display = 'flex';
+          actionsContainer.innerHTML = `
+            <button class="action-button primary" onclick="openEditModal()">
+              <span>Edit Profile</span>
+            </button>
+            <button class="action-button" onclick="window.location.href='/settings'">
+              <span>Settings</span>
+            </button>
+          `;
+        } else {
+          actionsContainer.innerHTML = `
+            <button class="action-button ${user.is_following ? 'secondary' : 'primary'}" onclick="${user.is_following ? 'unfollow()' : 'follow()'}">
+              <span>${user.is_following ? 'Following' : 'Follow'}</span>
+            </button>
+            <button class="action-button" onclick="messageUser()">
+              <span>Message</span>
+            </button>
+            <button class="action-button" onclick="toggleMenu()">
+              <i class="fas fa-user-plus"></i>
+            </button>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        alert('Failed to load profile');
+      }
+    }
+
+    async function loadPosts() {
+      try {
+        const response = await fetch(`/users/${userId}/posts`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load posts');
+        
+        const data = await response.json();
+        const container = document.getElementById('posts-tab');
+        container.innerHTML = '';
+
+        if (data.posts.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <i class="fas fa-camera"></i>
+              <p>${isOwnProfile ? 'Share your first post' : 'No posts yet'}</p>
+            </div>
+          `;
+          return;
+        }
+
+        data.posts.forEach(post => {
+          const div = document.createElement('div');
+          div.className = 'post-grid-item';
+          
+          if (post.images && post.images.length > 0) {
+            div.innerHTML = `
+              <img src="${post.images[0]}" alt="Post" onclick="viewPost(${post.id})">
+              ${post.images.length > 1 ? '<i class="fas fa-clone post-multiple"></i>' : ''}
+            `;
+          } else {
+            div.innerHTML = `
+              <div class="post-text-preview" onclick="viewPost(${post.id})">
+                ${post.content ? post.content.substring(0, 100) : ''}
+              </div>
+            `;
+          }
+          
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      }
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+      event.target.closest('.profile-tab').classList.add('active');
+      
+      document.getElementById('posts-tab').style.display = tab === 'posts' ? 'grid' : 'none';
+      document.getElementById('tagged-tab').style.display = tab === 'tagged' ? 'grid' : 'none';
+    }
+
+    function toggleMenu() {
+      const menu = document.getElementById('menu-dropdown');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function openEditModal() {
+      const modal = document.getElementById('edit-modal');
+      document.getElementById('edit-avatar').src = document.getElementById('profile-picture').src;
+      document.getElementById('edit-fullname').value = document.getElementById('profile-fullname').textContent;
+      document.getElementById('edit-bio').value = document.getElementById('profile-bio').textContent;
+      
+      updateBioCount();
+      modal.style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').style.display = 'none';
+    }
+
+    function updateBioCount() {
+      const bio = document.getElementById('edit-bio').value;
+      document.getElementById('bio-count').textContent = bio.length;
+    }
+
+    document.getElementById('edit-bio')?.addEventListener('input', updateBioCount);
+
+    async function saveProfile() {
+      try {
+        const formData = new FormData();
+        formData.append('bio', document.getElementById('edit-bio').value);
+        formData.append('skills', JSON.stringify(
+          document.getElementById('edit-skills').value.split(',').map(s => s.trim()).filter(s => s)
+        ));
+        formData.append('interests', JSON.stringify(
+          document.getElementById('edit-interests').value.split(',').map(i => i.trim()).filter(i => i)
+        ));
+        formData.append('favorite_teams', JSON.stringify(
+          document.getElementById('edit-teams').value.split(',').map(t => t.trim()).filter(t => t)
+        ));
+
+        const response = await fetch('/users', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Failed to update profile');
+
+        closeEditModal();
+        loadProfile();
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        alert('Failed to update profile');
+      }
+    }
+
+    async function follow() {
+      try {
+        const response = await fetch(`/users/${userId}/follow`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to follow');
+        loadProfile();
+      } catch (error) {
+        console.error('Error following:', error);
+      }
+    }
+
+    async function unfollow() {
+      try {
+        const response = await fetch(`/users/${userId}/follow`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to unfollow');
+        loadProfile();
+      } catch (error) {
+        console.error('Error unfollowing:', error);
+      }
+    }
+
+    function messageUser() {
+      window.location.href = `/messages?user=${userId}`;
+    }
+
+    async function showFollowers() {
+      showUsersList('Followers', `/users/${userId}/followers`);
+    }
+
+    async function showFollowing() {
+      showUsersList('Following', `/users/${userId}/following`);
+    }
+
+    async function showUsersList(title, endpoint) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load list');
+        
+        const data = await response.json();
+        const modal = document.getElementById('list-modal');
+        const listContainer = document.getElementById('users-list');
+        
+        document.getElementById('list-title').textContent = title;
+        listContainer.innerHTML = '';
+
+        if (data.users && data.users.length > 0) {
+          data.users.forEach(user => {
+            const div = document.createElement('div');
+            div.className = 'user-list-item';
+            div.innerHTML = `
+              <img src="${user.profile_picture || '/images/default-avatar.png'}" alt="${user.username}" class="user-avatar">
+              <div class="user-info">
+                <div class="user-username">${user.username}</div>
+                <div class="user-bio">${user.bio || ''}</div>
+              </div>
+              <button class="follow-button" onclick="window.location.href='/profile/${user.id}'">View</button>
+            `;
+            listContainer.appendChild(div);
+          });
+        } else {
+          listContainer.innerHTML = '<div class="empty-state"><p>No users yet</p></div>';
+        }
+
+        modal.style.display = 'flex';
+      } catch (error) {
+        console.error('Error loading users list:', error);
+      }
+    }
+
+    function closeListModal() {
+      document.getElementById('list-modal').style.display = 'none';
+    }
+
+    function viewPost(postId) {
+      window.location.href = `/post/${postId}`;
+    }
+
+    function shareProfile() {
+      if (navigator.share) {
+        navigator.share({
+          title: 'Innovate Profile',
+          url: window.location.href
+        });
+      } else {
+        copyProfileLink();
+      }
+      toggleMenu();
+    }
+
+    function copyProfileLink() {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Profile link copied!');
+      toggleMenu();
+    }
+
+    function reportUser() {
+      if (confirm('Report this user?')) {
+        alert('User reported. Thank you for keeping Innovate safe.');
+      }
+      toggleMenu();
+    }
+
+    function changePhoto() {
+      alert('Photo upload functionality would open here');
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('menu-dropdown');
+      if (menu.style.display === 'block' && !e.target.closest('.icon-button')) {
+        menu.style.display = 'none';
+      }
+    });
+
+    // Initialize
+    loadProfile();
+    loadPosts();
+  </script>
+</body>
+</html>

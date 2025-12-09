@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/profile" id="profile-link">Profile</a></li>
+        <li><a href="/settings" class="active">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container mobile-container">
+    <div class="card">
+      <h1>Settings</h1>
+      
+      <div class="settings-section">
+        <h2>Account</h2>
+        <div class="settings-item">
+          <label>Username</label>
+          <p id="settings-username" class="settings-value">Loading...</p>
+        </div>
+        <div class="settings-item">
+          <label>Email</label>
+          <p id="settings-email" class="settings-value">Loading...</p>
+        </div>
+        <button class="btn btn-secondary" onclick="window.location.href='/profile'">Edit Profile</button>
+      </div>
+
+      <div class="settings-section">
+        <h2>Preferences</h2>
+        <div class="settings-item">
+          <label>
+            <input type="checkbox" id="enable-crosspath" onchange="toggleCrosspath()">
+            Enable Crosspath Feature
+          </label>
+          <p class="settings-description">Get notifications when you attend the same events as other users</p>
+        </div>
+        <div class="settings-item">
+          <label>
+            <input type="checkbox" id="enable-notifications" onchange="toggleNotifications()">
+            Enable Push Notifications
+          </label>
+          <p class="settings-description">Receive real-time notifications for messages and interactions</p>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Privacy</h2>
+        <div class="settings-item">
+          <label>
+            <input type="checkbox" id="show-online-status" onchange="toggleOnlineStatus()">
+            Show Online Status
+          </label>
+          <p class="settings-description">Let others see when you're online</p>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Danger Zone</h2>
+        <button class="btn btn-danger" onclick="confirmLogout()">Logout</button>
+        <button class="btn btn-outline-danger" onclick="confirmDeleteAccount()">Delete Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logout Confirmation Modal -->
+  <div id="logout-modal" class="modal">
+    <div class="modal-content">
+      <h2>Confirm Logout</h2>
+      <p>Are you sure you want to logout?</p>
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeLogoutModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Account Modal -->
+  <div id="delete-modal" class="modal">
+    <div class="modal-content">
+      <h2>Delete Account</h2>
+      <p>This action cannot be undone. Are you sure you want to delete your account?</p>
+      <input type="password" id="delete-password" placeholder="Enter your password to confirm" class="input-field" style="margin: 1rem 0;">
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="deleteAccount()">Delete Account</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // Define toggleMobileMenu globally for onclick handler
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    let currentUser = null;
+
+    async function loadSettings() {
+      if (!InnovateAPI.isAuthenticated()) {
+        window.location.href = '/login';
+        return;
+      }
+
+      currentUser = InnovateAPI.getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        const response = await InnovateAPI.apiRequest(`/users/${currentUser.id}`);
+        if (response.success) {
+          document.getElementById('settings-username').textContent = response.user.username;
+          document.getElementById('settings-email').textContent = response.user.email;
+          
+          // Load preferences from localStorage
+          const enableCrosspath = localStorage.getItem('enableCrosspath') !== 'false';
+          const enableNotifications = localStorage.getItem('enableNotifications') !== 'false';
+          const showOnlineStatus = localStorage.getItem('showOnlineStatus') !== 'false';
+          
+          document.getElementById('enable-crosspath').checked = enableCrosspath;
+          document.getElementById('enable-notifications').checked = enableNotifications;
+          document.getElementById('show-online-status').checked = showOnlineStatus;
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    }
+
+    function toggleCrosspath() {
+      const enabled = document.getElementById('enable-crosspath').checked;
+      localStorage.setItem('enableCrosspath', enabled);
+      showToast(enabled ? 'Crosspath enabled' : 'Crosspath disabled', 'success');
+    }
+
+    function toggleNotifications() {
+      const enabled = document.getElementById('enable-notifications').checked;
+      localStorage.setItem('enableNotifications', enabled);
+      showToast(enabled ? 'Notifications enabled' : 'Notifications disabled', 'success');
+    }
+
+    function toggleOnlineStatus() {
+      const enabled = document.getElementById('show-online-status').checked;
+      localStorage.setItem('showOnlineStatus', enabled);
+      showToast(enabled ? 'Online status visible' : 'Online status hidden', 'success');
+    }
+
+    function confirmLogout() {
+      document.getElementById('logout-modal').style.display = 'flex';
+    }
+
+    function closeLogoutModal() {
+      document.getElementById('logout-modal').style.display = 'none';
+    }
+
+    async function logout() {
+      try {
+        await InnovateAPI.apiRequest('/auth/logout', {
+          method: 'POST'
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+      
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+
+    function confirmDeleteAccount() {
+      document.getElementById('delete-modal').style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').style.display = 'none';
+      document.getElementById('delete-password').value = '';
+    }
+
+    async function deleteAccount() {
+      const password = document.getElementById('delete-password').value;
+      if (!password) {
+        showToast('Please enter your password', 'error');
+        return;
+      }
+
+      try {
+        const response = await InnovateAPI.apiRequest('/users/delete', {
+          method: 'DELETE',
+          body: JSON.stringify({ password })
+        });
+
+        if (response.success) {
+          showToast('Account deleted successfully', 'success');
+          localStorage.clear();
+          window.location.href = '/login';
+        }
+      } catch (error) {
+        showToast(error.message || 'Error deleting account', 'error');
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: ${type === 'success' ? 'var(--success-color)' : type === 'error' ? 'var(--danger-color)' : 'var(--primary-color)'};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 10000;
+        animation: slideIn 0.3s ease-out;
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Initialize
+    loadSettings();
+  </script>
+
+  <style>
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+  </style>
+</body>
+</html>

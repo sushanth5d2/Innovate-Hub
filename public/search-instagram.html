@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Search • Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <style>
+    .ig-search-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--ig-border);
+      margin-bottom: 16px;
+    }
+    .ig-search-tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-secondary-text);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s;
+    }
+    .ig-search-tab.active {
+      color: var(--ig-primary-text);
+      border-bottom-color: var(--ig-primary-text);
+    }
+    .ig-user-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .ig-user-item:hover {
+      background-color: var(--ig-hover);
+    }
+    .ig-user-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .ig-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .ig-user-username {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+    .ig-user-fullname {
+      font-size: 14px;
+      color: var(--ig-secondary-text);
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      
+      <div class="ig-search-box" style="width: 400px;">
+        <input type="text" class="ig-search-input" placeholder="Search" id="searchInput" autofocus>
+      </div>
+      
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/home'">
+          <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="ig-main">
+    <div class="ig-search-tabs">
+      <div class="ig-search-tab active" id="usersTab" onclick="switchTab('users')">Users</div>
+      <div class="ig-search-tab" id="communitiesTab" onclick="switchTab('communities')">Communities</div>
+    </div>
+
+    <div id="usersResults" class="ig-settings-section"></div>
+    <div id="communitiesResults" class="ig-settings-section" style="display: none;"></div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/search" class="ig-bottom-nav-item active">
+      <svg aria-label="Search" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M19 10.5A8.5 8.5 0 1 1 10.5 2a8.5 8.5 0 0 1 8.5 8.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.511" x2="22" y1="16.511" y2="22"></line>
+      </svg>
+    </a>
+    <div class="ig-bottom-nav-item" onclick="window.location.href='/home'">
+      <svg aria-label="New post" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2 12v3.45c0 2.849.698 4.005 1.606 4.944.94.909 2.098 1.608 4.946 1.608h6.896c2.848 0 4.006-.7 4.946-1.608C21.302 19.455 22 18.3 22 15.45V8.552c0-2.849-.698-4.006-1.606-4.945C19.454 2.7 18.296 2 15.448 2H8.552c-2.848 0-4.006.699-4.946 1.607C2.698 4.547 2 5.703 2 8.552Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="6.545" x2="17.455" y1="12.001" y2="12.001"></line>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="12.003" x2="12.003" y1="6.545" y2="17.455"></line>
+      </svg>
+    </div>
+    <a href="/events" class="ig-bottom-nav-item">
+      <svg aria-label="Events" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2.049 7.002 10.38 3.28a3.5 3.5 0 0 1 3.241 0l8.332 3.723a1.5 1.5 0 0 1 .816 1.32v5.024a1.5 1.5 0 0 1-.816 1.32l-8.332 3.723a3.5 3.5 0 0 1-3.24 0l-8.332-3.723a1.5 1.5 0 0 1-.816-1.32v-5.024a1.5 1.5 0 0 1 .816-1.32Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/profile" class="ig-bottom-nav-item" id="bottomProfileLink">
+      <img id="bottomProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+    </a>
+  </nav>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    const user = InnovateAPI.getCurrentUser();
+    let currentTab = 'users';
+    let searchTimeout;
+
+    // Load user info
+    async function loadUserInfo() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        document.getElementById('bottomProfilePic').src = avatar;
+        document.getElementById('bottomProfileLink').href = `/profile/${user.id}`;
+      } catch (error) {
+        console.error('Error loading user info:', error);
+      }
+    }
+
+    // Switch tab
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      document.getElementById('usersTab').classList.toggle('active', tab === 'users');
+      document.getElementById('communitiesTab').classList.toggle('active', tab === 'communities');
+      
+      document.getElementById('usersResults').style.display = tab === 'users' ? 'block' : 'none';
+      document.getElementById('communitiesResults').style.display = tab === 'communities' ? 'block' : 'none';
+      
+      const query = document.getElementById('searchInput').value.trim();
+      if (query) {
+        search(query);
+      }
+    }
+
+    // Search
+    async function search(query) {
+      if (!query) {
+        document.getElementById('usersResults').innerHTML = '';
+        document.getElementById('communitiesResults').innerHTML = '';
+        return;
+      }
+
+      if (currentTab === 'users') {
+        await searchUsers(query);
+      } else {
+        await searchCommunities(query);
+      }
+    }
+
+    // Search users
+    async function searchUsers(query) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(query)}`);
+        const container = document.getElementById('usersResults');
+        container.innerHTML = '';
+
+        if (data.users.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+              <div style="font-size: 16px;">No users found</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.users.forEach(user => {
+          const userEl = document.createElement('div');
+          userEl.className = 'ig-user-item';
+          userEl.onclick = () => window.location.href = `/profile/${user.id}`;
+          
+          userEl.innerHTML = `
+            <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" alt="${user.username}" class="ig-user-avatar">
+            <div class="ig-user-info">
+              <div class="ig-user-username">${user.username}</div>
+              <div class="ig-user-fullname">${user.bio || 'No bio'}</div>
+            </div>
+          `;
+          
+          container.appendChild(userEl);
+        });
+      } catch (error) {
+        console.error('Error searching users:', error);
+        document.getElementById('usersResults').innerHTML = 
+          '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error searching users</div>';
+      }
+    }
+
+    // Search communities
+    async function searchCommunities(query) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/communities?q=${encodeURIComponent(query)}`);
+        const container = document.getElementById('communitiesResults');
+        container.innerHTML = '';
+
+        if (data.communities.length === 0) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);">
+              <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+              <div style="font-size: 16px;">No communities found</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.communities.forEach(community => {
+          const communityEl = document.createElement('div');
+          communityEl.className = 'ig-user-item';
+          communityEl.onclick = () => window.location.href = `/community/${community.id}`;
+          
+          communityEl.innerHTML = `
+            <img src="${community.banner_image || '/images/default-community.png'}" alt="${community.name}" class="ig-user-avatar">
+            <div class="ig-user-info">
+              <div class="ig-user-username">${community.name}</div>
+              <div class="ig-user-fullname">${community.member_count} members</div>
+            </div>
+          `;
+          
+          container.appendChild(communityEl);
+        });
+      } catch (error) {
+        console.error('Error searching communities:', error);
+        document.getElementById('communitiesResults').innerHTML = 
+          '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error searching communities</div>';
+      }
+    }
+
+    // Search input handler
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      const query = e.target.value.trim();
+      
+      if (query) {
+        searchTimeout = setTimeout(() => search(query), 300);
+      } else {
+        document.getElementById('usersResults').innerHTML = '';
+        document.getElementById('communitiesResults').innerHTML = '';
+      }
+    });
+
+    // Handle URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryParam = urlParams.get('q');
+    if (queryParam) {
+      document.getElementById('searchInput').value = queryParam;
+      search(queryParam);
+    }
+
+    // Initialize
+    loadUserInfo();
+  </script>
+</body>
+</html>

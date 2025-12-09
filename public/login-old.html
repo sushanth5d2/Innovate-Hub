@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .auth-card {
+      background: white;
+      padding: 3rem;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 450px;
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .auth-header h1 {
+      color: var(--primary-color);
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .auth-header p {
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>Innovate</h1>
+        <p>Connect, Create, Collaborate</p>
+      </div>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="email" required>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="password" required>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+      </form>
+      
+      <div style="text-align: center; margin-top: 1.5rem;">
+        <a href="#" id="forgot-password" style="color: var(--primary-color); text-decoration: none;">Forgot Password?</a>
+      </div>
+      
+      <div style="text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+        <span style="color: var(--text-secondary);">Don't have an account?</span>
+        <a href="/register" style="color: var(--primary-color); text-decoration: none; font-weight: 600; margin-left: 0.5rem;">Register</a>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Forgot Password Modal -->
+  <div id="forgot-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <h2 class="modal-header">Reset Password</h2>
+      <form id="forgot-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="forgot-email" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Reset Link</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // Redirect if already logged in
+    if (InnovateAPI.isAuthenticated()) {
+      window.location.href = '/home';
+    }
+
+    // Login form handler
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      try {
+        const data = await InnovateAPI.apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+        
+        InnovateAPI.setToken(data.token);
+        InnovateAPI.setCurrentUser(data.user);
+        window.location.href = '/home';
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    // Forgot password modal
+    const forgotModal = document.getElementById('forgot-modal');
+    const forgotLink = document.getElementById('forgot-password');
+    const closeBtn = document.querySelector('.modal-close');
+
+    forgotLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      forgotModal.classList.add('active');
+    });
+
+    closeBtn.addEventListener('click', () => {
+      forgotModal.classList.remove('active');
+    });
+
+    window.addEventListener('click', (e) => {
+      if (e.target === forgotModal) {
+        forgotModal.classList.remove('active');
+      }
+    });
+
+    // Forgot password form handler
+    document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('forgot-email').value;
+      
+      try {
+        await InnovateAPI.apiRequest('/auth/forgot-password', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+        
+        InnovateAPI.showAlert('Password reset link sent to your email!', 'success');
+        forgotModal.classList.remove('active');
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

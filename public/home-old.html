@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home" class="active">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <!-- Left Sidebar -->
+    <aside>
+      <div class="card">
+        <div id="user-profile-card">
+          <img id="profile-pic" src="" alt="Profile" style="width: 80px; height: 80px; border-radius: 50%; margin-bottom: 1rem;">
+          <h3 id="profile-username"></h3>
+          <p id="profile-bio" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
+          <div style="display: flex; justify-content: space-around; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+            <div style="text-align: center;">
+              <div style="font-weight: 600;" id="posts-count">0</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">Posts</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-weight: 600;" id="followers-count">0</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">Followers</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-weight: 600;" id="following-count">0</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">Following</div>
+            </div>
+          </div>
+          <a href="#" id="view-profile-link" class="btn btn-outline btn-sm" style="width: 100%; margin-top: 1rem;">View Profile</a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Feed -->
+    <main>
+      <!-- Stories -->
+      <div class="card">
+        <div class="card-header">Stories</div>
+        <div class="stories-container" id="stories-container">
+          <div class="story" onclick="openCreateStoryModal()">
+            <div style="width: 80px; height: 80px; border-radius: 50%; border: 3px dashed var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--primary-color); cursor: pointer;">+</div>
+            <div class="story-username">Add Story</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Post -->
+      <div class="card">
+        <div class="card-header">Create Post</div>
+        <form id="create-post-form">
+          <textarea class="form-textarea" id="post-content" placeholder="What's on your mind?" rows="3"></textarea>
+          
+          <div id="image-preview" style="margin-top: 1rem;"></div>
+          <div id="file-preview" style="margin-top: 1rem;"></div>
+          
+          <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+              📷 Photos
+              <input type="file" id="post-images" multiple accept="image/*" style="display: none;">
+            </label>
+            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+              📎 Files
+              <input type="file" id="post-files" multiple style="display: none;">
+            </label>
+            <button type="button" class="btn btn-outline btn-sm" onclick="openPollModal()">📊 Poll</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="openScheduleModal()">⏰ Schedule</button>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" style="margin-top: 1rem; width: 100%;">Post</button>
+        </form>
+      </div>
+
+      <!-- Feed -->
+      <div id="posts-feed"></div>
+    </main>
+
+    <!-- Right Sidebar -->
+    <aside>
+      <div class="card">
+        <div class="card-header">Suggested Communities</div>
+        <div id="suggested-communities"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Create Poll Modal -->
+  <div id="poll-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closePollModal()">&times;</span>
+      <h2 class="modal-header">Create Poll</h2>
+      <div class="form-group">
+        <label class="form-label">Question</label>
+        <input type="text" class="form-input" id="poll-question" placeholder="e.g., Who will win the game?">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Options (comma separated)</label>
+        <input type="text" class="form-input" id="poll-options" placeholder="e.g., Team A, Team B">
+      </div>
+      <button class="btn btn-primary" onclick="createPoll()">Add Poll</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Define toggleMobileMenu globally for onclick handler
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    const user = InnovateAPI.getCurrentUser();
+    let pollData = null;
+    let scheduledTime = null;
+
+    // Initialize Socket.IO (socket is already declared in app.js)
+    InnovateAPI.initSocket();
+
+    // Load user profile card
+    async function loadUserProfile() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        document.getElementById('profile-pic').src = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        document.getElementById('profile-username').textContent = data.user.username;
+        document.getElementById('profile-bio').textContent = data.user.bio || 'No bio yet';
+        document.getElementById('posts-count').textContent = data.user.post_count;
+        document.getElementById('followers-count').textContent = data.user.followers_count;
+        document.getElementById('following-count').textContent = data.user.following_count;
+        document.getElementById('view-profile-link').href = `/profile/${user.id}`;
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    }
+
+    // Load stories
+    async function loadStories() {
+      try {
+        const data = await InnovateAPI.apiRequest('/posts/stories');
+        const container = document.getElementById('stories-container');
+        
+        data.stories.forEach(story => {
+          const storyEl = document.createElement('div');
+          storyEl.className = 'story';
+          storyEl.innerHTML = `
+            <img src="${InnovateAPI.getUserAvatar(story.profile_picture)}" alt="${story.username}" class="story-avatar">
+            <div class="story-username">${story.username}</div>
+          `;
+          storyEl.onclick = () => viewStory(story);
+          container.appendChild(storyEl);
+        });
+      } catch (error) {
+        console.error('Error loading stories:', error);
+      }
+    }
+
+    // Load posts
+    async function loadPosts() {
+      try {
+        const data = await InnovateAPI.apiRequest('/posts');
+        const feed = document.getElementById('posts-feed');
+        feed.innerHTML = '';
+        
+        data.posts.forEach(post => {
+          const postEl = createPostElement(post);
+          feed.appendChild(postEl);
+        });
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      }
+    }
+
+    // Create post element
+    function createPostElement(post) {
+      const postEl = document.createElement('div');
+      postEl.className = 'post';
+      
+      const images = post.images && post.images.length > 0 ? `
+        <div class="post-images">
+          ${post.images.map(img => `<img src="${img}" class="post-image" alt="Post image">`).join('')}
+        </div>
+      ` : '';
+      
+      const files = post.files && post.files.length > 0 ? `
+        <div class="post-files">
+          ${post.files.map(file => `
+            <div style="padding: 0.5rem; background: #f3f4f6; border-radius: 6px; margin-bottom: 0.5rem;">
+              <a href="${file.path}" download style="text-decoration: none; color: var(--primary-color);">📎 ${file.name}</a>
+            </div>
+          `).join('')}
+        </div>
+      ` : '';
+      
+      postEl.innerHTML = `
+        <div class="post-header">
+          <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="post-avatar">
+          <div class="post-author">
+            <div class="post-author-name">${post.username}</div>
+            <div class="post-timestamp">${InnovateAPI.formatDate(post.created_at)}</div>
+          </div>
+          ${post.user_id === user.id ? `
+            <div style="margin-left: auto; position: relative;">
+              <button class="post-action" onclick="showPostMenu(event, ${post.id})">⋮</button>
+            </div>
+          ` : ''}
+        </div>
+        <div class="post-content">${post.content || ''}</div>
+        ${images}
+        ${files}
+        <div class="post-actions">
+          <button class="post-action" onclick="showInterested(${post.id})">👍 I'm Interested ${post.interested_count > 0 ? '(' + post.interested_count + ')' : ''}</button>
+          <button class="post-action" onclick="contactPoster(${post.user_id})">💬 Contact Me</button>
+          <button class="post-action" onclick="sharePost(${post.id})">🔗 Share</button>
+          <button class="post-action" onclick="savePost(${post.id})">${post.is_saved ? '⭐' : '☆'} Save</button>
+          ${post.user_id !== user.id ? `
+            <button class="post-action" onclick="showPostOptionsMenu(event, ${post.id})">⋯</button>
+          ` : ''}
+        </div>
+      `;
+      
+      return postEl;
+    }
+
+    // Create post
+    document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const content = document.getElementById('post-content').value;
+      const images = document.getElementById('post-images').files;
+      const files = document.getElementById('post-files').files;
+      
+      const formData = new FormData();
+      formData.append('content', content);
+      
+      if (scheduledTime) {
+        formData.append('scheduled_at', scheduledTime);
+      }
+      
+      for (let file of images) {
+        formData.append('images', file);
+      }
+      
+      for (let file of files) {
+        formData.append('files', file);
+      }
+      
+      try {
+        const data = await InnovateAPI.apiRequest('/posts', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+        
+        // Create poll if added
+        if (pollData) {
+          await InnovateAPI.apiRequest(`/posts/${data.post.id}/poll`, {
+            method: 'POST',
+            body: JSON.stringify(pollData)
+          });
+        }
+        
+        InnovateAPI.showAlert('Post created successfully!', 'success');
+        document.getElementById('create-post-form').reset();
+        document.getElementById('image-preview').innerHTML = '';
+        document.getElementById('file-preview').innerHTML = '';
+        pollData = null;
+        scheduledTime = null;
+        
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    // File preview handlers
+    document.getElementById('post-images').addEventListener('change', (e) => {
+      InnovateAPI.previewFiles(e.target, document.getElementById('image-preview'));
+    });
+
+    document.getElementById('post-files').addEventListener('change', (e) => {
+      InnovateAPI.previewFiles(e.target, document.getElementById('file-preview'));
+    });
+
+    // Post interactions
+    async function showInterested(postId) {
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/interact`, {
+          method: 'POST',
+          body: JSON.stringify({ type: 'interested' })
+        });
+        InnovateAPI.showAlert('Marked as interested!', 'success');
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function contactPoster(userId) {
+      window.location.href = `/messages?user=${userId}`;
+    }
+
+    function sharePost(postId) {
+      const url = `${window.location.origin}/post/${postId}`;
+      InnovateAPI.copyToClipboard(url);
+    }
+
+    async function savePost(postId) {
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/save`, {
+          method: 'POST'
+        });
+        InnovateAPI.showAlert('Post saved!', 'success');
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function showPostOptionsMenu(event, postId) {
+      event.stopPropagation();
+      const menu = confirm('Create a reminder or instant meeting?\n\n1. Gentle Reminder\n2. Instant Meeting');
+      if (menu) {
+        const option = prompt('Enter 1 for Gentle Reminder or 2 for Instant Meeting:');
+        if (option === '1') {
+          const date = prompt('Enter reminder date (YYYY-MM-DD HH:MM):');
+          createReminder(postId, date);
+        } else if (option === '2') {
+          createInstantMeeting(postId);
+        }
+      }
+    }
+
+    async function createReminder(postId, date) {
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/reminder`, {
+          method: 'POST',
+          body: JSON.stringify({ reminder_date: date, message: 'Reminder' })
+        });
+        InnovateAPI.showAlert('Reminder created!', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function createInstantMeeting(postId) {
+      window.location.href = `/events?create=true&postId=${postId}`;
+    }
+
+    // Poll modal
+    function openPollModal() {
+      document.getElementById('poll-modal').classList.add('active');
+    }
+
+    function closePollModal() {
+      document.getElementById('poll-modal').classList.remove('active');
+    }
+
+    function createPoll() {
+      const question = document.getElementById('poll-question').value;
+      const options = document.getElementById('poll-options').value.split(',').map(o => o.trim());
+      
+      if (question && options.length >= 2) {
+        pollData = { question, options };
+        InnovateAPI.showAlert('Poll added to post!', 'success');
+        closePollModal();
+      } else {
+        InnovateAPI.showAlert('Please provide a question and at least 2 options', 'error');
+      }
+    }
+
+    // Schedule modal
+    function openScheduleModal() {
+      const time = prompt('Schedule post for (YYYY-MM-DD HH:MM):');
+      if (time) {
+        scheduledTime = time;
+        InnovateAPI.showAlert('Post will be scheduled for ' + time, 'success');
+      }
+    }
+
+    // Story modal
+    function openCreateStoryModal() {
+      const content = prompt('Enter story content:');
+      if (content) {
+        createStory(content);
+      }
+    }
+
+    async function createStory(content) {
+      try {
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('is_story', 'true');
+        
+        await InnovateAPI.apiRequest('/posts', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+        
+        InnovateAPI.showAlert('Story created!', 'success');
+        loadStories();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function viewStory(story) {
+      alert(`Story by ${story.username}\n\n${story.content}`);
+    }
+
+    // Load suggested communities
+    async function loadSuggestedCommunities() {
+      try {
+        const data = await InnovateAPI.apiRequest('/communities?limit=5');
+        const container = document.getElementById('suggested-communities');
+        container.innerHTML = '';
+        
+        data.communities.slice(0, 5).forEach(community => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 0.75rem; border-bottom: 1px solid var(--border-color); cursor: pointer;';
+          div.innerHTML = `
+            <div style="font-weight: 600;">${community.name}</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">${community.member_count} members</div>
+          `;
+          div.onclick = () => window.location.href = `/community/${community.id}`;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading communities:', error);
+      }
+    }
+
+    // Initialize page
+    loadUserProfile();
+    loadStories();
+    loadPosts();
+    loadSuggestedCommunities();
+  </script>
+</body>
+</html>

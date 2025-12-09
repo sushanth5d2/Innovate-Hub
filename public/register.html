@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Sign up • Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <style>
+    body {
+      background-color: var(--ig-primary-background);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .ig-auth-container {
+      max-width: 350px;
+      width: 100%;
+    }
+    .ig-auth-box {
+      background-color: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 1px;
+      padding: 40px;
+      margin-bottom: 10px;
+    }
+    .ig-auth-logo {
+      font-family: 'Grand Hotel', 'Brush Script MT', cursive;
+      font-size: 48px;
+      font-weight: 400;
+      text-align: center;
+      margin-bottom: 12px;
+      color: var(--ig-primary-text);
+    }
+    .ig-auth-subtitle {
+      text-align: center;
+      color: var(--ig-secondary-text);
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      line-height: 20px;
+    }
+    .ig-auth-input {
+      width: 100%;
+      padding: 9px 8px 7px;
+      background-color: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 3px;
+      font-size: 12px;
+      color: var(--ig-primary-text);
+      margin-bottom: 6px;
+      outline: none;
+    }
+    .ig-auth-input:focus {
+      border-color: var(--ig-secondary-text);
+    }
+    .ig-auth-button {
+      width: 100%;
+      padding: 7px 16px;
+      background-color: var(--ig-blue);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      opacity: 0.7;
+    }
+    .ig-auth-button:hover {
+      opacity: 1;
+    }
+    .ig-auth-divider {
+      display: flex;
+      align-items: center;
+      margin: 18px 0;
+      color: var(--ig-secondary-text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .ig-auth-divider::before,
+    .ig-auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background-color: var(--ig-border);
+    }
+    .ig-auth-divider span {
+      padding: 0 18px;
+    }
+    .ig-auth-link {
+      text-align: center;
+      padding: 24px 40px;
+      background-color: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 1px;
+      font-size: 14px;
+      color: var(--ig-primary-text);
+    }
+    .ig-auth-link a {
+      color: var(--ig-blue);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .ig-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+    }
+    .ig-terms {
+      text-align: center;
+      color: var(--ig-secondary-text);
+      font-size: 12px;
+      margin-top: 16px;
+      line-height: 16px;
+    }
+    .ig-terms a {
+      color: var(--ig-secondary-text);
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="ig-auth-container">
+    <div class="ig-auth-box">
+      <div class="ig-auth-logo">Innovate</div>
+      <div class="ig-auth-subtitle">Sign up to connect with friends and share moments.</div>
+      
+      <!-- Profile Photo Upload -->
+      <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+        <div style="position: relative;">
+          <div id="profilePhotoPreview" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--ig-border); background: var(--ig-secondary-background); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;" onclick="document.getElementById('profilePhoto').click()">
+            <svg width="50" height="50" fill="var(--ig-secondary-text)" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <label for="profilePhoto" style="position: absolute; bottom: 0; right: 0; background: var(--ig-blue); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid var(--ig-primary-background);">
+            <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+            </svg>
+          </label>
+          <input type="file" id="profilePhoto" accept="image/*" style="display: none;">
+        </div>
+      </div>
+      
+      <form id="register-form">
+        <input type="email" class="ig-auth-input" id="email" placeholder="Email" required>
+        <input type="text" class="ig-auth-input" id="username" placeholder="Username" required minlength="3">
+        <input type="text" class="ig-auth-input" id="fullname" placeholder="Full Name" required>
+        <input type="date" class="ig-auth-input" id="dateOfBirth" placeholder="Date of Birth" required style="color: var(--ig-secondary-text);">
+        <input type="password" class="ig-auth-input" id="password" placeholder="Password" required minlength="6">
+        <button type="submit" class="ig-auth-button">Sign up</button>
+      </form>
+      
+      <div class="ig-terms">
+        By signing up, you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.
+      </div>
+    </div>
+    
+    <div class="ig-auth-link">
+      Have an account? <a href="/login">Log in</a>
+    </div>
+    
+    <div class="ig-footer">
+      © 2024 Innovate
+    </div>
+  </div>
+
+  <script src="/js/app.js?v=20251209001"></script>
+  <script src="/js/instagram-theme.js?v=20251209001"></script>
+  <script>
+    // Clear any old cached code
+    console.log('Register page loaded - Version 20251209001');
+    
+    let selectedPhoto = null;
+
+    // Profile photo preview
+    document.getElementById('profilePhoto').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        selectedPhoto = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('profilePhotoPreview').innerHTML = `
+            <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+          `;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Set max date for date of birth (must be at least 13 years old)
+    const today = new Date();
+    const maxDate = new Date(today.getFullYear() - 13, today.getMonth(), today.getDate());
+    document.getElementById('dateOfBirth').max = maxDate.toISOString().split('T')[0];
+    
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const username = document.getElementById('username').value;
+      const fullname = document.getElementById('fullname').value;
+      const dateOfBirth = document.getElementById('dateOfBirth').value;
+      const password = document.getElementById('password').value;
+      
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('username', username);
+      formData.append('fullname', fullname);
+      formData.append('date_of_birth', dateOfBirth);
+      formData.append('password', password);
+      
+      if (selectedPhoto) {
+        formData.append('profile_picture', selectedPhoto);
+      }
+      
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          alert(data.error || 'Registration failed. Please try again.');
+          return;
+        }
+        
+        if (data.success) {
+          alert('Registration successful! Please log in.');
+          window.location.href = '/login';
+        } else {
+          alert(data.error || 'Registration failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        alert('Registration failed. Please try again.');
+      }
+    });
+  </script>
+</body>
+</html>

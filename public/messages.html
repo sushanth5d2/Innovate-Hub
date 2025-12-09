@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Messages • Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      
+      <div class="ig-search-box">
+        <input type="text" class="ig-search-input" placeholder="Search messages" id="searchMessages">
+      </div>
+      
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/home'">
+          <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+          </svg>
+        </div>
+        
+        <div class="ig-nav-icon">
+          <svg aria-label="Messenger" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M12.003 2.001a9.705 9.705 0 1 1 0 19.4 10.876 10.876 0 0 1-2.895-.384.798.798 0 0 0-.533.04l-1.984.876a.801.801 0 0 1-1.123-.708l-.054-1.78a.806.806 0 0 0-.27-.569 9.49 9.49 0 0 1-3.14-7.175 9.65 9.65 0 0 1 10-9.7Z"></path>
+            <path d="M17.79 10.132a.659.659 0 0 0-.962-.873l-2.556 2.05a.63.63 0 0 1-.758.002L11.06 9.47a1.576 1.576 0 0 0-2.277.42l-2.567 3.98a.659.659 0 0 0 .961.875l2.556-2.049a.63.63 0 0 1 .759-.002l2.452 1.84a1.576 1.576 0 0 0 2.278-.42Z" fill-rule="evenodd"></path>
+          </svg>
+        </div>
+        
+        <div class="ig-nav-icon" onclick="window.location.href='/profile/' + getCurrentUserId()">
+          <img id="navProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Messages Container -->
+  <div class="ig-messages-container">
+    <!-- Conversations List -->
+    <div class="ig-conversations">
+      <div class="ig-messages-header">
+        <div class="ig-messages-username" id="currentUsername">Loading...</div>
+        <button class="ig-new-message-btn" onclick="newMessage()">
+          <svg aria-label="New message" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M12.202 3.203H5.25a3 3 0 0 0-3 3V18.75a3 3 0 0 0 3 3h12.547a3 3 0 0 0 3-3v-6.952" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+            <path d="M10.002 17.226H6.774v-3.228L18.607 2.165a1.417 1.417 0 0 1 2.004 0l1.224 1.225a1.417 1.417 0 0 1 0 2.004Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.848" x2="20.076" y1="3.924" y2="7.153"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="ig-conversations-list" id="conversationsList">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+
+    <!-- Chat Window -->
+    <div class="ig-chat" id="chatWindow">
+      <div class="ig-chat-header">
+        <button class="ig-chat-back" onclick="closeChat()">
+          <svg aria-label="Back" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="2.909" x2="22.001" y1="12.004" y2="12.004"></line>
+            <polyline fill="none" points="9.276 4.726 2.001 12.004 9.276 19.274" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+          </svg>
+        </button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img id="chatAvatar" src="" alt="" class="ig-post-avatar">
+          <div>
+            <div class="ig-post-username" id="chatUsername">Select a conversation</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="ig-chat-messages" id="chatMessages">
+        <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+          Select a conversation to start messaging
+        </div>
+      </div>
+      
+      <div class="ig-chat-input-container">
+        <input type="text" class="ig-chat-input" placeholder="Message..." id="messageInput">
+        <button class="ig-send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/search" class="ig-bottom-nav-item">
+      <svg aria-label="Search" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M19 10.5A8.5 8.5 0 1 1 10.5 2a8.5 8.5 0 0 1 8.5 8.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.511" x2="22" y1="16.511" y2="22"></line>
+      </svg>
+    </a>
+    <div class="ig-bottom-nav-item" onclick="window.location.href='/home'">
+      <svg aria-label="New post" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2 12v3.45c0 2.849.698 4.005 1.606 4.944.94.909 2.098 1.608 4.946 1.608h6.896c2.848 0 4.006-.7 4.946-1.608C21.302 19.455 22 18.3 22 15.45V8.552c0-2.849-.698-4.006-1.606-4.945C19.454 2.7 18.296 2 15.448 2H8.552c-2.848 0-4.006.699-4.946 1.607C2.698 4.547 2 5.703 2 8.552Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="6.545" x2="17.455" y1="12.001" y2="12.001"></line>
+        <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="12.003" x2="12.003" y1="6.545" y2="17.455"></line>
+      </svg>
+    </div>
+    <a href="/events" class="ig-bottom-nav-item">
+      <svg aria-label="Events" fill="none" height="24" viewBox="0 0 24 24" width="24">
+        <path d="M2.049 7.002 10.38 3.28a3.5 3.5 0 0 1 3.241 0l8.332 3.723a1.5 1.5 0 0 1 .816 1.32v5.024a1.5 1.5 0 0 1-.816 1.32l-8.332 3.723a3.5 3.5 0 0 1-3.24 0l-8.332-3.723a1.5 1.5 0 0 1-.816-1.32v-5.024a1.5 1.5 0 0 1 .816-1.32Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+      </svg>
+    </a>
+    <a href="/profile" class="ig-bottom-nav-item" id="bottomProfileLink">
+      <img id="bottomProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+    </a>
+  </nav>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+    InnovateAPI.initSocket();
+
+    const user = InnovateAPI.getCurrentUser();
+    const socket = InnovateAPI.getSocket();
+    let currentContactId = null;
+    let conversations = [];
+
+    function getCurrentUserId() {
+      return user.id;
+    }
+
+    // Load user info
+    async function loadUserInfo() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        document.getElementById('navProfilePic').src = avatar;
+        document.getElementById('bottomProfilePic').src = avatar;
+        document.getElementById('currentUsername').textContent = data.user.username;
+        document.getElementById('bottomProfileLink').href = `/profile/${user.id}`;
+      } catch (error) {
+        console.error('Error loading user info:', error);
+      }
+    }
+
+    // Load conversations
+    async function loadConversations() {
+      try {
+        const data = await InnovateAPI.apiRequest('/messages/conversations');
+        conversations = data.conversations;
+        renderConversations(conversations);
+      } catch (error) {
+        console.error('Error loading conversations:', error);
+        document.getElementById('conversationsList').innerHTML = 
+          '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading conversations</div>';
+      }
+    }
+
+    // Render conversations
+    function renderConversations(convos) {
+      const list = document.getElementById('conversationsList');
+      list.innerHTML = '';
+
+      if (convos.length === 0) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">
+            <div style="font-size: 24px; margin-bottom: 8px;">📨</div>
+            <div>No messages yet</div>
+            <div style="font-size: 12px; margin-top: 4px;">Start a conversation</div>
+          </div>
+        `;
+        return;
+      }
+
+      convos.forEach(conv => {
+        const convEl = document.createElement('div');
+        convEl.className = `ig-conversation ${currentContactId === conv.contact_id ? 'active' : ''}`;
+        
+        const isUnread = conv.unread_count > 0;
+        const messageClass = isUnread ? 'ig-conversation-message unread' : 'ig-conversation-message';
+        
+        convEl.innerHTML = `
+          <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" alt="${conv.username}" class="ig-conversation-avatar">
+          <div class="ig-conversation-info">
+            <div class="ig-conversation-name">${conv.username}</div>
+            <div class="${messageClass}">${conv.last_message || 'Start a conversation'}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <div class="ig-conversation-time">${conv.last_message_time ? formatTime(conv.last_message_time) : ''}</div>
+            ${isUnread ? '<div class="ig-conversation-unread"></div>' : ''}
+          </div>
+        `;
+        
+        convEl.onclick = () => openChat(conv.contact_id, conv.username, conv.profile_picture);
+        list.appendChild(convEl);
+      });
+    }
+
+    // Open chat
+    async function openChat(contactId, username, profilePicture) {
+      currentContactId = contactId;
+      
+      // Update UI
+      document.getElementById('chatAvatar').src = InnovateAPI.getUserAvatar(profilePicture);
+      document.getElementById('chatUsername').textContent = username;
+      
+      // Mark conversation as active
+      document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
+      event?.currentTarget?.classList.add('active');
+      
+      // On mobile, show chat window
+      document.getElementById('chatWindow').classList.add('active');
+      
+      // Load messages
+      await loadMessages(contactId);
+    }
+
+    // Load messages
+    async function loadMessages(contactId) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/${contactId}`);
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.innerHTML = '';
+
+        if (data.messages.length === 0) {
+          messagesContainer.innerHTML = `
+            <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+              <div style="font-size: 24px; margin-bottom: 8px;">👋</div>
+              <div>No messages yet</div>
+              <div style="font-size: 12px; margin-top: 4px;">Send a message to start the conversation</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.messages.forEach(msg => {
+          const messageEl = document.createElement('div');
+          const isSent = msg.sender_id === user.id;
+          messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+          messageEl.textContent = msg.content;
+          messagesContainer.appendChild(messageEl);
+        });
+
+        // Scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      }
+    }
+
+    // Send message
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const content = input.value.trim();
+      
+      if (!content || !currentContactId) return;
+      
+      try {
+        await InnovateAPI.apiRequest('/messages', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: currentContactId,
+            content: content
+          })
+        });
+        
+        // Clear input
+        input.value = '';
+        
+        // Add message to UI
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'ig-message ig-message-sent';
+        messageEl.textContent = content;
+        
+        // Remove placeholder if exists
+        if (messagesContainer.querySelector('[style*="text-align: center"]')) {
+          messagesContainer.innerHTML = '';
+        }
+        
+        messagesContainer.appendChild(messageEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Emit via socket
+        socket.emit('send_message', {
+          receiver_id: currentContactId,
+          content: content
+        });
+        
+        // Reload conversations to update last message
+        loadConversations();
+      } catch (error) {
+        console.error('Error sending message:', error);
+        InnovateAPI.showAlert('Failed to send message', 'error');
+      }
+    }
+
+    // Handle Enter key
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Close chat (mobile)
+    function closeChat() {
+      document.getElementById('chatWindow').classList.remove('active');
+    }
+
+    // New message
+    function newMessage() {
+      const username = prompt('Enter username to message:');
+      if (username) {
+        // Search for user and start conversation
+        InnovateAPI.showAlert('Search feature coming soon!', 'info');
+      }
+    }
+
+    // Format time
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      
+      if (minutes < 1) return 'now';
+      if (minutes < 60) return `${minutes}m`;
+      if (hours < 24) return `${hours}h`;
+      if (days < 7) return `${days}d`;
+      return date.toLocaleDateString();
+    }
+
+    // Search messages
+    document.getElementById('searchMessages').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      const filtered = conversations.filter(conv => 
+        conv.username.toLowerCase().includes(query) ||
+        (conv.last_message && conv.last_message.toLowerCase().includes(query))
+      );
+      renderConversations(filtered);
+    });
+
+    // Socket listeners
+    socket.on('new_message', (data) => {
+      if (data.sender_id === currentContactId) {
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'ig-message ig-message-received';
+        messageEl.textContent = data.content;
+        messagesContainer.appendChild(messageEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+      
+      // Reload conversations
+      loadConversations();
+    });
+
+    // Check for user parameter (deep link from home)
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user');
+    
+    // Initialize
+    loadUserInfo();
+    loadConversations().then(() => {
+      if (userId) {
+        // Find conversation with this user and open it
+        const conv = conversations.find(c => c.contact_id == userId);
+        if (conv) {
+          openChat(conv.contact_id, conv.username, conv.profile_picture);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

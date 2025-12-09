@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communities - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities" class="active">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <h1>Communities</h1>
+      <button class="btn btn-primary" onclick="openCreateCommunityModal()">+ Create Community</button>
+    </div>
+
+    <div class="card">
+      <input type="text" class="form-input" id="search-communities" placeholder="Search communities, teams...">
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;" id="communities-grid"></div>
+  </div>
+
+  <!-- Create Community Modal -->
+  <div id="create-community-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeCreateCommunityModal()">&times;</span>
+      <h2 class="modal-header">Create Community</h2>
+      <form id="create-community-form">
+        <div class="form-group">
+          <label class="form-label">Community Name *</label>
+          <input type="text" class="form-input" id="community-name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Team Name (for sports communities)</label>
+          <input type="text" class="form-input" id="team-name" placeholder="e.g., Lakers, Yankees">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="community-description" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Banner Image</label>
+          <input type="file" class="form-input" id="banner-image" accept="image/*">
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="is-public" checked>
+            <span>Public community</span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Community</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    async function loadCommunities(search = '') {
+      try {
+        const url = search ? `/communities?search=${encodeURIComponent(search)}` : '/communities';
+        const data = await InnovateAPI.apiRequest(url);
+        const grid = document.getElementById('communities-grid');
+        grid.innerHTML = '';
+
+        data.communities.forEach(community => {
+          const card = document.createElement('div');
+          card.className = 'community-card';
+          card.innerHTML = `
+            ${community.banner_image ? `<img src="${community.banner_image}" class="community-banner" alt="${community.name}">` : ''}
+            <div class="community-info">
+              <div class="community-name">${community.name}</div>
+              ${community.team_name ? `<div class="community-team">🏆 ${community.team_name}</div>` : ''}
+              <div style="color: var(--text-secondary); font-size: 0.875rem; margin: 0.5rem 0;">${community.description || 'No description'}</div>
+              <div class="community-members">${community.member_count} members</div>
+              <button class="btn ${community.is_member ? 'btn-secondary' : 'btn-primary'} btn-sm" style="margin-top: 1rem; width: 100%;" onclick="event.stopPropagation(); ${community.is_member ? `leaveCommunity(${community.id})` : `joinCommunity(${community.id})`}">
+                ${community.is_member ? 'Leave' : 'Join'}
+              </button>
+            </div>
+          `;
+          card.onclick = () => window.location.href = `/community/${community.id}`;
+          grid.appendChild(card);
+        });
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function joinCommunity(communityId) {
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined community!', 'success');
+        loadCommunities();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function leaveCommunity(communityId) {
+      if (confirm('Are you sure you want to leave this community?')) {
+        try {
+          await InnovateAPI.apiRequest(`/communities/${communityId}/leave`, { method: 'POST' });
+          InnovateAPI.showAlert('Left community', 'success');
+          loadCommunities();
+        } catch (error) {
+          InnovateAPI.showAlert(error.message, 'error');
+        }
+      }
+    }
+
+    function openCreateCommunityModal() {
+      document.getElementById('create-community-modal').classList.add('active');
+    }
+
+    function closeCreateCommunityModal() {
+      document.getElementById('create-community-modal').classList.remove('active');
+    }
+
+    document.getElementById('create-community-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      formData.append('name', document.getElementById('community-name').value);
+      formData.append('team_name', document.getElementById('team-name').value);
+      formData.append('description', document.getElementById('community-description').value);
+      formData.append('is_public', document.getElementById('is-public').checked);
+
+      const bannerFile = document.getElementById('banner-image').files[0];
+      if (bannerFile) {
+        formData.append('banner_image', bannerFile);
+      }
+
+      try {
+        await InnovateAPI.apiRequest('/communities', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('Community created successfully!', 'success');
+        closeCreateCommunityModal();
+        document.getElementById('create-community-form').reset();
+        loadCommunities();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('search-communities');
+    searchInput.addEventListener('input', InnovateAPI.debounce((e) => {
+      loadCommunities(e.target.value);
+    }, 500));
+
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    loadCommunities();
+  </script>
+</body>
+</html>

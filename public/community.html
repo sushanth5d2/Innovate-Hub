@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Community Header -->
+    <div class="card">
+      <div id="community-banner"></div>
+      <div style="padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <h1 id="community-name"></h1>
+            <div id="community-team" style="color: var(--sports-accent); font-weight: 500; font-size: 1.1rem; margin: 0.5rem 0;"></div>
+            <p id="community-description" style="color: var(--text-secondary);"></p>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+              <span id="member-count"></span> members
+            </div>
+          </div>
+          <div id="community-actions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+      <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+        <button class="btn btn-outline btn-sm" id="posts-tab" onclick="switchTab('posts')">Posts</button>
+        <button class="btn btn-outline btn-sm" id="chat-tab" onclick="switchTab('chat')">Chat</button>
+        <button class="btn btn-outline btn-sm" id="members-tab" onclick="switchTab('members')">Members</button>
+        <button class="btn btn-outline btn-sm" id="files-tab" onclick="switchTab('files')">Files</button>
+      </div>
+    </div>
+
+    <!-- Posts Tab -->
+    <div id="posts-content">
+      <div class="card" id="create-post-section" style="display: none;">
+        <div class="card-header">Create Post</div>
+        <form id="create-post-form">
+          <textarea class="form-textarea" id="post-content" placeholder="Share with the community..." rows="3"></textarea>
+          <div id="post-preview" style="margin-top: 1rem;"></div>
+          <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+              📷 Photos
+              <input type="file" id="post-images" multiple accept="image/*" style="display: none;">
+            </label>
+            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+              📎 Files
+              <input type="file" id="post-files" multiple style="display: none;">
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Post</button>
+        </form>
+      </div>
+      <div id="community-posts"></div>
+    </div>
+
+    <!-- Chat Tab -->
+    <div id="chat-content" style="display: none;">
+      <div class="chat-container">
+        <div class="chat-messages" id="community-chat-messages"></div>
+        <div class="chat-input-container">
+          <input type="text" class="chat-input" id="chat-message-input" placeholder="Type a message...">
+          <button class="btn btn-primary btn-sm" onclick="sendChatMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Members Tab -->
+    <div id="members-content" style="display: none;">
+      <div class="card">
+        <div id="community-members"></div>
+      </div>
+    </div>
+
+    <!-- Files Tab -->
+    <div id="files-content" style="display: none;">
+      <div class="card">
+        <div id="upload-file-section" style="display: none; margin-bottom: 1rem;">
+          <label class="btn btn-primary btn-sm" style="cursor: pointer;">
+            📤 Upload File
+            <input type="file" id="file-upload" style="display: none;" onchange="uploadFile()">
+          </label>
+        </div>
+        <div id="community-files"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    const communityId = window.location.pathname.split('/').pop();
+    // Initialize Socket.IO (socket is already declared in app.js)
+    InnovateAPI.initSocket();
+    const socket = InnovateAPI.getSocket();
+    let currentTab = 'posts';
+    let isMember = false;
+
+    async function loadCommunity() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}`);
+        const community = data.community;
+
+        document.getElementById('community-name').textContent = community.name;
+        if (community.team_name) {
+          document.getElementById('community-team').textContent = '🏆 ' + community.team_name;
+        }
+        document.getElementById('community-description').textContent = community.description || 'No description';
+        document.getElementById('member-count').textContent = community.member_count;
+
+        if (community.banner_image) {
+          document.getElementById('community-banner').innerHTML = `
+            <img src="${community.banner_image}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;" alt="${community.name}">
+          `;
+        }
+
+        isMember = community.is_member > 0;
+
+        // Actions
+        const actionsContainer = document.getElementById('community-actions');
+        if (isMember) {
+          actionsContainer.innerHTML = '<button class="btn btn-secondary" onclick="leaveCommunity()">Leave Community</button>';
+          document.getElementById('create-post-section').style.display = 'block';
+          document.getElementById('upload-file-section').style.display = 'block';
+          socket.emit('community:join', communityId);
+        } else {
+          actionsContainer.innerHTML = '<button class="btn btn-primary" onclick="joinCommunity()">Join Community</button>';
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      document.getElementById('posts-content').style.display = tab === 'posts' ? 'block' : 'none';
+      document.getElementById('chat-content').style.display = tab === 'chat' ? 'block' : 'none';
+      document.getElementById('members-content').style.display = tab === 'members' ? 'block' : 'none';
+      document.getElementById('files-content').style.display = tab === 'files' ? 'block' : 'none';
+
+      document.getElementById('posts-tab').className = tab === 'posts' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      document.getElementById('chat-tab').className = tab === 'chat' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      document.getElementById('members-tab').className = tab === 'members' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      document.getElementById('files-tab').className = tab === 'files' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+
+      if (tab === 'posts') loadPosts();
+      else if (tab === 'chat') loadChat();
+      else if (tab === 'members') loadMembers();
+      else if (tab === 'files') loadFiles();
+    }
+
+    async function loadPosts() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/posts`);
+        const container = document.getElementById('community-posts');
+        container.innerHTML = '';
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No posts yet</div>';
+          return;
+        }
+
+        data.posts.forEach(post => {
+          const div = document.createElement('div');
+          div.className = 'post';
+          div.innerHTML = `
+            <div class="post-header">
+              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" class="post-avatar" alt="${post.username}">
+              <div class="post-author">
+                <div class="post-author-name">${post.username}</div>
+                <div class="post-timestamp">${InnovateAPI.formatDate(post.created_at)}</div>
+              </div>
+            </div>
+            <div class="post-content">${post.content || ''}</div>
+            ${post.images && post.images.length > 0 ? `
+              <div class="post-images">
+                ${post.images.map(img => `<img src="${img}" class="post-image" alt="Post">`).join('')}
+              </div>
+            ` : ''}
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      }
+    }
+
+    async function loadChat() {
+      if (!isMember) {
+        document.getElementById('community-chat-messages').innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Join the community to chat</div>';
+        return;
+      }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/chat`);
+        const container = document.getElementById('community-chat-messages');
+        container.innerHTML = '';
+
+        data.messages.forEach(msg => {
+          const div = document.createElement('div');
+          div.className = 'chat-message';
+          div.innerHTML = `
+            <div class="chat-bubble">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;">${msg.username}</div>
+              ${msg.message}
+              <div style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">${InnovateAPI.formatDate(msg.created_at)}</div>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (error) {
+        console.error('Error loading chat:', error);
+      }
+    }
+
+    async function loadMembers() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/members`);
+        const container = document.getElementById('community-members');
+        container.innerHTML = '';
+
+        data.members.forEach(member => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem;';
+          div.innerHTML = `
+            <img src="${InnovateAPI.getUserAvatar(member.profile_picture)}" style="width: 50px; height: 50px; border-radius: 50%;" alt="${member.username}">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">${member.username}</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);">${member.role}</div>
+            </div>
+            ${member.is_online ? '<span class="online-indicator"></span>' : ''}
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading members:', error);
+      }
+    }
+
+    async function loadFiles() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/files`);
+        const container = document.getElementById('community-files');
+        container.innerHTML = '';
+
+        if (data.files.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No files uploaded</div>';
+          return;
+        }
+
+        data.files.forEach(file => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color);';
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600;">📎 ${file.filename}</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                  Uploaded by ${file.username} • ${InnovateAPI.formatDate(file.created_at)}
+                </div>
+              </div>
+              <a href="${file.filepath}" download class="btn btn-outline btn-sm">Download</a>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading files:', error);
+      }
+    }
+
+    async function joinCommunity() {
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined community!', 'success');
+        loadCommunity();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function leaveCommunity() {
+      if (confirm('Are you sure you want to leave this community?')) {
+        try {
+          await InnovateAPI.apiRequest(`/communities/${communityId}/leave`, { method: 'POST' });
+          InnovateAPI.showAlert('Left community', 'success');
+          window.location.href = '/communities';
+        } catch (error) {
+          InnovateAPI.showAlert(error.message, 'error');
+        }
+      }
+    }
+
+    document.getElementById('create-post-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const content = document.getElementById('post-content').value;
+      const images = document.getElementById('post-images').files;
+      const files = document.getElementById('post-files').files;
+
+      const formData = new FormData();
+      formData.append('content', content);
+
+      for (let file of images) {
+        formData.append('images', file);
+      }
+
+      for (let file of files) {
+        formData.append('files', file);
+      }
+
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/posts`, {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('Post created!', 'success');
+        document.getElementById('create-post-form').reset();
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chat-message-input');
+      const message = input.value.trim();
+
+      if (!message) return;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/chat`, {
+          method: 'POST',
+          body: JSON.stringify({ message })
+        });
+
+        socket.emit('community:message', {
+          communityId,
+          message: data.chatMessage
+        });
+
+        input.value = '';
+        loadChat();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('file-upload');
+      const file = fileInput.files[0];
+
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/files`, {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('File uploaded!', 'success');
+        fileInput.value = '';
+        loadFiles();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Socket listeners
+    socket.on('community:message:receive', (message) => {
+      if (currentTab === 'chat') {
+        loadChat();
+      }
+    });
+
+    document.getElementById('chat-message-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendChatMessage();
+      }
+    });
+
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    loadCommunity();
+    switchTab('posts');
+  </script>
+</body>
+</html>

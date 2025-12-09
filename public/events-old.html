@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events" class="active">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <h1>Events</h1>
+      <button class="btn btn-primary" onclick="openCreateEventModal()">+ Create Event</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+      <div>
+        <div class="card">
+          <div class="card-header">Upcoming Events</div>
+          <div id="events-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Crosspath Requests</div>
+          <div id="crosspath-list"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-header">Gentle Reminders</div>
+          <div id="reminders-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Event Modal -->
+  <div id="create-event-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeCreateEventModal()">&times;</span>
+      <h2 class="modal-header">Create Event</h2>
+      <form id="create-event-form">
+        <div class="form-group">
+          <label class="form-label">Event Title *</label>
+          <input type="text" class="form-input" id="event-title" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="event-description" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date & Time *</label>
+          <input type="datetime-local" class="form-input" id="event-date" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input type="text" class="form-input" id="event-location" placeholder="e.g., Stadium, Virtual">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-textarea" id="event-notes" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Event</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    async function loadEvents() {
+      try {
+        const data = await InnovateAPI.apiRequest('/events');
+        const list = document.getElementById('events-list');
+        list.innerHTML = '';
+
+        if (data.events.length === 0) {
+          list.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No events yet</div>';
+          return;
+        }
+
+        data.events.forEach(event => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color);';
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div style="flex: 1;">
+                <h3 style="margin-bottom: 0.5rem;">${event.title}</h3>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">${event.description || ''}</p>
+                <div style="font-size: 0.875rem;">
+                  <div>📅 ${InnovateAPI.formatTimestamp(event.event_date)}</div>
+                  ${event.location ? `<div>📍 ${event.location}</div>` : ''}
+                  <div>👥 ${event.accepted_count}/${event.total_invited} attending</div>
+                </div>
+              </div>
+              <div>
+                ${event.user_status === 'pending' ? `
+                  <button class="btn btn-success btn-sm" onclick="rsvp(${event.id}, 'accepted')">Accept</button>
+                  <button class="btn btn-danger btn-sm" onclick="rsvp(${event.id}, 'declined')">Decline</button>
+                ` : event.user_status ? `
+                  <span class="btn btn-sm ${event.user_status === 'accepted' ? 'btn-success' : 'btn-secondary'}">${event.user_status}</span>
+                ` : ''}
+              </div>
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading events:', error);
+      }
+    }
+
+    async function loadCrosspathRequests() {
+      try {
+        const data = await InnovateAPI.apiRequest('/events/crosspath/requests');
+        const list = document.getElementById('crosspath-list');
+        list.innerHTML = '';
+
+        if (data.requests.length === 0) {
+          list.innerHTML = '<div style="text-align: center; padding: 1rem; color: var(--text-secondary);">No crosspath requests</div>';
+          return;
+        }
+
+        data.requests.forEach(request => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color);';
+          div.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <img src="${InnovateAPI.getUserAvatar(request.profile_picture)}" style="width: 40px; height: 40px; border-radius: 50%;" alt="${request.username}">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${request.username}</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">Also interested in ${request.event_title}</div>
+              </div>
+              <div>
+                <button class="btn btn-success btn-sm" onclick="respondToCrosspath(${request.id}, 'accepted')">Accept</button>
+                <button class="btn btn-danger btn-sm" onclick="respondToCrosspath(${request.id}, 'declined')">Decline</button>
+              </div>
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading crosspath requests:', error);
+      }
+    }
+
+    async function loadReminders() {
+      try {
+        const data = await InnovateAPI.apiRequest('/events/reminders');
+        const list = document.getElementById('reminders-list');
+        list.innerHTML = '';
+
+        if (data.reminders.length === 0) {
+          list.innerHTML = '<div style="text-align: center; padding: 1rem; color: var(--text-secondary);">No reminders</div>';
+          return;
+        }
+
+        data.reminders.forEach(reminder => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 0.75rem; border-bottom: 1px solid var(--border-color);';
+          div.innerHTML = `
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">${InnovateAPI.formatTimestamp(reminder.reminder_date)}</div>
+            <div>${reminder.message || reminder.post_content}</div>
+          `;
+          list.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading reminders:', error);
+      }
+    }
+
+    function openCreateEventModal() {
+      document.getElementById('create-event-modal').classList.add('active');
+    }
+
+    function closeCreateEventModal() {
+      document.getElementById('create-event-modal').classList.remove('active');
+    }
+
+    document.getElementById('create-event-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const eventData = {
+        title: document.getElementById('event-title').value,
+        description: document.getElementById('event-description').value,
+        event_date: document.getElementById('event-date').value,
+        location: document.getElementById('event-location').value,
+        notes: document.getElementById('event-notes').value,
+        attendees: []
+      };
+
+      try {
+        await InnovateAPI.apiRequest('/events', {
+          method: 'POST',
+          body: JSON.stringify(eventData)
+        });
+
+        InnovateAPI.showAlert('Event created successfully!', 'success');
+        closeCreateEventModal();
+        document.getElementById('create-event-form').reset();
+        loadEvents();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    async function rsvp(eventId, status) {
+      try {
+        await InnovateAPI.apiRequest(`/events/${eventId}/rsvp`, {
+          method: 'POST',
+          body: JSON.stringify({ status })
+        });
+
+        InnovateAPI.showAlert('RSVP updated!', 'success');
+        loadEvents();
+        loadCrosspathRequests();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function respondToCrosspath(crosspathId, status) {
+      try {
+        await InnovateAPI.apiRequest(`/events/crosspath/${crosspathId}/respond`, {
+          method: 'POST',
+          body: JSON.stringify({ status })
+        });
+
+        InnovateAPI.showAlert(status === 'accepted' ? 'Crosspath accepted! You can now chat.' : 'Crosspath declined', 'success');
+        loadCrosspathRequests();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    loadEvents();
+    loadCrosspathRequests();
+    loadReminders();
+  </script>
+</body>
+</html>

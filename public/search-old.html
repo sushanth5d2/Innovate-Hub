@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search" class="active">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Search</h1>
+
+    <div class="card">
+      <input type="text" class="form-input" id="search-input" placeholder="Search users and communities..." autofocus>
+      
+      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <button class="btn btn-outline btn-sm" id="users-tab" onclick="switchTab('users')">Users</button>
+        <button class="btn btn-outline btn-sm" id="communities-tab" onclick="switchTab('communities')">Communities</button>
+      </div>
+    </div>
+
+    <div id="users-results" style="display: block;"></div>
+    <div id="communities-results" style="display: none;"></div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    let currentTab = 'users';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('users-results').style.display = tab === 'users' ? 'block' : 'none';
+      document.getElementById('communities-results').style.display = tab === 'communities' ? 'block' : 'none';
+      
+      document.getElementById('users-tab').className = tab === 'users' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      document.getElementById('communities-tab').className = tab === 'communities' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      
+      const query = document.getElementById('search-input').value;
+      if (query) {
+        search(query);
+      }
+    }
+
+    async function searchUsers(query) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(query)}`);
+        const container = document.getElementById('users-results');
+        container.innerHTML = '';
+
+        if (data.users.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users found</div>';
+          return;
+        }
+
+        data.users.forEach(user => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.cursor = 'pointer';
+          card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" style="width: 60px; height: 60px; border-radius: 50%;" alt="${user.username}">
+              <div style="flex: 1;">
+                <h3 style="margin-bottom: 0.25rem;">${user.username}</h3>
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${user.bio || 'No bio'}</p>
+              </div>
+              <div style="display: flex; gap: 0.5rem;">
+                ${user.is_following ? 
+                  `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); unfollowUser(${user.id})">Following</button>` :
+                  `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); followUser(${user.id})">Follow</button>`
+                }
+                <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); messageUser(${user.id})">Message</button>
+              </div>
+            </div>
+          `;
+          card.onclick = () => window.location.href = `/profile/${user.id}`;
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error searching users:', error);
+      }
+    }
+
+    async function searchCommunities(query) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/communities?q=${encodeURIComponent(query)}`);
+        const container = document.getElementById('communities-results');
+        container.innerHTML = '';
+
+        if (data.communities.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No communities found</div>';
+          return;
+        }
+
+        data.communities.forEach(community => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.cursor = 'pointer';
+          card.innerHTML = `
+            <div style="display: flex; gap: 1rem;">
+              ${community.banner_image ? `<img src="${community.banner_image}" style="width: 100px; height: 100px; border-radius: 8px; object-fit: cover;" alt="${community.name}">` : ''}
+              <div style="flex: 1;">
+                <h3 style="margin-bottom: 0.25rem;">${community.name}</h3>
+                ${community.team_name ? `<div style="color: var(--sports-accent); font-weight: 500; margin-bottom: 0.5rem;">🏆 ${community.team_name}</div>` : ''}
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0.5rem 0;">${community.description || 'No description'}</p>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">${community.member_count} members</div>
+              </div>
+              <div>
+                ${community.is_member ?
+                  `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); leaveCommunity(${community.id})">Leave</button>` :
+                  `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); joinCommunity(${community.id})">Join</button>`
+                }
+              </div>
+            </div>
+          `;
+          card.onclick = () => window.location.href = `/community/${community.id}`;
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error searching communities:', error);
+      }
+    }
+
+    function search(query) {
+      if (!query.trim()) return;
+      
+      if (currentTab === 'users') {
+        searchUsers(query);
+      } else {
+        searchCommunities(query);
+      }
+    }
+
+    async function followUser(userId) {
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'POST' });
+        InnovateAPI.showAlert('Following user!', 'success');
+        search(document.getElementById('search-input').value);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function unfollowUser(userId) {
+      try {
+        await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'DELETE' });
+        InnovateAPI.showAlert('Unfollowed user', 'success');
+        search(document.getElementById('search-input').value);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function messageUser(userId) {
+      window.location.href = `/messages?user=${userId}`;
+    }
+
+    async function joinCommunity(communityId) {
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined community!', 'success');
+        search(document.getElementById('search-input').value);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function leaveCommunity(communityId) {
+      if (confirm('Are you sure you want to leave this community?')) {
+        try {
+          await InnovateAPI.apiRequest(`/communities/${communityId}/leave`, { method: 'POST' });
+          InnovateAPI.showAlert('Left community', 'success');
+          search(document.getElementById('search-input').value);
+        } catch (error) {
+          InnovateAPI.showAlert(error.message, 'error');
+        }
+      }
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    document.getElementById('search-input').addEventListener('input', InnovateAPI.debounce((e) => {
+      search(e.target.value);
+    }, 500));
+  </script>
+</body>
+</html>

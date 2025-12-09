@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages">Messages</a></li>
+        <li><a href="/notifications" class="active">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <h1>Notifications</h1>
+      <button class="btn btn-outline btn-sm" onclick="markAllAsRead()">Mark all as read</button>
+    </div>
+
+    <div class="card">
+      <div id="notifications-list"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Define toggleMobileMenu globally for onclick handler
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    // Initialize Socket.IO
+    InnovateAPI.initSocket();
+    const socket = InnovateAPI.getSocket();
+
+    async function loadNotifications() {
+      try {
+        const data = await InnovateAPI.apiRequest('/notifications');
+        const list = document.getElementById('notifications-list');
+        list.innerHTML = '';
+
+        if (data.notifications.length === 0) {
+          list.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-secondary);">No notifications</div>';
+          return;
+        }
+
+        data.notifications.forEach(notification => {
+          const div = document.createElement('div');
+          div.style.cssText = `padding: 1rem; border-bottom: 1px solid var(--border-color); ${!notification.is_read ? 'background-color: #eff6ff;' : ''} cursor: pointer;`;
+          
+          let icon = '🔔';
+          if (notification.type === 'message') icon = '💬';
+          else if (notification.type === 'follow') icon = '👤';
+          else if (notification.type === 'event_invite') icon = '📅';
+          else if (notification.type === 'crosspath') icon = '🤝';
+          else if (notification.type === 'community_join') icon = '🏘️';
+
+          div.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              ${notification.profile_picture ? 
+                `<img src="${InnovateAPI.getUserAvatar(notification.profile_picture)}" style="width: 40px; height: 40px; border-radius: 50%;" alt="${notification.username}">` :
+                `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">${icon}</div>`
+              }
+              <div style="flex: 1;">
+                <div>
+                  ${notification.username ? `<strong>${notification.username}</strong> ` : ''}
+                  ${notification.content}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                  ${InnovateAPI.formatDate(notification.created_at)}
+                </div>
+              </div>
+              ${!notification.is_read ? '<div style="width: 8px; height: 8px; background: var(--primary-color); border-radius: 50%;"></div>' : ''}
+            </div>
+          `;
+          
+          div.onclick = () => handleNotificationClick(notification);
+          list.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+      }
+    }
+
+    async function handleNotificationClick(notification) {
+      // Mark as read
+      try {
+        await InnovateAPI.apiRequest(`/notifications/${notification.id}/read`, { method: 'PUT' });
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+
+      // Navigate based on type
+      if (notification.type === 'message') {
+        window.location.href = `/messages?user=${notification.related_id}`;
+      } else if (notification.type === 'follow') {
+        window.location.href = `/profile/${notification.related_id}`;
+      } else if (notification.type === 'event_invite' || notification.type === 'event_rsvp') {
+        window.location.href = '/events';
+      } else if (notification.type === 'crosspath' || notification.type === 'crosspath_accepted') {
+        window.location.href = notification.type === 'crosspath_accepted' ? `/messages?user=${notification.related_id}` : '/events';
+      } else if (notification.type === 'community_join') {
+        window.location.href = `/community/${notification.related_id}`;
+      }
+    }
+
+    async function markAllAsRead() {
+      try {
+        await InnovateAPI.apiRequest('/notifications/read/all', { method: 'PUT' });
+        InnovateAPI.showAlert('All notifications marked as read', 'success');
+        loadNotifications();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Listen for real-time notifications
+    socket.on('notification:receive', (notification) => {
+      loadNotifications();
+    });
+
+    loadNotifications();
+  </script>
+</body>
+</html>

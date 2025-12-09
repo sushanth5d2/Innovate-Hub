@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communities - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <span class="logo">Innovate</span>
+    <button onclick="openCreateModal()" class="icon-button">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-container">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" id="search-input" placeholder="Search communities..." oninput="searchCommunities()">
+    </div>
+  </div>
+
+  <!-- Communities Grid -->
+  <div class="communities-container">
+    <div id="communities-grid" class="communities-grid">
+      <!-- Communities will be loaded here -->
+    </div>
+  </div>
+
+  <!-- Create Community Modal -->
+  <div id="create-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button onclick="closeCreateModal()" class="text-button">Cancel</button>
+        <h3>Create Community</h3>
+        <button onclick="createCommunity()" class="text-button primary">Create</button>
+      </div>
+      <div class="modal-body">
+        <form id="create-form" onsubmit="createCommunity(); return false;">
+          <div class="form-group">
+            <label>Community Name</label>
+            <input type="text" id="community-name" class="form-control" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Team Name (optional)</label>
+            <input type="text" id="team-name" class="form-control" placeholder="For sports communities">
+          </div>
+          
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="community-description" class="form-control" rows="3"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="is-public" checked>
+              <span>Public community</span>
+            </label>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="bottom-nav">
+    <a href="/home" class="nav-item">
+      <i class="far fa-home"></i>
+    </a>
+    <a href="/search" class="nav-item">
+      <i class="far fa-search"></i>
+    </a>
+    <a href="/communities" class="nav-item active">
+      <i class="fas fa-users"></i>
+    </a>
+    <a href="/notifications" class="nav-item">
+      <i class="far fa-heart"></i>
+    </a>
+    <a href="/profile" class="nav-item">
+      <i class="far fa-user-circle"></i>
+    </a>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    const socket = io();
+
+    if (!localStorage.getItem('token')) {
+      window.location.href = '/login';
+    }
+
+    async function loadCommunities() {
+      try {
+        const response = await fetch('/communities', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load communities');
+        
+        const data = await response.json();
+        displayCommunities(data.communities || []);
+      } catch (error) {
+        console.error('Error loading communities:', error);
+      }
+    }
+
+    function displayCommunities(communities) {
+      const grid = document.getElementById('communities-grid');
+      grid.innerHTML = '';
+
+      if (communities.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <p>No communities yet</p>
+            <button class="action-button primary" onclick="openCreateModal()">Create First Community</button>
+          </div>
+        `;
+        return;
+      }
+
+      communities.forEach(community => {
+        const div = document.createElement('div');
+        div.className = 'community-card';
+        div.innerHTML = `
+          <div class="community-banner" style="background: linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()});">
+            ${community.banner_url ? `<img src="${community.banner_url}" alt="${community.name}">` : ''}
+          </div>
+          <div class="community-info">
+            <div class="community-name">${community.name}</div>
+            ${community.team_name ? `<div class="community-team"><i class="fas fa-trophy"></i> ${community.team_name}</div>` : ''}
+            <div class="community-meta">
+              <span><i class="fas fa-users"></i> ${community.member_count || 0} members</span>
+              ${community.is_public ? '<span><i class="fas fa-globe"></i> Public</span>' : '<span><i class="fas fa-lock"></i> Private</span>'}
+            </div>
+            <div class="community-description">${community.description || ''}</div>
+            <button class="join-button ${community.is_member ? 'joined' : ''}" onclick="toggleJoin(${community.id}, this)">
+              ${community.is_member ? 'Joined' : 'Join'}
+            </button>
+          </div>
+        `;
+        div.onclick = (e) => {
+          if (!e.target.classList.contains('join-button')) {
+            window.location.href = `/community/${community.id}`;
+          }
+        };
+        grid.appendChild(div);
+      });
+    }
+
+    function getRandomColor() {
+      const colors = ['#833AB4', '#FD1D1D', '#F77737', '#4F5BD5', '#962FBF', '#F09433'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    async function toggleJoin(communityId, button) {
+      event.stopPropagation();
+      const isJoined = button.classList.contains('joined');
+
+      try {
+        const response = await fetch(`/communities/${communityId}/join`, {
+          method: isJoined ? 'DELETE' : 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to join/leave community');
+        
+        button.classList.toggle('joined');
+        button.textContent = isJoined ? 'Join' : 'Joined';
+      } catch (error) {
+        console.error('Error toggling join:', error);
+      }
+    }
+
+    let searchTimeout;
+    async function searchCommunities() {
+      clearTimeout(searchTimeout);
+      const query = document.getElementById('search-input').value;
+
+      searchTimeout = setTimeout(async () => {
+        try {
+          const response = await fetch(`/search/communities?q=${encodeURIComponent(query)}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!response.ok) throw new Error('Search failed');
+          
+          const data = await response.json();
+          displayCommunities(data.communities || []);
+        } catch (error) {
+          console.error('Error searching:', error);
+        }
+      }, 300);
+    }
+
+    function openCreateModal() {
+      document.getElementById('create-modal').style.display = 'flex';
+    }
+
+    function closeCreateModal() {
+      document.getElementById('create-modal').style.display = 'none';
+      document.getElementById('create-form').reset();
+    }
+
+    async function createCommunity() {
+      event.preventDefault();
+      
+      const name = document.getElementById('community-name').value;
+      const teamName = document.getElementById('team-name').value;
+      const description = document.getElementById('community-description').value;
+      const isPublic = document.getElementById('is-public').checked;
+
+      try {
+        const response = await fetch('/communities', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            name,
+            team_name: teamName,
+            description,
+            is_public: isPublic
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to create community');
+        
+        const data = await response.json();
+        closeCreateModal();
+        loadCommunities();
+      } catch (error) {
+        console.error('Error creating community:', error);
+        alert('Failed to create community');
+      }
+    }
+
+    // Initialize
+    loadCommunities();
+  </script>
+</body>
+</html>

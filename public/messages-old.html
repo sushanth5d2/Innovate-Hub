@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages - Innovate</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/home" class="navbar-brand">Innovate</a>
+      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="navbar-menu" id="navbarMenu">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/communities">Communities</a></li>
+        <li><a href="/events">Events</a></li>
+        <li><a href="/messages" class="active">Messages</a></li>
+        <li><a href="/notifications">Notifications</a></li>
+        <li><a href="/search">Search</a></li>
+        <li><a href="/settings">Settings</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Messages</h1>
+    
+    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; height: 700px;">
+      <!-- Conversations List -->
+      <div class="card" style="overflow-y: auto;">
+        <div class="card-header">Conversations</div>
+        <input type="text" class="form-input" id="search-contacts" placeholder="Search contacts..." style="margin-bottom: 1rem;">
+        <div id="conversations-list"></div>
+      </div>
+
+      <!-- Chat Window -->
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div id="chat-placeholder" style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-secondary);">
+          Select a conversation to start messaging
+        </div>
+        <div id="chat-window" style="display: none; flex-direction: column; height: 100%;">
+          <div class="chat-header" id="chat-header"></div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-container">
+            <button class="btn btn-outline btn-sm" onclick="attachFile()">📎</button>
+            <input type="file" id="file-attachment" multiple style="display: none;">
+            <input type="text" class="chat-input" id="message-input" placeholder="Type a message...">
+            <button class="btn btn-primary btn-sm" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Define toggleMobileMenu globally for onclick handler
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
+
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    const user = InnovateAPI.getCurrentUser();
+    // Initialize Socket.IO
+    InnovateAPI.initSocket();
+    const socket = InnovateAPI.getSocket();
+    let currentContactId = null;
+    let conversations = [];
+
+    async function loadConversations() {
+      try {
+        const data = await InnovateAPI.apiRequest('/messages/conversations');
+        conversations = data.conversations;
+        renderConversations(conversations);
+      } catch (error) {
+        console.error('Error loading conversations:', error);
+      }
+    }
+
+    function renderConversations(convos) {
+      const list = document.getElementById('conversations-list');
+      list.innerHTML = '';
+
+      if (convos.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No conversations yet</div>';
+        return;
+      }
+
+      convos.forEach(conv => {
+        const item = document.createElement('div');
+        item.className = `message-item ${conv.unread_count > 0 ? 'unread' : ''}`;
+        item.innerHTML = `
+          <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" class="message-avatar" alt="${conv.username}">
+          <div class="message-content">
+            <div class="message-sender">
+              ${conv.username}
+              ${conv.is_online ? '<span class="online-indicator"></span>' : ''}
+            </div>
+            <div class="message-text">${conv.last_message || 'No messages yet'}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end;">
+            <div class="message-time">${InnovateAPI.formatDate(conv.last_message_time)}</div>
+            ${conv.unread_count > 0 ? `<span class="notification-badge">${conv.unread_count}</span>` : ''}
+          </div>
+        `;
+        item.onclick = () => openChat(conv.contact_id, conv.username, conv.profile_picture);
+        list.appendChild(item);
+      });
+    }
+
+    async function openChat(contactId, username, profilePicture) {
+      currentContactId = contactId;
+      document.getElementById('chat-placeholder').style.display = 'none';
+      document.getElementById('chat-window').style.display = 'flex';
+      
+      document.getElementById('chat-header').innerHTML = `
+        <div style="display: flex; align-items: center;">
+          <img src="${InnovateAPI.getUserAvatar(profilePicture)}" style="width: 40px; height: 40px; border-radius: 50%; margin-right: 1rem;" alt="${username}">
+          <div>
+            <div style="font-weight: 600;">${username}</div>
+          </div>
+        </div>
+      `;
+
+      await loadMessages(contactId);
+    }
+
+    async function loadMessages(contactId) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/${contactId}`);
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.innerHTML = '';
+
+        data.messages.forEach(msg => {
+          const messageEl = document.createElement('div');
+          messageEl.className = `chat-message ${msg.sender_id === user.id ? 'sent' : 'received'}`;
+          
+          let attachmentsHtml = '';
+          if (msg.attachments && msg.attachments.length > 0) {
+            attachmentsHtml = msg.attachments.map(att => {
+              if (att.type && att.type.startsWith('image/')) {
+                return `<img src="${att.path}" style="max-width: 200px; border-radius: 8px; margin-top: 0.5rem;" alt="Attachment">`;
+              } else {
+                return `<a href="${att.path}" download style="display: block; margin-top: 0.5rem; color: white;">📎 ${att.name}</a>`;
+              }
+            }).join('');
+          }
+
+          messageEl.innerHTML = `
+            <div class="chat-bubble">
+              ${msg.content || ''}
+              ${attachmentsHtml}
+              <div style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">${InnovateAPI.formatDate(msg.created_at)}</div>
+            </div>
+          `;
+          messagesContainer.appendChild(messageEl);
+        });
+
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('message-input');
+      const fileInput = document.getElementById('file-attachment');
+      const content = input.value.trim();
+
+      if (!content && fileInput.files.length === 0) return;
+      if (!currentContactId) return;
+
+      const formData = new FormData();
+      formData.append('receiver_id', currentContactId);
+      formData.append('content', content);
+
+      for (let file of fileInput.files) {
+        formData.append('attachments', file);
+      }
+
+      try {
+        const data = await InnovateAPI.apiRequest('/messages', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        // Emit via socket
+        socket.emit('message:send', {
+          receiverId: currentContactId,
+          message: data.message
+        });
+
+        input.value = '';
+        fileInput.value = '';
+        loadMessages(currentContactId);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function attachFile() {
+      document.getElementById('file-attachment').click();
+    }
+
+    // Socket listeners
+    socket.on('message:receive', (message) => {
+      if (currentContactId === message.sender_id) {
+        loadMessages(currentContactId);
+      }
+      loadConversations();
+    });
+
+    // Send message on Enter
+    document.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && document.getElementById('message-input') === document.activeElement) {
+        sendMessage();
+      }
+    });
+
+    // Search contacts
+    document.getElementById('search-contacts').addEventListener('input', InnovateAPI.debounce((e) => {
+      const search = e.target.value.toLowerCase();
+      const filtered = conversations.filter(conv => 
+        conv.username.toLowerCase().includes(search)
+      );
+      renderConversations(filtered);
+    }, 300));
+
+    // Check for user parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user');
+
+    loadConversations();
+
+    if (userId) {
+      // Load user info and open chat
+      InnovateAPI.apiRequest(`/users/${userId}`)
+        .then(data => {
+          openChat(userId, data.user.username, data.user.profile_picture);
+        });
+    }
+  </script>
+</body>
+</html>
