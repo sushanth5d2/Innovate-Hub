@@ -15,22 +15,30 @@ router.get('/users', authMiddleware, (req, res) => {
 
   const query = `
     SELECT 
-      u.id, u.username, u.profile_picture, u.bio,
+      u.id, u.username, u.fullname, u.profile_picture, u.bio, u.email,
       (SELECT COUNT(*) FROM followers WHERE follower_id = ? AND following_id = u.id) as is_following
     FROM users u
     LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = u.id)
     LEFT JOIN blocked_users b2 ON (b2.blocker_id = u.id AND b2.blocked_id = ?)
-    WHERE (u.username LIKE ? OR u.bio LIKE ?)
+    WHERE (u.username LIKE ? OR u.fullname LIKE ? OR u.email LIKE ? OR u.bio LIKE ?)
       AND u.id != ?
       AND b1.id IS NULL
       AND b2.id IS NULL
-    ORDER BY u.username ASC
+    ORDER BY 
+      CASE 
+        WHEN u.username LIKE ? THEN 1
+        WHEN u.fullname LIKE ? THEN 2
+        WHEN u.email LIKE ? THEN 3
+        ELSE 4
+      END,
+      u.username ASC
     LIMIT 20
   `;
 
   const searchTerm = `%${q}%`;
+  const exactTerm = `${q}%`;
 
-  db.all(query, [currentUserId, currentUserId, currentUserId, searchTerm, searchTerm, currentUserId], (err, users) => {
+  db.all(query, [currentUserId, currentUserId, currentUserId, searchTerm, searchTerm, searchTerm, searchTerm, currentUserId, exactTerm, exactTerm, exactTerm], (err, users) => {
     if (err) {
       return res.status(500).json({ error: 'Error searching users' });
     }

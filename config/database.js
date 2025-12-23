@@ -504,6 +504,33 @@ const migrateDatabase = () => {
         console.error('Error adding expires_at column:', err);
       }
     });
+    
+    // Add fullname column to users if not exists
+    db.run(`
+      ALTER TABLE users ADD COLUMN fullname TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding fullname column:', err);
+      }
+    });
+    
+    // Add created_by column to notifications if not exists
+    db.run(`
+      ALTER TABLE notifications ADD COLUMN created_by INTEGER
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding created_by column:', err);
+      }
+    });
+    
+    // Add original_filename column to messages if not exists
+    db.run(`
+      ALTER TABLE messages ADD COLUMN original_filename TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding original_filename column:', err);
+      }
+    });
   });
 };
 

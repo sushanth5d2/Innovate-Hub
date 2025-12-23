@@ -51,7 +51,7 @@ router.post('/register', upload.single('profile_picture'), async (req, res) => {
 
       // Create user with all fields
       const query = `
-        INSERT INTO users (username, email, password, bio, profile_picture, date_of_birth) 
+        INSERT INTO users (username, email, password, fullname, profile_picture, date_of_birth) 
         VALUES (?, ?, ?, ?, ?, ?)
       `;
       

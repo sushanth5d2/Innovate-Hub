@@ -104,12 +104,12 @@
               <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
             </svg>
           </button>
-          <button class="ig-chat-action-btn" title="Voice Call">
+          <button class="ig-chat-action-btn" onclick="startVoiceCall()" title="Voice Call">
             <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
               <path d="M14.344 2.5c4.633.122 8.194 3.816 8.194 8.5a8.66 8.66 0 0 1-1.836 5.364L22.768 22H14.5C9.806 22 6 18.194 6 13.5S9.806 5 14.5 5c.065 0 .13 0 .194.003l.15-.003Zm0 1.5a7 7 0 1 0 4.274 12.532l.228-.168.722 2.166h-5.068a7.5 7.5 0 0 1-7.495-7.066L7 11l.003-.15C7.127 6.264 10.286 3.5 14.344 4Z" fill="none" stroke="currentColor" stroke-width="1.5"></path>
             </svg>
           </button>
-          <button class="ig-chat-action-btn" title="Video Call">
+          <button class="ig-chat-action-btn" onclick="startVideoCall()" title="Video Call">
             <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
               <path d="M5.5 4A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20h8a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 4h-8Zm12.207 2.793a1 1 0 0 1 1.686.614l.021.113.006.117v8.726a1 1 0 0 1-1.595.78l-.108-.087-3.5-3.25v-3.512l3.5-3.25a1 1 0 0 1 .99-.25Z"></path>
             </svg>
@@ -133,7 +133,7 @@
         
         <input type="text" class="ig-chat-input" placeholder="Message..." id="messageInput" onkeypress="handleMessageKeyPress(event)">
         
-        <button class="ig-input-action-btn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchstart="startVoiceRecording()" ontouchend="stopVoiceRecording()" title="Voice" id="voiceBtn">
+        <button class="ig-input-action-btn ig-voice-btn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchstart="startVoiceRecording()" ontouchend="stopVoiceRecording()" title="Voice" id="voiceBtn">
           <svg aria-label="Voice message" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
             <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"></path>
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"></path>
@@ -256,10 +256,23 @@
       </div>
 
       <!-- Emoji Picker Modal -->
-      <div id="emojiModal" class="ig-modal" style="display: none;">
-        <div class="ig-modal-backdrop" onclick="closeEmojiPicker()"></div>
-        <div class="ig-emoji-picker">
-          <div class="ig-emoji-grid" id="emojiGrid"></div>
+      <div id="emojiModal" class="ig-modal" style="display: none; z-index: 99999;">
+        <div class="ig-modal-backdrop" onclick="closeEmojiPicker()" style="z-index: 99998;"></div>
+        <div class="ig-emoji-picker" style="z-index: 99999;">
+          <div class="ig-emoji-header" style="display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+            <button id="emojiTab" class="ig-emoji-tab active" onclick="switchEmojiTab('emoji')" style="flex: 1; padding: 8px; background: none; border: none; color: var(--ig-primary-text); font-weight: 600; cursor: pointer; border-bottom: 2px solid var(--ig-blue);">Emojis</button>
+            <button id="gifTab" class="ig-emoji-tab" onclick="switchEmojiTab('gif')" style="flex: 1; padding: 8px; background: none; border: none; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">GIFs</button>
+            <button onclick="closeEmojiPicker()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-primary-text); margin-left: 8px;">&times;</button>
+          </div>
+          <div id="emojiContent" style="display: block;">
+            <div class="ig-emoji-grid" id="emojiGrid"></div>
+          </div>
+          <div id="gifContent" style="display: none;">
+            <input type="text" id="gifSearchInPicker" placeholder="Search GIFs..." onkeyup="searchGifsInPicker(this.value)" style="width: calc(100% - 24px); margin: 12px; padding: 8px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            <div id="gifGridInPicker" style="padding: 0 12px 12px 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow-y: auto; max-height: 300px;">
+              <div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">Search for GIFs...</div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -320,7 +333,7 @@
         <div class="ig-modal-content" style="max-width: 350px;">
           <div class="ig-modal-header">
             <h3>Disappearing Message</h3>
-            <button onclick="closeTimerPicker())">&times;</button>
+            <button onclick="closeTimerPicker()">&times;</button>
           </div>
           <div style="padding: 16px;">
             <p style="color: var(--ig-secondary-text); margin-bottom: 16px; font-size: 14px;">Message will disappear after:</p>
@@ -391,6 +404,68 @@
       <img id="bottomProfilePic" src="" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
     </a>
   </nav>
+
+  <!-- Call Modals -->
+  <!-- Incoming Call Modal -->
+  <div id="incomingCallModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 999999; align-items: center; justify-content: center;">
+    <div style="background: var(--ig-primary-background); border-radius: 20px; padding: 40px; text-align: center; max-width: 400px; width: 90%;">
+      <img id="incomingCallAvatar" src="" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 20px;">
+      <h2 id="incomingCallName" style="margin-bottom: 10px; color: var(--ig-primary-text);">User</h2>
+      <p id="incomingCallType" style="color: var(--ig-secondary-text); margin-bottom: 40px;">Incoming call...</p>
+      <div style="display: flex; gap: 20px; justify-content: center;">
+        <button onclick="rejectCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #ed4956; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+          <svg fill="white" height="30" viewBox="0 0 24 24" width="30">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm0-4h-2V7h2v8z"/>
+          </svg>
+        </button>
+        <button onclick="acceptCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #0095f6; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+          <svg fill="white" height="30" viewBox="0 0 24 24" width="30">
+            <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Call Modal -->
+  <div id="activeCallModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 999999; flex-direction: column;">
+    <div style="flex: 1; position: relative; display: flex; align-items: center; justify-content: center;">
+      <video id="remoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+      <video id="localVideo" autoplay playsinline muted style="position: absolute; bottom: 20px; right: 20px; width: 150px; height: 200px; border-radius: 12px; object-fit: cover; border: 2px solid white;"></video>
+      
+      <!-- Call info overlay -->
+      <div id="callInfoOverlay" style="position: absolute; top: 40px; left: 50%; transform: translateX(-50%); text-align: center; color: white; background: rgba(0,0,0,0.5); padding: 20px 30px; border-radius: 12px;">
+        <img id="activeCallAvatar" src="" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 12px;">
+        <h3 id="activeCallName" style="margin-bottom: 8px;">User</h3>
+        <p id="callDuration" style="opacity: 0.8; font-size: 14px;">00:00</p>
+      </div>
+    </div>
+    
+    <!-- Call controls -->
+    <div style="padding: 30px; display: flex; gap: 20px; justify-content: center; align-items: center; background: rgba(0,0,0,0.8);">
+      <button id="muteBtn" onclick="toggleMute()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Mute">
+        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+      <button id="videoBtn" onclick="toggleVideo()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Video">
+        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
+          <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+        </svg>
+      </button>
+      <button onclick="endCall()" style="width: 70px; height: 70px; border-radius: 50%; background: #ed4956; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="End Call">
+        <svg fill="white" height="32" viewBox="0 0 24 24" width="32">
+          <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+        </svg>
+      </button>
+      <button onclick="toggleSpeaker()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Speaker">
+        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
@@ -531,22 +606,46 @@
           
           if (msg.type === 'image') {
             messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            const filename = msg.original_filename || msg.content.split('/').pop();
             messageEl.innerHTML = `
-              <img src="${msg.content}" style="max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;" onclick="window.open('${msg.content}')">
+              <div style="position: relative; display: inline-block;">
+                <img src="${msg.content}" style="max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;" onclick="openMediaPreview('${msg.content}', 'image', '${filename}')">
+                <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${filename}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                  <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                  </svg>
+                </button>
+              </div>
               <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
             `;
           } else if (msg.type === 'gif') {
             messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            const filename = msg.original_filename || msg.content.split('/').pop();
             messageEl.innerHTML = `
-              <img src="${msg.content}" style="max-width: 250px; max-height: 250px; border-radius: 18px; cursor: pointer; display: block;" onclick="window.open('${msg.content}')">
+              <div style="position: relative; display: inline-block;">
+                <img src="${msg.content}" style="max-width: 250px; max-height: 250px; border-radius: 18px; cursor: pointer; display: block;" onclick="openMediaPreview('${msg.content}', 'gif', '${filename}')">
+                <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${filename}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                  <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                  </svg>
+                </button>
+              </div>
               <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
             `;
           } else if (msg.type === 'voice') {
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            const filename = msg.original_filename || msg.content.split('/').pop();
             messageEl.innerHTML = `
-              <audio controls style="max-width: 250px;">
-                <source src="${msg.content}" type="audio/webm">
-              </audio>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <audio controls style="max-width: 200px;">
+                  <source src="${msg.content}" type="audio/webm">
+                </audio>
+                <button onclick="downloadFile('${msg.content}', '${filename}')" style="background: var(--ig-secondary-background); border: none; color: var(--ig-primary-text); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                  <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                  </svg>
+                </button>
+              </div>
             `;
           } else if (msg.type === 'location') {
             const loc = JSON.parse(msg.content);
@@ -568,13 +667,67 @@
               </div>`;
             });
             messageEl.innerHTML = html;
+          } else if (msg.type === 'file' || msg.type === 'video') {
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            const fileName = msg.original_filename || msg.content.split('/').pop();
+            const isVideo = msg.type === 'video' || msg.content.match(/\.(mp4|webm|mov|avi)$/i);
+            const isPdf = msg.content.match(/\.pdf$/i) || fileName.match(/\.pdf$/i);
+            const isDoc = msg.content.match(/\.(doc|docx|txt)$/i) || fileName.match(/\.(doc|docx|txt)$/i);
+            
+            if (isVideo) {
+              messageEl.innerHTML = `
+                <div style="position: relative; display: inline-block;">
+                  <video controls style="max-width: 250px; max-height: 350px; border-radius: 18px; display: block;">
+                    <source src="${msg.content}">
+                  </video>
+                  <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${fileName}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                    <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                    </svg>
+                  </button>
+                </div>
+              `;
+            } else {
+              const icon = isPdf ? '📄' : isDoc ? '📝' : '📎';
+              messageEl.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px;">
+                  <div style="font-size: 32px;">${icon}</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                    <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
+                  </div>
+                  <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${fileName}')" style="background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Download">
+                    <svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
+                      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                    </svg>
+                  </button>
+                </div>
+              `;
+              messageEl.style.cursor = 'pointer';
+              messageEl.onclick = () => openMediaPreview(msg.content, 'file', fileName);
+            }
           } else {
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
             messageEl.textContent = msg.content;
             const timeEl = document.createElement('div');
             timeEl.className = 'ig-message-time';
             timeEl.textContent = formatMessageTime(msg.created_at);
+            
+            // Add timer indicator if message has expiry
+            if (msg.expires_at) {
+              const timerEl = document.createElement('span');
+              timerEl.style.cssText = 'margin-left: 8px; opacity: 0.7;';
+              timerEl.textContent = '🕐';
+              timeEl.appendChild(timerEl);
+            }
+            
             messageEl.appendChild(timeEl);
+          }
+          
+          // Store message data for timer tracking
+          if (msg.expires_at) {
+            messageEl.dataset.messageId = msg.id;
+            messageEl.dataset.expiresAt = msg.expires_at;
           }
           
           // Add long-press detection for message actions
@@ -604,10 +757,37 @@
 
         // Scroll to bottom
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Start checking for expired messages
+        checkExpiredMessages();
       } catch (error) {
         console.error('Error loading messages:', error);
       }
     }
+    
+    // Check and remove expired messages
+    function checkExpiredMessages() {
+      const messagesContainer = document.getElementById('chatMessages');
+      if (!messagesContainer) return;
+      
+      const now = new Date().getTime();
+      const messages = messagesContainer.querySelectorAll('[data-expires-at]');
+      
+      messages.forEach(messageEl => {
+        const expiresAt = new Date(messageEl.dataset.expiresAt).getTime();
+        if (now >= expiresAt) {
+          // Fade out and remove
+          messageEl.style.transition = 'opacity 0.5s';
+          messageEl.style.opacity = '0';
+          setTimeout(() => {
+            messageEl.remove();
+          }, 500);
+        }
+      });
+    }
+    
+    // Check expired messages every 5 seconds
+    setInterval(checkExpiredMessages, 5000);
 
     // Send message
     async function sendMessage() {
@@ -762,13 +942,64 @@
     }
 
     // Search messages
-    document.getElementById('searchMessages').addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase();
+    let searchTimeout;
+    document.getElementById('searchMessages').addEventListener('input', async (e) => {
+      const query = e.target.value.trim();
+      
+      if (!query) {
+        renderConversations(conversations);
+        return;
+      }
+      
+      const queryLower = query.toLowerCase();
       const filtered = conversations.filter(conv => 
-        conv.username.toLowerCase().includes(query) ||
-        (conv.last_message && conv.last_message.toLowerCase().includes(query))
+        conv.username.toLowerCase().includes(queryLower) ||
+        (conv.last_message && conv.last_message.toLowerCase().includes(queryLower))
       );
-      renderConversations(filtered);
+      
+      // If no conversations match, search for users
+      if (filtered.length === 0 && query.length >= 2) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(async () => {
+          try {
+            const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(query)}`);
+            if (data.users && data.users.length > 0) {
+              // Display found users as potential new conversations
+              const list = document.getElementById('conversationsList');
+              list.innerHTML = `
+                <div style="padding: 12px 16px; font-size: 12px; color: var(--ig-secondary-text); font-weight: 600;">
+                  SEARCH RESULTS
+                </div>
+              `;
+              
+              data.users.forEach(user => {
+                const userEl = document.createElement('div');
+                userEl.className = 'ig-conversation';
+                userEl.innerHTML = `
+                  <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" alt="${user.username}" class="ig-conversation-avatar">
+                  <div class="ig-conversation-info">
+                    <div class="ig-conversation-name">${user.fullname || user.username}</div>
+                    <div class="ig-conversation-message">@${user.username}</div>
+                  </div>
+                `;
+                userEl.onclick = () => {
+                  openChat(user.id, user.username, user.profile_picture);
+                  e.target.value = '';
+                  renderConversations(conversations);
+                };
+                list.appendChild(userEl);
+              });
+            } else {
+              renderConversations([]);
+            }
+          } catch (error) {
+            console.error('Search error:', error);
+            renderConversations(filtered);
+          }
+        }, 300);
+      } else {
+        renderConversations(filtered);
+      }
     });
 
     // Socket listeners
@@ -776,33 +1007,113 @@
       if (data.sender_id === currentContactId) {
         const messagesContainer = document.getElementById('chatMessages');
         const messageEl = document.createElement('div');
-        messageEl.className = 'ig-message ig-message-received';
         
-        if (data.type === 'voice') {
+        if (data.type === 'image') {
+          messageEl.className = 'ig-message-media ig-message-received';
+          const filename = data.original_filename || data.content.split('/').pop();
           messageEl.innerHTML = `
-            <audio controls style="max-width: 300px;">
-              <source src="${data.content}" type="audio/webm">
-            </audio>
+            <div style="position: relative; display: inline-block;">
+              <img src="${data.content}" style="max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;" onclick='openMediaPreview(\`${data.content}\`, "image", \`${filename}\`)'>
+              <button onclick='event.stopPropagation(); downloadFile(\`${data.content}\`, \`${filename}\`)' style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="ig-message-time">${formatMessageTime(data.created_at)}</div>
           `;
-        } else if (data.type === 'image') {
-          messageEl.innerHTML = `<img src="${data.content}" style="max-width: 300px; border-radius: 12px; cursor: pointer;" onclick="window.open('${data.content}')">`;
+        } else if (data.type === 'gif') {
+          messageEl.className = 'ig-message-media ig-message-received';
+          messageEl.innerHTML = `
+            <div style="position: relative; display: inline-block;">
+              <img src="${data.content}" style="max-width: 250px; max-height: 250px; border-radius: 18px; cursor: pointer; display: block;" onclick='openMediaPreview(\`${data.content}\`, "gif")'>
+            </div>
+            <div class="ig-message-time">${formatMessageTime(data.created_at)}</div>
+          `;
+        } else if (data.type === 'voice') {
+          messageEl.className = 'ig-message ig-message-received';
+          const filename = data.original_filename || data.content.split('/').pop();
+          messageEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <audio controls style="max-width: 200px;">
+                <source src="${data.content}" type="audio/webm">
+              </audio>
+              <button onclick='downloadFile(\`${data.content}\`, \`${filename}\`)' style="background: var(--ig-secondary-background); border: none; color: var(--ig-primary-text); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                </svg>
+              </button>
+            </div>
+          `;
+        } else if (data.type === 'video') {
+          messageEl.className = 'ig-message ig-message-received';
+          const filename = data.original_filename || data.content.split('/').pop();
+          messageEl.innerHTML = `
+            <div style="position: relative; display: inline-block;">
+              <video controls style="max-width: 250px; max-height: 350px; border-radius: 18px; display: block;">
+                <source src="${data.content}">
+              </video>
+              <button onclick="event.stopPropagation(); downloadFile('${data.content}', '${filename}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+                <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                </svg>
+              </button>
+            </div>
+          `;
+        } else if (data.type === 'file') {
+          messageEl.className = 'ig-message ig-message-received';
+          const fileName = data.original_filename || data.content.split('/').pop();
+          const isPdf = data.content.match(/\.pdf$/i) || fileName.match(/\.pdf$/i);
+          const isDoc = data.content.match(/\.(doc|docx|txt)$/i) || fileName.match(/\.(doc|docx|txt)$/i);
+          const icon = isPdf ? '📄' : isDoc ? '📝' : '📎';
+          messageEl.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px; cursor: pointer;" onclick='openMediaPreview(\`${data.content}\`, "file", \`${fileName}\`)'>
+              <div style="font-size: 32px;">${icon}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
+              </div>
+              <button onclick='event.stopPropagation(); downloadFile(\`${data.content}\`, \`${fileName}\`)' style="background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Download">
+                <svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+                </svg>
+              </button>
+            </div>
+          `;
         } else if (data.type === 'location') {
+          messageEl.className = 'ig-message ig-message-received';
           const loc = JSON.parse(data.content);
           messageEl.innerHTML = `
-            <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; text-decoration: none; color: var(--ig-primary-text);">
+            <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; text-decoration: none; color: inherit;">
               <div style="font-weight: 600;">📍 Location</div>
-              <div style="font-size: 12px; color: var(--ig-secondary-text);">Tap to view on map</div>
+              <div style="font-size: 12px; opacity: 0.8;">Tap to view on map</div>
             </a>
           `;
+        } else if (data.type === 'todo') {
+          messageEl.className = 'ig-message ig-message-received';
+          const todo = JSON.parse(data.content);
+          let html = `<div style="font-weight: 600; margin-bottom: 8px;">✓ ${todo.title}</div>`;
+          todo.items.forEach((item, idx) => {
+            html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+              <input type="checkbox" ${item.checked ? 'checked' : ''} disabled style="width: 16px; height: 16px;">
+              <span style="font-size: 14px;">${item.text}</span>
+            </div>`;
+          });
+          messageEl.innerHTML = html;
         } else {
+          messageEl.className = 'ig-message ig-message-received';
           messageEl.textContent = data.content;
+          const timeEl = document.createElement('div');
+          timeEl.className = 'ig-message-time';
+          timeEl.textContent = formatMessageTime(data.created_at);
+          messageEl.appendChild(timeEl);
         }
         
         messagesContainer.appendChild(messageEl);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
       
-      // Reload conversations
+      // Reload conversations to update last message
       loadConversations();
     });
     
@@ -824,6 +1135,18 @@
           statusEl.textContent = 'Offline';
           statusEl.style.color = 'var(--ig-secondary-text)';
         }
+      }
+    });
+    
+    // Listen for expired messages
+    InnovateAPI.getSocket().on('message:expired', (messageId) => {
+      const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageEl) {
+        messageEl.style.transition = 'opacity 0.5s';
+        messageEl.style.opacity = '0';
+        setTimeout(() => {
+          messageEl.remove();
+        }, 500);
       }
     });
     
@@ -971,23 +1294,34 @@
     
     // File sending
     async function sendFile(file, filename) {
-      if (!currentContactId) return;
+      if (!currentContactId) {
+        InnovateAPI.showAlert('Please select a conversation first', 'error');
+        return;
+      }
       
       const formData = new FormData();
       formData.append('file', file, filename || file.name);
       formData.append('receiver_id', currentContactId);
-      formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
+      
+      // Determine type
+      let fileType = 'file';
+      if (file.type.startsWith('image/')) {
+        fileType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        fileType = 'video';
+      }
+      formData.append('type', fileType);
       
       try {
         const response = await InnovateAPI.apiRequest('/messages/send', {
           method: 'POST',
-          body: formData,
-          headers: {}
+          body: formData
         });
         
         loadMessages(currentContactId);
         InnovateAPI.showAlert('File sent', 'success');
       } catch (error) {
+        console.error('File send error:', error);
         InnovateAPI.showAlert('Failed to send file', 'error');
       }
     }
@@ -1029,6 +1363,38 @@
       document.getElementById('emojiModal').style.display = 'none';
     }
     
+    function switchEmojiTab(tab) {
+      const emojiTab = document.getElementById('emojiTab');
+      const gifTab = document.getElementById('gifTab');
+      const emojiContent = document.getElementById('emojiContent');
+      const gifContent = document.getElementById('gifContent');
+      
+      if (tab === 'emoji') {
+        emojiTab.classList.add('active');
+        emojiTab.style.borderBottom = '2px solid var(--ig-blue)';
+        emojiTab.style.color = 'var(--ig-primary-text)';
+        gifTab.classList.remove('active');
+        gifTab.style.borderBottom = '2px solid transparent';
+        gifTab.style.color = 'var(--ig-secondary-text)';
+        emojiContent.style.display = 'block';
+        gifContent.style.display = 'none';
+      } else {
+        gifTab.classList.add('active');
+        gifTab.style.borderBottom = '2px solid var(--ig-blue)';
+        gifTab.style.color = 'var(--ig-primary-text)';
+        emojiTab.classList.remove('active');
+        emojiTab.style.borderBottom = '2px solid transparent';
+        emojiTab.style.color = 'var(--ig-secondary-text)';
+        gifContent.style.display = 'block';
+        emojiContent.style.display = 'none';
+        // Load trending GIFs on first open
+        const gifGrid = document.getElementById('gifGridInPicker');
+        if (gifGrid.children.length === 1) {
+          searchGifsInPicker('trending');
+        }
+      }
+    }
+    
     function insertEmoji(emoji) {
       const input = document.getElementById('messageInput');
       const start = input.selectionStart;
@@ -1041,6 +1407,66 @@
       
       // Trigger input event to show send button if needed
       input.dispatchEvent(new Event('input'));
+    }
+    
+    // GIF search in emoji picker
+    let gifSearchTimeoutInPicker;
+    async function searchGifsInPicker(query) {
+      clearTimeout(gifSearchTimeoutInPicker);
+      gifSearchTimeoutInPicker = setTimeout(async () => {
+        const grid = document.getElementById('gifGridInPicker');
+        grid.innerHTML = '<div style="text-align: center; padding: 20px; grid-column: 1/-1; color: var(--ig-secondary-text);">Searching...</div>';
+        
+        try {
+          const endpoint = query === 'trending' ? 
+            `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20` :
+            `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=20`;
+          
+          const response = await fetch(endpoint);
+          const data = await response.json();
+          
+          grid.innerHTML = '';
+          if (data.data.length === 0) {
+            grid.innerHTML = '<div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">No GIFs found</div>';
+            return;
+          }
+          
+          data.data.forEach(gif => {
+            const img = document.createElement('img');
+            img.src = gif.images.fixed_height_small.url;
+            img.style.cssText = 'width: 100%; height: 150px; object-fit: cover; border-radius: 8px; cursor: pointer;';
+            img.onclick = () => sendGifFromPicker(gif.images.fixed_height.url);
+            grid.appendChild(img);
+          });
+        } catch (error) {
+          grid.innerHTML = '<div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">Failed to load GIFs</div>';
+        }
+      }, 500);
+    }
+    
+    async function sendGifFromPicker(gifUrl) {
+      if (!currentContactId) {
+        InnovateAPI.showAlert('Please select a conversation first', 'error');
+        return;
+      }
+      
+      closeEmojiPicker();
+      
+      try {
+        await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: currentContactId,
+            content: gifUrl,
+            type: 'gif'
+          })
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('GIF sent', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send GIF', 'error');
+      }
     }
     
     // Message Actions Functions
@@ -1459,6 +1885,88 @@
       openCamera();
     }
     
+    // Download file function
+    function downloadFile(url, filename) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || url.split('/').pop();
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    // Open media preview modal
+    function openMediaPreview(url, type, filename) {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 999999; display: flex; align-items: center; justify-content: center; flex-direction: column;';
+      
+      const displayFilename = filename || url.split('/').pop();
+      let content = '';
+      if (type === 'image' || type === 'gif') {
+        content = `<img src="${url}" style="max-width: 90vw; max-height: 80vh; object-fit: contain; border-radius: 8px;">`;
+      } else if (type === 'file') {
+        const isPdf = url.match(/\.pdf$/i) || (filename && filename.match(/\.pdf$/i));
+        const isTxt = url.match(/\.txt$/i) || (filename && filename.match(/\.txt$/i));
+        const isDoc = url.match(/\.(doc|docx)$/i) || (filename && filename.match(/\.(doc|docx)$/i));
+        
+        if (isPdf) {
+          // PDF preview with embedded viewer
+          content = `<iframe src="${url}#toolbar=1&navpanes=0&scrollbar=1" style="width: 90vw; height: 85vh; border: none; border-radius: 8px; background: white;"></iframe>`;
+        } else if (isTxt) {
+          // Text file preview - fetch and display content
+          content = `<div id="textPreviewContainer" style="width: 90vw; height: 85vh; background: white; border-radius: 8px; overflow: auto; padding: 20px;">
+            <div style="text-align: center; padding: 40px; color: #666;">Loading...</div>
+          </div>`;
+          // Fetch text content
+          fetch(url)
+            .then(response => response.text())
+            .then(text => {
+              const container = document.getElementById('textPreviewContainer');
+              if (container) {
+                container.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; color: #333; margin: 0;">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+              }
+            })
+            .catch(() => {
+              const container = document.getElementById('textPreviewContainer');
+              if (container) {
+                container.innerHTML = `<div style="text-align: center; padding: 40px; color: #666;">Failed to load text file</div>`;
+              }
+            });
+        } else if (isDoc) {
+          // DOC/DOCX preview using Google Docs Viewer
+          const encodedUrl = encodeURIComponent(window.location.origin + url);
+          content = `<iframe src="https://docs.google.com/viewer?url=${encodedUrl}&embedded=true" style="width: 90vw; height: 85vh; border: none; border-radius: 8px; background: white;"></iframe>`;
+        } else {
+          content = `<div style="text-align: center; color: white; padding: 40px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">📄</div>
+            <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px;">${displayFilename}</div>
+            <div style="font-size: 18px; margin-bottom: 30px; color: rgba(255,255,255,0.7);">Preview not available</div>
+            <button onclick="downloadFile('${url}', '${displayFilename}')" style="padding: 14px 28px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600;">Download File</button>
+          </div>`;
+        }
+      }
+      
+      modal.innerHTML = `
+        <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 12px;">
+          <button onclick="downloadFile('${url}', '${displayFilename}')" style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 50%; width: 48px; height: 48px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
+            <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+            </svg>
+          </button>
+          <button onclick="this.closest('[style*=fixed]').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 50%; width: 48px; height: 48px; cursor: pointer; font-size: 32px; display: flex; align-items: center; justify-content: center;">&times;</button>
+        </div>
+        ${content}
+      `;
+      
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      };
+      
+      document.body.appendChild(modal);
+    }
+    
     // Initialize
     loadUserInfo();
     loadConversations().then(() => {
@@ -1469,6 +1977,362 @@
           openChat(conv.contact_id, conv.username, conv.profile_picture);
         }
       }
+    });
+
+    // Voice and Video Calling with WebRTC
+    let localStream = null;
+    let remoteStream = null;
+    let peerConnection = null;
+    let isCallActive = false;
+    let isVideoCall = false;
+    let isMuted = false;
+    let isVideoEnabled = true;
+    let callStartTime = null;
+    let callDurationInterval = null;
+    let currentCallContactId = null;
+
+    const configuration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
+
+    // Start voice call
+    async function startVoiceCall() {
+      if (!currentContactId) {
+        InnovateAPI.showAlert('Please select a conversation first', 'error');
+        return;
+      }
+      isVideoCall = false;
+      await initiateCall(false);
+    }
+
+    // Start video call
+    async function startVideoCall() {
+      if (!currentContactId) {
+        InnovateAPI.showAlert('Please select a conversation first', 'error');
+        return;
+      }
+      isVideoCall = true;
+      await initiateCall(true);
+    }
+
+    // Initiate call
+    async function initiateCall(video) {
+      try {
+        // Get user media
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: video
+        });
+
+        // Set up call
+        currentCallContactId = currentContactId;
+        setupCallUI(video);
+        
+        // Create peer connection
+        peerConnection = new RTCPeerConnection(configuration);
+        
+        // Add local stream to peer connection
+        localStream.getTracks().forEach(track => {
+          peerConnection.addTrack(track, localStream);
+        });
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            InnovateAPI.getSocket().emit('call:ice-candidate', {
+              to: currentCallContactId,
+              candidate: event.candidate
+            });
+          }
+        };
+
+        // Handle remote stream
+        peerConnection.ontrack = (event) => {
+          if (!remoteStream) {
+            remoteStream = new MediaStream();
+            document.getElementById('remoteVideo').srcObject = remoteStream;
+          }
+          remoteStream.addTrack(event.track);
+        };
+
+        // Create and send offer
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        // Get contact info for call
+        const contactData = conversations.find(c => c.contact_id === currentCallContactId);
+        
+        console.log('Initiating call to user:', currentCallContactId);
+        console.log('Caller info:', { id: user.id, username: user.username });
+        
+        InnovateAPI.getSocket().emit('call:initiate', {
+          to: currentCallContactId,
+          from: user.id,
+          offer: offer,
+          isVideo: video,
+          caller: {
+            username: user.username,
+            profile_picture: user.profile_picture
+          }
+        });
+
+        showActiveCall(contactData?.username || 'User', contactData?.profile_picture);
+        
+      } catch (error) {
+        console.error('Error starting call:', error);
+        InnovateAPI.showAlert('Failed to access camera/microphone', 'error');
+      }
+    }
+
+    // Setup call UI
+    function setupCallUI(video) {
+      const localVideo = document.getElementById('localVideo');
+      const remoteVideo = document.getElementById('remoteVideo');
+      
+      if (localStream) {
+        localVideo.srcObject = localStream;
+        localVideo.style.display = video ? 'block' : 'none';
+      }
+      
+      remoteVideo.style.display = video ? 'block' : 'none';
+      
+      // Show/hide video button based on call type
+      document.getElementById('videoBtn').style.display = video ? 'flex' : 'none';
+    }
+
+    // Show active call UI
+    function showActiveCall(name, avatar) {
+      document.getElementById('activeCallModal').style.display = 'flex';
+      document.getElementById('activeCallName').textContent = name;
+      document.getElementById('activeCallAvatar').src = InnovateAPI.getUserAvatar(avatar);
+      
+      isCallActive = true;
+      callStartTime = Date.now();
+      
+      // Start duration counter
+      callDurationInterval = setInterval(updateCallDuration, 1000);
+    }
+
+    // Update call duration
+    function updateCallDuration() {
+      if (!callStartTime) return;
+      
+      const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      
+      document.getElementById('callDuration').textContent = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // Show incoming call
+    function showIncomingCall(data) {
+      console.log('Incoming call received:', data);
+      document.getElementById('incomingCallModal').style.display = 'flex';
+      document.getElementById('incomingCallName').textContent = data.caller.username;
+      document.getElementById('incomingCallAvatar').src = InnovateAPI.getUserAvatar(data.caller.profile_picture);
+      document.getElementById('incomingCallType').textContent = 
+        data.isVideo ? 'Incoming video call...' : 'Incoming voice call...';
+      
+      // Store call data for accepting
+      window.incomingCallData = data;
+    }
+
+    // Accept call
+    async function acceptCall() {
+      const data = window.incomingCallData;
+      if (!data) return;
+
+      try {
+        isVideoCall = data.isVideo;
+        currentCallContactId = data.from;
+        
+        // Get user media
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: data.isVideo
+        });
+
+        // Hide incoming call modal
+        document.getElementById('incomingCallModal').style.display = 'none';
+        
+        // Setup call UI
+        setupCallUI(data.isVideo);
+        showActiveCall(data.caller.username, data.caller.profile_picture);
+
+        // Create peer connection
+        peerConnection = new RTCPeerConnection(configuration);
+        
+        // Add local stream
+        localStream.getTracks().forEach(track => {
+          peerConnection.addTrack(track, localStream);
+        });
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            InnovateAPI.getSocket().emit('call:ice-candidate', {
+              to: currentCallContactId,
+              candidate: event.candidate
+            });
+          }
+        };
+
+        // Handle remote stream
+        peerConnection.ontrack = (event) => {
+          if (!remoteStream) {
+            remoteStream = new MediaStream();
+            document.getElementById('remoteVideo').srcObject = remoteStream;
+          }
+          remoteStream.addTrack(event.track);
+        };
+
+        // Set remote description and create answer
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        // Send answer
+        InnovateAPI.getSocket().emit('call:answer', {
+          to: data.from,
+          answer: answer
+        });
+
+      } catch (error) {
+        console.error('Error accepting call:', error);
+        InnovateAPI.showAlert('Failed to accept call', 'error');
+        rejectCall();
+      }
+    }
+
+    // Reject call
+    function rejectCall() {
+      const data = window.incomingCallData;
+      if (data) {
+        InnovateAPI.getSocket().emit('call:reject', {
+          to: data.from
+        });
+      }
+      
+      document.getElementById('incomingCallModal').style.display = 'none';
+      window.incomingCallData = null;
+    }
+
+    // End call
+    function endCall() {
+      // Send end call signal
+      if (currentCallContactId) {
+        InnovateAPI.getSocket().emit('call:end', {
+          to: currentCallContactId
+        });
+      }
+
+      // Clean up
+      cleanupCall();
+    }
+
+    // Cleanup call resources
+    function cleanupCall() {
+      // Stop all tracks
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+
+      if (remoteStream) {
+        remoteStream.getTracks().forEach(track => track.stop());
+        remoteStream = null;
+      }
+
+      // Close peer connection
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+
+      // Clear duration interval
+      if (callDurationInterval) {
+        clearInterval(callDurationInterval);
+        callDurationInterval = null;
+      }
+
+      // Hide call UI
+      document.getElementById('activeCallModal').style.display = 'none';
+      document.getElementById('incomingCallModal').style.display = 'none';
+
+      // Reset state
+      isCallActive = false;
+      currentCallContactId = null;
+      callStartTime = null;
+      isMuted = false;
+      isVideoEnabled = true;
+    }
+
+    // Toggle mute
+    function toggleMute() {
+      if (!localStream) return;
+      
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        isMuted = !audioTrack.enabled;
+        
+        const muteBtn = document.getElementById('muteBtn');
+        muteBtn.style.background = isMuted ? '#ed4956' : 'rgba(255,255,255,0.2)';
+      }
+    }
+
+    // Toggle video
+    function toggleVideo() {
+      if (!localStream) return;
+      
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        isVideoEnabled = videoTrack.enabled;
+        
+        const videoBtn = document.getElementById('videoBtn');
+        videoBtn.style.background = !isVideoEnabled ? '#ed4956' : 'rgba(255,255,255,0.2)';
+        
+        document.getElementById('localVideo').style.display = isVideoEnabled ? 'block' : 'none';
+      }
+    }
+
+    // Toggle speaker (placeholder - browser handles audio output)
+    function toggleSpeaker() {
+      InnovateAPI.showAlert('Speaker toggle', 'info');
+    }
+
+    console.log('Registering call event listeners...');
+    InnovateAPI.getSocket().on('call:incoming', (data) => {
+      console.log('call:incoming event received:', data);
+    InnovateAPI.getSocket().on('call:incoming', (data) => {
+      showIncomingCall(data);
+    });
+
+    InnovateAPI.getSocket().on('call:answered', async (data) => {
+      if (peerConnection && data.answer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    });
+
+    InnovateAPI.getSocket().on('call:ice-candidate', async (data) => {
+      if (peerConnection && data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
+    InnovateAPI.getSocket().on('call:rejected', () => {
+      InnovateAPI.showAlert('Call rejected', 'info');
+      cleanupCall();
+    });
+
+    InnovateAPI.getSocket().on('call:ended', () => {
+      InnovateAPI.showAlert('Call ended', 'info');
+      cleanupCall();
     });
   </script>
 </body>

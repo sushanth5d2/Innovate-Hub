@@ -93,18 +93,21 @@ router.post('/send', authMiddleware, upload.fields([
 ]), (req, res) => {
   const db = getDb();
   const senderId = req.user.userId;
-  const { receiver_id, content, type } = req.body;
+  const { receiver_id, content, type, timer } = req.body;
   
   let messageContent = content;
   let messageType = type || 'text';
   
   // Handle file upload
+  let originalFilename = null;
   if (req.files?.file) {
     const file = req.files.file[0];
+    originalFilename = file.originalname;
     messageContent = file.mimetype.startsWith('image/') 
       ? `/uploads/images/${file.filename}`
       : `/uploads/files/${file.filename}`;
-    messageType = file.mimetype.startsWith('image/') ? 'image' : 'file';
+    messageType = file.mimetype.startsWith('image/') ? 'image' : 
+                  file.mimetype.startsWith('video/') ? 'video' : 'file';
   }
   
   // Handle voice message
@@ -114,12 +117,20 @@ router.post('/send', authMiddleware, upload.fields([
     messageType = 'voice';
   }
 
+  // Calculate expiration time if timer is set
+  let expiresAt = null;
+  if (timer) {
+    const now = new Date();
+    now.setSeconds(now.getSeconds() + parseInt(timer));
+    expiresAt = now.toISOString();
+  }
+
   const query = `
-    INSERT INTO messages (sender_id, receiver_id, content, type, created_at)
-    VALUES (?, ?, ?, ?, datetime('now'))
+    INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `;
 
-  db.run(query, [senderId, receiver_id, messageContent, messageType], function(err) {
+  db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename], function(err) {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Error sending message' });
@@ -140,6 +151,9 @@ router.post('/send', authMiddleware, upload.fields([
           receiver_id,
           content: messageContent,
           type: messageType,
+          timer: timer || null,
+          expires_at: expiresAt,
+          original_filename: originalFilename,
           sender_username: sender.username,
           sender_picture: sender.profile_picture,
           created_at: new Date().toISOString()

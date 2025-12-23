@@ -16,9 +16,12 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.ALLOWED_ORIGINS || 'http://localhost:3000',
-    methods: ['GET', 'POST']
-  }
+    origin: process.env.ALLOWED_ORIGINS || '*',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
 
 // Make io accessible to routes
@@ -57,7 +60,10 @@ app.use(compression());
 app.use(responseTimeLogger);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
@@ -106,12 +112,36 @@ app.get('/home', (req, res) => {
 setInterval(() => {
   const { getDb } = require('./config/database');
   const db = getDb();
-  db.run(`
-    DELETE FROM messages 
+  
+  // First, get expired messages to notify users
+  db.all(`
+    SELECT id, sender_id, receiver_id 
+    FROM messages 
     WHERE expires_at IS NOT NULL 
     AND datetime(expires_at) <= datetime('now')
-  `, (err) => {
-    if (err) console.error('Error cleaning expired messages:', err);
+  `, (err, expiredMessages) => {
+    if (err) {
+      console.error('Error fetching expired messages:', err);
+      return;
+    }
+    
+    // Notify users via socket
+    expiredMessages.forEach(msg => {
+      io.to(`user_${msg.sender_id}`).emit('message:expired', msg.id);
+      io.to(`user_${msg.receiver_id}`).emit('message:expired', msg.id);
+    });
+    
+    // Delete expired messages
+    db.run(`
+      DELETE FROM messages 
+      WHERE expires_at IS NOT NULL 
+      AND datetime(expires_at) <= datetime('now')
+    `, (err) => {
+      if (err) console.error('Error cleaning expired messages:', err);
+      else if (expiredMessages.length > 0) {
+        console.log(`Cleaned ${expiredMessages.length} expired messages`);
+      }
+    });
   });
 }, 60000); // Run every 60 seconds
 
@@ -125,6 +155,10 @@ io.on('connection', (socket) => {
   socket.on('user:join', (userId) => {
     connectedUsers.set(userId, socket.id);
     socket.userId = userId;
+    
+    // Join user-specific room for receiving messages
+    socket.join(`user_${userId}`);
+    console.log(`User ${userId} joined room user_${userId}, socket: ${socket.id}`);
     
     // Broadcast online status
     io.emit('user:online', userId);
@@ -183,6 +217,42 @@ io.on('connection', (socket) => {
     if (userSocketId) {
       io.to(userSocketId).emit('notification:receive', notification);
     }
+  });
+
+  // WebRTC Call Signaling
+  socket.on('call:initiate', (data) => {
+    const { to, from, offer, isVideo, caller } = data;
+    console.log(`Call initiated from ${from} to ${to}, video: ${isVideo}`);
+    console.log(`Emitting to room: user_${to}`);
+    io.to(`user_${to}`).emit('call:incoming', {
+      from,
+      offer,
+      isVideo,
+      caller
+    });
+  });
+
+  socket.on('call:answer', (data) => {
+    const { to, answer } = data;
+    console.log(`Call answered, sending to user_${to}`);
+    io.to(`user_${to}`).emit('call:answered', { answer });
+  });
+
+  socket.on('call:ice-candidate', (data) => {
+    const { to, candidate } = data;
+    io.to(`user_${to}`).emit('call:ice-candidate', { candidate });
+  });
+
+  socket.on('call:reject', (data) => {
+    const { to } = data;
+    console.log(`Call rejected, notifying user_${to}`);
+    io.to(`user_${to}`).emit('call:rejected');
+  });
+
+  socket.on('call:end', (data) => {
+    const { to } = data;
+    console.log(`Call ended, notifying user_${to}`);
+    io.to(`user_${to}`).emit('call:ended');
   });
 
   // Disconnect
