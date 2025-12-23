@@ -148,10 +148,17 @@ function previewFiles(input, previewContainer) {
 
 // Logout
 function logout() {
+  // Disconnect socket before logout
+  if (socket && socket.connected) {
+    socket.disconnect();
+    socket = null;
+  }
+  
   apiRequest('/auth/logout', { method: 'POST' })
     .catch(() => {})
     .finally(() => {
       removeToken();
+      localStorage.removeItem('user');
       window.location.href = '/';
     });
 }
@@ -164,9 +171,8 @@ function copyToClipboard(text) {
 }
 
 // Emoji picker (simple implementation)
-const emojis = ['😀', '😂', '😍', '🎉', '👍', '❤️', '🔥', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏆', '🥇', '🎯'];
-
 function createEmojiPicker(inputElement) {
+  const emojisList = ['😀', '😂', '😍', '🎉', '👍', '❤️', '🔥', '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏆', '🥇', '🎯'];
   const picker = document.createElement('div');
   picker.className = 'emoji-picker';
   picker.style.cssText = `
@@ -180,7 +186,7 @@ function createEmojiPicker(inputElement) {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   `;
   
-  emojis.forEach(emoji => {
+  emojisList.forEach(emoji => {
     const span = document.createElement('span');
     span.textContent = emoji;
     span.style.cssText = 'cursor: pointer; padding: 5px; font-size: 24px;';
@@ -198,9 +204,24 @@ function createEmojiPicker(inputElement) {
 let socket;
 
 function initSocket() {
-  if (!isAuthenticated()) return;
+  if (!isAuthenticated()) {
+    console.log('Cannot initialize socket: User not authenticated');
+    return null;
+  }
   
-  socket = io(window.location.origin);
+  // Prevent multiple socket connections
+  if (socket && socket.connected) {
+    console.log('Socket already connected');
+    return socket;
+  }
+  
+  socket = io(window.location.origin, {
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 5
+  });
+  
   const user = getCurrentUser();
   
   socket.on('connect', () => {
@@ -214,12 +235,16 @@ function initSocket() {
     console.log('Disconnected from server');
   });
   
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
+  });
+  
   return socket;
 }
 
 // Get socket instance
 function getSocket() {
-  if (!socket) {
+  if (!socket || !socket.connected) {
     socket = initSocket();
   }
   return socket;

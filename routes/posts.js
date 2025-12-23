@@ -347,7 +347,11 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
 
         // Update post likes count
         db.run('UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?', [postId]);
-        res.json({ success: true, liked: false });
+        
+        // Get updated count
+        db.get('SELECT likes_count FROM posts WHERE id = ?', [postId], (err, post) => {
+          res.json({ success: true, liked: false, likes_count: post ? post.likes_count : 0 });
+        });
       });
     } else {
       // Like
@@ -360,7 +364,7 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
         db.run('UPDATE posts SET likes_count = likes_count + 1 WHERE id = ?', [postId]);
 
         // Create notification for post owner
-        db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
+        db.get('SELECT user_id, likes_count FROM posts WHERE id = ?', [postId], (err, post) => {
           if (post && post.user_id !== userId) {
             db.run(
               'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
@@ -377,11 +381,34 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
               });
             }
           }
+          
+          res.json({ success: true, liked: true, likes_count: post ? post.likes_count : 1 });
         });
-
-        res.json({ success: true, liked: true });
       });
     }
+  });
+});
+
+// Get users who liked a post
+router.get('/:postId/likes', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { postId } = req.params;
+
+  const query = `
+    SELECT u.id as user_id, u.username, u.profile_picture, u.bio, pl.created_at as liked_at
+    FROM post_likes pl
+    JOIN users u ON pl.user_id = u.id
+    WHERE pl.post_id = ?
+    ORDER BY pl.created_at DESC
+  `;
+
+  db.all(query, [postId], (err, likes) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Error fetching likes' });
+    }
+
+    res.json({ success: true, likes: likes || [] });
   });
 });
 

@@ -5,7 +5,12 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { initDatabase } = require('./config/database');
+const { initRedis } = require('./config/cache');
+const { responseTimeLogger } = require('./middleware/performance');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,18 +21,58 @@ const io = socketIo(server, {
   }
 });
 
+// Make io accessible to routes
+app.set('io', io);
+
+// Trust proxy (required for rate limiting in development containers)
+app.set('trust proxy', 1);
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for now to allow inline scripts
+  crossOriginEmbedderPolicy: false
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // Limit auth attempts
+  message: 'Too many login attempts, please try again later.'
+});
+
+app.use('/api/', limiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// Compression middleware
+app.use(compression());
+
+// Performance monitoring
+app.use(responseTimeLogger);
+
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  etag: true
+}));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0
+}));
 
-// Initialize database
-initDatabase();
+// Initialize database (removed - will be called in startServer)
+// initDatabase();
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -38,6 +83,7 @@ app.use('/api/events', require('./routes/events'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/search', require('./routes/search'));
+app.use('/api/ml', require('./routes/ml'));
 
 // Serve HTML pages
 app.get('/', (req, res) => {
@@ -55,6 +101,19 @@ app.get('/register', (req, res) => {
 app.get('/home', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'home.html'));
 });
+
+// Clean up expired timer messages every minute
+setInterval(() => {
+  const { getDb } = require('./config/database');
+  const db = getDb();
+  db.run(`
+    DELETE FROM messages 
+    WHERE expires_at IS NOT NULL 
+    AND datetime(expires_at) <= datetime('now')
+  `, (err) => {
+    if (err) console.error('Error cleaning expired messages:', err);
+  });
+}, 60000); // Run every 60 seconds
 
 // Socket.IO connection handling
 const connectedUsers = new Map();
@@ -188,9 +247,35 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT}`);
+
+async function startServer() {
+  try {
+    // Initialize database
+    await initDatabase();
+    
+    // Initialize Redis cache (optional)
+    await initRedis();
+    
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Visit http://localhost:${PORT}`);
+      console.log('Environment:', process.env.NODE_ENV || 'development');
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, closing server gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
 
 module.exports = { app, io };

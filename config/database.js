@@ -18,6 +18,7 @@ const initDatabase = () => {
         console.log('Connected to SQLite database');
         enableForeignKeys();
         createTables();
+        migrateDatabase();
       }
     });
   } else if (dbType === 'postgresql') {
@@ -471,6 +472,38 @@ const createTables = () => {
     });
 
     console.log('SQLite tables created successfully');
+  });
+};
+
+// Migrate database schema
+const migrateDatabase = () => {
+  db.serialize(() => {
+    // Add type column to messages if not exists
+    db.run(`
+      ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding type column:', err);
+      }
+    });
+    
+    // Add timer column to messages if not exists
+    db.run(`
+      ALTER TABLE messages ADD COLUMN timer INTEGER
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding timer column:', err);
+      }
+    });
+    
+    // Add expires_at column to messages if not exists
+    db.run(`
+      ALTER TABLE messages ADD COLUMN expires_at DATETIME
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding expires_at column:', err);
+      }
+    });
   });
 };
 

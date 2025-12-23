@@ -244,7 +244,7 @@
       <div class="ig-modal-header">Create Story</div>
       <div style="padding: 20px;">
         <textarea id="storyContent" class="ig-chat-input" placeholder="What's on your mind?" rows="4" style="width: 100%; border-radius: 8px; resize: vertical;"></textarea>
-        <div id="storyPreview" style="margin-top: 12px;"></div>
+        <div id="storyPreview" style="margin-top: 12px; max-height: 300px; overflow: hidden; display: flex; justify-content: center;"></div>
         <label class="ig-modal-item" style="display: flex; align-items: center; justify-content: center; color: var(--ig-blue); cursor: pointer; margin-top: 12px;">
           <input type="file" id="storyMedia" accept="image/*,video/*" style="display: none;">
           Add Photo or Video (Max 120 sec)
@@ -904,9 +904,27 @@
           return;
         }
         
-        data.posts.forEach(post => {
+        data.posts.forEach((post, index) => {
           const postEl = createInstagramPost(post);
+          postEl.style.cursor = 'pointer';
           feed.appendChild(postEl);
+          
+          // Initialize carousel for posts with multiple images
+          if (post.images && post.images.length > 1) {
+            initCarousel(post.id, post.images.length);
+            enableCarouselSwipe(post.id);
+          }
+          
+          // Add click handler to open full-screen viewer
+          postEl.addEventListener('click', (e) => {
+            // Don't open if clicking buttons or inputs, but allow image clicks
+            if (e.target.closest('button, input, a:not(.ig-post-user), .ig-action-btn, .ig-carousel-btn')) {
+              console.log('Click prevented - interactive element');
+              return;
+            }
+            console.log('Opening full-screen viewer for post', index);
+            openFullScreenPost(index, data.posts);
+          });
         });
       } catch (error) {
         console.error('Error loading posts:', error);
@@ -919,6 +937,9 @@
       postEl.className = 'ig-post';
       postEl.dataset.postId = post.id;
       
+      // Make post clickable to open full-screen viewer
+      postEl.style.cursor = 'pointer';
+      
       const isLiked = post.user_has_liked || false;
       const isSaved = post.is_saved || false;
       const likesCount = post.likes_count || post.interested_count || 0;
@@ -929,7 +950,27 @@
       if (post.video_url) {
         mediaHtml = `<video src="${post.video_url}" class="ig-post-image" controls ondblclick="toggleLike(${post.id})"></video>`;
       } else if (post.images && post.images.length > 0) {
-        mediaHtml = `<img src="${post.images[0]}" alt="Post image" class="ig-post-image" ondblclick="toggleLike(${post.id})">`;
+        if (post.images.length === 1) {
+          mediaHtml = `<img src="${post.images[0]}" alt="Post image" class="ig-post-image" ondblclick="toggleLike(${post.id})">`;  
+        } else {
+          // Multiple images carousel
+          mediaHtml = `
+            <div class="ig-carousel" id="carousel-${post.id}">
+              <div class="ig-carousel-inner" id="carousel-inner-${post.id}">
+                ${post.images.map((img, idx) => `
+                  <img src="${img}" alt="Post image ${idx+1}" class="ig-post-image" ondblclick="toggleLike(${post.id})">
+                `).join('')}
+              </div>
+              ${post.images.length > 1 ? `
+                <button class="ig-carousel-btn ig-carousel-prev" onclick="carouselPrev(${post.id})" style="left: 10px;">‹</button>
+                <button class="ig-carousel-btn ig-carousel-next" onclick="carouselNext(${post.id})" style="right: 10px;">›</button>
+                <div class="ig-carousel-dots" id="dots-${post.id}">
+                  ${post.images.map((_, idx) => `<span class="ig-carousel-dot ${idx === 0 ? 'active' : ''}" onclick="carouselGoTo(${post.id}, ${idx})"></span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }
       }
       
       postEl.innerHTML = `
@@ -960,28 +1001,28 @@
             </button>
             
             <button class="ig-action-btn" onclick="focusComment(${post.id})">
-              <svg aria-label="Comment" fill="none" height="24" viewBox="0 0 24 24" width="24">
-                <path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+              <svg aria-label="Comment" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+                <path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" fill="none" stroke-linejoin="round"></path>
               </svg>
             </button>
             
             <button class="ig-action-btn" onclick="sharePost(${post.id})">
-              <svg aria-label="Share" fill="none" height="24" viewBox="0 0 24 24" width="24">
-                <line fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" x1="22" x2="9.218" y1="3" y2="10.083"></line>
-                <polygon fill="none" points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></polygon>
+              <svg aria-label="Share" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+                <line fill="none" stroke-linejoin="round" x1="22" x2="9.218" y1="3" y2="10.083"></line>
+                <polygon fill="none" points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke-linejoin="round"></polygon>
               </svg>
             </button>
           </div>
           
           <button class="ig-action-btn ${isSaved ? 'saved' : ''}" onclick="toggleSave(${post.id})">
-            <svg aria-label="Save" fill="${isSaved ? 'currentColor' : 'none'}" height="24" viewBox="0 0 24 24" width="24">
-              <polygon fill="none" points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polygon>
+            <svg aria-label="Save" fill="${isSaved ? '#262626' : 'none'}" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+              <polygon fill="none" points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke-linecap="round" stroke-linejoin="round"></polygon>
             </svg>
           </button>
         </div>
         
         <div class="ig-post-likes">
-          <span class="ig-post-likes-count" id="likes-${post.id}">${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</span>
+          <span class="ig-post-likes-count" id="likes-${post.id}" onclick="showWhoLiked(${post.id})" style="cursor: pointer;">${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</span>
         </div>
         
         ${post.content ? `
@@ -1457,7 +1498,7 @@
           
           video.src = URL.createObjectURL(file);
           video.controls = true;
-          video.style.cssText = 'max-width: 100%; border-radius: 8px;';
+          video.style.cssText = 'max-width: 100%; max-height: 280px; border-radius: 8px; object-fit: contain;';
           preview.appendChild(video);
         };
         video.src = URL.createObjectURL(file);
@@ -1466,7 +1507,7 @@
         reader.onload = (e) => {
           const img = document.createElement('img');
           img.src = e.target.result;
-          img.style.cssText = 'max-width: 100%; border-radius: 8px;';
+          img.style.cssText = 'max-width: 100%; max-height: 280px; border-radius: 8px; object-fit: contain;';
           preview.appendChild(img);
         };
         reader.readAsDataURL(file);
@@ -1729,6 +1770,446 @@
     loadUserAvatar();
     loadStories();
     loadPosts();
+
+    // Carousel navigation functions
+    const carouselStates = {};
+    
+    function initCarousel(postId, totalImages) {
+      if (!carouselStates[postId]) {
+        carouselStates[postId] = { currentIndex: 0, totalImages: totalImages };
+      }
+    }
+    
+    function carouselNext(postId) {
+      const state = carouselStates[postId];
+      if (!state) return;
+      
+      state.currentIndex = (state.currentIndex + 1) % state.totalImages;
+      updateCarousel(postId);
+    }
+    
+    function carouselPrev(postId) {
+      const state = carouselStates[postId];
+      if (!state) return;
+      
+      state.currentIndex = (state.currentIndex - 1 + state.totalImages) % state.totalImages;
+      updateCarousel(postId);
+    }
+    
+    function carouselGoTo(postId, index) {
+      const state = carouselStates[postId];
+      if (!state) return;
+      
+      state.currentIndex = index;
+      updateCarousel(postId);
+    }
+    
+    function updateCarousel(postId) {
+      const state = carouselStates[postId];
+      if (!state) return;
+      
+      const inner = document.getElementById(`carousel-inner-${postId}`);
+      const dots = document.querySelectorAll(`#dots-${postId} .ig-carousel-dot`);
+      
+      if (inner) {
+        inner.style.transform = `translateX(-${state.currentIndex * 100}%)`;
+      }
+      
+      dots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === state.currentIndex);
+      });
+    }
+    
+    // Enable swipe for carousels
+    function enableCarouselSwipe(postId) {
+      const carousel = document.getElementById(`carousel-${postId}`);
+      if (!carousel) return;
+      
+      let startX = 0;
+      let isDragging = false;
+      
+      carousel.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+      });
+      
+      carousel.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+      });
+      
+      carousel.addEventListener('touchend', (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        
+        const endX = e.changedTouches[0].clientX;
+        const diff = startX - endX;
+        
+        if (Math.abs(diff) > 50) {
+          if (diff > 0) {
+            carouselNext(postId);
+          } else {
+            carouselPrev(postId);
+          }
+        }
+      });
+    }
+    
+    // Image zoom function
+    function zoomImage(imgSrc) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-zoom-modal';
+      modal.innerHTML = `
+        <div class="ig-zoom-overlay" onclick="this.parentElement.remove()">
+          <img src="${imgSrc}" class="ig-zoom-image" onclick="event.stopPropagation()">
+          <button class="ig-zoom-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      
+      // Enable pinch to zoom
+      const img = modal.querySelector('.ig-zoom-image');
+      let scale = 1;
+      let lastDistance = 0;
+      
+      img.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          lastDistance = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+          );
+        }
+      });
+      
+      img.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+          e.preventDefault();
+          const distance = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+          );
+          
+          if (lastDistance > 0) {
+            scale *= distance / lastDistance;
+            scale = Math.max(0.5, Math.min(scale, 4));
+            img.style.transform = `scale(${scale})`;
+          }
+          
+          lastDistance = distance;
+        }
+      });
+      
+      img.addEventListener('touchend', () => {
+        lastDistance = 0;
+      });
+    }
+    
+    // Show who liked modal
+    async function showWhoLiked(postId) {
+      try {
+        const response = await InnovateAPI.apiRequest(`/posts/${postId}/likes`);
+        
+        if (!response.likes || response.likes.length === 0) {
+          InnovateAPI.showAlert('No likes yet', 'info');
+          return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'ig-modal-overlay';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+          <div class="ig-modal" onclick="event.stopPropagation()" style="max-width: 400px; max-height: 500px; overflow-y: auto;">
+            <div class="ig-modal-header">
+              Liked by
+              <button onclick="this.closest('.ig-modal-overlay').remove()" style="position: absolute; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text);">×</button>
+            </div>
+            <div style="padding: 8px 0;">
+              ${response.likes.map(user => `
+                <a href="/profile/${user.user_id}" class="ig-modal-item" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: inherit;">
+                  <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" alt="${user.username}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: 600;">${user.username}</div>
+                    ${user.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text);">${user.bio}</div>` : ''}
+                  </div>
+                </a>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        
+        modal.onclick = (e) => {
+          if (e.target === modal) modal.remove();
+        };
+        
+        document.body.appendChild(modal);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to load likes', 'error');
+      }
+    }
+    
+    // Full-screen post viewer with vertical scrolling
+    let fullScreenPosts = [];
+    let currentFullScreenIndex = 0;
+    
+    // Helper function to extract plain text from HTML content
+    function getPlainText(htmlContent) {
+      if (!htmlContent) return '';
+      const div = document.createElement('div');
+      div.innerHTML = htmlContent;
+      return div.textContent || div.innerText || '';
+    }
+    
+    function openFullScreenPost(index, posts) {
+      console.log('openFullScreenPost called', { index, postsCount: posts.length });
+      fullScreenPosts = posts;
+      currentFullScreenIndex = index;
+      
+      const viewer = document.createElement('div');
+      viewer.id = 'fullScreenPostViewer';
+      viewer.className = 'ig-fullscreen-viewer';
+      viewer.innerHTML = `
+        <div class="ig-fullscreen-header">
+          <button class="ig-fullscreen-back" onclick="closeFullScreenPost()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="ig-fullscreen-camera" style="margin-left: auto;">
+            <svg aria-label="Camera" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23h-.005A2.31 2.31 0 0 1 3.54 6.175L1.945 4.581a.75.75 0 0 1 1.06-1.06l1.595 1.594a.767.767 0 0 0 .544.226.767.767 0 0 0 .543-.226L7.281 3.52a.75.75 0 0 1 1.061 1.06L6.827 6.175Z" fill-rule="evenodd"></path>
+              <path d="M2.25 12a9.75 9.75 0 1 1 19.5 0 9.75 9.75 0 0 1-19.5 0Zm9.75-8.25a8.25 8.25 0 1 0 0 16.5 8.25 8.25 0 0 0 0-16.5Zm0 12.5a4.25 4.25 0 1 1 0-8.5 4.25 4.25 0 0 1 0 8.5Zm0-1.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="ig-fullscreen-content" id="fullScreenContent"></div>
+      `;
+      
+      document.body.appendChild(viewer);
+      document.body.style.overflow = 'hidden';
+      
+      renderFullScreenPost(currentFullScreenIndex);
+      enableFullScreenScroll();
+    }
+    
+    function renderFullScreenPost(index) {
+      const content = document.getElementById('fullScreenContent');
+      if (!content || !fullScreenPosts || fullScreenPosts.length === 0) return;
+      
+      currentFullScreenIndex = index;
+      
+      // Render all posts for smooth scrolling
+      content.innerHTML = fullScreenPosts.map((post, idx) => {
+        const isLiked = post.user_has_liked || false;
+        const isSaved = post.is_saved || false;
+        const likesCount = post.likes_count || 0;
+        const commentsCount = post.comments_count || 0;
+        
+        // Handle media
+        let mediaHtml = '';
+        if (post.video_url) {
+          mediaHtml = `<video src="${post.video_url}" class="ig-fullscreen-image" controls></video>`;
+        } else if (post.images && post.images.length > 0) {
+          if (post.images.length === 1) {
+            mediaHtml = `<img src="${post.images[0]}" alt="Post" class="ig-fullscreen-image" ondblclick="toggleLikeFullScreen(${post.id})">`;
+          } else {
+            mediaHtml = `
+              <div class="ig-carousel" id="fs-carousel-${post.id}">
+                <div class="ig-carousel-inner" id="fs-carousel-inner-${post.id}">
+                  ${post.images.map((img, imgIdx) => `
+                    <img src="${img}" alt="Image ${imgIdx+1}" class="ig-fullscreen-image" ondblclick="toggleLikeFullScreen(${post.id})">
+                  `).join('')}
+                </div>
+                ${post.images.length > 1 ? `
+                  <button class="ig-carousel-btn ig-carousel-prev" onclick="fsCarouselPrev(${post.id}, event)" style="left: 10px;">‹</button>
+                  <button class="ig-carousel-btn ig-carousel-next" onclick="fsCarouselNext(${post.id}, event)" style="right: 10px;">›</button>
+                  <div class="ig-carousel-dots" id="fs-dots-${post.id}">
+                    ${post.images.map((_, dotIdx) => `<span class="ig-carousel-dot ${dotIdx === 0 ? 'active' : ''}" onclick="fsCarouselGoTo(${post.id}, ${dotIdx}, event)"></span>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }
+        }
+        
+        return `
+          <div class="ig-fullscreen-post" data-post-id="${post.id}" data-post-index="${idx}">
+            ${mediaHtml}
+          
+          <div class="ig-post-actions">
+            <div class="ig-post-actions-left">
+              <button class="ig-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLikeFullScreen(${post.id})" data-post-id="${post.id}">
+                <svg aria-label="Like" fill="${isLiked ? '#ed4956' : 'none'}" height="24" viewBox="0 0 24 24" width="24" stroke="${isLiked ? '#ed4956' : '#fff'}" stroke-width="2">
+                  <path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938m0-2a6.04 6.04 0 0 0-4.797 2.127 6.052 6.052 0 0 0-4.787-2.127A6.985 6.985 0 0 0 .5 9.122c0 3.61 2.55 5.827 5.015 7.97.283.246.569.494.853.747l1.027.918a44.998 44.998 0 0 0 3.518 3.018 2 2 0 0 0 2.174 0 45.263 45.263 0 0 0 3.626-3.115l.922-.824c.293-.26.59-.519.885-.774 2.334-2.025 4.98-4.32 4.98-7.94a6.985 6.985 0 0 0-6.708-7.218Z"></path>
+                </svg>
+              </button>
+              
+              <button class="ig-action-btn" onclick="focusCommentFullScreen(${post.id})">
+                <svg aria-label="Comment" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#fff" stroke-width="2">
+                  <path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" fill="none" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+              
+              <button class="ig-action-btn" onclick="sharePost(${post.id})">
+                <svg aria-label="Share" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#fff" stroke-width="2">
+                  <line fill="none" stroke-linejoin="round" x1="22" x2="9.218" y1="3" y2="10.083"></line>
+                  <polygon fill="none" points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke-linejoin="round"></polygon>
+                </svg>
+              </button>
+            </div>
+            
+            <button class="ig-action-btn ${isSaved ? 'saved' : ''}" onclick="toggleSaveFullScreen(${post.id})">
+              <svg aria-label="Save" fill="${isSaved ? '#fff' : 'none'}" height="24" viewBox="0 0 24 24" width="24" stroke="#fff" stroke-width="2">
+                <polygon fill="none" points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke-linecap="round" stroke-linejoin="round"></polygon>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="ig-post-likes">
+            <span class="ig-post-likes-count" id="fs-likes-${post.id}" onclick="showWhoLiked(${post.id})" style="cursor: pointer;">${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</span>
+          </div>
+          
+          ${post.content ? `
+          <div class="ig-post-caption">
+            <span class="ig-caption-username">${post.username}</span>
+            <span class="ig-caption-text">${getPlainText(post.content).substring(0, 200)}${getPlainText(post.content).length > 200 ? '...' : ''}</span>
+          </div>
+          ` : ''}
+          
+          ${commentsCount > 0 ? `
+          <button class="ig-post-comments-btn" onclick="window.location.href='/post/${post.id}'">
+            View all ${commentsCount} comments
+          </button>
+          ` : ''}
+          
+          <div class="ig-fullscreen-bottom-info">
+            <div class="ig-fullscreen-user">
+              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-fullscreen-avatar">
+              <span class="ig-fullscreen-username">${post.username}</span>
+            </div>
+            <button class="ig-fullscreen-more" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
+              <svg aria-label="More options" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="6" cy="12" r="1.5"></circle>
+                <circle cx="18" cy="12" r="1.5"></circle>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="ig-post-time">${InnovateAPI.formatDate(post.created_at)}</div>
+          
+          <div class="ig-add-comment">
+            <input type="text" class="ig-add-comment-input" placeholder="Add a comment..." id="fs-comment-${post.id}">
+            <button class="ig-post-comment-btn" id="fs-comment-btn-${post.id}">Post</button>
+          </div>
+        </div>
+        `;
+      }).join('');
+      
+      // Scroll to the selected post
+      setTimeout(() => {
+        const posts = content.querySelectorAll('.ig-fullscreen-post');
+        if (posts[index]) {
+          posts[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        // Initialize carousels for all posts with multiple images
+        fullScreenPosts.forEach((post, idx) => {
+          if (post.images && post.images.length > 1) {
+            initCarousel(`fs-carousel-${post.id}`, post.images.length);
+            enableCarouselSwipe(`fs-carousel-${post.id}`);
+          }
+        });
+      }, 100);
+    }
+    
+    function enableFullScreenScroll() {
+      const content = document.getElementById('fullScreenContent');
+      if (!content) return;
+      
+      let startY = 0;
+      let scrollTimeout;
+      
+      content.addEventListener('touchstart', (e) => {
+        startY = e.touches[0].clientY;
+      });
+      
+      content.addEventListener('touchend', (e) => {
+        const endY = e.changedTouches[0].clientY;
+        const diff = startY - endY;
+        
+        // Scroll to next/previous post
+        if (Math.abs(diff) > 100) {
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            if (diff > 0 && currentFullScreenIndex < fullScreenPosts.length - 1) {
+              renderFullScreenPost(currentFullScreenIndex + 1);
+            } else if (diff < 0 && currentFullScreenIndex > 0) {
+              renderFullScreenPost(currentFullScreenIndex - 1);
+            }
+          }, 100);
+        }
+      });
+      
+      // Mouse wheel support
+      content.addEventListener('wheel', (e) => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          if (e.deltaY > 0 && currentFullScreenIndex < fullScreenPosts.length - 1) {
+            renderFullScreenPost(currentFullScreenIndex + 1);
+          } else if (e.deltaY < 0 && currentFullScreenIndex > 0) {
+            renderFullScreenPost(currentFullScreenIndex - 1);
+          }
+        }, 100);
+      });
+    }
+    
+    function closeFullScreenPost() {
+      const viewer = document.getElementById('fullScreenPostViewer');
+      if (viewer) {
+        viewer.remove();
+        document.body.style.overflow = '';
+        fullScreenPosts = [];
+        currentFullScreenIndex = 0;
+      }
+    }
+    
+    // Fullscreen carousel functions
+    function fsCarouselNext(postId, event) {
+      event?.stopPropagation();
+      carouselNext(`fs-carousel-${postId}`);
+    }
+    
+    function fsCarouselPrev(postId, event) {
+      event?.stopPropagation();
+      carouselPrev(`fs-carousel-${postId}`);
+    }
+    
+    function fsCarouselGoTo(postId, index, event) {
+      event?.stopPropagation();
+      carouselGoTo(`fs-carousel-${postId}`, index);
+    }
+    
+    // Fullscreen actions
+    async function toggleLikeFullScreen(postId) {
+      await toggleLike(postId);
+      // Update fullscreen like count
+      const response = await InnovateAPI.apiRequest(`/posts/${postId}`);
+      if (response.post) {
+        const likesEl = document.getElementById(`fs-likes-${postId}`);
+        if (likesEl) {
+          likesEl.textContent = `${response.post.likes_count} ${response.post.likes_count === 1 ? 'like' : 'likes'}`;
+        }
+      }
+    }
+    
+    async function toggleSaveFullScreen(postId) {
+      await toggleSave(postId);
+    }
+    
+    function focusCommentFullScreen(postId) {
+      const input = document.getElementById(`fs-comment-${postId}`);
+      if (input) input.focus();
+    }
 
     // Set datetime inputs to India timezone (IST = UTC+5:30)
     function setIndiaDateTime() {

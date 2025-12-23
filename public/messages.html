@@ -41,15 +41,40 @@
   <div class="ig-messages-container">
     <!-- Conversations List -->
     <div class="ig-conversations">
-      <div class="ig-messages-header">
-        <div class="ig-messages-username" id="currentUsername">Loading...</div>
+      <!-- Mobile Header -->
+      <div class="ig-messages-mobile-header">
+        <button class="ig-mobile-back" onclick="window.location.href='/home'">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M21 11.25H5.81l6.22-6.22a.75.75 0 0 0-1.06-1.06l-7.5 7.5a.75.75 0 0 0 0 1.06l7.5 7.5a.75.75 0 0 0 1.06-1.06L5.81 12.75H21a.75.75 0 0 0 0-1.5Z"></path>
+          </svg>
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+          <span class="ig-messages-username" id="currentUsername" style="font-size: 18px; font-weight: 600;">Loading...</span>
+          <svg fill="currentColor" height="12" viewBox="0 0 24 24" width="12">
+            <path d="M21 7.5l-9 9-9-9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+          </svg>
+        </div>
         <button class="ig-new-message-btn" onclick="newMessage()">
           <svg aria-label="New message" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
             <path d="M12.202 3.203H5.25a3 3 0 0 0-3 3V18.75a3 3 0 0 0 3 3h12.547a3 3 0 0 0 3-3v-6.952" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
             <path d="M10.002 17.226H6.774v-3.228L18.607 2.165a1.417 1.417 0 0 1 2.004 0l1.224 1.225a1.417 1.417 0 0 1 0 2.004Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
-            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.848" x2="20.076" y1="3.924" y2="7.153"></line>
           </svg>
         </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="ig-messages-search">
+        <svg aria-label="Search" fill="currentColor" height="16" viewBox="0 0 24 24" width="16" style="margin-right: 8px; color: var(--ig-secondary-text);">
+          <path d="M19 10.5A8.5 8.5 0 1 1 10.5 2a8.5 8.5 0 0 1 8.5 8.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+          <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.511" x2="22" y1="16.511" y2="22"></line>
+        </svg>
+        <input type="text" placeholder="Ask Meta AI or search" id="searchMessages" style="background: none; border: none; outline: none; color: var(--ig-primary-text); flex: 1; font-size: 14px;">
+      </div>
+
+      <!-- Messages/Requests Tabs -->
+      <div class="ig-messages-tabs">
+        <div class="ig-messages-tab active" id="messagesTab" onclick="switchMessagesTab('messages')">Messages</div>
+        <div class="ig-messages-tab" id="requestsTab" onclick="switchMessagesTab('requests')">Requests</div>
       </div>
       
       <div class="ig-conversations-list" id="conversationsList">
@@ -62,15 +87,33 @@
       <div class="ig-chat-header">
         <button class="ig-chat-back" onclick="closeChat()">
           <svg aria-label="Back" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="2.909" x2="22.001" y1="12.004" y2="12.004"></line>
-            <polyline fill="none" points="9.276 4.726 2.001 12.004 9.276 19.274" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></polyline>
+            <path d="M21 11.25H5.81l6.22-6.22a.75.75 0 0 0-1.06-1.06l-7.5 7.5a.75.75 0 0 0 0 1.06l7.5 7.5a.75.75 0 0 0 1.06-1.06L5.81 12.75H21a.75.75 0 0 0 0-1.5Z"></path>
           </svg>
         </button>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <img id="chatAvatar" src="" alt="" class="ig-post-avatar">
-          <div>
-            <div class="ig-post-username" id="chatUsername">Select a conversation</div>
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+          <img id="chatAvatar" src="" alt="" class="ig-chat-avatar">
+          <div style="flex: 1;">
+            <div class="ig-chat-username" id="chatUsername">Select a conversation</div>
+            <div class="ig-chat-status" id="chatStatus"></div>
           </div>
+        </div>
+        <div class="ig-chat-actions">
+          <button class="ig-chat-action-btn" title="Link">
+            <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M13.5 10.5 21 3m-5.5.5h5v5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+              <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+            </svg>
+          </button>
+          <button class="ig-chat-action-btn" title="Voice Call">
+            <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M14.344 2.5c4.633.122 8.194 3.816 8.194 8.5a8.66 8.66 0 0 1-1.836 5.364L22.768 22H14.5C9.806 22 6 18.194 6 13.5S9.806 5 14.5 5c.065 0 .13 0 .194.003l.15-.003Zm0 1.5a7 7 0 1 0 4.274 12.532l.228-.168.722 2.166h-5.068a7.5 7.5 0 0 1-7.495-7.066L7 11l.003-.15C7.127 6.264 10.286 3.5 14.344 4Z" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+            </svg>
+          </button>
+          <button class="ig-chat-action-btn" title="Video Call">
+            <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M5.5 4A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20h8a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 4h-8Zm12.207 2.793a1 1 0 0 1 1.686.614l.021.113.006.117v8.726a1 1 0 0 1-1.595.78l-.108-.087-3.5-3.25v-3.512l3.5-3.25a1 1 0 0 1 .99-.25Z"></path>
+            </svg>
+          </button>
         </div>
       </div>
       
@@ -81,8 +124,240 @@
       </div>
       
       <div class="ig-chat-input-container">
-        <input type="text" class="ig-chat-input" placeholder="Message..." id="messageInput">
-        <button class="ig-send-btn" onclick="sendMessage()">Send</button>
+        <button class="ig-input-action-btn" onclick="openCamera()" title="Camera">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23h-.005A2.31 2.31 0 0 1 3.54 6.175L1.945 4.581a.75.75 0 0 1 1.06-1.06l1.595 1.594a.767.767 0 0 0 .544.226.767.767 0 0 0 .543-.226L7.281 3.52a.75.75 0 0 1 1.061 1.06L6.827 6.175Z" fill-rule="evenodd"></path>
+            <path d="M2.25 12a9.75 9.75 0 1 1 19.5 0 9.75 9.75 0 0 1-19.5 0Zm9.75-8.25a8.25 8.25 0 1 0 0 16.5 8.25 8.25 0 0 0 0-16.5Zm0 12.5a4.25 4.25 0 1 1 0-8.5 4.25 4.25 0 0 1 0 8.5Zm0-1.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z"></path>
+          </svg>
+        </button>
+        
+        <input type="text" class="ig-chat-input" placeholder="Message..." id="messageInput" onkeypress="handleMessageKeyPress(event)">
+        
+        <button class="ig-input-action-btn" onmousedown="startVoiceRecording()" onmouseup="stopVoiceRecording()" ontouchstart="startVoiceRecording()" ontouchend="stopVoiceRecording()" title="Voice" id="voiceBtn">
+          <svg aria-label="Voice message" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"></path>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"></path>
+          </svg>
+        </button>
+        
+        <label class="ig-input-action-btn" title="Gallery">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M2.25 18c0 .966.784 1.75 1.75 1.75h16a1.75 1.75 0 0 0 1.75-1.75V6a1.75 1.75 0 0 0-1.75-1.75H4A1.75 1.75 0 0 0 2.25 6Zm1.75-.25a.25.25 0 0 1-.25-.25V6a.25.25 0 0 1 .25-.25h16a.25.25 0 0 1 .25.25v12a.25.25 0 0 1-.25.25Z"></path>
+            <path d="M16 9.75a1.75 1.75 0 1 1-3.5 0 1.75 1.75 0 0 1 3.5 0Zm-13.25 8v-2.052l5.5-5.464 5.464 5.464 3.232-3.232L21 16.52v1.23a1.75 1.75 0 0 1-1.75 1.75H4A1.75 1.75 0 0 1 2.75 17.75Z"></path>
+          </svg>
+          <input type="file" accept="image/*" onchange="sendFile(this.files[0])" style="display: none;">
+        </label>
+        
+        <button class="ig-input-action-btn" onclick="openEmojiPicker()" title="Emoji" id="emojiBtn">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M15.83 10.997a1.167 1.167 0 1 0 1.167 1.167 1.167 1.167 0 0 0-1.167-1.167Zm-6.5 1.167a1.167 1.167 0 1 0-1.166 1.167 1.167 1.167 0 0 0 1.166-1.167Zm5.163 3.24a3.406 3.406 0 0 1-4.982.007 1 1 0 1 0-1.557 1.256 5.397 5.397 0 0 0 8.09 0 1 1 0 0 0-1.55-1.263ZM12 .503a11.5 11.5 0 1 0 11.5 11.5A11.513 11.513 0 0 0 12 .503Zm0 21a9.5 9.5 0 1 1 9.5-9.5 9.51 9.51 0 0 1-9.5 9.5Z"></path>
+          </svg>
+        </button>
+        
+        <button class="ig-input-action-btn" onclick="toggleAttachMenu()" title="More" id="moreBtn">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <circle cx="12" cy="12" r="2"></circle>
+            <circle cx="19" cy="12" r="2"></circle>
+            <circle cx="5" cy="12" r="2"></circle>
+          </svg>
+        </button>
+        
+        <div class="ig-attach-menu" id="attachMenu" style="display: none;">
+          <button class="ig-attach-option" onclick="openMapPicker()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"></path>
+            </svg>
+            Location
+          </button>
+          <label class="ig-attach-option">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"></path>
+            </svg>
+            Video
+            <input type="file" accept="video/*" onchange="sendFile(this.files[0])" style="display: none;">
+          </label>
+          <label class="ig-attach-option">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+            </svg>
+            Document
+            <input type="file" accept=".pdf,.doc,.docx,.txt" onchange="sendFile(this.files[0])" style="display: none;">
+          </label>
+          <button class="ig-attach-option" onclick="openGifPicker()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"></path>
+            </svg>
+            GIF
+          </button>
+          <button class="ig-attach-option" onclick="openTodoCreator()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M22 5.18L10.59 16.6l-4.24-4.24 1.41-1.41 2.83 2.83 10-10L22 5.18zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8c1.57 0 3.04.46 4.28 1.25l1.45-1.45C16.1 2.67 14.13 2 12 2 6.48 2 2 6.48 2 12s4.48 10 10 10c1.73 0 3.36-.44 4.78-1.22l-1.5-1.5C14.28 19.74 13.17 20 12 20z"></path>
+            </svg>
+            TODO List
+          </button>
+          <button class="ig-attach-option" onclick="openTimerPicker()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"></path>
+            </svg>
+            Timer
+          </button>
+        </div>
+        
+        <button class="ig-send-btn" onclick="sendMessage()" style="display: none;" id="sendBtn">
+          <svg aria-label="Send" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M1.464 12.986 23.963.863a.5.5 0 0 1 .71.627l-5.24 20.618a.5.5 0 0 1-.925.114l-5.14-9.47-9.472-5.138a.5.5 0 0 1 .115-.925l-.547.297Z" stroke="currentColor" fill="none" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Message Actions Modal -->
+      <div id="messageActionsModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeMessageActions()"></div>
+        <div class="ig-message-actions-menu">
+          <button class="ig-message-action" onclick="replyToMessage()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"></path>
+            </svg>
+            Reply
+          </button>
+          <button class="ig-message-action" onclick="copyMessage()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path>
+            </svg>
+            Copy
+          </button>
+          <button class="ig-message-action" onclick="forwardMessage()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path>
+            </svg>
+            Forward
+          </button>
+          <button class="ig-message-action" onclick="deleteMessage()">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
+            </svg>
+            Delete
+          </button>
+          <button class="ig-message-action" onclick="editMessage()
+
+" id="editBtn" style="display: none;">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
+            </svg>
+            Edit
+          </button>
+          <button class="ig-message-action" onclick="unsendMessage()" id="unsendBtn" style="display: none;">
+            <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+              <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"></path>
+            </svg>
+            Unsend
+          </button>
+        </div>
+      </div>
+
+      <!-- Emoji Picker Modal -->
+      <div id="emojiModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeEmojiPicker()"></div>
+        <div class="ig-emoji-picker">
+          <div class="ig-emoji-grid" id="emojiGrid"></div>
+        </div>
+      </div>
+      
+      <!-- Camera Modal -->
+      <div id="cameraModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-content" style="max-width: 600px;">
+          <div class="ig-modal-header">
+            <h3>Take Photo</h3>
+            <button onclick="closeCameraModal()">&times;</button>
+          </div>
+          <video id="cameraPreview" autoplay playsinline style="width: 100%; border-radius: 8px;"></video>
+          <canvas id="cameraCanvas" style="display: none;"></canvas>
+          <div style="padding: 16px; display: flex; gap: 12px; justify-content: center;">
+            <button class="ig-btn-secondary" onclick="closeCameraModal()">Cancel</button>
+            <button class="ig-btn-primary" onclick="capturePhoto()">Capture</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GIF Picker Modal -->
+      <div id="gifModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeGifPicker()"></div>
+        <div class="ig-emoji-picker" style="max-height: 500px;">
+          <div class="ig-emoji-header">
+            <h3>Choose a GIF</h3>
+            <input type="text" id="gifSearch" placeholder="Search GIFs..." onkeyup="searchGifs(this.value)" style="flex: 1; margin: 0 12px; padding: 8px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            <button onclick="closeGifPicker()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-primary-text);">&times;</button>
+          </div>
+          <div id="gifGrid" style="padding: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow-y: auto; max-height: 350px;">
+            <div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">Search for GIFs...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TODO List Creator Modal -->
+      <div id="todoModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeTodoCreator()"></div>
+        <div class="ig-modal-content" style="max-width: 400px;">
+          <div class="ig-modal-header">
+            <h3>Create TODO List</h3>
+            <button onclick="closeTodoCreator()">&times;</button>
+          </div>
+          <div style="padding: 16px;">
+            <input type="text" id="todoTitle" placeholder="List title..." style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); margin-bottom: 12px;">
+            <div id="todoItems" style="margin-bottom: 12px;"></div>
+            <button onclick="addTodoItem()" style="width: 100%; padding: 10px; background: var(--ig-secondary-background); border: 1px dashed var(--ig-border); border-radius: 8px; cursor: pointer; color: var(--ig-primary-text); margin-bottom: 12px;">+ Add Item</button>
+            <div style="display: flex; gap: 12px;">
+              <button class="ig-btn-secondary" onclick="closeTodoCreator()" style="flex: 1;">Cancel</button>
+              <button class="ig-btn-primary" onclick="sendTodoList()" style="flex: 1;">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timer Picker Modal -->
+      <div id="timerModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeTimerPicker()"></div>
+        <div class="ig-modal-content" style="max-width: 350px;">
+          <div class="ig-modal-header">
+            <h3>Disappearing Message</h3>
+            <button onclick="closeTimerPicker())">&times;</button>
+          </div>
+          <div style="padding: 16px;">
+            <p style="color: var(--ig-secondary-text); margin-bottom: 16px; font-size: 14px;">Message will disappear after:</p>
+            <div style="display: grid; gap: 8px;">
+              <button class="ig-timer-option" onclick="setMessageTimer(10)">10 seconds</button>
+              <button class="ig-timer-option" onclick="setMessageTimer(30)">30 seconds</button>
+              <button class="ig-timer-option" onclick="setMessageTimer(60)">1 minute</button>
+              <button class="ig-timer-option" onclick="setMessageTimer(300)">5 minutes</button>
+              <button class="ig-timer-option" onclick="setMessageTimer(3600)">1 hour</button>
+              <button class="ig-timer-option" onclick="setMessageTimer(86400)">24 hours</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Location Picker Modal -->
+      <div id="mapModal" class="ig-modal" style="display: none;">
+        <div class="ig-modal-backdrop" onclick="closeMapPicker()"></div>
+        <div class="ig-modal-content" style="max-width: 600px;">
+          <div class="ig-modal-header">
+            <h3>Share Location</h3>
+            <button onclick="closeMapPicker()">&times;</button>
+          </div>
+          <div style="padding: 16px;">
+            <div id="mapContainer" style="width: 100%; height: 300px; background: var(--ig-secondary-background); border-radius: 8px; margin-bottom: 12px; position: relative; overflow: hidden; cursor: crosshair;" onclick="selectPointOnMap(event)">
+              <div id="mapPin" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px;">📍</div>
+              <div id="mapCoords" style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;"></div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+              <button class="ig-btn-secondary" onclick="useCurrentLocation()" style="flex: 1;">Use Current Location</button>
+            </div>
+            <div style="display: flex; gap: 12px;">
+              <button class="ig-btn-secondary" onclick="closeMapPicker()" style="flex: 1;">Cancel</button>
+              <button class="ig-btn-primary" onclick="sendSelectedLocation()" style="flex: 1;">Send Location</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -126,7 +401,6 @@
     InnovateAPI.initSocket();
 
     const user = InnovateAPI.getCurrentUser();
-    const socket = InnovateAPI.getSocket();
     let currentContactId = null;
     let conversations = [];
 
@@ -192,6 +466,12 @@
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <div class="ig-conversation-time">${conv.last_message_time ? formatTime(conv.last_message_time) : ''}</div>
+            <button class="ig-conversation-camera" onclick="event.stopPropagation(); openCameraForUser(${conv.contact_id})">
+              <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
+                <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23h-.005A2.31 2.31 0 0 1 3.54 6.175L1.945 4.581a.75.75 0 0 1 1.06-1.06l1.595 1.594a.767.767 0 0 0 .544.226.767.767 0 0 0 .543-.226L7.281 3.52a.75.75 0 0 1 1.061 1.06L6.827 6.175Z" fill-rule="evenodd"></path>
+                <path d="M2.25 12a9.75 9.75 0 1 1 19.5 0 9.75 9.75 0 0 1-19.5 0Zm9.75-8.25a8.25 8.25 0 1 0 0 16.5 8.25 8.25 0 0 0 0-16.5Zm0 12.5a4.25 4.25 0 1 1 0-8.5 4.25 4.25 0 0 1 0 8.5Zm0-1.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z"></path>
+              </svg>
+            </button>
             ${isUnread ? '<div class="ig-conversation-unread"></div>' : ''}
           </div>
         `;
@@ -213,8 +493,15 @@
       document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
       event?.currentTarget?.classList.add('active');
       
-      // On mobile, show chat window
-      document.getElementById('chatWindow').classList.add('active');
+      // On mobile, show chat window and hide nav
+      const chatWindow = document.getElementById('chatWindow');
+      chatWindow.classList.add('active');
+      
+      // Hide nav on mobile
+      if (window.innerWidth <= 768) {
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', 'none');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', 'none');
+      }
       
       // Load messages
       await loadMessages(contactId);
@@ -241,8 +528,77 @@
         data.messages.forEach(msg => {
           const messageEl = document.createElement('div');
           const isSent = msg.sender_id === user.id;
-          messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-          messageEl.textContent = msg.content;
+          
+          if (msg.type === 'image') {
+            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            messageEl.innerHTML = `
+              <img src="${msg.content}" style="max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;" onclick="window.open('${msg.content}')">
+              <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
+            `;
+          } else if (msg.type === 'gif') {
+            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            messageEl.innerHTML = `
+              <img src="${msg.content}" style="max-width: 250px; max-height: 250px; border-radius: 18px; cursor: pointer; display: block;" onclick="window.open('${msg.content}')">
+              <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
+            `;
+          } else if (msg.type === 'voice') {
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            messageEl.innerHTML = `
+              <audio controls style="max-width: 250px;">
+                <source src="${msg.content}" type="audio/webm">
+              </audio>
+            `;
+          } else if (msg.type === 'location') {
+            const loc = JSON.parse(msg.content);
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            messageEl.innerHTML = `
+              <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; text-decoration: none; color: inherit;">
+                <div style="font-weight: 600;">📍 Location</div>
+                <div style="font-size: 12px; opacity: 0.8;">Tap to view on map</div>
+              </a>
+            `;
+          } else if (msg.type === 'todo') {
+            const todo = JSON.parse(msg.content);
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            let html = `<div style="font-weight: 600; margin-bottom: 8px;">✓ ${todo.title}</div>`;
+            todo.items.forEach((item, idx) => {
+              html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+                <input type="checkbox" ${item.checked ? 'checked' : ''} disabled style="width: 16px; height: 16px;">
+                <span style="font-size: 14px;">${item.text}</span>
+              </div>`;
+            });
+            messageEl.innerHTML = html;
+          } else {
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            messageEl.textContent = msg.content;
+            const timeEl = document.createElement('div');
+            timeEl.className = 'ig-message-time';
+            timeEl.textContent = formatMessageTime(msg.created_at);
+            messageEl.appendChild(timeEl);
+          }
+          
+          // Add long-press detection for message actions
+          let pressTimer;
+          messageEl.addEventListener('touchstart', (e) => {
+            pressTimer = setTimeout(() => {
+              showMessageActions(msg.id, msg.content, isSent);
+            }, 500);
+          });
+          
+          messageEl.addEventListener('touchend', () => {
+            clearTimeout(pressTimer);
+          });
+          
+          messageEl.addEventListener('touchmove', () => {
+            clearTimeout(pressTimer);
+          });
+          
+          // Desktop right-click support
+          messageEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showMessageActions(msg.id, msg.content, isSent);
+          });
+          
           messagesContainer.appendChild(messageEl);
         });
 
@@ -260,13 +616,48 @@
       
       if (!content || !currentContactId) return;
       
+      // Check if editing
+      const isEditing = input.dataset.editing;
+      if (isEditing) {
+        try {
+          await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
+            method: 'PUT',
+            body: JSON.stringify({ content })
+          });
+          
+          delete input.dataset.editing;
+          input.value = '';
+          input.placeholder = 'Message...';
+          
+          // Reset send button
+          const sendBtn = document.getElementById('sendBtn');
+          sendBtn.innerHTML = '<svg aria-label="Send" fill="currentColor" height="24" viewBox="0 0 24 24" width="24"><path d="M1.464 12.986 23.963.863a.5.5 0 0 1 .71.627l-5.24 20.618a.5.5 0 0 1-.925.114l-5.14-9.47-9.472-5.138a.5.5 0 0 1 .115-.925l-.547.297Z" stroke="currentColor" fill="none" stroke-linejoin="round"></path></svg>';
+          
+          loadMessages(currentContactId);
+          InnovateAPI.showAlert('Message updated', 'success');
+        } catch (error) {
+          InnovateAPI.showAlert('Failed to update message', 'error');
+        }
+        return;
+      }
+      
+      // Check for timer
+      const timer = input.dataset.timer;
+      const messageData = {
+        receiver_id: currentContactId,
+        content: content
+      };
+      
+      if (timer) {
+        messageData.timer = parseInt(timer);
+        delete input.dataset.timer;
+        input.placeholder = 'Message...';
+      }
+      
       try {
         await InnovateAPI.apiRequest('/messages', {
           method: 'POST',
-          body: JSON.stringify({
-            receiver_id: currentContactId,
-            content: content
-          })
+          body: JSON.stringify(messageData)
         });
         
         // Clear input
@@ -278,6 +669,13 @@
         messageEl.className = 'ig-message ig-message-sent';
         messageEl.textContent = content;
         
+        if (timer) {
+          const timerEl = document.createElement('div');
+          timerEl.style.cssText = 'font-size: 11px; opacity: 0.7; margin-top: 4px;';
+          timerEl.textContent = `🕐 ${formatTimerDuration(parseInt(timer))}`;
+          messageEl.appendChild(timerEl);
+        }
+        
         // Remove placeholder if exists
         if (messagesContainer.querySelector('[style*="text-align: center"]')) {
           messagesContainer.innerHTML = '';
@@ -287,7 +685,7 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
         // Emit via socket
-        socket.emit('send_message', {
+        InnovateAPI.getSocket().emit('send_message', {
           receiver_id: currentContactId,
           content: content
         });
@@ -300,25 +698,32 @@
       }
     }
 
-    // Handle Enter key
-    document.getElementById('messageInput').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
     // Close chat (mobile)
     function closeChat() {
       document.getElementById('chatWindow').classList.remove('active');
+      
+      // Show nav on mobile
+      if (window.innerWidth <= 768) {
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', 'block');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', 'flex');
+      }
     }
 
     // New message
-    function newMessage() {
+    async function newMessage() {
       const username = prompt('Enter username to message:');
-      if (username) {
-        // Search for user and start conversation
-        InnovateAPI.showAlert('Search feature coming soon!', 'info');
+      if (!username) return;
+      
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(username)}`);
+        if (data.users && data.users.length > 0) {
+          const user = data.users[0];
+          openChat(user.id, user.username, user.profile_picture);
+        } else {
+          InnovateAPI.showAlert('User not found', 'error');
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Error searching for user', 'error');
       }
     }
 
@@ -337,6 +742,24 @@
       if (days < 7) return `${days}d`;
       return date.toLocaleDateString();
     }
+    
+    // Format message time (for chat)
+    function formatMessageTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      
+      if (isToday) {
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      } else {
+        const diff = now - date;
+        const days = Math.floor(diff / 86400000);
+        if (days < 7) {
+          return date.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        }
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+    }
 
     // Search messages
     document.getElementById('searchMessages').addEventListener('input', (e) => {
@@ -349,12 +772,32 @@
     });
 
     // Socket listeners
-    socket.on('new_message', (data) => {
+    InnovateAPI.getSocket().on('new_message', (data) => {
       if (data.sender_id === currentContactId) {
         const messagesContainer = document.getElementById('chatMessages');
         const messageEl = document.createElement('div');
         messageEl.className = 'ig-message ig-message-received';
-        messageEl.textContent = data.content;
+        
+        if (data.type === 'voice') {
+          messageEl.innerHTML = `
+            <audio controls style="max-width: 300px;">
+              <source src="${data.content}" type="audio/webm">
+            </audio>
+          `;
+        } else if (data.type === 'image') {
+          messageEl.innerHTML = `<img src="${data.content}" style="max-width: 300px; border-radius: 12px; cursor: pointer;" onclick="window.open('${data.content}')">`;
+        } else if (data.type === 'location') {
+          const loc = JSON.parse(data.content);
+          messageEl.innerHTML = `
+            <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; text-decoration: none; color: var(--ig-primary-text);">
+              <div style="font-weight: 600;">📍 Location</div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text);">Tap to view on map</div>
+            </a>
+          `;
+        } else {
+          messageEl.textContent = data.content;
+        }
+        
         messagesContainer.appendChild(messageEl);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
@@ -362,10 +805,659 @@
       // Reload conversations
       loadConversations();
     });
+    
+    // Online/Offline status listeners
+    InnovateAPI.getSocket().on('user:online', (userId) => {
+      if (userId == currentContactId) {
+        const statusEl = document.getElementById('chatStatus');
+        if (statusEl) {
+          statusEl.textContent = 'Active now';
+          statusEl.style.color = 'var(--ig-secondary-text)';
+        }
+      }
+    });
+    
+    InnovateAPI.getSocket().on('user:offline', (userId) => {
+      if (userId == currentContactId) {
+        const statusEl = document.getElementById('chatStatus');
+        if (statusEl) {
+          statusEl.textContent = 'Offline';
+          statusEl.style.color = 'var(--ig-secondary-text)';
+        }
+      }
+    });
+    
+    // Emit user join when page loads
+    InnovateAPI.getSocket().emit('user:join', user.id);
+    
+    // Voice recording
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+    
+    async function startVoiceRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        isRecording = true;
+        
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          await sendVoiceMessage(audioBlob);
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        document.querySelector('.ig-voice-btn').style.background = '#ed4956';
+      } catch (error) {
+        InnovateAPI.showAlert('Microphone access denied', 'error');
+      }
+    }
+    
+    function stopVoiceRecording() {
+      if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        isRecording = false;
+        document.querySelector('.ig-voice-btn').style.background = '';
+      }
+    }
+    
+    async function sendVoiceMessage(audioBlob) {
+      if (!currentContactId) return;
+      
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'voice-message.webm');
+      formData.append('receiver_id', currentContactId);
+      formData.append('type', 'voice');
+      
+      try {
+        const response = await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: formData,
+          headers: {} // Let browser set Content-Type for FormData
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('Voice message sent', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send voice message', 'error');
+      }
+    }
+    
+    // Camera functions
+    let cameraStream;
+    
+    async function openCamera() {
+      document.getElementById('attachMenu').style.display = 'none';
+      document.getElementById('cameraModal').style.display = 'flex';
+      
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } 
+        });
+        document.getElementById('cameraPreview').srcObject = cameraStream;
+      } catch (error) {
+        InnovateAPI.showAlert('Camera access denied', 'error');
+        closeCameraModal();
+      }
+    }
+    
+    function closeCameraModal() {
+      document.getElementById('cameraModal').style.display = 'none';
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    }
+    
+    async function capturePhoto() {
+      const video = document.getElementById('cameraPreview');
+      const canvas = document.getElementById('cameraCanvas');
+      const context = canvas.getContext('2d');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        closeCameraModal();
+        await sendFile(blob, 'camera-photo.jpg');
+      }, 'image/jpeg', 0.9);
+    }
+    
+    // Location sharing
+    async function shareLocation() {
+      document.getElementById('attachMenu').style.display = 'none';
+      
+      if (!navigator.geolocation) {
+        InnovateAPI.showAlert('Geolocation not supported', 'error');
+        return;
+      }
+      
+      InnovateAPI.showAlert('Getting your location...', 'info');
+      
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          
+          try {
+            await InnovateAPI.apiRequest('/messages/send', {
+              method: 'POST',
+              body: JSON.stringify({
+                receiver_id: currentContactId,
+                content: JSON.stringify(location),
+                type: 'location'
+              })
+            });
+            
+            loadMessages(currentContactId);
+            InnovateAPI.showAlert('Location shared', 'success');
+          } catch (error) {
+            InnovateAPI.showAlert('Failed to share location', 'error');
+          }
+        },
+        (error) => {
+          InnovateAPI.showAlert('Location access denied', 'error');
+        }
+      );
+    }
+    
+    // File sending
+    async function sendFile(file, filename) {
+      if (!currentContactId) return;
+      
+      const formData = new FormData();
+      formData.append('file', file, filename || file.name);
+      formData.append('receiver_id', currentContactId);
+      formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
+      
+      try {
+        const response = await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('File sent', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send file', 'error');
+      }
+    }
+    
+    // Attach menu toggle
+    function toggleAttachMenu() {
+      const menu = document.getElementById('attachMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    // Emoji Picker Functions
+    const emojis = [
+      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', 
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', 
+      '👍', '👎', '👊', '✊', '🤛', '🤜', '🤞', '✌️', '🤟', '🤘', '👌', '🤏', '👈', 
+      '🔥', '✨', '💫', '⭐', '🌟', '💥', '💢', '💯', '✅', '❌', '⚠️', '❗', '❓',
+      '🎉', '🎊', '🎈', '🎁', '🏆', '🥇', '🥈', '🥉', '⚽', '🏀', '🏈', '⚾', '🎾'
+    ];
+    
+    function openEmojiPicker() {
+      const modal = document.getElementById('emojiModal');
+      const grid = document.querySelector('.ig-emoji-grid');
+      
+      // Populate emoji grid if empty
+      if (!grid.hasChildNodes()) {
+        emojis.forEach(emoji => {
+          const btn = document.createElement('button');
+          btn.className = 'ig-emoji-item';
+          btn.textContent = emoji;
+          btn.onclick = () => insertEmoji(emoji);
+          grid.appendChild(btn);
+        });
+      }
+      
+      modal.style.display = 'flex';
+    }
+    
+    function closeEmojiPicker() {
+      document.getElementById('emojiModal').style.display = 'none';
+    }
+    
+    function insertEmoji(emoji) {
+      const input = document.getElementById('messageInput');
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const text = input.value;
+      
+      input.value = text.substring(0, start) + emoji + text.substring(end);
+      input.selectionStart = input.selectionEnd = start + emoji.length;
+      input.focus();
+      
+      // Trigger input event to show send button if needed
+      input.dispatchEvent(new Event('input'));
+    }
+    
+    // Message Actions Functions
+    let selectedMessageId = null;
+    let selectedMessageContent = null;
+    
+    function showMessageActions(messageId, content, isSent) {
+      selectedMessageId = messageId;
+      selectedMessageContent = content;
+      
+      const modal = document.getElementById('messageActionsModal');
+      const unsendBtn = document.getElementById('unsendBtn');
+      const editBtn = document.getElementById('editBtn');
+      
+      // Only show unsend and edit for sent messages
+      if (unsendBtn) {
+        unsendBtn.style.display = isSent ? 'flex' : 'none';
+      }
+      if (editBtn) {
+        editBtn.style.display = isSent ? 'flex' : 'none';
+      }
+      
+      modal.style.display = 'flex';
+    }
+    
+    function closeMessageActions() {
+      document.getElementById('messageActionsModal').style.display = 'none';
+      selectedMessageId = null;
+      selectedMessageContent = null;
+    }
+    
+    async function replyToMessage() {
+      closeMessageActions();
+      const input = document.getElementById('messageInput');
+      const replyPreview = document.createElement('div');
+      replyPreview.className = 'ig-reply-preview';
+      replyPreview.innerHTML = `
+        <div style="padding: 8px 12px; background: var(--ig-hover-overlay); border-left: 3px solid var(--ig-blue); margin-bottom: 8px; border-radius: 8px;">
+          <div style="font-size: 12px; color: var(--ig-blue); margin-bottom: 4px;">Replying to message</div>
+          <div style="font-size: 13px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${selectedMessageContent}
+          </div>
+          <button onclick="this.parentElement.remove()" style="position: absolute; right: 8px; top: 8px; background: none; border: none; cursor: pointer;">✕</button>
+        </div>
+      `;
+      input.parentElement.insertBefore(replyPreview, input);
+      input.focus();
+    }
+    
+    async function copyMessage() {
+      try {
+        await navigator.clipboard.writeText(selectedMessageContent);
+        InnovateAPI.showAlert('Message copied', 'success');
+        closeMessageActions();
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to copy message', 'error');
+      }
+    }
+    
+    async function forwardMessage() {
+      closeMessageActions();
+      InnovateAPI.showAlert('Forward feature coming soon', 'info');
+      // TODO: Show user picker modal to select recipients
+    }
+    
+    async function deleteMessage() {
+      if (!confirm('Delete this message for you?')) return;
+      
+      try {
+        const response = await InnovateAPI.apiRequest(`/messages/${selectedMessageId}`, {
+          method: 'DELETE'
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('Message deleted', 'success');
+        closeMessageActions();
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to delete message', 'error');
+      }
+    }
+    
+    async function unsendMessage() {
+      if (!confirm('Unsend this message for everyone?')) return;
+      
+      try {
+        const response = await InnovateAPI.apiRequest(`/messages/${selectedMessageId}/unsend`, {
+          method: 'DELETE'
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('Message unsent', 'success');
+        closeMessageActions();
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to unsend message', 'error');
+      }
+    }
+    
+    // Edit message
+    async function editMessage() {
+      closeMessageActions();
+      const input = document.getElementById('messageInput');
+      input.value = selectedMessageContent;
+      input.dataset.editing = selectedMessageId;
+      input.focus();
+      
+      // Change send button to "Update"
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) {
+        sendBtn.innerHTML = '<svg aria-label="Update" fill="currentColor" height="24" viewBox="0 0 24 24" width="24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"></path></svg>';
+        sendBtn.style.display = 'inline-flex';
+      }
+    }
+    
+    // GIF Picker Functions
+    let gifSearchTimeout;
+    const GIPHY_API_KEY = 'Gc7131jiJuvI7IdN0HZ1D7nh0ow5BH6g'; // Public Giphy API key
+    
+    function openGifPicker() {
+      document.getElementById('gifModal').style.display = 'flex';
+      document.getElementById('gifSearch').value = '';
+      searchGifs('trending');
+    }
+    
+    function closeGifPicker() {
+      document.getElementById('gifModal').style.display = 'none';
+    }
+    
+    async function searchGifs(query) {
+      clearTimeout(gifSearchTimeout);
+      gifSearchTimeout = setTimeout(async () => {
+        const grid = document.getElementById('gifGrid');
+        grid.innerHTML = '<div style="text-align: center; padding: 20px; grid-column: 1/-1; color: var(--ig-secondary-text);">Searching...</div>';
+        
+        try {
+          const endpoint = query === 'trending' ? 
+            `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20` :
+            `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=20`;
+          
+          const response = await fetch(endpoint);
+          const data = await response.json();
+          
+          grid.innerHTML = '';
+          if (data.data.length === 0) {
+            grid.innerHTML = '<div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">No GIFs found</div>';
+            return;
+          }
+          
+          data.data.forEach(gif => {
+            const img = document.createElement('img');
+            img.src = gif.images.fixed_height_small.url;
+            img.style.cssText = 'width: 100%; height: 150px; object-fit: cover; border-radius: 8px; cursor: pointer;';
+            img.onclick = () => sendGif(gif.images.fixed_height.url);
+            grid.appendChild(img);
+          });
+        } catch (error) {
+          grid.innerHTML = '<div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--ig-secondary-text);">Failed to load GIFs</div>';
+        }
+      }, 500);
+    }
+    
+    async function sendGif(gifUrl) {
+      if (!currentContactId) return;
+      
+      closeGifPicker();
+      toggleAttachMenu();
+      
+      try {
+        await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: currentContactId,
+            content: gifUrl,
+            type: 'gif'
+          })
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('GIF sent', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send GIF', 'error');
+      }
+    }
+    
+    // TODO List Functions
+    let todoItemCount = 0;
+    
+    function openTodoCreator() {
+      document.getElementById('todoModal').style.display = 'flex';
+      document.getElementById('todoTitle').value = '';
+      document.getElementById('todoItems').innerHTML = '';
+      todoItemCount = 0;
+      addTodoItem();
+      toggleAttachMenu();
+    }
+    
+    function closeTodoCreator() {
+      document.getElementById('todoModal').style.display = 'none';
+    }
+    
+    function addTodoItem() {
+      const container = document.getElementById('todoItems');
+      const itemId = ++todoItemCount;
+      const div = document.createElement('div');
+      div.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
+      div.innerHTML = `
+        <input type="checkbox" id="todo_${itemId}" style="width: 18px; height: 18px;">
+        <input type="text" class="todo-item-text" placeholder="Task ${itemId}..." style="flex: 1; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 20px;">&times;</button>
+      `;
+      container.appendChild(div);
+    }
+    
+    async function sendTodoList() {
+      const title = document.getElementById('todoTitle').value || 'TODO List';
+      const items = [];
+      
+      document.querySelectorAll('.todo-item-text').forEach(input => {
+        if (input.value.trim()) {
+          items.push({
+            text: input.value.trim(),
+            checked: false
+          });
+        }
+      });
+      
+      if (items.length === 0) {
+        InnovateAPI.showAlert('Please add at least one item', 'error');
+        return;
+      }
+      
+      const todoData = { title, items };
+      
+      try {
+        await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: currentContactId,
+            content: JSON.stringify(todoData),
+            type: 'todo'
+          })
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('TODO list sent', 'success');
+        closeTodoCreator();
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send TODO list', 'error');
+      }
+    }
+    
+    // Timer Message Functions
+    let messageTimer = null;
+    
+    function openTimerPicker() {
+      document.getElementById('timerModal').style.display = 'flex';
+      toggleAttachMenu();
+    }
+    
+    function closeTimerPicker() {
+      document.getElementById('timerModal').style.display = 'none';
+      messageTimer = null;
+    }
+    
+    function setMessageTimer(seconds) {
+      messageTimer = seconds;
+      closeTimerPicker();
+      const input = document.getElementById('messageInput');
+      input.placeholder = `Message will disappear in ${formatTimerDuration(seconds)}...`;
+      input.dataset.timer = seconds;
+      input.focus();
+      
+      InnovateAPI.showAlert(`Timer set: ${formatTimerDuration(seconds)}`, 'success');
+    }
+    
+    function formatTimerDuration(seconds) {
+      if (seconds < 60) return `${seconds}s`;
+      if (seconds < 3600) return `${Math.floor(seconds/60)}m`;
+      if (seconds < 86400) return `${Math.floor(seconds/3600)}h`;
+      return `${Math.floor(seconds/86400)}d`;
+    }
+    
+    // Map Location Picker Functions
+    let selectedLocation = null;
+    
+    function openMapPicker() {
+      document.getElementById('mapModal').style.display = 'flex';
+      selectedLocation = null;
+      document.getElementById('mapCoords').textContent = 'Click on map to select location';
+      toggleAttachMenu();
+    }
+    
+    function closeMapPicker() {
+      document.getElementById('mapModal').style.display = 'none';
+      selectedLocation = null;
+    }
+    
+    function selectPointOnMap(event) {
+      const container = event.currentTarget;
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      
+      // Convert click position to approximate lat/lng (simplified)
+      const lat = 40.7128 + (150 - y) / 10; // Example center: NYC
+      const lng = -74.0060 + (x - 250) / 10;
+      
+      selectedLocation = { lat, lng };
+      
+      // Move pin to clicked position
+      const pin = document.getElementById('mapPin');
+      pin.style.left = x + 'px';
+      pin.style.top = y + 'px';
+      
+      document.getElementById('mapCoords').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+    
+    function useCurrentLocation() {
+      if (!navigator.geolocation) {
+        InnovateAPI.showAlert('Geolocation not supported', 'error');
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          selectedLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          document.getElementById('mapCoords').textContent = 
+            `${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)}`;
+          InnovateAPI.showAlert('Current location selected', 'success');
+        },
+        (error) => {
+          InnovateAPI.showAlert('Failed to get location', 'error');
+        }
+      );
+    }
+    
+    async function sendSelectedLocation() {
+      if (!selectedLocation) {
+        InnovateAPI.showAlert('Please select a location', 'error');
+        return;
+      }
+      
+      try {
+        await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: currentContactId,
+            content: JSON.stringify(selectedLocation),
+            type: 'location'
+          })
+        });
+        
+        loadMessages(currentContactId);
+        InnovateAPI.showAlert('Location shared', 'success');
+        closeMapPicker();
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to share location', 'error');
+      }
+    }
+    
+    // Handle Enter key
+    function handleMessageKeyPress(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+    
+    // Update send button visibility based on input
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+      messageInput.addEventListener('input', (e) => {
+        const hasText = e.target.value.trim();
+        const sendBtn = document.getElementById('sendBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const moreBtn = document.getElementById('moreBtn');
+        
+        if (hasText) {
+          if (sendBtn) sendBtn.style.display = 'inline-flex';
+          if (voiceBtn) voiceBtn.style.display = 'none';
+          if (moreBtn) moreBtn.style.display = 'none';
+        } else {
+          if (sendBtn) sendBtn.style.display = 'none';
+          if (voiceBtn) voiceBtn.style.display = 'inline-flex';
+          if (moreBtn) moreBtn.style.display = 'inline-flex';
+        }
+      });
+    }
 
     // Check for user parameter (deep link from home)
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('user');
+    
+    // Switch Messages/Requests tab
+    function switchMessagesTab(tab) {
+      document.getElementById('messagesTab').classList.toggle('active', tab === 'messages');
+      document.getElementById('requestsTab').classList.toggle('active', tab === 'requests');
+      
+      if (tab === 'requests') {
+        document.getElementById('conversationsList').innerHTML = `
+          <div style=\"text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);\">
+            <div style=\"font-size: 48px; margin-bottom: 16px;\">📬</div>
+            <div style=\"font-size: 16px;\">No message requests</div>
+          </div>
+        `;
+      } else {
+        loadConversations();
+      }
+    }
+    
+    // Open camera for specific user
+    function openCameraForUser(userId) {
+      currentContactId = userId;
+      openCamera();
+    }
     
     // Initialize
     loadUserInfo();

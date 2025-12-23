@@ -87,10 +87,92 @@ router.get('/:contactId', authMiddleware, (req, res) => {
 });
 
 // Send message
+router.post('/send', authMiddleware, upload.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'audio', maxCount: 1 }
+]), (req, res) => {
+  const db = getDb();
+  const senderId = req.user.userId;
+  const { receiver_id, content, type } = req.body;
+  
+  let messageContent = content;
+  let messageType = type || 'text';
+  
+  // Handle file upload
+  if (req.files?.file) {
+    const file = req.files.file[0];
+    messageContent = file.mimetype.startsWith('image/') 
+      ? `/uploads/images/${file.filename}`
+      : `/uploads/files/${file.filename}`;
+    messageType = file.mimetype.startsWith('image/') ? 'image' : 'file';
+  }
+  
+  // Handle voice message
+  if (req.files?.audio) {
+    const audio = req.files.audio[0];
+    messageContent = `/uploads/files/${audio.filename}`;
+    messageType = 'voice';
+  }
+
+  const query = `
+    INSERT INTO messages (sender_id, receiver_id, content, type, created_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `;
+
+  db.run(query, [senderId, receiver_id, messageContent, messageType], function(err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Error sending message' });
+    }
+
+    const messageId = this.lastID;
+
+    // Get the created message
+    db.get(
+      'SELECT * FROM users WHERE id = ?',
+      [senderId],
+      (err, sender) => {
+        if (err) return res.status(500).json({ error: 'Error' });
+
+        const messageData = {
+          id: messageId,
+          sender_id: senderId,
+          receiver_id,
+          content: messageContent,
+          type: messageType,
+          sender_username: sender.username,
+          sender_picture: sender.profile_picture,
+          created_at: new Date().toISOString()
+        };
+
+        // Emit socket event
+        const io = req.app.get('io');
+        io.to(`user_${receiver_id}`).emit('new_message', messageData);
+
+        // Create notification
+        db.run(
+          `INSERT INTO notifications (user_id, type, content, related_id, created_by, created_at)
+           VALUES (?, 'message', ?, ?, ?, datetime('now'))`,
+          [receiver_id, `New message from ${sender.username}`, messageId, senderId]
+        );
+
+        io.to(`user_${receiver_id}`).emit('new_notification', {
+          type: 'message',
+          content: `New message from ${sender.username}`,
+          created_at: new Date().toISOString()
+        });
+
+        res.json({ success: true, message: messageData });
+      }
+    );
+  });
+});
+
+// Original send endpoint for backward compatibility
 router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
   const db = getDb();
   const senderId = req.user.userId;
-  const { receiver_id, content } = req.body;
+  const { receiver_id, content, timer } = req.body;
 
   let attachments = [];
   if (req.files) {
@@ -102,12 +184,20 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
     }));
   }
 
+  // Calculate expiration time if timer is set
+  let expiresAt = null;
+  if (timer) {
+    const now = new Date();
+    now.setSeconds(now.getSeconds() + parseInt(timer));
+    expiresAt = now.toISOString();
+  }
+
   const query = `
-    INSERT INTO messages (sender_id, receiver_id, content, attachments)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO messages (sender_id, receiver_id, content, attachments, timer, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments)], function(err) {
+  db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt], function(err) {
     if (err) {
       return res.status(500).json({ error: 'Error sending message' });
     }
@@ -126,6 +216,8 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
         receiver_id,
         content,
         attachments,
+        timer: timer || null,
+        expires_at: expiresAt,
         created_at: new Date().toISOString()
       }
     });
