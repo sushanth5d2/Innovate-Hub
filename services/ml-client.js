@@ -129,6 +129,26 @@ class MLServiceClient {
       throw new Error('Failed to train model');
     }
   }
+
+  /**
+   * Analyze image for task extraction
+   */
+  async analyzeImageForTasks(imagePath) {
+    try {
+      const fs = require('fs');
+      const imageData = fs.readFileSync(imagePath, { encoding: 'base64' });
+      
+      const response = await axios.post(
+        `${this.baseURL}/api/tasks/from-image`,
+        { image: `data:image/jpeg;base64,${imageData}` },
+        { timeout: this.timeout }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error analyzing image for tasks:', error.message);
+      throw new Error('Failed to analyze image');
+    }
+  }
 }
 
 module.exports = new MLServiceClient();

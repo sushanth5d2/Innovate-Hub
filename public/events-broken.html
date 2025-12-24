@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <span class="logo">Innovate</span>
+    <button onclick="openCreateModal()" class="icon-button">
+      <i class="fas fa-plus"></i>
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <button class="tab active" onclick="switchTab('events')">Events</button>
+    <button class="tab" onclick="switchTab('crosspath')">Crosspath</button>
+    <button class="tab" onclick="switchTab('reminders')">Reminders</button>
+  </div>
+
+  <!-- Events Tab -->
+  <div id="events-tab" class="events-container">
+    <div id="events-list"></div>
+  </div>
+
+  <!-- Crosspath Tab -->
+  <div id="crosspath-tab" class="events-container" style="display: none;">
+    <div id="crosspath-list"></div>
+  </div>
+
+  <!-- Reminders Tab -->
+  <div id="reminders-tab" class="events-container" style="display: none;">
+    <div id="reminders-list"></div>
+  </div>
+
+  <!-- Create Event Modal -->
+  <div id="create-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button onclick="closeCreateModal()" class="text-button">Cancel</button>
+        <h3>Create Event</h3>
+        <button onclick="createEvent()" class="text-button primary">Create</button>
+      </div>
+      <div class="modal-body">
+        <form id="create-form" onsubmit="createEvent(); return false;">
+          <div class="form-group">
+            <label>Event Title</label>
+            <input type="text" id="event-title" class="form-control" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="event-description" class="form-control" rows="3"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label>Date & Time</label>
+            <input type="datetime-local" id="event-date" class="form-control" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Location</label>
+            <input type="text" id="event-location" class="form-control" placeholder="Stadium, Virtual, etc.">
+          </div>
+
+          <div class="form-group">
+            <label>Max Attendees (optional)</label>
+            <input type="number" id="max-attendees" class="form-control" min="1">
+          </div>
+
+          <div class="form-group">
+            <label>Community (optional)</label>
+            <select id="event-community" class="form-control">
+              <option value="">None</option>
+            </select>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="bottom-nav">
+    <a href="/home" class="nav-item">
+      <i class="far fa-home"></i>
+    </a>
+    <a href="/search" class="nav-item">
+      <i class="far fa-search"></i>
+    </a>
+    <a href="/events" class="nav-item active">
+      <i class="fas fa-calendar"></i>
+    </a>
+    <a href="/notifications" class="nav-item">
+      <i class="far fa-heart"></i>
+    </a>
+    <a href="/profile" class="nav-item">
+      <i class="far fa-user-circle"></i>
+    </a>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    const socket = io();
+    let activeTab = 'events';
+
+    if (!localStorage.getItem('token')) {
+      window.location.href = '/login';
+    }
+
+    async function loadEvents() {
+      try {
+        const response = await fetch('/api/events', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load events');
+        
+        const data = await response.json();
+        displayEvents(data.events || []);
+      } catch (error) {
+        console.error('Error loading events:', error);
+      }
+    }
+
+    async function loadCrosspaths() {
+      try {
+        const response = await fetch('/api/events/crosspath/requests', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load crosspaths');
+        
+        const data = await response.json();
+        displayCrosspaths(data.crosspaths || []);
+      } catch (error) {
+        console.error('Error loading crosspaths:', error);
+      }
+    }
+
+    async function loadReminders() {
+      try {
+        const response = await fetch('/api/events/reminders', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to load reminders');
+        
+        const data = await response.json();
+        displayReminders(data.reminders || []);
+      } catch (error) {
+        console.error('Error loading reminders:', error);
+      }
+    }
+
+    function displayEvents(events) {
+      const list = document.getElementById('events-list');
+      list.innerHTML = '';
+
+      if (events.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-calendar"></i>
+            <p>No upcoming events</p>
+            <button class="action-button primary" onclick="openCreateModal()">Create Event</button>
+          </div>
+        `;
+        return;
+      }
+
+      events.forEach(event => {
+        const div = document.createElement('div');
+        div.className = 'event-card';
+        const date = new Date(event.event_date);
+        const isAttending = event.is_attending;
+
+        div.innerHTML = `
+          <div class="event-date">
+            <div class="event-day">${date.getDate()}</div>
+            <div class="event-month">${date.toLocaleString('default', { month: 'short' })}</div>
+          </div>
+          <div class="event-info">
+            <div class="event-title">${event.title}</div>
+            <div class="event-meta">
+              ${event.location ? `<span><i class="fas fa-map-marker-alt"></i> ${event.location}</span>` : ''}
+              <span><i class="fas fa-clock"></i> ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div class="event-description">${event.description || ''}</div>
+            <div class="event-attendees">
+              <i class="fas fa-users"></i> ${event.attendee_count || 0} attending
+              ${event.max_attendees ? ` / ${event.max_attendees}` : ''}
+            </div>
+          </div>
+          <button class="attend-button ${isAttending ? 'attending' : ''}" onclick="toggleAttend(${event.id}, this)">
+            ${isAttending ? '<i class="fas fa-check"></i>' : '<i class="fas fa-plus"></i>'}
+          </button>
+        `;
+        
+        div.onclick = (e) => {
+          if (!e.target.classList.contains('attend-button')) {
+            viewEvent(event.id);
+          }
+        };
+        
+        list.appendChild(div);
+      });
+    }
+
+    function displayCrosspaths(crosspaths) {
+      const list = document.getElementById('crosspath-list');
+      list.innerHTML = '';
+
+      if (crosspaths.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-handshake"></i>
+            <p>No crosspath requests</p>
+          </div>
+        `;
+        return;
+      }
+
+      crosspaths.forEach(cp => {
+        const div = document.createElement('div');
+        div.className = 'crosspath-card';
+        div.innerHTML = `
+          <img src="${cp.user_profile_picture || '/images/default-avatar.png'}" alt="${cp.username}" class="crosspath-avatar">
+          <div class="crosspath-info">
+            <div class="crosspath-user">${cp.username}</div>
+            <div class="crosspath-message">${cp.message || 'Wants to connect'}</div>
+            <div class="crosspath-time">${formatTimeAgo(cp.created_at)}</div>
+          </div>
+          <div class="crosspath-actions">
+            <button class="action-button primary small" onclick="acceptCrosspath(${cp.id})">Accept</button>
+            <button class="action-button small" onclick="rejectCrosspath(${cp.id})">Decline</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function displayReminders(reminders) {
+      const list = document.getElementById('reminders-list');
+      list.innerHTML = '';
+
+      if (reminders.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-bell"></i>
+            <p>No reminders</p>
+          </div>
+        `;
+        return;
+      }
+
+      reminders.forEach(reminder => {
+        const div = document.createElement('div');
+        div.className = 'reminder-card';
+        div.innerHTML = `
+          <div class="reminder-icon">
+            <i class="fas fa-bell"></i>
+          </div>
+          <div class="reminder-info">
+            <div class="reminder-title">${reminder.title}</div>
+            <div class="reminder-time">${new Date(reminder.remind_at).toLocaleString()}</div>
+          </div>
+          <button class="icon-button" onclick="deleteReminder(${reminder.id})">
+            <i class="fas fa-times"></i>
+          </button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.getElementById('events-tab').style.display = tab === 'events' ? 'block' : 'none';
+      document.getElementById('crosspath-tab').style.display = tab === 'crosspath' ? 'block' : 'none';
+      document.getElementById('reminders-tab').style.display = tab === 'reminders' ? 'block' : 'none';
+
+      if (tab === 'crosspath') loadCrosspaths();
+      if (tab === 'reminders') loadReminders();
+    }
+
+    async function toggleAttend(eventId, button) {
+      event.stopPropagation();
+      const isAttending = button.classList.contains('attending');
+
+      try {
+        const response = await fetch(`/api/events/${eventId}/attend`, {
+          method: isAttending ? 'DELETE' : 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to update attendance');
+        
+        button.classList.toggle('attending');
+        button.innerHTML = isAttending ? '<i class="fas fa-plus"></i>' : '<i class="fas fa-check"></i>';
+      } catch (error) {
+        console.error('Error toggling attendance:', error);
+      }
+    }
+
+    function viewEvent(eventId) {
+      window.location.href = `/event/${eventId}`;
+    }
+
+    async function openCreateModal() {
+      // Load communities for dropdown
+      try {
+        const response = await fetch('/api/communities', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const data = await response.json();
+        const select = document.getElementById('event-community');
+        select.innerHTML = '<option value="">None</option>';
+        (data.communities || []).forEach(c => {
+          select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+      } catch (error) {
+        console.error('Error loading communities:', error);
+      }
+
+      document.getElementById('create-modal').style.display = 'flex';
+    }
+
+    function closeCreateModal() {
+      document.getElementById('create-modal').style.display = 'none';
+      document.getElementById('create-form').reset();
+    }
+
+    async function createEvent() {
+      event.preventDefault();
+
+      const eventData = {
+        title: document.getElementById('event-title').value,
+        description: document.getElementById('event-description').value,
+        event_date: document.getElementById('event-date').value,
+        location: document.getElementById('event-location').value,
+        max_attendees: document.getElementById('max-attendees').value || null,
+        community_id: document.getElementById('event-community').value || null
+      };
+
+      try {
+        const response = await fetch('/api/events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(eventData)
+        });
+
+        if (!response.ok) throw new Error('Failed to create event');
+        
+        closeCreateModal();
+        loadEvents();
+      } catch (error) {
+        console.error('Error creating event:', error);
+        alert('Failed to create event');
+      }
+    }
+
+    async function acceptCrosspath(crosspathId) {
+      try {
+        const response = await fetch(`/api/events/crosspath/${crosspathId}/accept`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to accept');
+        loadCrosspaths();
+      } catch (error) {
+        console.error('Error accepting crosspath:', error);
+      }
+    }
+
+    async function rejectCrosspath(crosspathId) {
+      try {
+        const response = await fetch(`/api/events/crosspath/${crosspathId}/reject`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to reject');
+        loadCrosspaths();
+      } catch (error) {
+        console.error('Error rejecting crosspath:', error);
+      }
+    }
+
+    async function deleteReminder(reminderId) {
+      try {
+        const response = await fetch(`/api/events/reminders/${reminderId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to delete');
+        loadReminders();
+      } catch (error) {
+        console.error('Error deleting reminder:', error);
+      }
+    }
+
+    function formatTimeAgo(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const seconds = Math.floor((now - date) / 1000);
+      
+      if (seconds < 60) return 'now';
+      if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
+      if (seconds < 604800) return Math.floor(seconds / 86400) + 'd';
+      return Math.floor(seconds / 604800) + 'w';
+    }
+
+    // Initialize
+    loadEvents();
+  </script>
+</body>
+</html>

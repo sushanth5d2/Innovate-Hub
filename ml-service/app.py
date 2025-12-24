@@ -475,6 +475,76 @@ def suggest_hashtags():
             'error': str(e)
         }), 500
 
+# Extract tasks from image (OCR + AI)
+@app.route('/api/tasks/from-image', methods=['POST'])
+def extract_tasks_from_image():
+    """Extract task list from image using OCR"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image')  # Base64 encoded
+        
+        if not image_data:
+            return jsonify({
+                'success': False,
+                'error': 'image data is required'
+            }), 400
+        
+        # Try to use OCR (pytesseract) if available
+        try:
+            import pytesseract
+            from PIL import Image
+            import base64
+            import io
+            
+            # Decode image
+            image_bytes = base64.b64decode(image_data.split(',')[-1])
+            img = Image.open(io.BytesIO(image_bytes))
+            
+            # Extract text
+            text = pytesseract.image_to_string(img)
+            
+            if not text.strip():
+                return jsonify({
+                    'success': False,
+                    'error': 'No text found in image'
+                }), 400
+            
+            # Extract tasks from text
+            tasks = content_analyzer.extract_tasks_from_text(text)
+            
+            if not tasks:
+                return jsonify({
+                    'success': False,
+                    'error': 'No tasks found in extracted text',
+                    'extracted_text': text
+                }), 400
+            
+            # Generate title
+            title = content_analyzer.generate_todo_title(tasks)
+            
+            return jsonify({
+                'success': True,
+                'tasks': tasks,
+                'title': title,
+                'extracted_text': text,
+                'task_count': len(tasks)
+            })
+            
+        except ImportError:
+            # OCR not available, use simple pattern matching
+            return jsonify({
+                'success': False,
+                'error': 'OCR not available. Please install pytesseract for image analysis.',
+                'suggestion': 'Use text input instead'
+            }), 501
+        
+    except Exception as e:
+        logger.error(f'Error extracting tasks from image: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # Story analytics
 @app.route('/api/stories/analytics', methods=['POST'])
 def get_story_analytics():

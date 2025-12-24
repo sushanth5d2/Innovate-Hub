@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo Lists - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .todo-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px;
+      background: var(--ig-secondary-background);
+      border-bottom: 1px solid var(--ig-border);
+    }
+    
+    .stat-card {
+      text-align: center;
+      padding: 12px;
+      background: var(--ig-primary-background);
+      border-radius: 8px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: var(--ig-secondary-text);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    
+    .todo-card {
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      margin: 12px 16px;
+      padding: 16px;
+    }
+    
+    .todo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .todo-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      flex: 1;
+    }
+    
+    .todo-priority {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .priority-high {
+      background: #fee;
+      color: #c00;
+    }
+    
+    .priority-medium {
+      background: #ffeaa7;
+      color: #d63031;
+    }
+    
+    .priority-low {
+      background: #dfe6e9;
+      color: #636e72;
+    }
+    
+    .todo-items {
+      margin: 12px 0;
+    }
+    
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    
+    .todo-item:last-child {
+      border-bottom: none;
+    }
+    
+    .todo-checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--ig-border);
+      border-radius: 50%;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .todo-checkbox.checked {
+      background: var(--ig-blue);
+      border-color: var(--ig-blue);
+    }
+    
+    .todo-checkbox.checked::after {
+      content: '✓';
+      color: white;
+      font-size: 14px;
+    }
+    
+    .todo-item-text {
+      flex: 1;
+      color: var(--ig-primary-text);
+    }
+    
+    .todo-item-text.completed {
+      text-decoration: line-through;
+      color: var(--ig-secondary-text);
+    }
+    
+    .todo-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      margin-top: 8px;
+    }
+    
+    .todo-due {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .todo-due.overdue {
+      color: var(--ig-error);
+    }
+    
+    .todo-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    .create-fab {
+      position: fixed;
+      bottom: 70px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      color: white;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+    }
+    
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .modal-content {
+      background: var(--ig-primary-background);
+      border-radius: 12px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    
+    .modal-header h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+    
+    .modal-body {
+      padding: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 8px;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      font-size: 14px;
+    }
+    
+    .items-list {
+      margin-bottom: 12px;
+    }
+    
+    .item-input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .remove-item-btn {
+      background: var(--ig-error);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    
+    .image-upload-area {
+      border: 2px dashed var(--ig-border);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    
+    .image-upload-area:hover {
+      border-color: var(--ig-blue);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .empty-state i {
+      font-size: 64px;
+      color: var(--ig-secondary-text);
+      margin-bottom: 16px;
+    }
+    
+    .empty-state p {
+      color: var(--ig-secondary-text);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation -->
+  <div class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="openCreateModal()">
+          <i class="fas fa-plus"></i>
+        </div>
+        <a href="/settings" class="ig-nav-icon">
+          <i class="fas fa-bars"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="todo-stats">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-completed">0</div>
+      <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-pending">0</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-overdue">0</div>
+      <div class="stat-label">Overdue</div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="ig-main" style="padding-bottom: 100px;">
+    <div id="todos-container"></div>
+  </div>
+
+  <!-- Create Button -->
+  <button class="create-fab" onclick="openCreateModal()">
+    <i class="fas fa-plus"></i>
+  </button>
+
+  <!-- Create/Edit Modal -->
+  <div id="todoModal" style="display: none;">
+    <div class="modal-backdrop" onclick="if(event.target === this) closeModal()">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button onclick="closeModal()" style="background: none; border: none; color: var(--ig-secondary-text); font-size: 16px; cursor: pointer;">Cancel</button>
+          <h3 id="modal-title">Create Todo List</h3>
+          <button onclick="saveTodo()" class="ig-btn-primary" style="background: none; border: none; color: var(--ig-blue); font-weight: 600; cursor: pointer;">Save</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="todo-title" class="form-control" placeholder="Enter list title...">
+          </div>
+
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="todo-priority" class="form-control">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Due Date (Optional)</label>
+            <input type="datetime-local" id="todo-due-date" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label>Tasks</label>
+            <div class="items-list" id="items-list"></div>
+            <button onclick="addItem()" class="ig-btn-secondary" style="width: 100%; padding: 10px; border: 1px dashed var(--ig-border); background: transparent; color: var(--ig-primary-text); border-radius: 6px; cursor: pointer;">
+              <i class="fas fa-plus"></i> Add Task
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label>Or Capture from Image</label>
+            <div class="image-upload-area" onclick="document.getElementById('image-input').click()">
+              <i class="fas fa-camera" style="font-size: 32px; color: var(--ig-secondary-text); margin-bottom: 8px;"></i>
+              <p style="color: var(--ig-secondary-text); font-size: 14px;">Click to upload image with tasks</p>
+              <p style="color: var(--ig-tertiary-text); font-size: 12px;">AI will extract tasks automatically</p>
+            </div>
+            <input type="file" id="image-input" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    </a>
+    <a href="/search" class="ig-bottom-nav-item">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+    </a>
+    <a href="/todos" class="ig-bottom-nav-item active">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>
+    </a>
+    <a href="/communities" class="ig-bottom-nav-item">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    </a>
+    <a href="/profile" class="ig-bottom-nav-item">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    </a>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    let todos = [];
+    let editingTodoId = null;
+    let currentItems = [];
+
+    // Initialize
+    if (!InnovateAPI.isAuthenticated()) {
+      window.location.href = '/login';
+    }
+
+    loadStats();
+    loadTodos();
+
+    // Load statistics
+    async function loadStats() {
+      try {
+        const data = await InnovateAPI.apiRequest('/todos/stats');
+        if (data.success) {
+          document.getElementById('stat-total').textContent = data.stats.total || 0;
+          document.getElementById('stat-completed').textContent = data.stats.completed || 0;
+          document.getElementById('stat-pending').textContent = data.stats.pending || 0;
+          document.getElementById('stat-overdue').textContent = data.stats.overdue || 0;
+        }
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    // Load todos
+    async function loadTodos() {
+      try {
+        const data = await InnovateAPI.apiRequest('/todos');
+        if (data.success) {
+          todos = data.todos || [];
+          renderTodos();
+        }
+      } catch (error) {
+        console.error('Error loading todos:', error);
+        InnovateAPI.showAlert('Error loading todos', 'error');
+      }
+    }
+
+    // Render todos
+    function renderTodos() {
+      const container = document.getElementById('todos-container');
+      
+      if (todos.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-check-circle"></i>
+            <p>No todo lists yet</p>
+            <button onclick="openCreateModal()" class="ig-btn-primary" style="margin-top: 16px; padding: 12px 24px; border-radius: 8px;">Create Todo List</button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = todos.map(todo => createTodoCard(todo)).join('');
+    }
+
+    // Create todo card HTML
+    function createTodoCard(todo) {
+      const completedCount = todo.items.filter(item => item.completed).length;
+      const totalCount = todo.items.length;
+      const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      
+      let dueInfo = '';
+      if (todo.due_date) {
+        const dueDate = new Date(todo.due_date);
+        const now = new Date();
+        const isOverdue = dueDate < now && !todo.completed;
+        dueInfo = `<div class="todo-due ${isOverdue ? 'overdue' : ''}">
+          <i class="fas fa-clock"></i>
+          ${InnovateAPI.formatDate(todo.due_date)}
+        </div>`;
+      }
+
+      return `
+        <div class="todo-card">
+          <div class="todo-header">
+            <div class="todo-title">${todo.title}</div>
+            <span class="todo-priority priority-${todo.priority}">${todo.priority}</span>
+          </div>
+          
+          <div class="todo-items">
+            ${todo.items.map((item, index) => `
+              <div class="todo-item">
+                <div class="todo-checkbox ${item.completed ? 'checked' : ''}" 
+                     onclick="toggleItem(${todo.id}, ${index})"></div>
+                <div class="todo-item-text ${item.completed ? 'completed' : ''}">${item.text}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="todo-meta">
+            <span>${completedCount}/${totalCount} completed (${progress}%)</span>
+            ${dueInfo}
+          </div>
+
+          <div class="todo-actions">
+            <button onclick="editTodo(${todo.id})" class="ig-action-btn" style="color: var(--ig-blue);">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button onclick="deleteTodo(${todo.id})" class="ig-action-btn" style="color: var(--ig-error);">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Open create modal
+    function openCreateModal() {
+      editingTodoId = null;
+      document.getElementById('modal-title').textContent = 'Create Todo List';
+      document.getElementById('todo-title').value = '';
+      document.getElementById('todo-priority').value = 'medium';
+      document.getElementById('todo-due-date').value = '';
+      currentItems = [];
+      renderItems();
+      document.getElementById('todoModal').style.display = 'block';
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('todoModal').style.display = 'none';
+      editingTodoId = null;
+      currentItems = [];
+    }
+
+    // Add item
+    function addItem(text = '') {
+      currentItems.push({ text: text || '', completed: false });
+      renderItems();
+    }
+
+    // Remove item
+    function removeItem(index) {
+      currentItems.splice(index, 1);
+      renderItems();
+    }
+
+    // Render items in modal
+    function renderItems() {
+      const container = document.getElementById('items-list');
+      container.innerHTML = currentItems.map((item, index) => `
+        <div class="item-input-group">
+          <input type="text" class="form-control" placeholder="Task ${index + 1}..." value="${item.text}" 
+                 onchange="currentItems[${index}].text = this.value" style="flex: 1;">
+          <button onclick="removeItem(${index})" class="remove-item-btn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Handle image upload
+    async function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          InnovateAPI.showAlert('Analyzing image...', 'info');
+          
+          const response = await fetch('http://localhost:5000/api/tasks/from-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: e.target.result })
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            document.getElementById('todo-title').value = data.title;
+            currentItems = data.tasks.map(task => ({
+              text: task.text,
+              completed: false
+            }));
+            renderItems();
+            InnovateAPI.showAlert(`Extracted ${data.task_count} tasks!`, 'success');
+          } else {
+            InnovateAPI.showAlert(data.error || 'Failed to extract tasks', 'error');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          InnovateAPI.showAlert('Failed to analyze image. Please try manual entry.', 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Save todo
+    async function saveTodo() {
+      const title = document.getElementById('todo-title').value.trim();
+      const priority = document.getElementById('todo-priority').value;
+      const dueDate = document.getElementById('todo-due-date').value;
+
+      if (!title) {
+        InnovateAPI.showAlert('Please enter a title', 'error');
+        return;
+      }
+
+      if (currentItems.length === 0) {
+        InnovateAPI.showAlert('Please add at least one task', 'error');
+        return;
+      }
+
+      const validItems = currentItems.filter(item => item.text.trim());
+      if (validItems.length === 0) {
+        InnovateAPI.showAlert('Please enter task descriptions', 'error');
+        return;
+      }
+
+      try {
+        const endpoint = editingTodoId ? `/todos/${editingTodoId}` : '/todos';
+        const method = editingTodoId ? 'PUT' : 'POST';
+
+        const data = await InnovateAPI.apiRequest(endpoint, {
+          method,
+          body: JSON.stringify({
+            title,
+            items: validItems,
+            priority,
+            due_date: dueDate || null
+          })
+        });
+
+        if (data.success) {
+          InnovateAPI.showAlert(editingTodoId ? 'Todo updated!' : 'Todo created!', 'success');
+          closeModal();
+          loadTodos();
+          loadStats();
+        }
+      } catch (error) {
+        console.error('Error saving todo:', error);
+        InnovateAPI.showAlert('Error saving todo', 'error');
+      }
+    }
+
+    // Edit todo
+    function editTodo(id) {
+      const todo = todos.find(t => t.id === id);
+      if (!todo) return;
+
+      editingTodoId = id;
+      document.getElementById('modal-title').textContent = 'Edit Todo List';
+      document.getElementById('todo-title').value = todo.title;
+      document.getElementById('todo-priority').value = todo.priority;
+      document.getElementById('todo-due-date').value = todo.due_date || '';
+      currentItems = [...todo.items];
+      renderItems();
+      document.getElementById('todoModal').style.display = 'block';
+    }
+
+    // Delete todo
+    async function deleteTodo(id) {
+      if (!confirm('Delete this todo list?')) return;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/todos/${id}`, { method: 'DELETE' });
+        if (data.success) {
+          InnovateAPI.showAlert('Todo deleted!', 'success');
+          loadTodos();
+          loadStats();
+        }
+      } catch (error) {
+        console.error('Error deleting todo:', error);
+        InnovateAPI.showAlert('Error deleting todo', 'error');
+      }
+    }
+
+    // Toggle item completion
+    async function toggleItem(todoId, itemIndex) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/todos/${todoId}/items/${itemIndex}`, {
+          method: 'PATCH'
+        });
+
+        if (data.success) {
+          loadTodos();
+          loadStats();
+        }
+      } catch (error) {
+        console.error('Error toggling item:', error);
+        InnovateAPI.showAlert('Error updating item', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

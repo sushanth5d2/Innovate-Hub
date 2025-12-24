@@ -90,6 +90,8 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/ml', require('./routes/ml'));
+app.use('/api/social-service', require('./routes/social-service'));
+app.use('/api/todos', require('./routes/todos'));
 
 // Serve HTML pages
 app.get('/', (req, res) => {

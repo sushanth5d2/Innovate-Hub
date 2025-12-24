@@ -274,7 +274,7 @@ async function handleContactMe() {
   closePostActionsModal();
   
   try {
-    await fetch(`/posts/${currentPostIdForActions}/interact`, {
+    await fetch(`/api/posts/${currentPostIdForActions}/interact`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -322,7 +322,7 @@ function handleEditPost() {
 async function handleArchivePost() {
   if (confirm('Archive this post? You can restore it later from your profile.')) {
     try {
-      const response = await fetch(`/posts/${currentPostIdForActions}/archive`, {
+      const response = await fetch(`/api/posts/${currentPostIdForActions}/archive`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -344,7 +344,7 @@ async function handleArchivePost() {
 async function handleDeletePost() {
   if (confirm('Are you sure you want to delete this post? This cannot be undone.')) {
     try {
-      const response = await fetch(`/posts/${currentPostIdForActions}`, {
+      const response = await fetch(`/api/posts/${currentPostIdForActions}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -380,7 +380,7 @@ async function submitReminder() {
   }
   
   try {
-    const response = await fetch(`/posts/${currentPostIdForActions}/reminder`, {
+    const response = await fetch(`/api/posts/${currentPostIdForActions}/reminder`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -423,7 +423,7 @@ async function submitMeeting() {
   }
   
   try {
-    const response = await fetch(`/posts/${currentPostIdForActions}/meeting`, {
+    const response = await fetch(`/api/posts/${currentPostIdForActions}/meeting`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`,

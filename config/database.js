@@ -362,6 +362,57 @@ const createTables = () => {
       )
     `);
 
+    // Donations table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS donations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        images TEXT,
+        address TEXT,
+        latitude REAL,
+        longitude REAL,
+        status TEXT DEFAULT 'available',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Donation assigns table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS donation_assigns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donation_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed BOOLEAN DEFAULT 0,
+        completion_photos TEXT,
+        FOREIGN KEY (donation_id) REFERENCES donations(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(donation_id, user_id)
+      )
+    `);
+
+    // Todos table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS todos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        items TEXT NOT NULL,
+        tags TEXT,
+        priority TEXT DEFAULT 'medium',
+        due_date DATETIME,
+        completed BOOLEAN DEFAULT 0,
+        image_source TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Migrations for existing databases
     db.serialize(() => {
       // Add video_url column if it doesn't exist

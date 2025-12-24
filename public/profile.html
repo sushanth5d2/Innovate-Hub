@@ -198,7 +198,7 @@
 
     async function loadProfile() {
       try {
-        const response = await fetch(`/users/${userId}`, {
+        const response = await fetch(`/api/users/${userId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -263,7 +263,7 @@
 
     async function loadPosts() {
       try {
-        const response = await fetch(`/users/${userId}/posts`, {
+        const response = await fetch(`/api/users/${userId}/posts`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -358,7 +358,7 @@
           document.getElementById('edit-teams').value.split(',').map(t => t.trim()).filter(t => t)
         ));
 
-        const response = await fetch('/users', {
+        const response = await fetch('/api/users', {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -378,7 +378,7 @@
 
     async function follow() {
       try {
-        const response = await fetch(`/users/${userId}/follow`, {
+        const response = await fetch(`/api/users/${userId}/follow`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -394,7 +394,7 @@
 
     async function unfollow() {
       try {
-        const response = await fetch(`/users/${userId}/follow`, {
+        const response = await fetch(`/api/users/${userId}/follow`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`

@@ -143,3 +143,87 @@ class ContentAnalyzer:
             readability = 'moderate'
         
         return readability
+    
+    def extract_tasks_from_text(self, text):
+        """
+        Extract task items from text (e.g., from image OCR)
+        Returns list of tasks with priorities
+        """
+        try:
+            tasks = []
+            
+            # Common task indicators
+            task_markers = [
+                r'^\s*[-•*]\s*(.+)$',  # Bullet points
+                r'^\s*\d+[.)]\s*(.+)$',  # Numbered lists
+                r'^\s*\[[ x]\]\s*(.+)$',  # Checkboxes
+                r'^TODO:\s*(.+)$',  # TODO prefix
+                r'^Task:\s*(.+)$',  # Task prefix
+            ]
+            
+            # Priority keywords
+            priority_high = ['urgent', 'asap', 'important', 'critical', 'priority']
+            priority_low = ['optional', 'maybe', 'someday', 'low priority']
+            
+            lines = text.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Try to match task markers
+                task_text = None
+                for pattern in task_markers:
+                    match = re.match(pattern, line, re.IGNORECASE)
+                    if match:
+                        task_text = match.group(1).strip()
+                        break
+                
+                # If no marker found, treat any line as potential task
+                if not task_text and len(line) > 3:
+                    task_text = line
+                
+                if task_text:
+                    # Determine priority
+                    priority = 'medium'
+                    line_lower = task_text.lower()
+                    
+                    if any(word in line_lower for word in priority_high):
+                        priority = 'high'
+                    elif any(word in line_lower for word in priority_low):
+                        priority = 'low'
+                    
+                    tasks.append({
+                        'text': task_text,
+                        'priority': priority,
+                        'completed': False
+                    })
+            
+            return tasks
+        except Exception as e:
+            logger.error(f"Error extracting tasks: {str(e)}")
+            return []
+    
+    def generate_todo_title(self, tasks):
+        """
+        Generate a meaningful title from task list
+        """
+        if not tasks:
+            return "Task List"
+        
+        # Common project keywords
+        if any('meeting' in t['text'].lower() for t in tasks):
+            return "Meeting Tasks"
+        elif any('shop' in t['text'].lower() or 'buy' in t['text'].lower() for t in tasks):
+            return "Shopping List"
+        elif any('work' in t['text'].lower() or 'office' in t['text'].lower() for t in tasks):
+            return "Work Tasks"
+        elif any('home' in t['text'].lower() for t in tasks):
+            return "Home Tasks"
+        else:
+            # Use first task as title (truncated)
+            first_task = tasks[0]['text'][:30]
+            if len(tasks) > 1:
+                return f"{first_task}... ({len(tasks)} tasks)"
+            return first_task
