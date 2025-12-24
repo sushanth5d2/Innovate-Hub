@@ -9,38 +9,42 @@ router.get('/conversations', authMiddleware, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
+  // First, get all unique contacts and their last message ID
   const query = `
-    SELECT DISTINCT
-      CASE 
-        WHEN m.sender_id = ? THEN m.receiver_id
-        ELSE m.sender_id
-      END as contact_id,
+    WITH contact_messages AS (
+      SELECT 
+        CASE 
+          WHEN sender_id = ? THEN receiver_id
+          ELSE sender_id
+        END as contact_id,
+        MAX(id) as last_message_id
+      FROM messages
+      WHERE (sender_id = ? OR receiver_id = ?)
+        AND (is_deleted_by_sender = 0 OR sender_id != ?)
+        AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
+      GROUP BY contact_id
+    )
+    SELECT 
+      cm.contact_id,
       u.username,
       u.profile_picture,
       u.is_online,
       u.last_seen,
-      (SELECT content FROM messages 
-       WHERE (sender_id = ? AND receiver_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END) 
-          OR (sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AND receiver_id = ?)
-       ORDER BY created_at DESC LIMIT 1) as last_message,
-      (SELECT created_at FROM messages 
-       WHERE (sender_id = ? AND receiver_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END) 
-          OR (sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AND receiver_id = ?)
-       ORDER BY created_at DESC LIMIT 1) as last_message_time,
+      m.content as last_message,
+      m.type as last_message_type,
+      m.original_filename as last_message_filename,
+      m.created_at as last_message_time,
       (SELECT COUNT(*) FROM messages 
-       WHERE sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AND receiver_id = ? AND is_read = 0) as unread_count
-    FROM messages m
-    JOIN users u ON u.id = CASE 
-      WHEN m.sender_id = ? THEN m.receiver_id
-      ELSE m.sender_id
-    END
-    WHERE (m.sender_id = ? OR m.receiver_id = ?)
-      AND (m.is_deleted_by_sender = 0 OR m.sender_id != ?)
-      AND (m.is_deleted_by_receiver = 0 OR m.receiver_id != ?)
-    ORDER BY last_message_time DESC
+       WHERE sender_id = cm.contact_id 
+       AND receiver_id = ? 
+       AND is_read = 0) as unread_count
+    FROM contact_messages cm
+    JOIN users u ON u.id = cm.contact_id
+    LEFT JOIN messages m ON m.id = cm.last_message_id
+    ORDER BY m.created_at DESC
   `;
 
-  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId], (err, conversations) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId], (err, conversations) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Error fetching conversations' });
@@ -87,56 +91,69 @@ router.get('/:contactId', authMiddleware, (req, res) => {
 });
 
 // Send message
-router.post('/send', authMiddleware, upload.fields([
-  { name: 'file', maxCount: 1 },
-  { name: 'audio', maxCount: 1 }
-]), (req, res) => {
-  const db = getDb();
-  const senderId = req.user.userId;
-  const { receiver_id, content, type, timer } = req.body;
-  
-  let messageContent = content;
-  let messageType = type || 'text';
-  
-  // Handle file upload
-  let originalFilename = null;
-  if (req.files?.file) {
-    const file = req.files.file[0];
-    originalFilename = file.originalname;
-    messageContent = file.mimetype.startsWith('image/') 
-      ? `/uploads/images/${file.filename}`
-      : `/uploads/files/${file.filename}`;
-    messageType = file.mimetype.startsWith('image/') ? 'image' : 
-                  file.mimetype.startsWith('video/') ? 'video' : 'file';
-  }
-  
-  // Handle voice message
-  if (req.files?.audio) {
-    const audio = req.files.audio[0];
-    messageContent = `/uploads/files/${audio.filename}`;
-    messageType = 'voice';
-  }
-
-  // Calculate expiration time if timer is set
-  let expiresAt = null;
-  if (timer) {
-    const now = new Date();
-    now.setSeconds(now.getSeconds() + parseInt(timer));
-    expiresAt = now.toISOString();
-  }
-
-  const query = `
-    INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `;
-
-  db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename], function(err) {
+router.post('/send', authMiddleware, (req, res, next) => {
+  // Use multer middleware
+  upload.fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'audio', maxCount: 1 }
+  ])(req, res, (err) => {
     if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Error sending message' });
+      console.error('Multer error:', err.message);
+      return res.status(400).json({ error: err.message });
+    }
+    
+    const db = getDb();
+    const senderId = req.user.userId;
+    const { receiver_id, content, type, timer } = req.body;
+    
+    if (!receiver_id) {
+      return res.status(400).json({ error: 'receiver_id is required' });
+    }
+    
+    let messageContent = content;
+    let messageType = type || 'text';
+    
+    // Handle file upload
+    let originalFilename = null;
+    if (req.files?.file) {
+      const file = req.files.file[0];
+      originalFilename = file.originalname;
+      console.log('File uploaded:', originalFilename, 'MIME:', file.mimetype);
+      messageContent = file.mimetype.startsWith('image/') 
+        ? `/uploads/images/${file.filename}`
+        : `/uploads/files/${file.filename}`;
+      messageType = file.mimetype.startsWith('image/') ? 'image' : 
+                    file.mimetype.startsWith('video/') ? 'video' : 'file';
+    }
+    
+    // Handle voice message
+    if (req.files?.audio) {
+      const audio = req.files.audio[0];
+      originalFilename = audio.originalname;
+      messageContent = `/uploads/files/${audio.filename}`;
+      messageType = 'voice';
     }
 
-    const messageId = this.lastID;
+    // Calculate expiration time if timer is set
+    let expiresAt = null;
+    if (timer) {
+      const now = new Date();
+      now.setSeconds(now.getSeconds() + parseInt(timer));
+      expiresAt = now.toISOString();
+    }
+
+    const query = `
+      INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `;
+
+    db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename], function(err) {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Error sending message' });
+      }
+
+      const messageId = this.lastID;
 
     // Get the created message
     db.get(
@@ -179,6 +196,7 @@ router.post('/send', authMiddleware, upload.fields([
         res.json({ success: true, message: messageData });
       }
     );
+  });
   });
 });
 

@@ -39,19 +39,38 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|mp4|mov|webm|m4a|mp3|wav/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = file.mimetype.match(/^(image|video|audio|application\/(pdf|msword|vnd\.|text))/);
+  
+  // Check MIME types more comprehensively
+  const allowedMimeTypes = [
+    // Images
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    // Videos
+    'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
+    // Audio
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/m4a', 'audio/x-m4a',
+    // Documents
+    'application/pdf',
+    'application/msword', // .doc
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'text/plain', // .txt
+    'application/vnd.ms-excel', // .xls
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
+  ];
+  
+  const mimetypeValid = allowedMimeTypes.includes(file.mimetype);
 
-  if (mimetype && extname) {
+  if ((mimetypeValid || extname) && extname) {
     return cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only images, PDFs, documents, videos, and audio files are allowed.'));
+    console.log('Rejected file:', file.originalname, 'MIME:', file.mimetype);
+    cb(new Error(`Invalid file type: ${file.mimetype}. Only images, PDFs, documents, videos, and audio files are allowed.`));
   }
 };
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760 // 10MB default
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 52428800 // 50MB default (increased for documents/videos)
   },
   fileFilter: fileFilter
 });

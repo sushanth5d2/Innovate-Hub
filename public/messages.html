@@ -502,11 +502,50 @@
       try {
         const data = await InnovateAPI.apiRequest('/messages/conversations');
         conversations = data.conversations;
+        console.log('Conversations loaded and rendering:', conversations.length);
         renderConversations(conversations);
+        return conversations;
       } catch (error) {
         console.error('Error loading conversations:', error);
         document.getElementById('conversationsList').innerHTML = 
           '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading conversations</div>';
+        return [];
+      }
+    }
+
+    // Format message preview based on type
+    function formatMessagePreview(message, type, filename) {
+      if (!message) return 'Start a conversation';
+      
+      switch(type) {
+        case 'image':
+          return '📷 Photo';
+        case 'video':
+          return '🎬 Video';
+        case 'voice':
+          return '🎤 Voice message';
+        case 'gif':
+          return '🎞️ GIF';
+        case 'location':
+          return '📍 Location';
+        case 'file':
+          if (filename) {
+            if (filename.match(/\.(pdf)$/i)) return '📄 PDF';
+            if (filename.match(/\.(doc|docx)$/i)) return '📝 Document';
+            if (filename.match(/\.(xls|xlsx)$/i)) return '📊 Spreadsheet';
+            if (filename.match(/\.(txt)$/i)) return '📃 Text file';
+          }
+          return '📎 File';
+        case 'todo':
+          try {
+            const todo = JSON.parse(message);
+            return `✓ ${todo.title || 'Todo list'}`;
+          } catch {
+            return '✓ Todo list';
+          }
+        default:
+          // For text messages, truncate if too long
+          return message.length > 40 ? message.substring(0, 40) + '...' : message;
       }
     }
 
@@ -532,12 +571,13 @@
         
         const isUnread = conv.unread_count > 0;
         const messageClass = isUnread ? 'ig-conversation-message unread' : 'ig-conversation-message';
+        const messagePreview = formatMessagePreview(conv.last_message, conv.last_message_type, conv.last_message_filename);
         
         convEl.innerHTML = `
           <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" alt="${conv.username}" class="ig-conversation-avatar">
           <div class="ig-conversation-info">
             <div class="ig-conversation-name">${conv.username}</div>
-            <div class="${messageClass}">${conv.last_message || 'Start a conversation'}</div>
+            <div class="${messageClass}">${messagePreview}</div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <div class="ig-conversation-time">${conv.last_message_time ? formatTime(conv.last_message_time) : ''}</div>
@@ -711,7 +751,15 @@
             messageEl.textContent = msg.content;
             const timeEl = document.createElement('div');
             timeEl.className = 'ig-message-time';
-            timeEl.textContent = formatMessageTime(msg.created_at);
+            timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
+            
+            // Format time and add status for sent messages
+            if (isSent) {
+              const statusIcon = msg.is_read ? '✓✓' : '✓'; // Double check if read, single if delivered
+              timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
+            } else {
+              timeEl.textContent = formatMessageTime(msg.created_at);
+            }
             
             // Add timer indicator if message has expiry
             if (msg.expires_at) {
@@ -849,6 +897,13 @@
         messageEl.className = 'ig-message ig-message-sent';
         messageEl.textContent = content;
         
+        // Add message status (delivered)
+        const statusEl = document.createElement('div');
+        statusEl.className = 'ig-message-time';
+        statusEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: flex-end;';
+        statusEl.innerHTML = `<span style="font-size: 11px;">Just now</span><span style="font-size: 10px;">✓✓</span>`;
+        messageEl.appendChild(statusEl);
+        
         if (timer) {
           const timerEl = document.createElement('div');
           timerEl.style.cssText = 'font-size: 11px; opacity: 0.7; margin-top: 4px;';
@@ -870,8 +925,10 @@
           content: content
         });
         
-        // Reload conversations to update last message
-        loadConversations();
+        // Reload conversations to update last message (with small delay)
+        setTimeout(() => {
+          loadConversations();
+        }, 300);
       } catch (error) {
         console.error('Error sending message:', error);
         InnovateAPI.showAlert('Failed to send message', 'error');
@@ -1002,8 +1059,19 @@
       }
     });
 
-    // Socket listeners
-    InnovateAPI.getSocket().on('new_message', (data) => {
+    // Setup Socket.IO Event Listeners
+    function setupSocketListeners() {
+      console.log('Setting up Socket.IO event listeners...');
+      const socket = InnovateAPI.getSocket();
+      
+      // Remove any existing listeners to prevent duplicates
+      socket.off('new_message');
+      socket.off('user:online');
+      socket.off('user:offline');
+      socket.off('message:expired');
+      
+      // New message listener
+      socket.on('new_message', (data) => {
       if (data.sender_id === currentContactId) {
         const messagesContainer = document.getElementById('chatMessages');
         const messageEl = document.createElement('div');
@@ -1113,12 +1181,14 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
       
-      // Reload conversations to update last message
-      loadConversations();
+      // Reload conversations to update last message (with small delay to ensure DB is updated)
+      setTimeout(() => {
+        loadConversations();
+      }, 300);
     });
     
     // Online/Offline status listeners
-    InnovateAPI.getSocket().on('user:online', (userId) => {
+    socket.on('user:online', (userId) => {
       if (userId == currentContactId) {
         const statusEl = document.getElementById('chatStatus');
         if (statusEl) {
@@ -1128,7 +1198,7 @@
       }
     });
     
-    InnovateAPI.getSocket().on('user:offline', (userId) => {
+    socket.on('user:offline', (userId) => {
       if (userId == currentContactId) {
         const statusEl = document.getElementById('chatStatus');
         if (statusEl) {
@@ -1139,7 +1209,7 @@
     });
     
     // Listen for expired messages
-    InnovateAPI.getSocket().on('message:expired', (messageId) => {
+    socket.on('message:expired', (messageId) => {
       const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
       if (messageEl) {
         messageEl.style.transition = 'opacity 0.5s';
@@ -1150,8 +1220,45 @@
       }
     });
     
-    // Emit user join when page loads
-    InnovateAPI.getSocket().emit('user:join', user.id);
+    // WebRTC call event listeners
+    socket.off('call:incoming');
+    socket.off('call:answered');
+    socket.off('call:ice-candidate');
+    socket.off('call:rejected');
+    socket.off('call:ended');
+    
+    console.log('Registering call event listeners...');
+    socket.on('call:incoming', (data) => {
+      console.log('call:incoming event received:', data);
+      showIncomingCall(data);
+    });
+
+    socket.on('call:answered', async (data) => {
+      if (peerConnection && data.answer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    });
+
+    socket.on('call:ice-candidate', async (data) => {
+      if (peerConnection && data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
+    socket.on('call:rejected', () => {
+      InnovateAPI.showAlert('Call rejected', 'info');
+      cleanupCall();
+    });
+
+    socket.on('call:ended', () => {
+      InnovateAPI.showAlert('Call ended', 'info');
+      cleanupCall();
+    });
+      
+    // Emit user join
+    socket.emit('user:join', user.id);
+    console.log('Socket.IO listeners setup complete');
+  }
     
     // Voice recording
     let mediaRecorder;
@@ -1318,8 +1425,35 @@
           body: formData
         });
         
-        loadMessages(currentContactId);
-        InnovateAPI.showAlert('File sent', 'success');
+        // Add file message to UI immediately with delivered status
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'ig-message ig-message-sent';
+        
+        let icon = '📎';
+        if (file.type.startsWith('image/')) icon = '📷';
+        else if (file.type.startsWith('video/')) icon = '🎬';
+        else if (filename.match(/\.pdf$/i)) icon = '📄';
+        else if (filename.match(/\.(doc|docx)$/i)) icon = '📝';
+        
+        messageEl.innerHTML = `
+          <div style="display: inline-block;">
+            <div style="font-size: 14px;">${icon} ${filename || file.name}</div>
+            <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
+              <span style="font-size: 11px;">Just now</span>
+              <span style="font-size: 10px;">✓✓</span>
+            </div>
+          </div>
+        `;
+        messagesContainer.appendChild(messageEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Reload messages to get full message data
+        setTimeout(() => {
+          loadMessages(currentContactId);
+        }, 500);
+        
+        InnovateAPI.showAlert('File sent successfully', 'success');
       } catch (error) {
         console.error('File send error:', error);
         InnovateAPI.showAlert('Failed to send file', 'error');
@@ -1709,7 +1843,32 @@
           })
         });
         
-        loadMessages(currentContactId);
+        // Add TODO message to UI immediately
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'ig-message ig-message-sent';
+        
+        let html = `<div style="font-weight: 600; margin-bottom: 8px;">\u2713 ${title}</div>`;
+        items.forEach((item) => {
+          html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+            <input type="checkbox" disabled style="width: 16px; height: 16px;">
+            <span style="font-size: 14px;">${item.text}</span>
+          </div>`;
+        });
+        html += `<div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 8px;">
+          <span style="font-size: 11px;">Just now</span>
+          <span style="font-size: 10px;">\u2713\u2713</span>
+        </div>`;
+        messageEl.innerHTML = html;
+        
+        messagesContainer.appendChild(messageEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Reload messages after delay to get full data
+        setTimeout(() => {
+          loadMessages(currentContactId);
+        }, 500);
+        
         InnovateAPI.showAlert('TODO list sent', 'success');
         closeTodoCreator();
       } catch (error) {
@@ -1910,32 +2069,76 @@
         const isDoc = url.match(/\.(doc|docx)$/i) || (filename && filename.match(/\.(doc|docx)$/i));
         
         if (isPdf) {
-          // PDF preview with embedded viewer
-          content = `<iframe src="${url}#toolbar=1&navpanes=0&scrollbar=1" style="width: 90vw; height: 85vh; border: none; border-radius: 8px; background: white;"></iframe>`;
-        } else if (isTxt) {
-          // Text file preview - fetch and display content
-          content = `<div id="textPreviewContainer" style="width: 90vw; height: 85vh; background: white; border-radius: 8px; overflow: auto; padding: 20px;">
-            <div style="text-align: center; padding: 40px; color: #666;">Loading...</div>
+          // PDF preview with embedded viewer and loading state
+          content = `<div style="width: 90vw; height: 85vh; position: relative;">
+            <div id="pdfLoader" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center;">
+              <div class="ig-spinner" style="border-color: rgba(255,255,255,0.3); border-top-color: white; margin: 0 auto 16px;"></div>
+              <div>Loading PDF...</div>
+            </div>
+            <iframe src="${url}#toolbar=1&navpanes=0&scrollbar=1" style="width: 100%; height: 100%; border: none; border-radius: 8px; background: white;" onload="document.getElementById('pdfLoader')?.remove()"></iframe>
           </div>`;
-          // Fetch text content
+        } else if (isTxt) {
+          // Text file preview - fetch and display content with loading
+          content = `<div id="textPreviewContainer" style="width: 90vw; height: 85vh; background: white; border-radius: 8px; overflow: auto; padding: 20px; position: relative;">
+            <div id="textLoader" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #666; text-align: center;">
+              <div class="ig-spinner" style="margin: 0 auto 16px;"></div>
+              <div>Loading text file...</div>
+            </div>
+          </div>`;
+          // Fetch text content with timeout
+          const fetchTimeout = setTimeout(() => {
+            const container = document.getElementById('textPreviewContainer');
+            if (container) {
+              container.innerHTML = `<div style="text-align: center; padding: 40px; color: #666;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⏱️</div>
+                <div style="font-size: 16px; margin-bottom: 12px;">Loading taking too long</div>
+                <button onclick="downloadFile('${url}', '${displayFilename}')" style="padding: 10px 20px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer;">Download Instead</button>
+              </div>`;
+            }
+          }, 5000); // 5 second timeout
+
           fetch(url)
-            .then(response => response.text())
+            .then(response => {
+              if (!response.ok) throw new Error('Failed to load');
+              return response.text();
+            })
             .then(text => {
+              clearTimeout(fetchTimeout);
               const container = document.getElementById('textPreviewContainer');
               if (container) {
-                container.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; color: #333; margin: 0;">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+                // Limit text size for performance
+                const displayText = text.length > 100000 ? text.substring(0, 100000) + '\\n\\n... (File too large, showing first 100KB)' : text;
+                container.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; color: #333; margin: 0;">${displayText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
               }
             })
             .catch(() => {
+              clearTimeout(fetchTimeout);
               const container = document.getElementById('textPreviewContainer');
               if (container) {
-                container.innerHTML = `<div style="text-align: center; padding: 40px; color: #666;">Failed to load text file</div>`;
+                container.innerHTML = `<div style="text-align: center; padding: 40px; color: #666;">
+                  <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                  <div style="font-size: 16px; margin-bottom: 12px;">Failed to load text file</div>
+                  <button onclick="downloadFile('${url}', '${displayFilename}')" style="padding: 10px 20px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer;">Download File</button>
+                </div>`;
               }
             });
         } else if (isDoc) {
-          // DOC/DOCX preview using Google Docs Viewer
-          const encodedUrl = encodeURIComponent(window.location.origin + url);
-          content = `<iframe src="https://docs.google.com/viewer?url=${encodedUrl}&embedded=true" style="width: 90vw; height: 85vh; border: none; border-radius: 8px; background: white;"></iframe>`;
+          // DOC/DOCX - direct download with preview message
+          content = `<div style="text-align: center; color: white; padding: 40px; max-width: 600px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">📝</div>
+            <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px;">${displayFilename}</div>
+            <div style="font-size: 16px; margin-bottom: 8px; color: rgba(255,255,255,0.9);">Word Document</div>
+            <div style="font-size: 14px; margin-bottom: 30px; color: rgba(255,255,255,0.7); line-height: 1.6;">Preview not available for Word documents in this environment. Download the file to view it in Microsoft Word or compatible viewer.</div>
+            <button onclick="downloadFile('${url}', '${displayFilename}')" style="padding: 14px 32px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,149,246,0.3);">
+              <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20" style="vertical-align: middle; margin-right: 8px;">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
+              </svg>
+              Download File
+            </button>
+            <div style="font-size: 12px; margin-top: 16px; color: rgba(255,255,255,0.5);">
+              Supported viewers: Microsoft Word, Google Docs, LibreOffice
+            </div>
+          </div>`;
         } else {
           content = `<div style="text-align: center; color: white; padding: 40px;">
             <div style="font-size: 64px; margin-bottom: 20px;">📄</div>
@@ -1967,16 +2170,41 @@
       document.body.appendChild(modal);
     }
     
-    // Initialize
-    loadUserInfo();
-    loadConversations().then(() => {
-      if (userId) {
-        // Find conversation with this user and open it
-        const conv = conversations.find(c => c.contact_id == userId);
-        if (conv) {
-          openChat(conv.contact_id, conv.username, conv.profile_picture);
-        }
+    // Initialize - Wrap in DOMContentLoaded to ensure DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Messages page initializing...');
+      
+      // Initialize Socket.IO first
+      const socket = InnovateAPI.getSocket();
+      if (!socket) {
+        console.error('Socket.IO not initialized!');
+        InnovateAPI.initSocket();
       }
+      
+      // Setup socket event listeners
+      setupSocketListeners();
+      
+      // Load user info and conversations
+      loadUserInfo()
+        .then(() => {
+          console.log('User info loaded');
+          return loadConversations();
+        })
+        .then(() => {
+          console.log('Conversations loaded:', conversations.length);
+          if (userId) {
+            // Find conversation with this user and open it
+            const conv = conversations.find(c => c.contact_id == userId);
+            if (conv) {
+              console.log('Opening chat with user:', userId);
+              openChat(conv.contact_id, conv.username, conv.profile_picture);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Initialization error:', error);
+          InnovateAPI.showAlert('Failed to load messages', 'error');
+        });
     });
 
     // Voice and Video Calling with WebRTC
@@ -2305,35 +2533,6 @@
     function toggleSpeaker() {
       InnovateAPI.showAlert('Speaker toggle', 'info');
     }
-
-    console.log('Registering call event listeners...');
-    InnovateAPI.getSocket().on('call:incoming', (data) => {
-      console.log('call:incoming event received:', data);
-    InnovateAPI.getSocket().on('call:incoming', (data) => {
-      showIncomingCall(data);
-    });
-
-    InnovateAPI.getSocket().on('call:answered', async (data) => {
-      if (peerConnection && data.answer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
-    });
-
-    InnovateAPI.getSocket().on('call:ice-candidate', async (data) => {
-      if (peerConnection && data.candidate) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-      }
-    });
-
-    InnovateAPI.getSocket().on('call:rejected', () => {
-      InnovateAPI.showAlert('Call rejected', 'info');
-      cleanupCall();
-    });
-
-    InnovateAPI.getSocket().on('call:ended', () => {
-      InnovateAPI.showAlert('Call ended', 'info');
-      cleanupCall();
-    });
   </script>
 </body>
 </html>
