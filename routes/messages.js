@@ -324,3 +324,25 @@ router.delete('/:messageId', authMiddleware, (req, res) => {
 });
 
 module.exports = router;
+
+// Delete entire conversation for current user
+router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  const query = `
+    UPDATE messages
+    SET 
+      is_deleted_by_sender = CASE WHEN sender_id = ? THEN 1 ELSE is_deleted_by_sender END,
+      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN 1 ELSE is_deleted_by_receiver END
+    WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+  `;
+
+  db.run(query, [userId, userId, userId, contactId, contactId, userId], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Error deleting conversation' });
+    }
+    res.json({ success: true });
+  });
+});

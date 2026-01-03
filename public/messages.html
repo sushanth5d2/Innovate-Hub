@@ -60,6 +60,11 @@
             <path d="M10.002 17.226H6.774v-3.228L18.607 2.165a1.417 1.417 0 0 1 2.004 0l1.224 1.225a1.417 1.417 0 0 1 0 2.004Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
           </svg>
         </button>
+        <button class="ig-new-message-btn" onclick="newGroup()" title="New Group" style="margin-left: 8px;">
+          <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5Z"></path>
+          </svg>
+        </button>
       </div>
 
       <!-- Search Bar -->
@@ -102,6 +107,14 @@
             <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
               <path d="M13.5 10.5 21 3m-5.5.5h5v5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
               <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+            </svg>
+          </button>
+          <button class="ig-chat-action-btn" onclick="deleteConversation()" title="Delete Chat">
+            <svg fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+              <path d="M3 6h18" stroke="currentColor" stroke-linecap="round" stroke-width="2" fill="none"></path>
+              <path d="M8 6v-2a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" fill="none"></path>
+              <path d="M19 6v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" stroke="currentColor" stroke-width="2" fill="none"></path>
+              <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" fill="none"></path>
             </svg>
           </button>
           <button class="ig-chat-action-btn" onclick="startVoiceCall()" title="Voice Call">
@@ -522,6 +535,12 @@
       try {
         const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
         const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        const navProfilePic = document.getElementById('navProfilePic');
+        if (navProfilePic) navProfilePic.src = avatar;
+        const currentUsernameEl = document.getElementById('currentUsername');
+        if (currentUsernameEl && data.user.username) {
+          currentUsernameEl.textContent = data.user.username;
+        }
         // Update profile link in navigation
         const profileLink = document.querySelector('.ig-bottom-nav-item[href^="/profile/"]');
         if (profileLink) {
@@ -609,9 +628,11 @@
         const messagePreview = formatMessagePreview(conv.last_message, conv.last_message_type, conv.last_message_filename);
         
         convEl.innerHTML = `
-          <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" alt="${conv.username}" class="ig-conversation-avatar">
+          <a href="/profile/${conv.contact_id}" onclick="event.stopPropagation()" title="View profile">
+            <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" alt="${conv.username}" class="ig-conversation-avatar" style="cursor:pointer;">
+          </a>
           <div class="ig-conversation-info">
-            <div class="ig-conversation-name">${conv.username}</div>
+            <div class="ig-conversation-name"><a href="/profile/${conv.contact_id}" onclick="event.stopPropagation()" style="text-decoration:none; color: inherit;">${conv.username}</a></div>
             <div class="${messageClass}">${messagePreview}</div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
@@ -629,15 +650,67 @@
         convEl.onclick = () => openChat(conv.contact_id, conv.username, conv.profile_picture);
         list.appendChild(convEl);
       });
+
+      // After rendering DMs, also render groups
+      renderGroupsSection();
     }
+
+    async function renderGroupsSection() {
+      try {
+        const data = await InnovateAPI.apiRequest('/groups');
+        const groups = data.groups || [];
+        const list = document.getElementById('conversationsList');
+        if (groups.length === 0) return;
+
+        // Section header
+        const header = document.createElement('div');
+        header.style.cssText = 'padding: 8px 20px; font-size: 12px; color: var(--ig-secondary-text); border-top: 1px solid var(--ig-border);';
+        header.textContent = 'Groups';
+        list.appendChild(header);
+
+        groups.forEach(group => {
+          const convEl = document.createElement('div');
+          convEl.className = 'ig-conversation';
+          const preview = formatMessagePreview(group.last_message, group.last_message_type);
+          convEl.innerHTML = `
+            <div>
+              <img src="/images/default-avatar.svg" alt="${group.name}" class="ig-conversation-avatar" style="cursor:pointer;">
+            </div>
+            <div class="ig-conversation-info">
+              <div class="ig-conversation-name">${group.name}</div>
+              <div class="ig-conversation-message">${preview || 'Group • ' + (group.member_count || 0) + ' members'}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <div class="ig-conversation-time">${group.last_message_time ? formatTime(group.last_message_time) : ''}</div>
+              ${group.unread_count > 0 ? '<div class="ig-conversation-unread"></div>' : ''}
+            </div>
+          `;
+          convEl.onclick = () => openGroupChat(group.id, group.name);
+          list.appendChild(convEl);
+        });
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      }
+    }
+
+    // Current group chat state
+    let currentGroupId = null;
 
     // Open chat
     async function openChat(contactId, username, profilePicture) {
       currentContactId = contactId;
+      currentGroupId = null;
       
       // Update UI
-      document.getElementById('chatAvatar').src = InnovateAPI.getUserAvatar(profilePicture);
-      document.getElementById('chatUsername').textContent = username;
+      const chatAvatarEl = document.getElementById('chatAvatar');
+      const chatUsernameEl = document.getElementById('chatUsername');
+      chatAvatarEl.src = InnovateAPI.getUserAvatar(profilePicture);
+      chatUsernameEl.textContent = username;
+      // Make avatar and username clickable to open profile
+      chatAvatarEl.style.cursor = 'pointer';
+      chatUsernameEl.style.cursor = 'pointer';
+      chatAvatarEl.onclick = () => window.location.href = `/profile/${currentContactId}`;
+      chatUsernameEl.onclick = () => window.location.href = `/profile/${currentContactId}`;
       
       // Mark conversation as active
       document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
@@ -676,44 +749,41 @@
         }
 
         data.messages.forEach(msg => {
-          const messageEl = document.createElement('div');
           const isSent = msg.sender_id === user.id;
-          
-          if (msg.type === 'image') {
+          const senderLabel = isSent ? 'You' : (msg.sender_username || '');
+
+          // Wrapper holds label + bubble
+          const wrapperEl = document.createElement('div');
+          wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
+          const labelEl = document.createElement('div');
+          labelEl.style.cssText = `font-size: 11px; color: var(--ig-secondary-text); width: 100%; text-align: ${isSent ? 'right' : 'left'}; padding: 0 12px; margin-bottom: 4px;`;
+          labelEl.textContent = senderLabel;
+          wrapperEl.appendChild(labelEl);
+
+          // Message bubble
+          const messageEl = document.createElement('div');
+
+          // Render by type
+          if (msg.type === 'image' || msg.type === 'gif') {
             messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
-            const filename = msg.original_filename || msg.content.split('/').pop();
+            const filename = msg.original_filename || (msg.content || '').split('/').pop();
             messageEl.innerHTML = `
               <div style="position: relative; display: inline-block;">
-                <img src="${msg.content}" style="max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;" onclick="openMediaPreview('${msg.content}', 'image', '${filename}')">
+                <img src="${msg.content}" style="max-width: 250px; max-height: ${msg.type === 'gif' ? '250px' : '350px'}; border-radius: 18px; cursor: pointer; display: block;" onclick="openMediaPreview('${msg.content}', '${msg.type}', '${filename}')">
                 <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${filename}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
                   <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
                   </svg>
                 </button>
               </div>
-              <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
-            `;
-          } else if (msg.type === 'gif') {
-            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
-            const filename = msg.original_filename || msg.content.split('/').pop();
-            messageEl.innerHTML = `
-              <div style="position: relative; display: inline-block;">
-                <img src="${msg.content}" style="max-width: 250px; max-height: 250px; border-radius: 18px; cursor: pointer; display: block;" onclick="openMediaPreview('${msg.content}', 'gif', '${filename}')">
-                <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${filename}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
-                  <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="ig-message-time">${formatMessageTime(msg.created_at)}</div>
             `;
           } else if (msg.type === 'voice') {
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            const filename = msg.original_filename || msg.content.split('/').pop();
+            const filename = msg.original_filename || (msg.content || '').split('/').pop();
             messageEl.innerHTML = `
               <div style="display: flex; align-items: center; gap: 8px;">
                 <audio controls style="max-width: 200px;">
-                  <source src="${msg.content}" type="audio/webm">
+                  <source src="${msg.content}">
                 </audio>
                 <button onclick="downloadFile('${msg.content}', '${filename}')" style="background: var(--ig-secondary-background); border: none; color: var(--ig-primary-text); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Download">
                   <svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16">
@@ -723,32 +793,39 @@
               </div>
             `;
           } else if (msg.type === 'location') {
-            const loc = JSON.parse(msg.content);
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            messageEl.innerHTML = `
-              <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; text-decoration: none; color: inherit;">
-                <div style="font-weight: 600;">📍 Location</div>
-                <div style="font-size: 12px; opacity: 0.8;">Tap to view on map</div>
-              </a>
-            `;
+            try {
+              const loc = JSON.parse(msg.content);
+              messageEl.innerHTML = `
+                <a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" style="display: block; text-decoration: none; color: inherit;">
+                  <div style="font-weight: 600;">📍 Location</div>
+                  <div style="font-size: 12px; opacity: 0.8;">Tap to view on map</div>
+                </a>
+              `;
+            } catch (_) {
+              messageEl.textContent = 'Shared location';
+            }
           } else if (msg.type === 'todo') {
-            const todo = JSON.parse(msg.content);
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            let html = `<div style="font-weight: 600; margin-bottom: 8px;">✓ ${todo.title}</div>`;
-            todo.items.forEach((item, idx) => {
-              html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
-                <input type="checkbox" ${item.checked ? 'checked' : ''} disabled style="width: 16px; height: 16px;">
-                <span style="font-size: 14px;">${item.text}</span>
-              </div>`;
-            });
-            messageEl.innerHTML = html;
+            try {
+              const todo = JSON.parse(msg.content || '{}');
+              let html = `<div style="font-weight: 600; margin-bottom: 8px;">✓ ${todo.title || 'Todo'}</div>`;
+              (todo.items || []).forEach(item => {
+                html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0;">
+                  <input type="checkbox" ${item.checked ? 'checked' : ''} disabled style="width: 16px; height: 16px;">
+                  <span style="font-size: 14px;">${item.text || ''}</span>
+                </div>`;
+              });
+              messageEl.innerHTML = html;
+            } catch (_) {
+              messageEl.textContent = msg.content || '';
+            }
           } else if (msg.type === 'file' || msg.type === 'video') {
-            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            const fileName = msg.original_filename || msg.content.split('/').pop();
-            const isVideo = msg.type === 'video' || msg.content.match(/\.(mp4|webm|mov|avi)$/i);
-            const isPdf = msg.content.match(/\.pdf$/i) || fileName.match(/\.pdf$/i);
-            const isDoc = msg.content.match(/\.(doc|docx|txt)$/i) || fileName.match(/\.(doc|docx|txt)$/i);
-            
+            const fileName = msg.original_filename || (msg.content || '').split('/').pop();
+            const isVideo = msg.type === 'video' || (msg.content || '').match(/\.(mp4|webm|mov|avi)$/i);
+            const isPdf = (msg.content || '').match(/\.pdf$/i) || (fileName || '').match(/\.pdf$/i);
+            const isDoc = (msg.content || '').match(/\.(doc|docx|txt)$/i) || (fileName || '').match(/\.(doc|docx|txt)$/i);
+            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
             if (isVideo) {
               messageEl.innerHTML = `
                 <div style="position: relative; display: inline-block;">
@@ -782,60 +859,55 @@
               messageEl.onclick = () => openMediaPreview(msg.content, 'file', fileName);
             }
           } else {
+            // Text
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            messageEl.textContent = msg.content;
-            const timeEl = document.createElement('div');
-            timeEl.className = 'ig-message-time';
-            timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
-            
-            // Format time and add status for sent messages
-            if (isSent) {
-              const statusIcon = msg.is_read ? '✓✓' : '✓'; // Double check if read, single if delivered
-              timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
-            } else {
-              timeEl.textContent = formatMessageTime(msg.created_at);
-            }
-            
-            // Add timer indicator if message has expiry
-            if (msg.expires_at) {
-              const timerEl = document.createElement('span');
-              timerEl.style.cssText = 'margin-left: 8px; opacity: 0.7;';
-              timerEl.textContent = '🕐';
-              timeEl.appendChild(timerEl);
-            }
-            
-            messageEl.appendChild(timeEl);
+            messageEl.textContent = msg.content || '';
           }
-          
-          // Store message data for timer tracking
+
+          // Time/status
+          const timeEl = document.createElement('div');
+          timeEl.className = 'ig-message-time';
+          timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
+          if (isSent) {
+            const statusIcon = msg.is_read ? '✓✓' : '✓';
+            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
+          } else {
+            timeEl.textContent = formatMessageTime(msg.created_at);
+          }
+          if (msg.expires_at) {
+            const timerEl = document.createElement('span');
+            timerEl.style.cssText = 'margin-left: 8px; opacity: 0.7;';
+            timerEl.textContent = '🕐';
+            timeEl.appendChild(timerEl);
+          }
+          messageEl.appendChild(timeEl);
+
+          // Track expiry
           if (msg.expires_at) {
             messageEl.dataset.messageId = msg.id;
             messageEl.dataset.expiresAt = msg.expires_at;
           }
-          
-          // Add long-press detection for message actions
+
+          // Long-press and context menu
           let pressTimer;
-          messageEl.addEventListener('touchstart', (e) => {
+          messageEl.addEventListener('touchstart', () => {
             pressTimer = setTimeout(() => {
               showMessageActions(msg.id, msg.content, isSent);
             }, 500);
           });
-          
           messageEl.addEventListener('touchend', () => {
             clearTimeout(pressTimer);
           });
-          
           messageEl.addEventListener('touchmove', () => {
             clearTimeout(pressTimer);
           });
-          
-          // Desktop right-click support
           messageEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             showMessageActions(msg.id, msg.content, isSent);
           });
-          
-          messagesContainer.appendChild(messageEl);
+
+          wrapperEl.appendChild(messageEl);
+          messagesContainer.appendChild(wrapperEl);
         });
 
         // Scroll to bottom
@@ -845,6 +917,90 @@
         checkExpiredMessages();
       } catch (error) {
         console.error('Error loading messages:', error);
+      }
+    }
+
+    // Open group chat
+    async function openGroupChat(groupId, groupName) {
+      currentGroupId = groupId;
+      currentContactId = null;
+      const chatAvatarEl = document.getElementById('chatAvatar');
+      const chatUsernameEl = document.getElementById('chatUsername');
+      chatAvatarEl.src = '/images/default-avatar.svg';
+      chatUsernameEl.textContent = groupName;
+      chatAvatarEl.style.cursor = 'default';
+      chatUsernameEl.style.cursor = 'default';
+
+      document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
+
+      const chatWindow = document.getElementById('chatWindow');
+      chatWindow.classList.add('active');
+      if (window.innerWidth <= 768) {
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', 'none');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', 'none');
+      }
+      await loadGroupMessages(groupId);
+      // Mark as read (non-throwing)
+      try {
+        const token = InnovateAPI.getToken();
+        await fetch(`${InnovateAPI.API_URL}/groups/${groupId}/read`, {
+          method: 'POST',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+      } catch (_) {}
+    }
+
+    // Load group messages (basic text)
+    async function loadGroupMessages(groupId) {
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${groupId}/messages`);
+        const messagesContainer = document.getElementById('chatMessages');
+        messagesContainer.innerHTML = '';
+
+        if (!data.messages || data.messages.length === 0) {
+          messagesContainer.innerHTML = `
+            <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+              <div style="font-size: 24px; margin-bottom: 8px;">👋</div>
+              <div>No messages yet</div>
+              <div style="font-size: 12px; margin-top: 4px;">Start the conversation</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.messages.forEach(msg => {
+          const isSent = msg.sender_id === user.id;
+          const senderLabel = isSent ? 'You' : (msg.sender_username || '');
+
+          const wrapperEl = document.createElement('div');
+          wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
+          const labelEl = document.createElement('div');
+          labelEl.style.cssText = `font-size: 11px; color: var(--ig-secondary-text); width: 100%; text-align: ${isSent ? 'right' : 'left'}; padding: 0 12px; margin-bottom: 4px;`;
+          labelEl.textContent = senderLabel;
+          wrapperEl.appendChild(labelEl);
+
+          const messageEl = document.createElement('div');
+          messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+          messageEl.textContent = msg.content || '';
+
+          const timeEl = document.createElement('div');
+          timeEl.className = 'ig-message-time';
+          timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
+          if (isSent) {
+            const statusIcon = msg.is_read ? '✓✓' : '✓';
+            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
+          } else {
+            timeEl.textContent = formatMessageTime(msg.created_at);
+          }
+          messageEl.appendChild(timeEl);
+
+          wrapperEl.appendChild(messageEl);
+          messagesContainer.appendChild(wrapperEl);
+        });
+
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      } catch (error) {
+        console.error('Error loading group messages:', error);
       }
     }
     
@@ -877,7 +1033,7 @@
       const input = document.getElementById('messageInput');
       const content = input.value.trim();
       
-      if (!content || !currentContactId) return;
+      if (!content || (!currentContactId && !currentGroupId)) return;
       
       // Check if editing
       const isEditing = input.dataset.editing;
@@ -906,21 +1062,27 @@
       
       // Check for timer
       const timer = input.dataset.timer;
-      const messageData = {
-        receiver_id: currentContactId,
-        content: content
-      };
-      
+      const isGroup = !!currentGroupId;
+      let endpoint, payload;
+      if (isGroup) {
+        endpoint = `/groups/${currentGroupId}/messages`;
+        payload = { content, type: 'text' };
+        if (timer) payload.timer = parseInt(timer);
+      } else {
+        endpoint = '/messages';
+        payload = { receiver_id: currentContactId, content };
+        if (timer) payload.timer = parseInt(timer);
+      }
+
       if (timer) {
-        messageData.timer = parseInt(timer);
         delete input.dataset.timer;
         input.placeholder = 'Message...';
       }
-      
+
       try {
-        await InnovateAPI.apiRequest('/messages', {
+        await InnovateAPI.apiRequest(endpoint, {
           method: 'POST',
-          body: JSON.stringify(messageData)
+          body: JSON.stringify(payload)
         });
         
         // Clear input
@@ -955,14 +1117,25 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
         // Emit via socket
-        InnovateAPI.getSocket().emit('send_message', {
-          receiver_id: currentContactId,
-          content: content
-        });
+        if (isGroup) {
+          InnovateAPI.getSocket().emit('group:message', {
+            groupId: currentGroupId,
+            message: { content }
+          });
+        } else {
+          InnovateAPI.getSocket().emit('send_message', {
+            receiver_id: currentContactId,
+            content: content
+          });
+        }
         
         // Reload conversations to update last message (with small delay)
         setTimeout(() => {
-          loadConversations();
+          if (isGroup) {
+            loadGroupMessages(currentGroupId);
+          } else {
+            loadConversations();
+          }
         }, 300);
       } catch (error) {
         console.error('Error sending message:', error);
@@ -978,6 +1151,80 @@
       if (window.innerWidth <= 768) {
         document.querySelector('.ig-top-nav')?.style.setProperty('display', 'block');
         document.querySelector('.ig-bottom-nav')?.style.setProperty('display', 'flex');
+      }
+    }
+
+    // Lightweight confirm modal (Instagram-style)
+    function showConfirmModal(title, message, confirmText = 'Confirm') {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ig-modal-overlay';
+        const modal = document.createElement('div');
+        modal.className = 'ig-modal';
+
+        const content = document.createElement('div');
+        content.style.padding = '16px';
+        content.innerHTML = `
+          <div style="font-weight: 600; font-size: 16px; margin-bottom: 8px;">${title}</div>
+          <div style="font-size: 14px; color: var(--ig-secondary-text);">${message}</div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex; justify-content:flex-end; gap:8px; padding: 12px 16px;';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'ig-btn-secondary';
+        cancelBtn.textContent = 'Cancel';
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'ig-btn-primary';
+        confirmBtn.textContent = confirmText;
+
+        cancelBtn.onclick = () => { document.body.removeChild(overlay); resolve(false); };
+        confirmBtn.onclick = () => { document.body.removeChild(overlay); resolve(true); };
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(confirmBtn);
+        modal.appendChild(content);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+      });
+    }
+
+    // Delete chat or group
+    async function deleteConversation() {
+      // If a group chat is open, delete the group
+      if (currentGroupId) {
+        const confirmed = await showConfirmModal(
+          'Delete Group',
+          'This will permanently delete the group for all members. Only the creator or an admin can perform this action.',
+          'Delete Group'
+        );
+        if (!confirmed) return;
+        try {
+          await InnovateAPI.apiRequest(`/groups/${currentGroupId}`, { method: 'DELETE' });
+          // Close chat and refresh lists
+          document.getElementById('chatWindow').classList.remove('active');
+          currentGroupId = null;
+          await loadConversations();
+          InnovateAPI.showAlert('Group deleted', 'success');
+        } catch (e) {
+          InnovateAPI.showAlert('Failed to delete group', 'error');
+        }
+        return;
+      }
+
+      // Otherwise delete DM conversation
+      if (!currentContactId) return;
+      const confirmed = await showConfirmModal('Delete Chat', 'This hides the conversation for you. You can still receive new messages from this user.', 'Delete');
+      if (!confirmed) return;
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}`, { method: 'DELETE' });
+        // Return to conversations list
+        document.getElementById('chatWindow').classList.remove('active');
+        await loadConversations();
+        InnovateAPI.showAlert('Chat deleted', 'success');
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to delete chat', 'error');
       }
     }
 
@@ -997,6 +1244,97 @@
       } catch (error) {
         InnovateAPI.showAlert('Error searching for user', 'error');
       }
+    }
+
+    // New Group modal with search & selection
+    async function newGroup() { openNewGroupModal(); }
+
+    function openNewGroupModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'ig-modal-overlay';
+      const modal = document.createElement('div');
+      modal.className = 'ig-message-actions-menu';
+
+      const header = document.createElement('div');
+      header.style.cssText = 'padding: 16px; border-bottom: 1px solid var(--ig-border); display:flex; align-items:center; gap:8px;';
+      header.innerHTML = `<div style="font-weight:600; font-size:16px;">New Group</div>`;
+
+      const body = document.createElement('div');
+      body.style.cssText = 'padding: 12px; display:flex; flex-direction:column; gap:12px; max-height: 50vh; overflow-y:auto;';
+      const nameInput = document.createElement('input');
+      nameInput.placeholder = 'Group name';
+      nameInput.style.cssText = 'width:100%; padding:10px; border:1px solid var(--ig-border); border-radius:8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);';
+
+      const searchInput = document.createElement('input');
+      searchInput.placeholder = 'Search users';
+      searchInput.style.cssText = 'width:100%; padding:10px; border:1px solid var(--ig-border); border-radius:8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);';
+
+      const resultsContainer = document.createElement('div');
+      resultsContainer.style.cssText = 'display:flex; flex-direction:column; gap:8px;';
+
+      const selected = new Map();
+      const doSearch = InnovateAPI.debounce(async () => {
+        const q = searchInput.value.trim();
+        if (!q) { resultsContainer.innerHTML=''; return; }
+        try {
+          const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(q)}`);
+          const users = data.users || [];
+          resultsContainer.innerHTML = '';
+          users.forEach(u => {
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--ig-border); border-radius:8px;';
+            row.innerHTML = `
+              <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">
+              <input type="checkbox" style="accent-color: var(--ig-blue);">
+              <div style="flex:1;">
+                <div style="font-weight:600;">${u.username}</div>
+                <div style="font-size:12px;color:var(--ig-secondary-text);">${u.fullname || ''}</div>
+              </div>`;
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            checkbox.checked = selected.has(u.username);
+            checkbox.onchange = () => { if (checkbox.checked) selected.set(u.username, true); else selected.delete(u.username); };
+            resultsContainer.appendChild(row);
+          });
+        } catch (e) {
+          resultsContainer.innerHTML = `<div style="color: var(--ig-secondary-text);">Search failed</div>`;
+        }
+      }, 300);
+      searchInput.addEventListener('input', doSearch);
+
+      body.appendChild(nameInput);
+      body.appendChild(searchInput);
+      body.appendChild(resultsContainer);
+
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex; justify-content:flex-end; gap:8px; padding: 12px 16px;';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'ig-btn-secondary';
+      cancelBtn.textContent = 'Cancel';
+      const createBtn = document.createElement('button');
+      createBtn.className = 'ig-btn-primary';
+      createBtn.textContent = 'Create';
+      cancelBtn.onclick = () => document.body.removeChild(overlay);
+      createBtn.onclick = async () => {
+        const name = nameInput.value.trim();
+        if (!name) { InnovateAPI.showAlert('Enter a group name', 'error'); return; }
+        const usernames = Array.from(selected.keys());
+        try {
+          const data = await InnovateAPI.apiRequest('/groups', { method: 'POST', body: JSON.stringify({ name, usernames }) });
+          if (data && data.group) {
+            document.body.removeChild(overlay);
+            openGroupChat(data.group.id, data.group.name);
+            setTimeout(() => loadConversations(), 300);
+          }
+        } catch (e) { InnovateAPI.showAlert('Failed to create group', 'error'); }
+      };
+      actions.appendChild(cancelBtn);
+      actions.appendChild(createBtn);
+
+      modal.appendChild(header);
+      modal.appendChild(body);
+      modal.appendChild(actions);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
     }
 
     // Format time
@@ -2225,14 +2563,28 @@
           console.log('User info loaded');
           return loadConversations();
         })
-        .then(() => {
+        .then(async () => {
           console.log('Conversations loaded:', conversations.length);
           if (userId) {
             // Find conversation with this user and open it
             const conv = conversations.find(c => c.contact_id == userId);
             if (conv) {
-              console.log('Opening chat with user:', userId);
+              console.log('Opening chat with user from existing conversation:', userId);
               openChat(conv.contact_id, conv.username, conv.profile_picture);
+            } else {
+              // No existing conversation; fetch user info and open a new chat window
+              try {
+                const userResp = await InnovateAPI.apiRequest(`/users/${userId}`);
+                const u = userResp && userResp.user ? userResp.user : null;
+                if (u) {
+                  console.log('Opening chat with user (no prior conversation):', userId);
+                  openChat(u.id, u.username, u.profile_picture);
+                } else {
+                  console.warn('User not found for direct message:', userId);
+                }
+              } catch (e) {
+                console.error('Failed to open chat for user param:', e);
+              }
             }
           }
         })

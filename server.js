@@ -36,17 +36,28 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Rate limiting
+// Rate limiting (relaxed in development)
+const isProd = (process.env.NODE_ENV === 'production');
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)),
+  max: parseInt(process.env.RATE_LIMIT_MAX || (isProd ? 100 : 1000)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again later.',
+  handler: (req, res, next, options) => {
+    res.status(options.statusCode).json({ error: options.message || 'Too many requests, please try again later.' });
+  }
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5, // Limit auth attempts
-  message: 'Too many login attempts, please try again later.'
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)),
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || (isProd ? 5 : 20)),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many login attempts, please try again later.',
+  handler: (req, res, next, options) => {
+    res.status(options.statusCode).json({ error: options.message || 'Too many login attempts, please try again later.' });
+  }
 });
 
 app.use('/api/', limiter);
@@ -92,6 +103,7 @@ app.use('/api/search', require('./routes/search'));
 app.use('/api/ml', require('./routes/ml'));
 app.use('/api/social-service', require('./routes/social-service'));
 app.use('/api/todos', require('./routes/todos'));
+app.use('/api/groups', require('./routes/groups'));
 
 // Serve HTML pages
 app.get('/', (req, res) => {
@@ -200,6 +212,20 @@ io.on('connection', (socket) => {
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('typing:start', { userId: socket.userId });
     }
+  });
+
+  // Group chat message broadcast (basic)
+  socket.on('group:join', (groupId) => {
+    socket.join(`group_${groupId}`);
+  });
+
+  socket.on('group:leave', (groupId) => {
+    socket.leave(`group_${groupId}`);
+  });
+
+  socket.on('group:message', (data) => {
+    const { groupId, message } = data;
+    io.to(`group_${groupId}`).emit('group:message:receive', message);
   });
 
   socket.on('typing:stop', (data) => {

@@ -39,7 +39,7 @@
         </div>
         
         <div class="ig-nav-icon" onclick="window.location.href='/profile'">
-          <img id="navProfilePic" src="/images/default-avatar.png" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+          <img id="navProfilePic" src="/images/default-avatar.svg" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
         </div>
       </div>
     </div>
@@ -340,7 +340,7 @@
         card.innerHTML = `
           <div style="padding: 20px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-              <img src="${request.user_profile_picture || '/images/default-avatar.png'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+              <img src="${request.user_profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
               <div>
                 <div style="font-weight: 600;">${request.user_username}</div>
                 <div style="font-size: 14px; color: var(--ig-secondary-text);">${request.event_title}</div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'innovate-v20251209001';
+const CACHE_NAME = 'innovate-v20260103';
 const urlsToCache = [
   '/',
   '/home',
@@ -13,7 +13,7 @@ const urlsToCache = [
   '/events',
   '/css/instagram.css',
   '/js/instagram-theme.js',
-  '/images/default-avatar.png',
+  '/images/default-avatar.svg',
   '/images/icon-192x192.png',
   '/images/icon-512x512.png'
 ];

@@ -274,7 +274,7 @@ function debounce(func, wait) {
 
 // Load user avatar
 function getUserAvatar(profilePicture) {
-  return profilePicture || '/images/default-avatar.png';
+  return profilePicture || '/images/default-avatar.svg';
 }
 
 // Create default avatar with initials

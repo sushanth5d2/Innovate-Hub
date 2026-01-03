@@ -586,5 +586,13 @@ def get_story_analytics():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    # Prefer ML-specific port env vars to avoid conflict with Node's PORT=3000
+    port_env = (
+        os.getenv('ML_PORT')
+        or os.getenv('PYTHON_ML_SERVICE_PORT')
+        or os.getenv('PYTHON_ML_PORT')
+        or os.getenv('FLASK_RUN_PORT')
+        or os.getenv('PORT')  # fallback only if others not set
+    )
+    port = int(port_env) if port_env else 5000
     app.run(host='0.0.0.0', port=port, debug=os.getenv('DEBUG', 'False') == 'True')

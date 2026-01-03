@@ -382,7 +382,7 @@
         ` : ''}
         <div class="donation-content">
           <div class="donation-header">
-            <img src="${donation.profile_picture || '/images/default-avatar.png'}" alt="${donation.username}" class="donation-avatar">
+            <img src="${donation.profile_picture || '/images/default-avatar.svg'}" alt="${donation.username}" class="donation-avatar">
             <div>
               <div style="font-weight: 600;">${donation.username}</div>
               <div style="font-size: 12px; color: var(--ig-secondary-text);">${InnovateAPI.formatDate(donation.created_at)}</div>
@@ -432,7 +432,7 @@
         ` : ''}
         <div class="donation-content">
           <div class="donation-header">
-            <img src="${donation.donor_picture || '/images/default-avatar.png'}" alt="${donation.donor_username}" class="donation-avatar">
+            <img src="${donation.donor_picture || '/images/default-avatar.svg'}" alt="${donation.donor_username}" class="donation-avatar">
             <div>
               <div style="font-weight: 600;">${donation.donor_username}</div>
               <div style="font-size: 12px; color: var(--ig-secondary-text);">Picked ${InnovateAPI.formatDate(donation.assigned_at)}</div>
