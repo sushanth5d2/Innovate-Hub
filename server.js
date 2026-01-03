@@ -312,6 +312,14 @@ app.get('/settings', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'settings.html'));
 });
 
+app.get('/social-service', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'social-service.html'));
+});
+
+app.get('/todos', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'todos.html'));
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

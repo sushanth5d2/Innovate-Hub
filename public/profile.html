@@ -6,97 +6,341 @@
   <title>Profile - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Instagram Profile Specific Styles */
+    body {
+      padding-top: 44px;
+      padding-bottom: 65px;
+    }
+
+    .ig-profile-header {
+      background: var(--ig-primary-background);
+      border-bottom: 1px solid var(--ig-border);
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 99;
+    }
+
+    .ig-profile-header-back {
+      background: none;
+      border: none;
+      color: var(--ig-primary-text);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .ig-profile-header-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+
+    .ig-profile-header-menu {
+      background: none;
+      border: none;
+      color: var(--ig-primary-text);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .ig-profile-content {
+      max-width: 630px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .ig-profile-info {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .ig-profile-pic {
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      border: 2px solid var(--ig-border);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .ig-profile-stats {
+      display: flex;
+      flex: 1;
+      justify-content: space-around;
+      text-align: center;
+    }
+
+    .ig-stat {
+      cursor: pointer;
+    }
+
+    .ig-stat-count {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+
+    .ig-stat-label {
+      font-size: 14px;
+      color: var(--ig-secondary-text);
+    }
+
+    .ig-profile-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 4px;
+    }
+
+    .ig-profile-bio {
+      font-size: 14px;
+      color: var(--ig-primary-text);
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+    }
+
+    .ig-profile-details {
+      font-size: 14px;
+      color: var(--ig-secondary-text);
+    }
+
+    .ig-profile-details > div {
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ig-profile-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .ig-profile-btn {
+      flex: 1;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      border: 1px solid var(--ig-border);
+    }
+
+    .ig-profile-btn:active {
+      opacity: 0.7;
+    }
+
+    .ig-profile-tabs {
+      display: flex;
+      border-top: 1px solid var(--ig-border);
+    }
+
+    .ig-profile-tab {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: 12px;
+      color: var(--ig-secondary-text);
+      cursor: pointer;
+      border-top: 1px solid transparent;
+      margin-top: -1px;
+    }
+
+    .ig-profile-tab.active {
+      color: var(--ig-primary-text);
+      border-top-color: var(--ig-primary-text);
+    }
+
+    .ig-profile-tab svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .ig-posts-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      margin-top: 2px;
+    }
+
+    .ig-post-grid-item {
+      aspect-ratio: 1;
+      background: var(--ig-secondary-background);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ig-post-grid-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .ig-empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--ig-secondary-text);
+    }
+
+    .ig-empty-state i {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+      opacity: 0.3;
+    }
+
+    .ig-empty-state p {
+      font-size: 16px;
+    }
+
+    .ig-menu-dropdown {
+      position: fixed;
+      top: 44px;
+      right: 16px;
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      min-width: 200px;
+      display: none;
+    }
+
+    .ig-menu-dropdown.active {
+      display: block;
+    }
+
+    .ig-menu-item {
+      padding: 14px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--ig-border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--ig-primary-text);
+      font-size: 14px;
+    }
+
+    .ig-menu-item:last-child {
+      border-bottom: none;
+    }
+
+    .ig-menu-item:hover {
+      background: var(--ig-hover);
+    }
+
+    .ig-menu-item i {
+      width: 20px;
+    }
+  </style>
 </head>
 <body>
-  <!-- Top Bar -->
-  <div class="top-bar">
-    <button onclick="history.back()" class="icon-button">
-      <i class="fas fa-arrow-left"></i>
+  <!-- Top Navigation -->
+  <div class="ig-profile-header">
+    <button class="ig-profile-header-back" onclick="history.back()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
     </button>
-    <span id="profile-username-header" class="top-bar-title"></span>
-    <button onclick="toggleMenu()" class="icon-button">
-      <i class="fas fa-ellipsis-v"></i>
+    <span id="profile-username-header" class="ig-profile-header-title"></span>
+    <button class="ig-profile-header-menu" onclick="toggleMenu()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+      </svg>
     </button>
   </div>
 
   <!-- Menu Dropdown -->
-  <div id="menu-dropdown" class="dropdown-menu" style="display: none;">
-    <div class="dropdown-item" onclick="shareProfile()">
+  <div id="menu-dropdown" class="ig-menu-dropdown">
+    <div class="ig-menu-item" onclick="window.location.href='/settings'">
+      <i class="fas fa-cog"></i> Settings
+    </div>
+    <div class="ig-menu-item" onclick="shareProfile()">
       <i class="fas fa-share"></i> Share Profile
     </div>
-    <div class="dropdown-item" onclick="copyProfileLink()">
+    <div class="ig-menu-item" onclick="copyProfileLink()">
       <i class="fas fa-link"></i> Copy Link
     </div>
-    <div class="dropdown-item" onclick="reportUser()">
+    <div class="ig-menu-item" onclick="reportUser()">
       <i class="fas fa-flag"></i> Report
     </div>
   </div>
 
   <!-- Profile Content -->
-  <div class="profile-container">
-    <!-- Profile Header -->
-    <div class="profile-header">
-      <div class="profile-avatar-container">
-        <img id="profile-picture" src="" alt="Profile" class="profile-avatar">
-        <button id="add-story-btn" class="add-story-btn" style="display: none;">
-          <i class="fas fa-plus"></i>
-        </button>
-      </div>
+  <div class="ig-profile-content"
+  <!-- Profile Content -->
+  <div class="ig-profile-content">
+    <!-- Profile Info Section -->
+    <div class="ig-profile-info">
+      <img id="profile-picture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e1e8ed'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23fff'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23fff'/%3E%3C/svg%3E" alt="Profile" class="ig-profile-pic">
       
-      <div class="profile-stats">
-        <div class="stat">
-          <div class="stat-count" id="posts-count">0</div>
-          <div class="stat-label">posts</div>
+      <div class="ig-profile-stats">
+        <div class="ig-stat">
+          <div class="ig-stat-count" id="posts-count">0</div>
+          <div class="ig-stat-label">posts</div>
         </div>
-        <div class="stat" onclick="showFollowers()">
-          <div class="stat-count" id="followers-count">0</div>
-          <div class="stat-label">followers</div>
+        <div class="ig-stat" onclick="showFollowers()">
+          <div class="ig-stat-count" id="followers-count">0</div>
+          <div class="ig-stat-label">followers</div>
         </div>
-        <div class="stat" onclick="showFollowing()">
-          <div class="stat-count" id="following-count">0</div>
-          <div class="stat-label">following</div>
+        <div class="ig-stat" onclick="showFollowing()">
+          <div class="ig-stat-count" id="following-count">0</div>
+          <div class="ig-stat-label">following</div>
         </div>
       </div>
     </div>
 
-    <!-- Profile Info -->
-    <div class="profile-info">
-      <div class="profile-name" id="profile-fullname"></div>
-      <div class="profile-bio" id="profile-bio"></div>
-      <div id="profile-details" class="profile-details"></div>
+    <!-- Profile Details -->
+    <div style="margin-bottom: 16px;">
+      <div class="ig-profile-name" id="profile-fullname">sushanth</div>
+      <div class="ig-profile-bio" id="profile-bio">No bio yet</div>
+      <div id="profile-details" class="ig-profile-details"></div>
     </div>
 
     <!-- Action Buttons -->
-    <div class="profile-actions" id="profile-actions"></div>
-
-    <!-- Stories Highlights -->
-    <div id="highlights-container" class="highlights-container" style="display: none;">
-      <div class="highlight-item">
-        <div class="highlight-circle">
-          <i class="fas fa-plus"></i>
-        </div>
-        <div class="highlight-label">New</div>
-      </div>
-    </div>
+    <div class="ig-profile-actions" id="profile-actions"></div>
 
     <!-- Tabs -->
-    <div class="profile-tabs">
-      <button class="profile-tab active" onclick="switchTab('posts')">
-        <i class="fas fa-th"></i>
+    <div class="ig-profile-tabs">
+      <button class="ig-profile-tab active" onclick="switchTab('posts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="13" y="3" width="7" height="7"/>
+          <rect x="3" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>
+        </svg>
       </button>
-      <button class="profile-tab" onclick="switchTab('tagged')">
-        <i class="fas fa-user-tag"></i>
+      <button class="ig-profile-tab" onclick="switchTab('tagged')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
       </button>
     </div>
 
     <!-- Posts Grid -->
-    <div id="posts-tab" class="posts-grid">
-      <!-- Posts will be loaded here -->
+    <div id="posts-tab" class="ig-posts-grid">
+      <div class="ig-empty-state">
+        <i class="fas fa-camera"></i>
+        <p>Share your first post</p>
+      </div>
     </div>
 
     <!-- Tagged Posts Grid -->
-    <div id="tagged-tab" class="posts-grid" style="display: none;">
-      <div class="empty-state">
+    <div id="tagged-tab" class="ig-posts-grid" style="display: none;">
+      <div class="ig-empty-state">
         <i class="fas fa-user-tag"></i>
         <p>No tagged posts yet</p>
       </div>
@@ -104,82 +348,108 @@
   </div>
 
   <!-- Bottom Navigation -->
-  <div class="bottom-nav">
-    <a href="/home" class="nav-item">
-      <i class="far fa-home"></i>
+  <nav class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg aria-label="Home" viewBox="0 0 24 24" width="24">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Home</span>
     </a>
-    <a href="/search" class="nav-item">
-      <i class="far fa-search"></i>
+    <a href="/communities" class="ig-bottom-nav-item">
+      <svg aria-label="Communities" viewBox="0 0 24 24" width="24">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Communities</span>
     </a>
-    <a href="/home" class="nav-item">
-      <i class="far fa-plus-square"></i>
+    <a href="/events" class="ig-bottom-nav-item">
+      <svg aria-label="Events" viewBox="0 0 24 24" width="24">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+        <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Events</span>
     </a>
-    <a href="/notifications" class="nav-item">
-      <i class="far fa-heart"></i>
+    <a href="/home" class="ig-bottom-nav-item" onclick="event.preventDefault(); window.location.href='/home';">
+      <svg aria-label="Create" viewBox="0 0 24 24" width="24">
+        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Create</span>
     </a>
-    <a href="/profile" class="nav-item active">
-      <i class="fas fa-user-circle"></i>
+    <a href="/social-service" class="ig-bottom-nav-item">
+      <svg aria-label="Social Service" viewBox="0 0 24 24" width="24">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Service</span>
     </a>
-  </div>
+    <a href="/search" class="ig-bottom-nav-item">
+      <svg aria-label="Search" viewBox="0 0 24 24" width="24">
+        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Search</span>
+    </a>
+    <a href="#" class="ig-bottom-nav-item active" id="profileNavLink" onclick="navigateToProfile(event)">
+      <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
+        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Profile</span>
+    </a>
+  </nav>
 
   <!-- Edit Profile Modal -->
-  <div id="edit-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button onclick="closeEditModal()" class="text-button">Cancel</button>
-        <h3>Edit Profile</h3>
-        <button onclick="saveProfile()" class="text-button primary">Done</button>
+  <div id="edit-modal" class="ig-modal-overlay" style="display: none;" onclick="if(event.target === this) closeEditModal()">
+    <div class="ig-modal" style="max-width: 500px; max-height: 90vh; overflow-y: auto;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--ig-border); display: flex; justify-content: space-between; align-items: center;">
+        <button onclick="closeEditModal()" style="background: none; border: none; color: var(--ig-primary-text); font-size: 16px; cursor: pointer;">Cancel</button>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--ig-primary-text);">Edit Profile</h3>
+        <button onclick="saveProfile()" style="background: none; border: none; color: var(--ig-blue); font-size: 16px; font-weight: 600; cursor: pointer;">Done</button>
       </div>
-      <div class="modal-body">
-        <div class="profile-edit-section">
-          <div class="edit-avatar-container">
-            <img id="edit-avatar" src="" alt="Avatar" class="edit-avatar">
-            <button class="change-photo-btn" onclick="changePhoto()">Change Photo</button>
-          </div>
+      <div style="padding: 20px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <img id="edit-avatar" src="" alt="Avatar" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 12px;">
+          <div style="color: var(--ig-blue); font-size: 14px; font-weight: 600; cursor: pointer;" onclick="changePhoto()">Change Photo</div>
         </div>
         
-        <div class="form-group">
-          <label>Name</label>
-          <input type="text" id="edit-fullname" class="form-control" placeholder="Name">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; color: var(--ig-primary-text); font-weight: 500;">Name</label>
+          <input type="text" id="edit-fullname" placeholder="Name" style="width: 100%; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;">
         </div>
         
-        <div class="form-group">
-          <label>Bio</label>
-          <textarea id="edit-bio" class="form-control" rows="3" placeholder="Bio" maxlength="150"></textarea>
-          <div class="char-count"><span id="bio-count">0</span>/150</div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; color: var(--ig-primary-text); font-weight: 500;">Bio</label>
+          <textarea id="edit-bio" rows="3" placeholder="Tell us about yourself" maxlength="150" style="width: 100%; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none; resize: vertical;"></textarea>
+          <div style="text-align: right; font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;"><span id="bio-count">0</span>/150</div>
         </div>
         
-        <div class="form-group">
-          <label>Skills</label>
-          <input type="text" id="edit-skills" class="form-control" placeholder="e.g. JavaScript, Python, Design">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; color: var(--ig-primary-text); font-weight: 500;">Skills</label>
+          <input type="text" id="edit-skills" placeholder="e.g. JavaScript, Python, Design" style="width: 100%; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;">
         </div>
         
-        <div class="form-group">
-          <label>Interests</label>
-          <input type="text" id="edit-interests" class="form-control" placeholder="e.g. Gaming, Travel, Music">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; color: var(--ig-primary-text); font-weight: 500;">Interests</label>
+          <input type="text" id="edit-interests" placeholder="e.g. Gaming, Travel, Music" style="width: 100%; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;">
         </div>
         
-        <div class="form-group">
-          <label>Favorite Teams</label>
-          <input type="text" id="edit-teams" class="form-control" placeholder="e.g. Lakers, Real Madrid">
+        <div style="margin-bottom: 0;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; color: var(--ig-primary-text); font-weight: 500;">Favorite Teams</label>
+          <input type="text" id="edit-teams" placeholder="e.g. Lakers, Real Madrid" style="width: 100%; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 6px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;">
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Followers/Following Modal -->
-  <div id="list-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button onclick="closeListModal()" class="text-button">Close</button>
-        <h3 id="list-title">Followers</h3>
-        <span></span>
-      </div>
-      <div class="modal-body">
-        <div id="users-list"></div>
-      </div>
-    </div>
-  </div>
+  <script>
+    function navigateToProfile(e) {
+      e.preventDefault();
+      // Already on profile, do nothing
+    }
+  </script>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/instagram-theme.js"></script>
@@ -209,8 +479,10 @@
         const data = await response.json();
         const user = data.user;
 
+        const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e1e8ed'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23fff'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23fff'/%3E%3C/svg%3E";
+        
         document.getElementById('profile-username-header').textContent = user.username;
-        document.getElementById('profile-picture').src = user.profile_picture || '/images/default-avatar.png';
+        document.getElementById('profile-picture').src = user.profile_picture || defaultAvatar;
         document.getElementById('profile-fullname').textContent = user.username;
         document.getElementById('profile-bio').textContent = user.bio || 'No bio yet';
         document.getElementById('posts-count').textContent = user.post_count || 0;
@@ -233,25 +505,23 @@
         // Action buttons
         const actionsContainer = document.getElementById('profile-actions');
         if (isOwnProfile) {
-          document.getElementById('add-story-btn').style.display = 'flex';
           actionsContainer.innerHTML = `
-            <button class="action-button primary" onclick="openEditModal()">
-              <span>Edit Profile</span>
-            </button>
-            <button class="action-button" onclick="window.location.href='/settings'">
-              <span>Settings</span>
+            <button class="ig-profile-btn" onclick="openEditModal()">Edit Profile</button>
+            <button class="ig-profile-btn" onclick="window.location.href='/settings'" style="flex: 0 0 auto; padding: 8px 12px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6M1 12h6m6 0h6"/>
+              </svg>
             </button>
           `;
         } else {
           actionsContainer.innerHTML = `
-            <button class="action-button ${user.is_following ? 'secondary' : 'primary'}" onclick="${user.is_following ? 'unfollow()' : 'follow()'}">
-              <span>${user.is_following ? 'Following' : 'Follow'}</span>
-            </button>
-            <button class="action-button" onclick="messageUser()">
-              <span>Message</span>
-            </button>
-            <button class="action-button" onclick="toggleMenu()">
-              <i class="fas fa-user-plus"></i>
+            <button class="ig-profile-btn" style="background: var(--ig-blue); color: white; border: none;" onclick="${user.is_following ? 'unfollow()' : 'follow()'}">${user.is_following ? 'Following' : 'Follow'}</button>
+            <button class="ig-profile-btn" onclick="messageUser()">Message</button>
+            <button class="ig-profile-btn" style="flex: 0 0 auto; padding: 8px 12px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+              </svg>
             </button>
           `;
         }
@@ -277,7 +547,7 @@
 
         if (data.posts.length === 0) {
           container.innerHTML = `
-            <div class="empty-state">
+            <div class="ig-empty-state" style="grid-column: 1 / -1;">
               <i class="fas fa-camera"></i>
               <p>${isOwnProfile ? 'Share your first post' : 'No posts yet'}</p>
             </div>
@@ -287,17 +557,16 @@
 
         data.posts.forEach(post => {
           const div = document.createElement('div');
-          div.className = 'post-grid-item';
+          div.className = 'ig-post-grid-item';
           
           if (post.images && post.images.length > 0) {
-            div.innerHTML = `
-              <img src="${post.images[0]}" alt="Post" onclick="viewPost(${post.id})">
-              ${post.images.length > 1 ? '<i class="fas fa-clone post-multiple"></i>' : ''}
-            `;
+            div.innerHTML = `<img src="${post.images[0]}" alt="Post" onclick="viewPost(${post.id})">`;
+          } else if (post.video_url) {
+            div.innerHTML = `<video src="${post.video_url}" style="width: 100%; height: 100%; object-fit: cover;"></video>`;
           } else {
             div.innerHTML = `
-              <div class="post-text-preview" onclick="viewPost(${post.id})">
-                ${post.content ? post.content.substring(0, 100) : ''}
+              <div style="padding: 8px; display: flex; align-items: center; justify-content: center; background: var(--ig-secondary-background); font-size: 12px; text-align: center; height: 100%;">
+                ${post.content ? post.content.substring(0, 50) + '...' : ''}
               </div>
             `;
           }
@@ -311,8 +580,8 @@
 
     function switchTab(tab) {
       activeTab = tab;
-      document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
-      event.target.closest('.profile-tab').classList.add('active');
+      document.querySelectorAll('.ig-profile-tab').forEach(t => t.classList.remove('active'));
+      event.target.closest('.ig-profile-tab').classList.add('active');
       
       document.getElementById('posts-tab').style.display = tab === 'posts' ? 'grid' : 'none';
       document.getElementById('tagged-tab').style.display = tab === 'tagged' ? 'grid' : 'none';
@@ -320,8 +589,18 @@
 
     function toggleMenu() {
       const menu = document.getElementById('menu-dropdown');
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      menu.classList.toggle('active');
     }
+
+    // Close menu when clicking outside
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('menu-dropdown');
+      const menuBtn = document.querySelector('.ig-profile-header-menu');
+      if (menu && !menu.contains(e.target) && !menuBtn.contains(e.target)) {
+        menu.classList.remove('active');
+      }
+    });
 
     function openEditModal() {
       const modal = document.getElementById('edit-modal');

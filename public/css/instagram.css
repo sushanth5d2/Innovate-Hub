@@ -144,25 +144,30 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 50px;
+  height: 65px;
   background-color: var(--ig-primary-background);
   border-top: 1px solid var(--ig-border);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 100;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .ig-bottom-nav-item {
   flex: 1;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100%;
-  color: var(--ig-primary-text);
+  gap: 4px;
+  color: var(--ig-secondary-text);
   text-decoration: none;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  padding: 8px 0;
 }
 
 .ig-bottom-nav-item:active {
@@ -170,12 +175,24 @@ body {
 }
 
 .ig-bottom-nav-item svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  stroke: currentColor;
+  fill: none;
+}
+
+.ig-bottom-nav-item.active {
+  color: var(--ig-blue);
 }
 
 .ig-bottom-nav-item.active svg {
   stroke-width: 2.5px;
+}
+
+.ig-bottom-nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.2px;
 }
 
 /* === MAIN CONTENT === */
