@@ -367,8 +367,8 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
         db.get('SELECT user_id, likes_count FROM posts WHERE id = ?', [postId], (err, post) => {
           if (post && post.user_id !== userId) {
             db.run(
-              'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-              [post.user_id, 'like', 'liked your post', postId]
+              'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+              [post.user_id, 'like', 'liked your post', postId, userId]
             );
 
             // Emit socket notification
@@ -377,7 +377,8 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
               io.to(`user_${post.user_id}`).emit('notification:receive', {
                 type: 'like',
                 content: 'liked your post',
-                post_id: postId
+                post_id: postId,
+                created_by: userId
               });
             }
           }
@@ -439,8 +440,8 @@ router.post('/:postId/action', authMiddleware, (req, res) => {
           : 'is interested in your post';
         
         db.run(
-          'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-          [post.user_id, action_type, notificationContent, postId]
+          'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+          [post.user_id, action_type, notificationContent, postId, userId]
         );
 
         const io = req.app.get('io');
@@ -448,7 +449,8 @@ router.post('/:postId/action', authMiddleware, (req, res) => {
           io.to(`user_${post.user_id}`).emit('notification:receive', {
             type: action_type,
             content: notificationContent,
-            post_id: postId
+            post_id: postId,
+            created_by: userId
           });
         }
       }
@@ -485,8 +487,8 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
       db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
         if (post && post.user_id !== userId) {
           db.run(
-            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-            [post.user_id, 'comment', 'commented on your post', postId]
+            'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+            [post.user_id, 'comment', 'commented on your post', postId, userId]
           );
 
           // Emit socket notification
@@ -495,7 +497,8 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
             io.to(`user_${post.user_id}`).emit('notification:receive', {
               type: 'comment',
               content: 'commented on your post',
-              post_id: postId
+              post_id: postId,
+              created_by: userId
             });
           }
         }

@@ -173,15 +173,19 @@
     InnovateAPI.initSocket();
 
     const user = InnovateAPI.getCurrentUser();
-    const socket = InnovateAPI.getSocket();
+    const notificationsSocket = InnovateAPI.getSocket();
 
     // Load user info
     async function loadUserInfo() {
       try {
         const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
         const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
-        document.getElementById('bottomProfilePic').src = avatar;
-        document.getElementById('bottomProfileLink').href = `/profile/${user.id}`;
+        // This page's bottom nav uses an SVG icon (no profile image).
+        // Guard in case markup changes across pages.
+        const bottomProfilePic = document.getElementById('bottomProfilePic');
+        if (bottomProfilePic) bottomProfilePic.src = avatar;
+        const bottomProfileLink = document.getElementById('bottomProfileLink');
+        if (bottomProfileLink) bottomProfileLink.href = `/profile/${user.id}`;
       } catch (error) {
         console.error('Error loading user info:', error);
       }
@@ -214,6 +218,15 @@
         document.getElementById('notificationsList').innerHTML = 
           '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading notifications</div>';
       }
+    }
+
+    // Socket listener for new notifications
+    // Server emits `notification:receive` (and some older routes emit `new_notification`).
+    if (notificationsSocket) {
+      notificationsSocket.on('notification:receive', () => loadNotifications());
+      notificationsSocket.on('new_notification', () => loadNotifications());
+      // Backward compat (if any page/server emits plain `notification`)
+      notificationsSocket.on('notification', () => loadNotifications());
     }
 
     // Create notification element
@@ -332,7 +345,7 @@
     // Mark all as read
     async function markAllAsRead() {
       try {
-        await InnovateAPI.apiRequest('/notifications/read-all', {
+        await InnovateAPI.apiRequest('/notifications/read/all', {
           method: 'PUT'
         });
         
@@ -342,11 +355,6 @@
         console.error('Error marking all as read:', error);
       }
     }
-
-    // Socket listener for new notifications
-    socket.on('notification', (data) => {
-      loadNotifications();
-    });
 
     // Initialize
     loadUserInfo();

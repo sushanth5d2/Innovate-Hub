@@ -246,6 +246,69 @@
     .ig-menu-item i {
       width: 20px;
     }
+
+    /* Simple list modal (followers/following) */
+    .ig-list-modal-header {
+      position: relative;
+      padding: 16px;
+      border-bottom: 1px solid var(--ig-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      background: var(--ig-secondary-background);
+    }
+
+    .ig-list-modal-close {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--ig-secondary-text);
+      padding: 6px;
+      line-height: 1;
+    }
+
+    .ig-user-list-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .ig-user-list-item:hover {
+      background: var(--ig-hover);
+    }
+
+    .ig-user-list-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .ig-user-list-username {
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      font-size: 14px;
+    }
+
+    .ig-user-list-bio {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
   </style>
 </head>
 <body>
@@ -280,8 +343,6 @@
     </div>
   </div>
 
-  <!-- Profile Content -->
-  <div class="ig-profile-content"
   <!-- Profile Content -->
   <div class="ig-profile-content">
     <!-- Profile Info Section -->
@@ -344,6 +405,17 @@
         <i class="fas fa-user-tag"></i>
         <p>No tagged posts yet</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Followers / Following List Modal -->
+  <div id="list-modal" class="ig-modal-overlay" style="display: none;" aria-hidden="true">
+    <div class="ig-modal" style="max-width: 420px; max-height: 70vh; overflow-y: auto;" role="dialog" aria-modal="true">
+      <div class="ig-list-modal-header">
+        <span id="list-title">Followers</span>
+        <button class="ig-list-modal-close" type="button" aria-label="Close" onclick="closeListModal()">×</button>
+      </div>
+      <div id="users-list"></div>
     </div>
   </div>
 
@@ -460,6 +532,7 @@
     const userId = pathParts[pathParts.length - 1] || currentUser.id;
     const isOwnProfile = currentUser.id == userId;
     let activeTab = 'posts';
+    let listModalPreviousOverflow = '';
 
     // Check authentication
     if (!localStorage.getItem('token')) {
@@ -692,14 +765,48 @@
     }
 
     async function showFollowers() {
-      showUsersList('Followers', `/users/${userId}/followers`);
+      showUsersList('Followers', `/api/users/${userId}/followers`, 'followers');
     }
 
     async function showFollowing() {
-      showUsersList('Following', `/users/${userId}/following`);
+      showUsersList('Following', `/api/users/${userId}/following`, 'following');
     }
 
-    async function showUsersList(title, endpoint) {
+    function getDefaultAvatarDataUri() {
+      return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e1e8ed'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23fff'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23fff'/%3E%3C/svg%3E";
+    }
+
+    function getAvatarUrl(profilePicture) {
+      return profilePicture || '/images/default-avatar.svg' || getDefaultAvatarDataUri();
+    }
+
+    function openListModal() {
+      const modal = document.getElementById('list-modal');
+      listModalPreviousOverflow = document.body.style.overflow;
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeListModal() {
+      const modal = document.getElementById('list-modal');
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = listModalPreviousOverflow;
+    }
+
+    // Close list modal on backdrop click + ESC
+    document.getElementById('list-modal')?.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'list-modal') closeListModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('list-modal');
+        if (modal && modal.style.display === 'flex') closeListModal();
+      }
+    });
+
+    async function showUsersList(title, endpoint, listKey) {
       try {
         const response = await fetch(endpoint, {
           headers: {
@@ -710,38 +817,35 @@
         if (!response.ok) throw new Error('Failed to load list');
         
         const data = await response.json();
-        const modal = document.getElementById('list-modal');
         const listContainer = document.getElementById('users-list');
         
         document.getElementById('list-title').textContent = title;
         listContainer.innerHTML = '';
 
-        if (data.users && data.users.length > 0) {
-          data.users.forEach(user => {
-            const div = document.createElement('div');
-            div.className = 'user-list-item';
-            div.innerHTML = `
-              <img src="${user.profile_picture || '/images/default-avatar.svg'}" alt="${user.username}" class="user-avatar">
-              <div class="user-info">
-                <div class="user-username">${user.username}</div>
-                <div class="user-bio">${user.bio || ''}</div>
+        const users = (data && listKey && Array.isArray(data[listKey])) ? data[listKey] : [];
+
+        if (users.length > 0) {
+          users.forEach(u => {
+            const a = document.createElement('a');
+            a.className = 'ig-user-list-item';
+            a.href = `/profile/${u.id}`;
+            a.innerHTML = `
+              <img class="ig-user-list-avatar" src="${getAvatarUrl(u.profile_picture)}" alt="${u.username}">
+              <div style="flex: 1; min-width: 0;">
+                <div class="ig-user-list-username">${u.username}</div>
+                ${u.bio ? `<div class="ig-user-list-bio">${u.bio}</div>` : ''}
               </div>
-              <button class="follow-button" onclick="window.location.href='/profile/${user.id}'">View</button>
             `;
-            listContainer.appendChild(div);
+            listContainer.appendChild(a);
           });
         } else {
           listContainer.innerHTML = '<div class="empty-state"><p>No users yet</p></div>';
         }
 
-        modal.style.display = 'flex';
+        openListModal();
       } catch (error) {
         console.error('Error loading users list:', error);
       }
-    }
-
-    function closeListModal() {
-      document.getElementById('list-modal').style.display = 'none';
     }
 
     function viewPost(postId) {
@@ -776,14 +880,6 @@
     function changePhoto() {
       alert('Photo upload functionality would open here');
     }
-
-    // Close menu when clicking outside
-    document.addEventListener('click', (e) => {
-      const menu = document.getElementById('menu-dropdown');
-      if (menu.style.display === 'block' && !e.target.closest('.icon-button')) {
-        menu.style.display = 'none';
-      }
-    });
 
     // Initialize
     loadProfile();

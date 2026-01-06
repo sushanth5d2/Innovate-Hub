@@ -961,6 +961,7 @@
       const isSaved = post.is_saved || false;
       const likesCount = post.likes_count || post.interested_count || 0;
       const commentsCount = post.comments_count || 0;
+      const rawAttachmentsHtml = renderAttachments(post);
       
       // Handle media (images or video)
       let mediaHtml = '';
@@ -988,6 +989,15 @@
             </div>
           `;
         }
+      }
+
+      // If there is no image/video, treat attachments (PDF preview) as the main media
+      // so Like/Comment/Share/Save appear underneath, Instagram-style.
+      const hasVisualMedia = !!post.video_url || (Array.isArray(post.images) && post.images.length > 0);
+      let attachmentsHtml = rawAttachmentsHtml;
+      if (!hasVisualMedia && rawAttachmentsHtml) {
+        mediaHtml = renderAttachments(post, { asMedia: true });
+        attachmentsHtml = '';
       }
       
       postEl.innerHTML = `
@@ -1048,9 +1058,11 @@
           <span class="ig-caption-text">${post.content}</span>
         </div>
         ` : ''}
+
+        ${attachmentsHtml}
         
         ${commentsCount > 0 ? `
-        <button class="ig-post-comments-btn" onclick="window.location.href='/post/${post.id}'">
+        <button class="ig-post-comments-btn" onclick="openCommentsModal(${post.id})">
           View all ${commentsCount} comments
         </button>
         ` : ''}
@@ -1127,6 +1139,20 @@
             }
           });
         }
+
+        // Attachment click handlers (open PDF in-app)
+        postEl.querySelectorAll('.ig-attachment-item').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const url = btn.getAttribute('data-attachment-url') || '';
+            const name = btn.getAttribute('data-attachment-name') || 'Document';
+            openAttachment(url, name);
+          });
+        });
+
+        // Initialize LinkedIn-style PDF previews (renders page 1)
+        initPdfEmbeds(postEl);
       }, 0);
       
       return postEl;
@@ -1934,33 +1960,119 @@
         const modal = document.createElement('div');
         modal.className = 'ig-modal-overlay';
         modal.style.display = 'flex';
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        const close = () => {
+          document.removeEventListener('keydown', onKeyDown);
+          document.body.style.overflow = previousOverflow;
+          modal.remove();
+        };
+
+        const onKeyDown = (e) => {
+          if (e.key === 'Escape') close();
+        };
+        document.addEventListener('keydown', onKeyDown);
+
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) close();
+        });
+
         modal.innerHTML = `
-          <div class="ig-modal" onclick="event.stopPropagation()" style="max-width: 400px; max-height: 500px; overflow-y: auto;">
-            <div class="ig-modal-header">
+          <div class="ig-modal" style="max-width: 400px; max-height: 500px; overflow-y: auto; position: relative;">
+            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">
               Liked by
-              <button onclick="this.closest('.ig-modal-overlay').remove()" style="position: absolute; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text);">×</button>
+              <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
             </div>
             <div style="padding: 8px 0;">
-              ${response.likes.map(user => `
-                <a href="/profile/${user.user_id}" class="ig-modal-item" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: inherit;">
-                  <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" alt="${user.username}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
-                  <div style="flex: 1;">
-                    <div style="font-weight: 600;">${user.username}</div>
-                    ${user.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text);">${user.bio}</div>` : ''}
+              ${response.likes.map(u => `
+                <a href="/profile/${u.user_id}" class="ig-modal-item" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: inherit;">
+                  <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600;">${u.username}</div>
+                    ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
                   </div>
                 </a>
               `).join('')}
             </div>
           </div>
         `;
-        
-        modal.onclick = (e) => {
-          if (e.target === modal) modal.remove();
-        };
-        
+
+        modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          close();
+        });
+
+        // Prevent clicks inside modal from closing it
+        modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+
         document.body.appendChild(modal);
       } catch (error) {
         InnovateAPI.showAlert('Failed to load likes', 'error');
+      }
+    }
+
+    // View all comments modal
+    async function openCommentsModal(postId) {
+      try {
+        const response = await InnovateAPI.apiRequest(`/posts/${postId}/comments`);
+        const comments = response.comments || [];
+
+        const modal = document.createElement('div');
+        modal.className = 'ig-modal-overlay';
+        modal.style.display = 'flex';
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        const close = () => {
+          document.removeEventListener('keydown', onKeyDown);
+          document.body.style.overflow = previousOverflow;
+          modal.remove();
+        };
+
+        const onKeyDown = (e) => {
+          if (e.key === 'Escape') close();
+        };
+        document.addEventListener('keydown', onKeyDown);
+
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) close();
+        });
+
+        modal.innerHTML = `
+          <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 70vh; overflow-y: auto; position: relative;">
+            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+              Comments
+              <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
+            </div>
+            <div style="padding: 8px 0;">
+              ${comments.length ? comments.map(c => `
+                <div style="display: flex; gap: 12px; padding: 12px 16px;">
+                  <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                  <div style="flex: 1;">
+                    <div style="font-weight: 600; margin-bottom: 2px;">${c.username}</div>
+                    <div style="white-space: pre-wrap;">${c.content}</div>
+                  </div>
+                </div>
+              `).join('') : `
+                <div style="padding: 20px 16px; color: var(--ig-secondary-text); text-align: center;">No comments yet</div>
+              `}
+            </div>
+          </div>
+        `;
+
+        modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          close();
+        });
+
+        modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+
+        document.body.appendChild(modal);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to load comments', 'error');
       }
     }
     
@@ -1974,6 +2086,336 @@
       const div = document.createElement('div');
       div.innerHTML = htmlContent;
       return div.textContent || div.innerText || '';
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatBytes(bytes) {
+      const num = Number(bytes);
+      if (!Number.isFinite(num) || num <= 0) return '';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.min(Math.floor(Math.log(num) / Math.log(1024)), units.length - 1);
+      const value = num / Math.pow(1024, i);
+      return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function getFileExtension(nameOrPath) {
+      const s = String(nameOrPath || '');
+      const idx = s.lastIndexOf('.');
+      return idx >= 0 ? s.slice(idx + 1).toLowerCase() : '';
+    }
+
+    // --- PDF Viewer (LinkedIn-style) via PDF.js (loaded from CDN) ---
+    const pdfDocCache = new Map();
+
+    function isPdfFile(nameOrUrl) {
+      return getFileExtension(nameOrUrl) === 'pdf';
+    }
+
+    function ensurePdfJsLoaded() {
+      if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-pdfjs]');
+        if (existing) {
+          existing.addEventListener('load', () => resolve(window.pdfjsLib));
+          existing.addEventListener('error', reject);
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+        script.async = true;
+        script.setAttribute('data-pdfjs', 'true');
+        script.onload = () => {
+          try {
+            // Worker must be explicitly set when loading from CDN.
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+          } catch (_) {
+            // Best-effort; pdf.js will fallback in some environments.
+          }
+          resolve(window.pdfjsLib);
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function loadPdfDocument(url) {
+      const key = String(url || '');
+      if (!key) return null;
+      if (pdfDocCache.has(key)) return pdfDocCache.get(key);
+
+      const pdfjsLib = await ensurePdfJsLoaded();
+      const loadingTask = pdfjsLib.getDocument({ url: key, withCredentials: true });
+      const pdf = await loadingTask.promise;
+      pdfDocCache.set(key, pdf);
+      return pdf;
+    }
+
+    async function renderPdfPageToCanvas(pdf, pageNumber, canvas) {
+      if (!pdf || !canvas) return;
+      const page = await pdf.getPage(pageNumber);
+      const ctx = canvas.getContext('2d');
+
+      // Fit page to container width.
+      const container = canvas.parentElement;
+      const targetWidth = Math.max(320, (container?.clientWidth || 800));
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = targetWidth / viewport.width;
+      const scaledViewport = page.getViewport({ scale });
+
+      canvas.width = Math.floor(scaledViewport.width);
+      canvas.height = Math.floor(scaledViewport.height);
+
+      await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+    }
+
+    function renderAttachments(post, options = {}) {
+      const asMedia = !!options.asMedia;
+      const files = Array.isArray(post?.files) ? post.files : [];
+      if (!files.length) return '';
+
+      const items = files
+        .filter(f => f && (f.path || f.name))
+        .map((f, idx) => {
+          const name = f.name || 'Attachment';
+          const url = f.path || '';
+          const ext = getFileExtension(name) || getFileExtension(url);
+          const size = f.size ? formatBytes(f.size) : '';
+          const safeName = escapeHtml(name);
+          const safeUrl = escapeHtml(url);
+          const safeSize = escapeHtml(size);
+
+          // LinkedIn-like inline preview for PDFs.
+          if (ext === 'pdf') {
+            const canvasId = `pdf-canvas-${post.id}-${idx}`;
+            return `
+              <div class="ig-pdf-embed" data-attachment-url="${safeUrl}" data-attachment-name="${safeName}" data-canvas-id="${canvasId}" role="button" tabindex="0">
+                <div class="ig-pdf-embed-header">
+                  <span class="ig-pdf-embed-badge">PDF</span>
+                  <span class="ig-pdf-embed-title">${safeName}</span>
+                  ${safeSize ? `<span class=\"ig-pdf-embed-size\">${safeSize}</span>` : ''}
+                </div>
+                <div class="ig-pdf-embed-preview">
+                  <canvas id="${canvasId}"></canvas>
+                </div>
+                <div class="ig-pdf-embed-controls">
+                  <button type="button" class="ig-pdf-ctrl" data-pdf-action="prev" aria-label="Previous page">‹</button>
+                  <span class="ig-pdf-page"><span data-pdf-page>1</span><span class="ig-pdf-sep">/</span><span data-pdf-pages>…</span></span>
+                  <button type="button" class="ig-pdf-ctrl" data-pdf-action="next" aria-label="Next page">›</button>
+                  <button type="button" class="ig-pdf-ctrl" data-pdf-action="expand" aria-label="Open" style="margin-left: auto;">⤢</button>
+                </div>
+              </div>
+            `;
+          }
+
+          // Default attachment card (non-PDF)
+          const label = ext ? ext.toUpperCase() : 'FILE';
+          const safeLabel = escapeHtml(label);
+          return `
+            <button type="button" class="ig-attachment-item" data-attachment-url="${safeUrl}" data-attachment-name="${safeName}" style="width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer;">
+              <div style="display: flex; gap: 12px; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background);">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--ig-primary-text); flex-shrink: 0;">
+                  ${safeLabel}
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${safeName}</div>
+                  ${safeSize ? `<div style=\"font-size: 12px; color: var(--ig-secondary-text); margin-top: 2px;\">${safeSize}</div>` : ''}
+                </div>
+              </div>
+            </button>
+          `;
+        })
+        .join('');
+
+      return `
+        <div class="ig-post-attachments" style="padding: ${asMedia ? '0' : '0 16px'}; margin: ${asMedia ? '0' : '10px 0 4px'}; display: grid; gap: 8px;">
+          ${items}
+        </div>
+      `;
+    }
+
+    async function initPdfEmbed(embedEl) {
+      try {
+        const url = embedEl.getAttribute('data-attachment-url') || '';
+        const name = embedEl.getAttribute('data-attachment-name') || 'Document';
+        const canvasId = embedEl.getAttribute('data-canvas-id');
+        const canvas = canvasId ? document.getElementById(canvasId) : null;
+        if (!url || !canvas) return;
+
+        const pdf = await loadPdfDocument(url);
+        if (!pdf) return;
+
+        const pagesEl = embedEl.querySelector('[data-pdf-pages]');
+        if (pagesEl) pagesEl.textContent = String(pdf.numPages || 1);
+
+        // Render the first page as the preview.
+        await renderPdfPageToCanvas(pdf, 1, canvas);
+
+        // Controls (prev/next/expand) trigger the full modal, similar to LinkedIn.
+        embedEl.querySelectorAll('[data-pdf-action]').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openPdfModal(url, name);
+          });
+        });
+
+        // Clicking the preview opens the modal.
+        embedEl.addEventListener('click', (e) => {
+          // ignore clicks that originate from a button (already handled)
+          if (e.target && e.target.closest && e.target.closest('[data-pdf-action]')) return;
+          openPdfModal(url, name);
+        });
+
+        embedEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openPdfModal(url, name);
+          }
+        });
+      } catch (e) {
+        // If PDF.js fails for any reason, keep the UI but avoid breaking the feed.
+        console.warn('PDF preview init failed', e);
+      }
+    }
+
+    function initPdfEmbeds(rootEl) {
+      const root = rootEl || document;
+      root.querySelectorAll('.ig-pdf-embed').forEach((embed) => {
+        if (embed.getAttribute('data-pdf-initialized') === 'true') return;
+        embed.setAttribute('data-pdf-initialized', 'true');
+        initPdfEmbed(embed);
+      });
+    }
+
+    function openAttachment(url, name) {
+      const ext = getFileExtension(name) || getFileExtension(url);
+      if (ext === 'pdf') {
+        openPdfModal(url, name);
+        return;
+      }
+      if (url) window.open(url, '_blank', 'noopener');
+    }
+
+    async function openPdfModal(url, name) {
+      if (!url) return;
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.style.display = 'flex';
+
+      const safeTitle = escapeHtml(name || 'Document');
+      const safeUrl = escapeHtml(url);
+
+      modal.innerHTML = `
+        <div class="ig-modal ig-pdf-modal" style="width: 92vw; max-width: 980px; height: 90vh; max-height: 900px; overflow: hidden; position: relative;">
+          <div class="ig-pdf-modal-header">
+            <div class="ig-pdf-modal-title">${safeTitle}</div>
+            <button type="button" aria-label="Close" class="ig-pdf-modal-close" data-close-modal>×</button>
+          </div>
+          <div class="ig-pdf-modal-body">
+            <div class="ig-pdf-canvas-wrap">
+              <canvas id="igPdfModalCanvas"></canvas>
+            </div>
+          </div>
+          <div class="ig-pdf-modal-controls">
+            <button type="button" class="ig-pdf-ctrl" data-pdf-modal="prev">‹</button>
+            <span class="ig-pdf-page"><span id="igPdfPage">1</span><span class="ig-pdf-sep">/</span><span id="igPdfPages">…</span></span>
+            <button type="button" class="ig-pdf-ctrl" data-pdf-modal="next">›</button>
+            <a class="ig-pdf-open" href="${safeUrl}" target="_blank" rel="noopener">Open</a>
+          </div>
+        </div>
+      `;
+
+      let resizeTimer;
+      let onResize;
+
+      const close = () => {
+        document.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('resize', onResize);
+        document.body.style.overflow = previousOverflow;
+        modal.remove();
+      };
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') close();
+      };
+
+      onResize = () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          // render() is defined later; call via window-safe optional.
+          modal.__igPdfRender?.().catch(() => {});
+        }, 100);
+      };
+
+      document.addEventListener('keydown', onKeyDown);
+      window.addEventListener('resize', onResize);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) close();
+      });
+      modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        close();
+      });
+      modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+
+      document.body.appendChild(modal);
+
+      // Load + render with PDF.js (with iframe fallback if PDF.js fails)
+      let pdf;
+      try {
+        pdf = await loadPdfDocument(url);
+      } catch (e) {
+        console.warn('PDF.js load failed, falling back to iframe', e);
+        const body = modal.querySelector('.ig-pdf-modal-body');
+        if (body) {
+          body.innerHTML = `<iframe src="${safeUrl}" title="${safeTitle}" style="width:100%; height:100%; border:0; background: var(--ig-primary-background);"></iframe>`;
+        }
+        return;
+      }
+
+      const canvas = modal.querySelector('#igPdfModalCanvas');
+      const pageEl = modal.querySelector('#igPdfPage');
+      const pagesEl = modal.querySelector('#igPdfPages');
+      if (pagesEl) pagesEl.textContent = String(pdf.numPages || 1);
+
+      let currentPage = 1;
+      const render = async () => {
+        if (pageEl) pageEl.textContent = String(currentPage);
+        await renderPdfPageToCanvas(pdf, currentPage, canvas);
+      };
+      modal.__igPdfRender = render;
+      await render();
+
+      modal.querySelector('[data-pdf-modal="prev"]')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (currentPage > 1) {
+          currentPage -= 1;
+          await render();
+        }
+      });
+
+      modal.querySelector('[data-pdf-modal="next"]')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const max = Number(pdf.numPages || 1);
+        if (currentPage < max) {
+          currentPage += 1;
+          await render();
+        }
+      });
     }
     
     function openFullScreenPost(index, posts) {
@@ -2020,6 +2462,7 @@
         const isSaved = post.is_saved || false;
         const likesCount = post.likes_count || 0;
         const commentsCount = post.comments_count || 0;
+        const rawAttachmentsHtml = renderAttachments(post);
         
         // Handle media
         let mediaHtml = '';
@@ -2046,6 +2489,15 @@
               </div>
             `;
           }
+        }
+
+        // If there is no image/video, treat attachments (PDF preview) as the main media
+        // so Like/Comment/Share/Save appear underneath.
+        const hasVisualMedia = !!post.video_url || (Array.isArray(post.images) && post.images.length > 0);
+        let attachmentsHtml = rawAttachmentsHtml;
+        if (!hasVisualMedia && rawAttachmentsHtml) {
+          mediaHtml = renderAttachments(post, { asMedia: true });
+          attachmentsHtml = '';
         }
         
         return `
@@ -2091,11 +2543,13 @@
             <span class="ig-caption-text">${getPlainText(post.content).substring(0, 200)}${getPlainText(post.content).length > 200 ? '...' : ''}</span>
           </div>
           ` : ''}
+
+          ${attachmentsHtml}
           
           ${commentsCount > 0 ? `
-          <button class="ig-post-comments-btn" onclick="window.location.href='/post/${post.id}'">
-            View all ${commentsCount} comments
-          </button>
+            <button class="ig-post-comments-btn" onclick="openCommentsModal(${post.id})">
+              View all ${commentsCount} comments
+            </button>
           ` : ''}
           
           <div class="ig-fullscreen-bottom-info">
@@ -2128,6 +2582,20 @@
         if (posts[index]) {
           posts[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+
+        // Attachment click handlers inside fullscreen
+        content.querySelectorAll('.ig-attachment-item').forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const url = btn.getAttribute('data-attachment-url') || '';
+            const name = btn.getAttribute('data-attachment-name') || 'Document';
+            openAttachment(url, name);
+          });
+        });
+
+        // Initialize LinkedIn-style PDF previews inside fullscreen
+        initPdfEmbeds(content);
         
         // Initialize carousels for all posts with multiple images
         fullScreenPosts.forEach((post, idx) => {

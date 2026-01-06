@@ -12,7 +12,14 @@ router.get('/', authMiddleware, (req, res) => {
     SELECT n.*,
            u.username, u.profile_picture
     FROM notifications n
-    LEFT JOIN users u ON n.related_id = u.id AND n.type IN ('follow', 'message', 'crosspath', 'crosspath_accepted')
+    LEFT JOIN users u ON (
+      (n.created_by IS NOT NULL AND u.id = n.created_by)
+      OR (
+        n.created_by IS NULL
+        AND n.type IN ('follow', 'message', 'crosspath', 'crosspath_accepted', 'community_join')
+        AND u.id = n.related_id
+      )
+    )
     WHERE n.user_id = ?
     ORDER BY n.created_at DESC
     LIMIT 100
