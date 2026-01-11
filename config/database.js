@@ -245,6 +245,81 @@ const createTables = () => {
       )
     `);
 
+    // Community groups table (sub-groups within communities)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        creator_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Community group members table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT DEFAULT 'member',
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(group_id, user_id)
+      )
+    `);
+
+    // Community group posts table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        content TEXT,
+        attachments TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Community group files table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        filename TEXT NOT NULL,
+        filepath TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        filesize INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Community group links table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        url TEXT NOT NULL,
+        title TEXT,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Group conversations (DM groups)
     db.run(`
       CREATE TABLE IF NOT EXISTS group_conversations (

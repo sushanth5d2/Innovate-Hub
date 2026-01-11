@@ -49,10 +49,11 @@
     <!-- Tabs -->
     <div class="card">
       <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-        <button class="btn btn-outline btn-sm" id="posts-tab" onclick="switchTab('posts')">Posts</button>
-        <button class="btn btn-outline btn-sm" id="chat-tab" onclick="switchTab('chat')">Chat</button>
-        <button class="btn btn-outline btn-sm" id="members-tab" onclick="switchTab('members')">Members</button>
-        <button class="btn btn-outline btn-sm" id="files-tab" onclick="switchTab('files')">Files</button>
+        <button class="btn btn-outline btn-sm" id="posts-tab">Posts</button>
+        <button class="btn btn-outline btn-sm" id="groups-tab">Groups</button>
+        <button class="btn btn-outline btn-sm" id="chat-tab">Chat</button>
+        <button class="btn btn-outline btn-sm" id="members-tab">Members</button>
+        <button class="btn btn-outline btn-sm" id="files-tab">Files</button>
       </div>
     </div>
 
@@ -79,13 +80,26 @@
       <div id="community-posts"></div>
     </div>
 
+    <!-- Groups Tab -->
+    <div id="groups-content" style="display: none;">
+      <div class="card" id="create-group-section" style="display: none; margin-bottom: 1rem;">
+        <div class="card-header">Create New Group</div>
+        <form id="create-group-form" style="padding: 1rem;">
+          <input type="text" class="form-input" id="group-name" placeholder="Group Name" required style="margin-bottom: 1rem;">
+          <textarea class="form-textarea" id="group-description" placeholder="Description (optional)" rows="3"></textarea>
+          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Create Group</button>
+        </form>
+      </div>
+      <div id="community-groups"></div>
+    </div>
+
     <!-- Chat Tab -->
     <div id="chat-content" style="display: none;">
       <div class="chat-container">
         <div class="chat-messages" id="community-chat-messages"></div>
         <div class="chat-input-container">
           <input type="text" class="chat-input" id="chat-message-input" placeholder="Type a message...">
-          <button class="btn btn-primary btn-sm" onclick="sendChatMessage()">Send</button>
+          <button class="btn btn-primary btn-sm" id="send-chat-btn">Send</button>
         </div>
       </div>
     </div>
@@ -103,7 +117,7 @@
         <div id="upload-file-section" style="display: none; margin-bottom: 1rem;">
           <label class="btn btn-primary btn-sm" style="cursor: pointer;">
             📤 Upload File
-            <input type="file" id="file-upload" style="display: none;" onchange="uploadFile()">
+            <input type="file" id="file-upload" style="display: none;">
           </label>
         </div>
         <div id="community-files"></div>
@@ -118,11 +132,17 @@
     InnovateAPI.initializePage();
 
     const communityId = window.location.pathname.split('/').pop();
-    // Initialize Socket.IO (socket is already declared in app.js)
+    // Initialize Socket.IO - uses global socket from app.js
     InnovateAPI.initSocket();
-    const socket = InnovateAPI.getSocket();
+    // Get socket reference without redeclaring
+    const socketInstance = InnovateAPI.getSocket();
     let currentTab = 'posts';
     let isMember = false;
+
+    // Define all functions before using them
+    function toggleMobileMenu() {
+      document.getElementById('navbarMenu').classList.toggle('active');
+    }
 
     async function loadCommunity() {
       try {
@@ -150,7 +170,7 @@
           actionsContainer.innerHTML = '<button class="btn btn-secondary" onclick="leaveCommunity()">Leave Community</button>';
           document.getElementById('create-post-section').style.display = 'block';
           document.getElementById('upload-file-section').style.display = 'block';
-          socket.emit('community:join', communityId);
+          socketInstance.emit('community:join', communityId);
         } else {
           actionsContainer.innerHTML = '<button class="btn btn-primary" onclick="joinCommunity()">Join Community</button>';
         }
@@ -163,16 +183,19 @@
       currentTab = tab;
       
       document.getElementById('posts-content').style.display = tab === 'posts' ? 'block' : 'none';
+      document.getElementById('groups-content').style.display = tab === 'groups' ? 'block' : 'none';
       document.getElementById('chat-content').style.display = tab === 'chat' ? 'block' : 'none';
       document.getElementById('members-content').style.display = tab === 'members' ? 'block' : 'none';
       document.getElementById('files-content').style.display = tab === 'files' ? 'block' : 'none';
 
       document.getElementById('posts-tab').className = tab === 'posts' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+      document.getElementById('groups-tab').className = tab === 'groups' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
       document.getElementById('chat-tab').className = tab === 'chat' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
       document.getElementById('members-tab').className = tab === 'members' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
       document.getElementById('files-tab').className = tab === 'files' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
 
       if (tab === 'posts') loadPosts();
+      else if (tab === 'groups') loadGroups();
       else if (tab === 'chat') loadChat();
       else if (tab === 'members') loadMembers();
       else if (tab === 'files') loadFiles();
@@ -367,7 +390,7 @@
           body: JSON.stringify({ message })
         });
 
-        socket.emit('community:message', {
+        socketInstance.emit('community:message', {
           communityId,
           message: data.chatMessage
         });
@@ -404,9 +427,72 @@
     }
 
     // Socket listeners
-    socket.on('community:message:receive', (message) => {
+    socketInstance.on('community:message:receive', (message) => {
       if (currentTab === 'chat') {
         loadChat();
+      }
+    });
+
+    // Load groups
+    async function loadGroups() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/groups`);
+        const container = document.getElementById('community-groups');
+        container.innerHTML = '';
+
+        // Show create button if member
+        if (isMember) {
+          document.getElementById('create-group-section').style.display = 'block';
+        }
+
+        if (data.groups.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No groups yet. Create one to get started!</div>';
+          return;
+        }
+
+        data.groups.forEach(group => {
+          const groupEl = document.createElement('div');
+          groupEl.className = 'card';
+          groupEl.style.cursor = 'pointer';
+          groupEl.innerHTML = `
+            <div style="display: flex; gap: 1rem; align-items: start; padding: 1rem;">
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 0.5rem 0;">${group.name}</h3>
+                <p style="color: var(--text-secondary); margin: 0 0 0.5rem 0;">${group.description || 'No description'}</p>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                  ${group.member_count} members · Created by ${group.creator_username}
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.location.href='/group.html?id=${group.id}'">
+                ${group.is_member ? 'Open' : 'Join'}
+              </button>
+            </div>
+          `;
+          groupEl.onclick = () => window.location.href = `/group.html?id=${group.id}`;
+          container.appendChild(groupEl);
+        });
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      }
+    }
+
+    // Create group form
+    document.getElementById('create-group-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('group-name').value;
+      const description = document.getElementById('group-description').value;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/groups`, {
+          method: 'POST',
+          body: JSON.stringify({ name, description })
+        });
+
+        InnovateAPI.showAlert('Group created successfully!', 'success');
+        document.getElementById('create-group-form').reset();
+        loadGroups();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
       }
     });
 
@@ -416,10 +502,18 @@
       }
     });
 
-    function toggleMobileMenu() {
-      document.getElementById('navbarMenu').classList.toggle('active');
-    }
+    // Add event listeners for tabs
+    document.getElementById('posts-tab').addEventListener('click', () => switchTab('posts'));
+    document.getElementById('groups-tab').addEventListener('click', () => switchTab('groups'));
+    document.getElementById('chat-tab').addEventListener('click', () => switchTab('chat'));
+    document.getElementById('members-tab').addEventListener('click', () => switchTab('members'));
+    document.getElementById('files-tab').addEventListener('click', () => switchTab('files'));
 
+    // Add event listeners for buttons
+    document.getElementById('send-chat-btn')?.addEventListener('click', sendChatMessage);
+    document.getElementById('file-upload')?.addEventListener('change', uploadFile);
+
+    // Initialize
     loadCommunity();
     switchTab('posts');
   </script>

@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Group - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Top Navigation -->
+  <div class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      <div class="ig-search-box">
+        <input type="text" class="ig-search-input" placeholder="Search...">
+      </div>
+      <div class="ig-nav-icons">
+        <a href="/home"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></a>
+        <a href="/messages"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></a>
+        <a href="/notifications"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="ig-main" style="margin-top: 70px; max-width: 935px;">
+    <!-- Group Header -->
+    <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <a href="#" id="back-to-community" style="color: var(--ig-secondary-text); text-decoration: none; font-size: 24px;">←</a>
+            <h1 id="group-name" style="font-size: 28px; margin: 0;"></h1>
+          </div>
+          <p id="group-description" style="color: var(--ig-secondary-text); margin-bottom: 12px;"></p>
+          <div style="font-size: 14px; color: var(--ig-secondary-text);">
+            <span id="member-count"></span> members · Created by <span id="creator-name"></span>
+          </div>
+        </div>
+        <div id="group-actions"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 24px;">
+      <div style="display: flex; gap: 0; border-bottom: 1px solid var(--ig-border);">
+        <button class="tab-btn active" id="feed-tab">Feed</button>
+        <button class="tab-btn" id="links-tab">Links</button>
+        <button class="tab-btn" id="images-tab">Images</button>
+        <button class="tab-btn" id="documents-tab">Documents</button>
+        <button class="tab-btn" id="videos-tab">Videos</button>
+        <button class="tab-btn" id="files-tab">Files</button>
+        <button class="tab-btn" id="members-tab">Members</button>
+      </div>
+    </div>
+
+    <!-- Feed Tab (Chat & Posts) -->
+    <div id="feed-content">
+      <!-- Group Chat Section -->
+      <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 80px;">
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Group Chat</h3>
+        
+        <!-- Chat Messages -->
+        <div id="group-chat-messages" style="height: 400px; overflow-y: auto; border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 16px; background: var(--ig-secondary-background);"></div>
+        
+        <!-- Chat Input Container -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Message Input -->
+          <textarea id="chat-message-input" placeholder="Type a message..." style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; min-height: 60px; max-height: 120px; resize: vertical; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-family: inherit;"></textarea>
+          
+          <!-- Attachment Preview -->
+          <div id="chat-attachment-preview" style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 0;"></div>
+          
+          <!-- Bottom Row: Attachments + Send Button -->
+          <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between;">
+            <!-- Attachment Options -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; flex: 1;">
+              <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                📷 Photo
+                <input type="file" id="chat-photo" accept="image/*" style="display: none;">
+              </label>
+              <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                🎥 Video
+                <input type="file" id="chat-video" accept="video/*" style="display: none;">
+              </label>
+              <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                📎 File
+                <input type="file" id="chat-file" style="display: none;">
+              </label>
+              <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                🎵 Audio
+                <input type="file" id="chat-audio" accept="audio/*" style="display: none;">
+              </label>
+              <button type="button" class="ig-action-btn" id="share-location-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                📍 Location
+              </button>
+            </div>
+            
+            <!-- Send Button -->
+            <button type="button" class="btn btn-primary" id="send-chat-message-btn" style="padding: 12px 32px; border-radius: 8px; font-weight: 600; white-space: nowrap;">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message history (hidden - messages show in chat area above) -->
+      <div id="group-posts" style="display: none;"></div>
+    </div>
+
+    <!-- Links Tab -->
+    <div id="links-content" style="display: none;">
+      <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 24px;" id="add-link-section">
+        <form id="add-link-form">
+          <input type="text" id="link-url" placeholder="URL" required style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+          <input type="text" id="link-title" placeholder="Title (optional)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+          <textarea id="link-description" placeholder="Description (optional)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; min-height: 60px; margin-bottom: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical;"></textarea>
+          <button type="submit" class="btn btn-primary">Save Link</button>
+        </form>
+      </div>
+      <div id="links-list"></div>
+    </div>
+
+    <!-- Images Tab -->
+    <div id="images-content" style="display: none;">
+      <div id="images-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;"></div>
+    </div>
+
+    <!-- Documents Tab -->
+    <div id="documents-content" style="display: none;">
+      <div id="documents-list"></div>
+    </div>
+
+    <!-- Videos Tab -->
+    <div id="videos-content" style="display: none;">
+      <div id="videos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;"></div>
+    </div>
+
+    <!-- Files Tab -->
+    <div id="files-content" style="display: none;">
+      <div id="files-list"></div>
+    </div>
+
+    <!-- Members Tab -->
+    <div id="members-content" style="display: none;">
+      <div id="members-list"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <div class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg width="28" height="28" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      <span class="ig-bottom-nav-label">Home</span>
+    </a>
+    <a href="/search" class="ig-bottom-nav-item">
+      <svg width="28" height="28" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+      <span class="ig-bottom-nav-label">Search</span>
+    </a>
+    <a href="/communities" class="ig-bottom-nav-item active">
+      <svg width="28" height="28" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      <span class="ig-bottom-nav-label">Communities</span>
+    </a>
+    <a href="/events" class="ig-bottom-nav-item">
+      <svg width="28" height="28" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      <span class="ig-bottom-nav-label">Events</span>
+    </a>
+    <a href="/profile" class="ig-bottom-nav-item">
+      <svg width="28" height="28" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      <span class="ig-bottom-nav-label">Profile</span>
+    </a>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+
+    const groupId = new URLSearchParams(window.location.search).get('id');
+    let currentTab = 'feed';
+    let isMember = false;
+    let communityId = null;
+
+    async function loadGroup() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
+        const group = data.group;
+        communityId = group.community_id;
+
+        document.getElementById('group-name').textContent = group.name;
+        document.getElementById('group-description').textContent = group.description || 'No description';
+        document.getElementById('member-count').textContent = group.member_count;
+        document.getElementById('creator-name').textContent = group.creator_username;
+
+        // Back button
+        document.getElementById('back-to-community').href = `/community/${communityId}`;
+
+        isMember = group.is_member > 0;
+
+        // Actions
+        const actionsContainer = document.getElementById('group-actions');
+        if (isMember) {
+          actionsContainer.innerHTML = '<button class="btn btn-secondary" id="leave-group-btn">Leave Group</button>';
+          // Add event listener for leave button
+          document.getElementById('leave-group-btn').addEventListener('click', leaveGroup);
+        } else {
+          actionsContainer.innerHTML = '<button class="btn btn-primary" id="join-group-btn">Join Group</button>';
+          // Add event listener for join button
+          document.getElementById('join-group-btn').addEventListener('click', joinGroup);
+        }
+
+        // Load initial content
+        loadGroupChat();
+        loadFeed();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      // Hide all
+      document.getElementById('feed-content').style.display = 'none';
+      document.getElementById('links-content').style.display = 'none';
+      document.getElementById('images-content').style.display = 'none';
+      document.getElementById('documents-content').style.display = 'none';
+      document.getElementById('videos-content').style.display = 'none';
+      document.getElementById('files-content').style.display = 'none';
+      document.getElementById('members-content').style.display = 'none';
+
+      // Update tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Show selected
+      if (tab === 'feed') {
+        document.getElementById('feed-content').style.display = 'block';
+        loadGroupChat();
+        loadFeed();
+      } else if (tab === 'links') {
+        document.getElementById('links-content').style.display = 'block';
+        loadLinks();
+      } else if (tab === 'images') {
+        document.getElementById('images-content').style.display = 'block';
+        loadFiles('image', 'images-grid');
+      } else if (tab === 'documents') {
+        document.getElementById('documents-content').style.display = 'block';
+        loadFiles('document', 'documents-list');
+      } else if (tab === 'videos') {
+        document.getElementById('videos-content').style.display = 'block';
+        loadFiles('video', 'videos-grid');
+      } else if (tab === 'files') {
+        document.getElementById('files-content').style.display = 'block';
+        loadFiles('other', 'files-list');
+      } else if (tab === 'members') {
+        document.getElementById('members-content').style.display = 'block';
+        loadMembers();
+      }
+    }
+
+    async function loadFeed() {
+      if (!isMember) {
+        document.getElementById('group-posts').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Join the group to see posts</div>';
+        return;
+      }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
+        const container = document.getElementById('group-posts');
+        container.innerHTML = '';
+
+        if (data.posts.length === 0) {
+          container.innerHTML = '<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-secondary-text);">No posts yet. Be the first to post!</div>';
+          return;
+        }
+
+        data.posts.forEach(post => {
+          const postEl = document.createElement('div');
+          postEl.className = 'ig-post';
+          postEl.innerHTML = `
+            <div class="ig-post-header">
+              <a href="/profile/${post.user_id}" class="ig-post-user">
+                <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" class="ig-post-avatar" alt="${post.username}">
+                <div class="ig-post-info">
+                  <span class="ig-post-username">${post.username}</span>
+                </div>
+              </a>
+            </div>
+            <div class="ig-post-caption">
+              ${post.content || ''}
+            </div>
+            ${post.attachments && post.attachments.length > 0 ? `
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 12px;">
+                ${post.attachments.map(att => {
+                  if (att.includes('/images/')) {
+                    return `<img src="${att}" style="width: 100%; border-radius: 8px; cursor: pointer;" onclick="window.open('${att}', '_blank')">`;
+                  } else if (att.includes('/videos/')) {
+                    return `<video src="${att}" controls style="width: 100%; border-radius: 8px;"></video>`;
+                  } else {
+                    const filename = att.split('/').pop();
+                    return `<a href="${att}" download style="padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; text-decoration: none; color: var(--ig-primary-text);">📎 ${filename}</a>`;
+                  }
+                }).join('')}
+              </div>
+            ` : ''}
+            <div class="ig-post-time">${InnovateAPI.formatDate(post.created_at)}</div>
+          `;
+          container.appendChild(postEl);
+        });
+      } catch (error) {
+        console.error('Error loading feed:', error);
+      }
+    }
+
+    async function loadLinks() {
+      if (!isMember) return;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/links`);
+        const container = document.getElementById('links-list');
+        container.innerHTML = '';
+
+        if (data.links.length === 0) {
+          container.innerHTML = '<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-secondary-text);">No links saved yet</div>';
+          return;
+        }
+
+        data.links.forEach(link => {
+          const linkEl = document.createElement('div');
+          linkEl.style.cssText = 'background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+          linkEl.innerHTML = `
+            <div style="display: flex; gap: 12px; align-items: start;">
+              <div style="flex: 1;">
+                <a href="${link.url}" target="_blank" style="font-weight: 600; color: var(--ig-blue); text-decoration: none; font-size: 16px;">${link.title || link.url}</a>
+                ${link.description ? `<p style="color: var(--ig-secondary-text); margin: 8px 0 0 0;">${link.description}</p>` : ''}
+                <div style="font-size: 12px; color: var(--ig-tertiary-text); margin-top: 8px;">
+                  Saved by ${link.username} · ${InnovateAPI.formatDate(link.created_at)}
+                </div>
+              </div>
+              <a href="${link.url}" target="_blank" class="btn btn-primary btn-sm">Open</a>
+            </div>
+          `;
+          container.appendChild(linkEl);
+        });
+      } catch (error) {
+        console.error('Error loading links:', error);
+      }
+    }
+
+    async function loadFiles(type, containerId) {
+      if (!isMember) return;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/files?type=${type}`);
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+
+        if (data.files.length === 0) {
+          container.innerHTML = '<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-secondary-text);">No files yet</div>';
+          return;
+        }
+
+        if (type === 'image') {
+          data.files.forEach(file => {
+            const fileEl = document.createElement('div');
+            fileEl.style.cssText = 'position: relative; cursor: pointer;';
+            fileEl.innerHTML = `
+              <img src="${file.filepath}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" alt="${file.filename}">
+              <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${file.filename}</div>
+            `;
+            fileEl.onclick = () => window.open(file.filepath, '_blank');
+            container.appendChild(fileEl);
+          });
+        } else if (type === 'video') {
+          data.files.forEach(file => {
+            const fileEl = document.createElement('div');
+            fileEl.innerHTML = `
+              <video src="${file.filepath}" controls style="width: 100%; border-radius: 8px;"></video>
+              <div style="padding: 8px; font-size: 14px;">${file.filename}</div>
+            `;
+            container.appendChild(fileEl);
+          });
+        } else {
+          data.files.forEach(file => {
+            const fileEl = document.createElement('div');
+            fileEl.style.cssText = 'background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+            fileEl.innerHTML = `
+              <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between;">
+                <div style="flex: 1;">
+                  <div style="font-weight: 600;">${file.filename}</div>
+                  <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
+                    ${(file.filesize / 1024).toFixed(1)} KB · Uploaded by ${file.username} · ${InnovateAPI.formatDate(file.created_at)}
+                  </div>
+                </div>
+                <a href="${file.filepath}" download class="btn btn-primary btn-sm">Download</a>
+              </div>
+            `;
+            container.appendChild(fileEl);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading files:', error);
+      }
+    }
+
+    async function loadMembers() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/members`);
+        const container = document.getElementById('members-list');
+        container.innerHTML = '';
+
+        data.members.forEach(member => {
+          const memberEl = document.createElement('div');
+          memberEl.style.cssText = 'background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+          memberEl.innerHTML = `
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <img src="${InnovateAPI.getUserAvatar(member.profile_picture)}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;" alt="${member.username}">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${member.username}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                  ${member.role === 'admin' ? '👑 Admin' : 'Member'} · Joined ${InnovateAPI.formatDate(member.joined_at)}
+                </div>
+              </div>
+              <a href="/profile/${member.id}" class="btn btn-outline btn-sm">View Profile</a>
+            </div>
+          `;
+          container.appendChild(memberEl);
+        });
+      } catch (error) {
+        console.error('Error loading members:', error);
+      }
+    }
+
+    async function joinGroup() {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined group successfully!', 'success');
+        loadGroup();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function leaveGroup() {
+      if (!confirm('Are you sure you want to leave this group?')) return;
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/leave`, { method: 'POST' });
+        InnovateAPI.showAlert('Left group successfully!', 'success');
+        window.location.href = `/community/${communityId}`;
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Save link
+    document.getElementById('add-link-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = document.getElementById('link-url').value;
+      const title = document.getElementById('link-title').value;
+      const description = document.getElementById('link-description').value;
+
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/links`, {
+          method: 'POST',
+          body: JSON.stringify({ url, title, description })
+        });
+        InnovateAPI.showAlert('Link saved!', 'success');
+        document.getElementById('add-link-form').reset();
+        loadLinks();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    // Chat functionality
+    let chatAttachments = [];
+
+    async function loadGroupChat() {
+      if (!isMember) return;
+      
+      try {
+        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
+        const container = document.getElementById('group-chat-messages');
+        
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        if (!data.posts || data.posts.length === 0) {
+          container.innerHTML = '<div style="text-align: center; color: var(--ig-secondary-text); padding: 20px;">No messages yet. Start the conversation!</div>';
+          return;
+        }
+
+        // Display messages in chat style (reverse chronological - newest at bottom)
+        data.posts.forEach(post => {
+          const messageEl = document.createElement('div');
+          messageEl.style.cssText = 'margin-bottom: 16px;';
+          
+          const currentUser = InnovateAPI.getCurrentUser();
+          const isOwnMessage = post.user_id === currentUser.id;
+          
+          messageEl.innerHTML = `
+            <div style="display: flex; gap: 12px; ${isOwnMessage ? 'flex-direction: row-reverse;' : ''}">
+              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1; max-width: 70%;">
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px; ${isOwnMessage ? 'flex-direction: row-reverse;' : ''}">
+                  <span style="font-weight: 600; font-size: 13px;">${post.username}</span>
+                  <span style="font-size: 11px; color: var(--ig-secondary-text);">${InnovateAPI.formatDate(post.created_at)}</span>
+                </div>
+                <div style="background: ${isOwnMessage ? '#0095f6' : 'var(--ig-secondary-background)'}; color: ${isOwnMessage ? '#fff' : 'var(--ig-primary-text)'}; padding: 12px; border-radius: 16px; word-wrap: break-word;">
+                  ${post.content || ''}
+                </div>
+                ${post.attachments && post.attachments.length > 0 ? `
+                  <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;">
+                    ${post.attachments.map(att => {
+                      if (att.includes('/images/')) {
+                        return `<img src="${att}" style="max-width: 200px; border-radius: 12px; cursor: pointer;" onclick="window.open('${att}', '_blank')">`;
+                      } else if (att.includes('/videos/')) {
+                        return `<video src="${att}" controls style="max-width: 200px; border-radius: 12px;"></video>`;
+                      } else {
+                        const filename = att.split('/').pop();
+                        return `<a href="${att}" download style="padding: 8px 12px; background: var(--ig-hover); border-radius: 8px; text-decoration: none; color: var(--ig-primary-text); font-size: 12px;">📎 ${filename}</a>`;
+                      }
+                    }).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+          container.appendChild(messageEl);
+        });
+
+        // Scroll to bottom to show latest messages
+        container.scrollTop = container.scrollHeight;
+      } catch (error) {
+        console.error('Error loading chat:', error);
+        const container = document.getElementById('group-chat-messages');
+        if (container) {
+          container.innerHTML = '<div style="text-align: center; color: var(--ig-error); padding: 20px;">Error loading messages</div>';
+        }
+      }
+    }
+
+    // Handle chat attachments
+    function handleChatAttachment(input, type) {
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        chatAttachments.push({ file, type });
+        displayChatAttachments();
+        e.target.value = ''; // Clear input
+      });
+    }
+
+    function displayChatAttachments() {
+      const preview = document.getElementById('chat-attachment-preview');
+      preview.innerHTML = '';
+
+      chatAttachments.forEach((attachment, index) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'position: relative; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; display: inline-flex; align-items: center; gap: 8px;';
+        
+        let icon = '📎';
+        if (attachment.type === 'photo') icon = '📷';
+        else if (attachment.type === 'video') icon = '🎥';
+        else if (attachment.type === 'audio') icon = '🎵';
+        else if (attachment.type === 'location') icon = '📍';
+        
+        item.innerHTML = `
+          <span>${icon}</span>
+          <span style="font-size: 12px;">${attachment.file ? attachment.file.name : attachment.type}</span>
+          <button onclick="removeAttachment(${index})" style="background: none; border: none; cursor: pointer; color: var(--ig-error); padding: 0; margin-left: 4px;">×</button>
+        `;
+        preview.appendChild(item);
+      });
+    }
+
+    window.removeAttachment = function(index) {
+      chatAttachments.splice(index, 1);
+      displayChatAttachments();
+    };
+
+    // Send chat message
+    async function sendChatMessage() {
+      const input = document.getElementById('chat-message-input');
+      const message = input.value.trim();
+      
+      if (!message && chatAttachments.length === 0) {
+        InnovateAPI.showAlert('Please enter a message or add an attachment', 'error');
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('content', message);
+        
+        formData.append('is_chat', 'true'); // Flag to indicate it's a chat message
+        
+        chatAttachments.forEach((attachment) => {
+          if (attachment.file) {
+            formData.append('attachments', attachment.file);
+          } else if (attachment.type === 'location' && attachment.data) {
+            formData.append('location', JSON.stringify(attachment.data));
+          }
+        });
+
+        // Send to group posts endpoint
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`, {
+          method: 'POST',
+          body: formData
+          // No headers - let browser set multipart/form-data with boundary
+        });
+
+        input.value = '';
+        chatAttachments = [];
+        displayChatAttachments();
+        InnovateAPI.showAlert('Message sent!', 'success');
+        loadGroupChat();
+        loadFeed(); // Refresh feed to show new message
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Share location
+    document.getElementById('share-location-btn')?.addEventListener('click', () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const { latitude, longitude } = position.coords;
+          chatAttachments.push({
+            type: 'location',
+            file: null,
+            data: { latitude, longitude }
+          });
+          displayChatAttachments();
+          InnovateAPI.showAlert('Location added!', 'success');
+        }, (error) => {
+          InnovateAPI.showAlert('Could not get location', 'error');
+        });
+      } else {
+        InnovateAPI.showAlert('Geolocation not supported', 'error');
+      }
+    });
+
+    // Send message button
+    document.getElementById('send-chat-message-btn')?.addEventListener('click', sendChatMessage);
+    
+    // Enter key to send
+    document.getElementById('chat-message-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+
+    // Attachment handlers
+    handleChatAttachment(document.getElementById('chat-photo'), 'photo');
+    handleChatAttachment(document.getElementById('chat-video'), 'video');
+    handleChatAttachment(document.getElementById('chat-file'), 'file');
+    handleChatAttachment(document.getElementById('chat-audio'), 'audio');
+
+    // Tab event listeners
+    document.getElementById('feed-tab').addEventListener('click', () => switchTab('feed'));
+    document.getElementById('links-tab').addEventListener('click', () => switchTab('links'));
+    document.getElementById('images-tab').addEventListener('click', () => switchTab('images'));
+    document.getElementById('documents-tab').addEventListener('click', () => switchTab('documents'));
+    document.getElementById('videos-tab').addEventListener('click', () => switchTab('videos'));
+    document.getElementById('files-tab').addEventListener('click', () => switchTab('files'));
+    document.getElementById('members-tab').addEventListener('click', () => switchTab('members'));
+
+    // Initialize
+    loadGroup();
+  </script>
+
+  <style>
+    .tab-btn {
+      flex: 1;
+      padding: 16px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--ig-secondary-text);
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--ig-primary-text);
+    }
+
+    .tab-btn.active {
+      color: var(--ig-primary-text);
+      border-bottom-color: var(--ig-primary-text);
+    }
+
+    .btn {
+      padding: 8px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-size: 14px;
+    }
+
+    .btn-primary {
+      background: var(--ig-blue);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+    }
+
+    .btn-outline {
+      background: none;
+      color: var(--ig-primary-text);
+      border: 1px solid var(--ig-border);
+    }
+
+    .btn-sm {
+      padding: 6px 16px;
+      font-size: 13px;
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      /* Main container */
+      .ig-main {
+        padding-bottom: 100px !important; /* Extra space for bottom nav */
+      }
+      
+      /* Chat area */
+      #group-chat-messages {
+        height: 300px !important;
+      }
+      
+      /* Tabs */
+      .tab-btn {
+        padding: 12px 8px;
+        font-size: 12px;
+      }
+      
+      /* Message input */
+      #chat-message-input {
+        min-height: 50px !important;
+        font-size: 14px;
+      }
+      
+      /* Attachment buttons */
+      .ig-action-btn, label.ig-action-btn {
+        font-size: 12px !important;
+        padding: 8px 10px !important;
+      }
+      
+      /* Send button */
+      #send-chat-message-btn {
+        padding: 12px 24px !important;
+        font-size: 14px !important;
+      }
+      
+      /* Feed content bottom margin */
+      #feed-content > div:first-child {
+        margin-bottom: 100px !important;
+      }
+    }
+    
+    /* Attachment preview styling */
+    #chat-attachment-preview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      padding: 8px;
+      background: var(--ig-secondary-background);
+      border-radius: 8px;
+      margin: 4px 0;
+    }
+    
+    #chat-attachment-preview:empty {
+      display: none;
+    }
+    
+    #chat-attachment-preview > div {
+      position: relative;
+      border: 1px solid var(--ig-border);
+      border-radius: 6px;
+      padding: 8px;
+      background: var(--ig-primary-background);
+      text-align: center;
+    }
+    
+    #chat-attachment-preview img {
+      max-width: 100%;
+      max-height: 80px;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+    
+    #chat-attachment-preview button {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+    }
+    
+    #chat-attachment-preview button:hover {
+      background: rgba(0, 0, 0, 0.9);
+    }
+  </style>
+</body>
+</html>

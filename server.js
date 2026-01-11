@@ -104,6 +104,7 @@ app.use('/api/ml', require('./routes/ml'));
 app.use('/api/social-service', require('./routes/social-service'));
 app.use('/api/todos', require('./routes/todos'));
 app.use('/api/groups', require('./routes/groups'));
+app.use('/api', require('./routes/community-groups'));
 
 // Serve HTML pages
 app.get('/', (req, res) => {
@@ -344,6 +345,10 @@ app.get('/social-service', (req, res) => {
 
 app.get('/todos', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'todos.html'));
+});
+
+app.get('/group.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'group.html'));
 });
 
 // Error handling middleware
