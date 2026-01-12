@@ -449,4 +449,121 @@ router.post('/:communityId/files', authMiddleware, upload.single('file'), (req, 
   });
 });
 
+// Get community announcements
+router.get('/:communityId/announcements', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId } = req.params;
+  const userId = req.user.userId;
+
+  db.get(
+    `SELECT c.is_public,
+            (SELECT COUNT(*) FROM community_members WHERE community_id = c.id AND user_id = ?) as is_member
+     FROM communities c
+     WHERE c.id = ?`,
+    [userId, communityId],
+    (err, access) => {
+      if (err || !access) return res.status(404).json({ error: 'Community not found' });
+      if (!access.is_public && !access.is_member) {
+        return res.status(403).json({ error: 'This community is private' });
+      }
+
+      const query = `
+        SELECT ca.*, u.username as author_username, u.profile_picture as author_profile_picture
+        FROM community_announcements ca
+        JOIN users u ON ca.author_id = u.id
+        WHERE ca.community_id = ?
+        ORDER BY ca.is_pinned DESC, ca.created_at DESC
+      `;
+
+      db.all(query, [communityId], (e, rows) => {
+        if (e) return res.status(500).json({ error: 'Error fetching announcements' });
+        res.json({ success: true, announcements: rows });
+      });
+    }
+  );
+});
+
+// Create community announcement (admin/moderator)
+router.post('/:communityId/announcements', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId } = req.params;
+  const userId = req.user.userId;
+  const { title, body = '', is_pinned = 0 } = req.body || {};
+
+  if (!title) return res.status(400).json({ error: 'title is required' });
+
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member to post announcements' });
+      if (!['admin', 'moderator'].includes(member.role)) {
+        return res.status(403).json({ error: 'Only admins/moderators can post announcements' });
+      }
+
+      db.run(
+        `INSERT INTO community_announcements (community_id, author_id, title, body, is_pinned)
+         VALUES (?, ?, ?, ?, ?)`,
+        [communityId, userId, title, body, is_pinned ? 1 : 0],
+        function(e) {
+          if (e) return res.status(500).json({ error: 'Error creating announcement' });
+          res.json({
+            success: true,
+            announcement: {
+              id: this.lastID,
+              community_id: Number(communityId),
+              author_id: userId,
+              title,
+              body,
+              is_pinned: is_pinned ? 1 : 0
+            }
+          });
+        }
+      );
+    }
+  );
+});
+
+// Update/pin/unpin announcement (admin/moderator)
+router.patch('/:communityId/announcements/:announcementId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, announcementId } = req.params;
+  const userId = req.user.userId;
+  const { title, body, is_pinned } = req.body || {};
+
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+      if (!['admin', 'moderator'].includes(member.role)) {
+        return res.status(403).json({ error: 'Only admins/moderators can update announcements' });
+      }
+
+      db.get(
+        'SELECT * FROM community_announcements WHERE id = ? AND community_id = ?',
+        [announcementId, communityId],
+        (e, existing) => {
+          if (e || !existing) return res.status(404).json({ error: 'Announcement not found' });
+
+          const nextTitle = typeof title === 'string' ? title : existing.title;
+          const nextBody = typeof body === 'string' ? body : existing.body;
+          const nextPinned = typeof is_pinned === 'undefined' ? existing.is_pinned : (is_pinned ? 1 : 0);
+
+          db.run(
+            `UPDATE community_announcements
+             SET title = ?, body = ?, is_pinned = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND community_id = ?`,
+            [nextTitle, nextBody, nextPinned, announcementId, communityId],
+            (uErr) => {
+              if (uErr) return res.status(500).json({ error: 'Error updating announcement' });
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;

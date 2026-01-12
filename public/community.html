@@ -1,237 +1,187 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Community - Innovate</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community Workspace - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css" />
+  <link rel="stylesheet" href="/css/workspace.css" />
+  <script src="/js/instagram-theme.js"></script>
 </head>
-<body>
-  <nav class="navbar">
-    <div class="navbar-content">
-      <a href="/home" class="navbar-brand">Innovate</a>
-      <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      <ul class="navbar-menu" id="navbarMenu">
-        <li><a href="/home">Home</a></li>
-        <li><a href="/communities">Communities</a></li>
-        <li><a href="/events">Events</a></li>
-        <li><a href="/messages">Messages</a></li>
-        <li><a href="/notifications">Notifications</a></li>
-        <li><a href="/search">Search</a></li>
-        <li><a href="/settings">Settings</a></li>
-      </ul>
-    </div>
-  </nav>
+<body class="ws-body">
+  <div class="ws-shell">
+    <!-- Sidebar -->
+    <aside class="ws-sidebar" id="wsSidebar">
+      <div class="ws-sidebar-inner">
+        <div class="ws-topbar">
+          <div class="ws-brand">
+            <a href="/home">Innovate</a>
+          </div>
+          <button class="ws-icon-btn" id="wsThemeToggle" type="button">Theme</button>
+        </div>
 
-  <div class="container">
-    <!-- Community Header -->
-    <div class="card">
-      <div id="community-banner"></div>
-      <div style="padding: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: start;">
-          <div>
-            <h1 id="community-name"></h1>
-            <div id="community-team" style="color: var(--sports-accent); font-weight: 500; font-size: 1.1rem; margin: 0.5rem 0;"></div>
-            <p id="community-description" style="color: var(--text-secondary);"></p>
-            <div style="font-size: 0.875rem; color: var(--text-secondary);">
-              <span id="member-count"></span> members
+        <div class="ws-card">
+          <div class="ws-row">
+            <div style="min-width:0;">
+              <div class="ws-card-title" id="wsCommunityName">Community</div>
+              <div class="ws-card-sub" id="wsCommunityMeta">Loading…</div>
+            </div>
+            <button class="ws-pill danger" id="wsLeaveCommunity" type="button" style="display:none;">Leave</button>
+          </div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-header">
+            <h3>Groups</h3>
+            <button class="ws-pill" id="wsCreateGroup" type="button">+ New</button>
+          </div>
+          <div class="ws-list" id="wsGroupsList"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="ws-main">
+      <div class="ws-main-header">
+        <button class="ws-icon-btn ws-mobile-menu" id="wsSidebarToggle" type="button" aria-label="Open sidebar">☰</button>
+
+        <div class="ws-context">
+          <div class="ws-context-title" id="wsContextTitle">Select a group</div>
+          <div class="ws-context-sub" id="wsContextSub">Teams + Notion style workspace</div>
+        </div>
+
+        <div class="ws-tabs">
+          <button class="ws-tab active" data-ws-tab="chat" type="button">Chat</button>
+          <button class="ws-tab" data-ws-tab="calls" type="button">Calls</button>
+          <button class="ws-tab" data-ws-tab="todo" type="button">To-Do</button>
+          <button class="ws-tab" data-ws-tab="notes" type="button">Notes</button>
+        </div>
+      </div>
+
+      <div class="ws-main-body">
+        <div class="ws-empty" id="wsEmptyState" aria-live="polite">
+          <div class="ws-empty-title">Select a group to start</div>
+          <div class="ws-empty-sub">Open a group from the left sidebar to use Chat, Calls, To‑Do and Notes.</div>
+        </div>
+        <!-- Chat -->
+        <section class="ws-view ws-chat active" id="view-chat">
+          <div class="ws-chat-messages" id="wsChatMessages"></div>
+          <div class="ws-chat-input">
+            <textarea class="ws-input" id="wsChatInput" rows="3" placeholder="Message… (Enter to send, Shift+Enter for new line)"></textarea>
+            <div class="ws-input-row">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="wsChatAttach" multiple />
+                <button class="ws-pill" id="wsChatLocation" type="button">Share location</button>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="ws-help" id="wsChatHint">Select a group to start.</div>
+                <button class="ws-pill primary" id="wsChatSend" type="button">Send</button>
+              </div>
             </div>
           </div>
-          <div id="community-actions"></div>
-        </div>
-      </div>
-    </div>
+        </section>
 
-    <!-- Tabs -->
-    <div class="card">
-      <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-        <button class="btn btn-outline btn-sm" id="posts-tab">Posts</button>
-        <button class="btn btn-outline btn-sm" id="groups-tab">Groups</button>
-        <button class="btn btn-outline btn-sm" id="chat-tab">Chat</button>
-        <button class="btn btn-outline btn-sm" id="members-tab">Members</button>
-        <button class="btn btn-outline btn-sm" id="files-tab">Files</button>
-      </div>
-    </div>
-
-    <!-- Posts Tab -->
-    <div id="posts-content">
-      <div class="card" id="create-post-section" style="display: none;">
-        <div class="card-header">Create Post</div>
-        <form id="create-post-form">
-          <textarea class="form-textarea" id="post-content" placeholder="Share with the community..." rows="3"></textarea>
-          <div id="post-preview" style="margin-top: 1rem;"></div>
-          <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
-              📷 Photos
-              <input type="file" id="post-images" multiple accept="image/*" style="display: none;">
-            </label>
-            <label class="btn btn-outline btn-sm" style="cursor: pointer;">
-              📎 Files
-              <input type="file" id="post-files" multiple style="display: none;">
-            </label>
+        <!-- Calls -->
+        <section class="ws-view ws-calls" id="view-calls">
+          <div class="ws-calls-top">
+            <button class="ws-pill" id="wsStartVoice" type="button">Start voice</button>
+            <button class="ws-pill" id="wsStartVideo" type="button">Start video</button>
+            <button class="ws-pill primary" id="wsJoinCall" type="button">Join</button>
+            <button class="ws-pill danger" id="wsLeaveCall" type="button" style="display:none;">Leave</button>
+            <button class="ws-pill" id="wsMute" type="button" disabled>Mute</button>
+            <button class="ws-pill" id="wsCamera" type="button" disabled>Camera off</button>
+            <button class="ws-pill" id="wsScreen" type="button" disabled>Share screen</button>
+            <div class="ws-help" id="wsParticipants" style="margin-left:auto;">Not in a call</div>
           </div>
-          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Post</button>
-        </form>
-      </div>
-      <div id="community-posts"></div>
-    </div>
+          <div class="ws-video-grid" id="wsVideoGrid"></div>
+        </section>
 
-    <!-- Groups Tab -->
-    <div id="groups-content" style="display: none;">
-      <div class="card" id="create-group-section" style="display: none; margin-bottom: 1rem;">
-        <div class="card-header">Create New Group</div>
-        <form id="create-group-form" style="padding: 1rem;">
-          <input type="text" class="form-input" id="group-name" placeholder="Group Name" required style="margin-bottom: 1rem;">
-          <textarea class="form-textarea" id="group-description" placeholder="Description (optional)" rows="3"></textarea>
-          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Create Group</button>
-        </form>
-      </div>
-      <div id="community-groups"></div>
-    </div>
+        <!-- To-Do -->
+        <section class="ws-view ws-board" id="view-todo">
+          <div class="ws-board-top">
+            <div class="ws-help">Create tasks from text or an image (OCR via ML service when available).</div>
+            <div style="display:grid; gap:10px;">
+              <textarea class="ws-input" id="wsTodoText" rows="3" placeholder="One task per line…"></textarea>
+              <div class="ws-input-row">
+                <button class="ws-pill primary" id="wsTodoCreateFromText" type="button">Create from text</button>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <input type="file" id="wsTodoImage" accept="image/*" />
+                  <button class="ws-pill" id="wsTodoCreateFromImage" type="button">Create from image</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ws-columns">
+            <div class="ws-col">
+              <div class="ws-col-head">To do</div>
+              <div class="ws-col-body" id="wsColTodo"></div>
+            </div>
+            <div class="ws-col">
+              <div class="ws-col-head">In progress</div>
+              <div class="ws-col-body" id="wsColInProgress"></div>
+            </div>
+            <div class="ws-col">
+              <div class="ws-col-head">Done</div>
+              <div class="ws-col-body" id="wsColDone"></div>
+            </div>
+          </div>
+        </section>
 
-    <!-- Chat Tab -->
-    <div id="chat-content" style="display: none;">
-      <div class="chat-container">
-        <div class="chat-messages" id="community-chat-messages"></div>
-        <div class="chat-input-container">
-          <input type="text" class="chat-input" id="chat-message-input" placeholder="Type a message...">
-          <button class="btn btn-primary btn-sm" id="send-chat-btn">Send</button>
+        <!-- Notes -->
+        <section class="ws-view ws-notes" id="view-notes">
+          <div class="ws-notes-list">
+            <div class="ws-section-header" style="padding: 0 0 10px 0;">
+              <h3>Notes</h3>
+              <button class="ws-pill" id="wsNoteNew" type="button">+ New</button>
+            </div>
+            <div id="wsNotesList"></div>
+          </div>
+
+          <div class="ws-notes-editor">
+            <div class="ws-notes-head">
+              <input class="ws-input" id="wsNoteTitle" placeholder="Note title" />
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button class="ws-pill" id="wsNoteVersions" type="button">Versions</button>
+                <button class="ws-pill primary" id="wsNoteSave" type="button">Save</button>
+              </div>
+            </div>
+            <div class="ws-editor">
+              <textarea class="ws-textarea" id="wsNoteContent" placeholder="Write markdown…"></textarea>
+            </div>
+            <div class="ws-foot">
+              <div class="ws-help" id="wsNoteStatus">Not opened</div>
+              <div class="ws-help">Saved versions are automatic on update.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Right panel -->
+    <aside class="ws-right">
+      <div class="ws-right-inner">
+        <div class="ws-right-tabs">
+          <button class="ws-right-tab active" data-ws-right="files" type="button">Files</button>
+          <button class="ws-right-tab" data-ws-right="members" type="button">Members</button>
+          <button class="ws-right-tab" data-ws-right="announcements" type="button">News</button>
+          <button class="ws-right-tab" data-ws-right="github" type="button">GitHub</button>
         </div>
+        <div class="ws-right-body" id="wsRightBody"></div>
       </div>
-    </div>
-
-    <!-- Members Tab -->
-    <div id="members-content" style="display: none;">
-      <div class="card">
-        <div id="community-members"></div>
-      </div>
-    </div>
-
-    <!-- Files Tab -->
-    <div id="files-content" style="display: none;">
-      <div class="card">
-        <div id="upload-file-section" style="display: none; margin-bottom: 1rem;">
-          <label class="btn btn-primary btn-sm" style="cursor: pointer;">
-            📤 Upload File
-            <input type="file" id="file-upload" style="display: none;">
-          </label>
-        </div>
-        <div id="community-files"></div>
-      </div>
-    </div>
+    </aside>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script>
-    InnovateAPI.requireAuth();
-    InnovateAPI.initializePage();
-
-    const communityId = window.location.pathname.split('/').pop();
-    // Initialize Socket.IO - uses global socket from app.js
-    InnovateAPI.initSocket();
-    // Get socket reference without redeclaring
-    const socketInstance = InnovateAPI.getSocket();
-    let currentTab = 'posts';
-    let isMember = false;
-
-    // Define all functions before using them
-    function toggleMobileMenu() {
-      document.getElementById('navbarMenu').classList.toggle('active');
-    }
-
-    async function loadCommunity() {
-      try {
-        const data = await InnovateAPI.apiRequest(`/communities/${communityId}`);
-        const community = data.community;
-
-        document.getElementById('community-name').textContent = community.name;
-        if (community.team_name) {
-          document.getElementById('community-team').textContent = '🏆 ' + community.team_name;
-        }
-        document.getElementById('community-description').textContent = community.description || 'No description';
-        document.getElementById('member-count').textContent = community.member_count;
-
-        if (community.banner_image) {
-          document.getElementById('community-banner').innerHTML = `
-            <img src="${community.banner_image}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 1rem;" alt="${community.name}">
-          `;
-        }
-
-        isMember = community.is_member > 0;
-
-        // Actions
-        const actionsContainer = document.getElementById('community-actions');
-        if (isMember) {
-          actionsContainer.innerHTML = '<button class="btn btn-secondary" onclick="leaveCommunity()">Leave Community</button>';
-          document.getElementById('create-post-section').style.display = 'block';
-          document.getElementById('upload-file-section').style.display = 'block';
-          socketInstance.emit('community:join', communityId);
-        } else {
-          actionsContainer.innerHTML = '<button class="btn btn-primary" onclick="joinCommunity()">Join Community</button>';
-        }
-      } catch (error) {
-        InnovateAPI.showAlert(error.message, 'error');
-      }
-    }
-
-    function switchTab(tab) {
-      currentTab = tab;
-      
-      document.getElementById('posts-content').style.display = tab === 'posts' ? 'block' : 'none';
-      document.getElementById('groups-content').style.display = tab === 'groups' ? 'block' : 'none';
-      document.getElementById('chat-content').style.display = tab === 'chat' ? 'block' : 'none';
-      document.getElementById('members-content').style.display = tab === 'members' ? 'block' : 'none';
-      document.getElementById('files-content').style.display = tab === 'files' ? 'block' : 'none';
-
-      document.getElementById('posts-tab').className = tab === 'posts' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-      document.getElementById('groups-tab').className = tab === 'groups' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-      document.getElementById('chat-tab').className = tab === 'chat' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-      document.getElementById('members-tab').className = tab === 'members' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-      document.getElementById('files-tab').className = tab === 'files' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
-
-      if (tab === 'posts') loadPosts();
-      else if (tab === 'groups') loadGroups();
-      else if (tab === 'chat') loadChat();
-      else if (tab === 'members') loadMembers();
-      else if (tab === 'files') loadFiles();
-    }
-
-    async function loadPosts() {
-      try {
-        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/posts`);
-        const container = document.getElementById('community-posts');
-        container.innerHTML = '';
-
-        if (data.posts.length === 0) {
-          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No posts yet</div>';
-          return;
-        }
-
-        data.posts.forEach(post => {
-          const div = document.createElement('div');
-          div.className = 'post';
-          div.innerHTML = `
-            <div class="post-header">
-              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" class="post-avatar" alt="${post.username}">
-              <div class="post-author">
-                <div class="post-author-name">${post.username}</div>
-                <div class="post-timestamp">${InnovateAPI.formatDate(post.created_at)}</div>
-              </div>
-            </div>
-            <div class="post-content">${post.content || ''}</div>
-            ${post.images && post.images.length > 0 ? `
-              <div class="post-images">
-                ${post.images.map(img => `<img src="${img}" class="post-image" alt="Post">`).join('')}
-              </div>
-            ` : ''}
-          `;
-          container.appendChild(div);
-        });
+    // Ensure auth and socket are ready before the workspace bootstraps.
+    window.InnovateAPI?.requireAuth?.();
+    window.InnovateAPI?.initSocket?.();
+  </script>
+  <script src="/js/community-workspace.js"></script>
+</body>
+</html>
+<!--
       } catch (error) {
         console.error('Error loading posts:', error);
       }
@@ -519,3 +469,5 @@
   </script>
 </body>
 </html>
+
+-->

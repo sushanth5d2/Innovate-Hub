@@ -163,6 +163,10 @@ setInterval(() => {
 // Socket.IO connection handling
 const connectedUsers = new Map();
 
+// Group call participation (WebRTC signaling)
+// Map socket.id -> { groupId, userId, displayName }
+const groupCallPresence = new Map();
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
@@ -182,6 +186,17 @@ io.on('connection', (socket) => {
   // Join community room
   socket.on('community:join', (communityId) => {
     socket.join(`community_${communityId}`);
+  });
+
+  // Join a community-group room for realtime posts
+  socket.on('community-group:join', (groupId) => {
+    if (!groupId) return;
+    socket.join(`community_group_${groupId}`);
+  });
+
+  socket.on('community-group:leave', (groupId) => {
+    if (!groupId) return;
+    socket.leave(`community_group_${groupId}`);
   });
 
   // Leave community room
@@ -284,8 +299,75 @@ io.on('connection', (socket) => {
     io.to(`user_${to}`).emit('call:ended');
   });
 
+  // === Group Call (WebRTC mesh) ===
+  // Client joins a group call room to exchange offers/answers/ICE.
+  socket.on('group-call:join', (data) => {
+    try {
+      const { groupId, userId, displayName } = data || {};
+      if (!groupId) return;
+
+      const room = `group_call_${groupId}`;
+      socket.join(room);
+      groupCallPresence.set(socket.id, { groupId: String(groupId), userId, displayName });
+
+      // List current peers in the room (excluding this socket)
+      const peers = [];
+      const roomSockets = io.sockets.adapter.rooms.get(room);
+      if (roomSockets) {
+        for (const sid of roomSockets) {
+          if (sid === socket.id) continue;
+          const p = groupCallPresence.get(sid);
+          peers.push({
+            socketId: sid,
+            userId: p?.userId,
+            displayName: p?.displayName
+          });
+        }
+      }
+
+      socket.emit('group-call:peers', { groupId, peers });
+      socket.to(room).emit('group-call:peer-joined', {
+        groupId,
+        peer: { socketId: socket.id, userId, displayName }
+      });
+    } catch (e) {
+      console.error('group-call:join error', e);
+    }
+  });
+
+  socket.on('group-call:signal', (data) => {
+    try {
+      const { groupId, to, payload } = data || {};
+      if (!groupId || !to || !payload) return;
+      io.to(to).emit('group-call:signal', { groupId, from: socket.id, payload });
+    } catch (e) {
+      console.error('group-call:signal error', e);
+    }
+  });
+
+  socket.on('group-call:leave', (data) => {
+    try {
+      const { groupId } = data || {};
+      if (!groupId) return;
+      const room = `group_call_${groupId}`;
+      socket.leave(room);
+      groupCallPresence.delete(socket.id);
+      socket.to(room).emit('group-call:peer-left', { groupId, socketId: socket.id });
+    } catch (e) {
+      console.error('group-call:leave error', e);
+    }
+  });
+
   // Disconnect
   socket.on('disconnect', () => {
+    // If user was in a group call, notify room
+    const presence = groupCallPresence.get(socket.id);
+    if (presence?.groupId) {
+      const room = `group_call_${presence.groupId}`;
+      socket.to(room).emit('group-call:peer-left', { groupId: presence.groupId, socketId: socket.id });
+      groupCallPresence.delete(socket.id);
+    }
+
     if (socket.userId) {
       connectedUsers.delete(socket.userId);
       io.emit('user:offline', socket.userId);

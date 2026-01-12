@@ -1,0 +1,466 @@
+-- Innovate Hub - PostgreSQL schema (prod)
+-- Generated for prod deployments; dev uses SQLite.
+
+BEGIN;
+
+-- Users
+CREATE TABLE IF NOT EXISTS users (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  fullname TEXT,
+  bio TEXT,
+  skills TEXT,
+  interests TEXT,
+  favorite_teams TEXT,
+  profile_picture TEXT,
+  date_of_birth DATE,
+  is_online BOOLEAN DEFAULT FALSE,
+  last_seen TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Posts
+CREATE TABLE IF NOT EXISTS posts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,
+  images TEXT,
+  files TEXT,
+  video_url TEXT,
+  is_story BOOLEAN DEFAULT FALSE,
+  is_archived BOOLEAN DEFAULT FALSE,
+  scheduled_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  likes_count INTEGER DEFAULT 0,
+  comments_count INTEGER DEFAULT 0,
+  hashtags TEXT,
+  enable_contact BOOLEAN DEFAULT FALSE,
+  enable_interested BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Polls
+CREATE TABLE IF NOT EXISTS polls (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  options TEXT NOT NULL,
+  votes TEXT,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Post likes
+CREATE TABLE IF NOT EXISTS post_likes (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(post_id, user_id)
+);
+
+-- Post comments
+CREATE TABLE IF NOT EXISTS post_comments (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Post interactions
+CREATE TABLE IF NOT EXISTS post_interactions (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Saved posts
+CREATE TABLE IF NOT EXISTS saved_posts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, post_id)
+);
+
+-- Messages (DMs)
+CREATE TABLE IF NOT EXISTS messages (
+  id BIGSERIAL PRIMARY KEY,
+  sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  receiver_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,
+  type TEXT DEFAULT 'text',
+  attachments TEXT,
+  original_filename TEXT,
+  timer INTEGER,
+  expires_at TIMESTAMPTZ,
+  is_read BOOLEAN DEFAULT FALSE,
+  is_deleted_by_sender BOOLEAN DEFAULT FALSE,
+  is_deleted_by_receiver BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Communities
+CREATE TABLE IF NOT EXISTS communities (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  description TEXT,
+  team_name TEXT,
+  banner_image TEXT,
+  is_public BOOLEAN DEFAULT TRUE,
+  admin_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_members (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member',
+  joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(community_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS community_posts (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,
+  images TEXT,
+  files TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_chat (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message TEXT,
+  attachments TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_files (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  filepath TEXT NOT NULL,
+  filesize BIGINT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Community groups (within communities)
+CREATE TABLE IF NOT EXISTS community_groups (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_group_members (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member',
+  joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS community_group_posts (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,
+  attachments TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_group_files (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  filepath TEXT NOT NULL,
+  file_type TEXT NOT NULL,
+  filesize BIGINT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_group_links (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  title TEXT,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Announcements
+CREATE TABLE IF NOT EXISTS community_announcements (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  body TEXT,
+  is_pinned BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Group tasks (AI To-Do)
+CREATE TABLE IF NOT EXISTS community_group_tasks (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  priority TEXT DEFAULT 'medium',
+  status TEXT DEFAULT 'todo',
+  due_date TIMESTAMPTZ,
+  assignees TEXT,
+  progress INTEGER DEFAULT 0,
+  source_type TEXT,
+  source_ref TEXT,
+  created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Group notes + versions
+CREATE TABLE IF NOT EXISTS community_group_notes (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES community_groups(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content_md TEXT,
+  created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS community_group_note_versions (
+  id BIGSERIAL PRIMARY KEY,
+  note_id BIGINT NOT NULL REFERENCES community_group_notes(id) ON DELETE CASCADE,
+  content_md TEXT,
+  created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Community GitHub integration (optional)
+CREATE TABLE IF NOT EXISTS community_github_integrations (
+  id BIGSERIAL PRIMARY KEY,
+  community_id BIGINT NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+  created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  github_org TEXT,
+  github_repo_full_name TEXT,
+  github_access_token TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(community_id)
+);
+
+-- Group conversations (DM groups)
+CREATE TABLE IF NOT EXISTS group_conversations (
+  id BIGSERIAL PRIMARY KEY,
+  creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES group_conversations(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member',
+  joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS group_messages (
+  id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES group_conversations(id) ON DELETE CASCADE,
+  sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT,
+  type TEXT DEFAULT 'text',
+  attachments TEXT,
+  timer INTEGER,
+  expires_at TIMESTAMPTZ,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Events
+CREATE TABLE IF NOT EXISTS events (
+  id BIGSERIAL PRIMARY KEY,
+  creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  event_date TIMESTAMPTZ NOT NULL,
+  location TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS event_attendees (
+  id BIGSERIAL PRIMARY KEY,
+  event_id BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(event_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS crosspath_events (
+  id BIGSERIAL PRIMARY KEY,
+  event_id BIGINT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user1_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user2_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  content TEXT NOT NULL,
+  related_id BIGINT,
+  created_by BIGINT,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Social graph
+CREATE TABLE IF NOT EXISTS followers (
+  id BIGSERIAL PRIMARY KEY,
+  follower_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  following_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(follower_id, following_id)
+);
+
+CREATE TABLE IF NOT EXISTS blocked_users (
+  id BIGSERIAL PRIMARY KEY,
+  blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(blocker_id, blocked_id)
+);
+
+-- Gentle reminders
+CREATE TABLE IF NOT EXISTS gentle_reminders (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  reminder_date TIMESTAMPTZ NOT NULL,
+  message TEXT,
+  is_sent BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Instant meetings
+CREATE TABLE IF NOT EXISTS instant_meetings (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL,
+  meeting_url TEXT,
+  meeting_date TIMESTAMPTZ NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Donations
+CREATE TABLE IF NOT EXISTS donations (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  images TEXT,
+  address TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  status TEXT DEFAULT 'available',
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS donation_assigns (
+  id BIGSERIAL PRIMARY KEY,
+  donation_id BIGINT NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  completed BOOLEAN DEFAULT FALSE,
+  completion_photos TEXT,
+  UNIQUE(donation_id, user_id)
+);
+
+-- Personal todos (existing feature)
+CREATE TABLE IF NOT EXISTS todos (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  items TEXT NOT NULL,
+  tags TEXT,
+  priority TEXT DEFAULT 'medium',
+  due_date TIMESTAMPTZ,
+  completed BOOLEAN DEFAULT FALSE,
+  image_source TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Hashtags + story views + poll votes + post actions
+CREATE TABLE IF NOT EXISTS hashtags (
+  id BIGSERIAL PRIMARY KEY,
+  tag TEXT UNIQUE NOT NULL,
+  usage_count INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS story_views (
+  id BIGSERIAL PRIMARY KEY,
+  story_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(story_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS post_actions (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(post_id, user_id, action_type)
+);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+  id BIGSERIAL PRIMARY KEY,
+  poll_id BIGINT NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  option_index INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(poll_id, user_id)
+);
+
+COMMIT;

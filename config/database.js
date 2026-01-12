@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const { Pool } = require('pg');
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
@@ -317,6 +318,90 @@ const createTables = () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Community announcements (Teams-like channel announcements)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        is_pinned BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Group-level AI tasks / To-Do board
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'todo',
+        due_date DATETIME,
+        assignees TEXT,
+        progress INTEGER DEFAULT 0,
+        source_type TEXT,
+        source_ref TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Group notes (markdown) + version history
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content_md TEXT,
+        created_by INTEGER NOT NULL,
+        updated_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_note_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER NOT NULL,
+        content_md TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (note_id) REFERENCES community_group_notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Optional: GitHub integration per community (OAuth token + linked repo/org)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_github_integrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        github_org TEXT,
+        github_repo_full_name TEXT,
+        github_access_token TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(community_id)
       )
     `);
 
@@ -701,14 +786,105 @@ const migrateDatabase = () => {
         console.error('Error adding original_filename column:', err);
       }
     });
+
+    // New collab tables (safe for existing DBs)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        author_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        is_pinned BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'todo',
+        due_date DATETIME,
+        assignees TEXT,
+        progress INTEGER DEFAULT 0,
+        source_type TEXT,
+        source_ref TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content_md TEXT,
+        created_by INTEGER NOT NULL,
+        updated_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_group_note_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER NOT NULL,
+        content_md TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (note_id) REFERENCES community_group_notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_github_integrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        created_by INTEGER NOT NULL,
+        github_org TEXT,
+        github_repo_full_name TEXT,
+        github_access_token TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(community_id)
+      )
+    `);
   });
 };
 
 // Create tables for PostgreSQL
 const createTablesPostgres = async () => {
-  // PostgreSQL table creation would go here
-  // Similar structure but with PostgreSQL syntax
-  console.log('PostgreSQL tables would be created here');
+  try {
+    const schemaPath = path.resolve(__dirname, '../db/postgres-schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      console.warn('PostgreSQL schema file not found:', schemaPath);
+      return;
+    }
+
+    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+    await db.query(schemaSql);
+    console.log('PostgreSQL tables ensured');
+  } catch (error) {
+    console.error('Failed to initialize PostgreSQL schema:', error);
+  }
 };
 
 module.exports = {

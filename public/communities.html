@@ -153,9 +153,7 @@
       }
     }
   </script>
-      </svg>
-    </a>
-  </nav>
+
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/instagram-theme.js"></script>
@@ -240,8 +238,12 @@
       const isJoined = button.classList.contains('joined');
 
       try {
-        const response = await fetch(`/api/communities/${communityId}/join`, {
-          method: isJoined ? 'DELETE' : 'POST',
+        const endpoint = isJoined
+          ? `/api/communities/${communityId}/leave`
+          : `/api/communities/${communityId}/join`;
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
