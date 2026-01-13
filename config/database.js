@@ -330,6 +330,7 @@ const createTables = () => {
         title TEXT NOT NULL,
         body TEXT,
         is_pinned BOOLEAN DEFAULT 0,
+        attachments TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
@@ -787,6 +788,15 @@ const migrateDatabase = () => {
       }
     });
 
+    // Add attachments column to community_announcements if not exists
+    db.run(`
+      ALTER TABLE community_announcements ADD COLUMN attachments TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding attachments column:', err);
+      }
+    });
+
     // New collab tables (safe for existing DBs)
     db.run(`
       CREATE TABLE IF NOT EXISTS community_announcements (
@@ -796,6 +806,7 @@ const migrateDatabase = () => {
         title TEXT NOT NULL,
         body TEXT,
         is_pinned BOOLEAN DEFAULT 0,
+        attachments TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,

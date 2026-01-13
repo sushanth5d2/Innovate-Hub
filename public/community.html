@@ -840,8 +840,8 @@
       </div>
 
       <div class="left-footer" id="leftFooter">
-        <button class="btn btn-primary" style="width: 100%;" onclick="showCreateGroupModal()" id="leftFooterBtn">
-          <i class="fas fa-plus"></i> Create Group
+        <button class="btn btn-primary" style="width: 100%;" onclick="showCreateAnnouncementModal()" id="leftFooterBtn">
+          <i class="fas fa-plus"></i> Create Announcement
         </button>
       </div>
     </div>
@@ -857,8 +857,8 @@
             <i class="fas fa-bullhorn"></i>
           </div>
           <div>
-            <h2 class="header-title" id="centerTitle">Select a group</h2>
-            <p class="header-subtitle" id="centerSubtitle">Choose from the left sidebar</p>
+            <h2 class="header-title" id="centerTitle">Announcements</h2>
+            <p class="header-subtitle" id="centerSubtitle">Community updates and news</p>
           </div>
         </div>
         <div id="centerActions"></div>
@@ -987,12 +987,13 @@
       state.communityId = urlParams.get('id') || window.location.pathname.split('/').pop();
 
       await Promise.all([
-        loadCommunityData(),
-        loadGroups()
+        loadCommunityData()
       ]);
 
       // Show announcements by default (Announcements tab is active)
-      loadAnnouncements();
+      await loadAnnouncements();
+      // Load groups in background but don't display them
+      loadGroups();
 
       setupSocketListeners();
       setupResponsive();
@@ -1035,7 +1036,6 @@
         }
       } catch (error) {
         console.error('Error loading community:', error);
-        InnovateAPI.showAlert('Error loading community', 'error');
       }
     }
 
@@ -1065,14 +1065,33 @@
 
     // ==================== UI RENDERING ====================
     function renderGroupsList() {
+      // Only render if groups tab is active
+      const groupsTab = document.querySelector('.left-tab[onclick*="groups"]');
+      if (!groupsTab || !groupsTab.classList.contains('active')) {
+        console.log('Groups loaded but not displayed (wrong tab active)');
+        return;
+      }
+      
       const content = document.getElementById('leftContent');
+      const centerContent = document.getElementById('centerContent');
+      
+      // Show default center content
+      centerContent.innerHTML = `
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
+          <div class="empty-icon">👥</div>
+          <div class="empty-title">Select a group</div>
+          <div class="empty-text">Choose from the left sidebar</div>
+        </div>
+      `;
       
       if (state.groups.length === 0) {
         content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">👥</div>
-            <div class="empty-title">No groups yet</div>
-            <div class="empty-text">Create your first group to get started</div>
+          <div class="empty-state" style="padding: 60px 20px; text-align: center;">
+            <div style="width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
+              <i class="fas fa-users"></i>
+            </div>
+            <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">No groups yet</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 24px;">Create your first group to get started</div>
           </div>
         `;
         return;
@@ -1093,44 +1112,115 @@
       const content = document.getElementById('leftContent');
       const centerContent = document.getElementById('centerContent');
       
-      if (state.groups.length === 0) {
-        content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📁</div>
-            <div class="empty-title">No folders yet</div>
-            <div class="empty-text">Create groups first to see their folders here</div>
-          </div>
-        `;
-        centerContent.innerHTML = `
-          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <div class="empty-icon">📁</div>
-            <div class="empty-title">Welcome to Folders</div>
-            <div class="empty-text">Each group has its own folder for organizing files and resources</div>
-          </div>
-        `;
-        return;
-      }
-
-      // Show folders organized by group names
-      content.innerHTML = state.groups.map(group => `
-        <div class="group-item" onclick="openGroupFolder(${group.id})">
-          <div class="group-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <i class="fas fa-folder"></i>
+      // Always show Announcements folder first
+      let foldersHTML = `
+        <div class="group-item" onclick="openAnnouncementsFolder()">
+          <div class="group-avatar" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <i class="fas fa-bullhorn"></i>
           </div>
           <div class="group-info">
-            <div class="group-name">${group.name}</div>
-            <div class="group-desc">Group folder · Files & resources</div>
+            <div class="group-name">Announcements</div>
+            <div class="group-desc">Announcement files & attachments</div>
           </div>
           <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text); font-size: 14px;"></i>
         </div>
-      `).join('');
+      `;
+      
+      // Add group folders
+      if (state.groups.length > 0) {
+        foldersHTML += state.groups.map(group => `
+          <div class="group-item" onclick="openGroupFolder(${group.id})">
+            <div class="group-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+              <i class="fas fa-folder"></i>
+            </div>
+            <div class="group-info">
+              <div class="group-name">${group.name}</div>
+              <div class="group-desc">Group folder · Files & resources</div>
+            </div>
+            <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text); font-size: 14px;"></i>
+          </div>
+        `).join('');
+      }
+      
+      content.innerHTML = foldersHTML;
 
       // Show empty state in center
       centerContent.innerHTML = `
         <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
           <div class="empty-icon">📂</div>
           <div class="empty-title">Select a folder</div>
-          <div class="empty-text">Click on a group folder from the left to view its contents</div>
+          <div class="empty-text">Click on a folder from the left to view its contents</div>
+        </div>
+      `;
+    }
+    
+    function openAnnouncementsFolder() {
+      const centerContent = document.getElementById('centerContent');
+      
+      centerContent.innerHTML = `
+        <div style="padding: 24px; max-width: 900px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
+            <div style="width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <div style="flex: 1;">
+              <h2 style="margin: 0; font-size: 22px;">Announcements</h2>
+              <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
+                All announcement attachments and files
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="switchLeftTab('announcements')">
+              <i class="fas fa-arrow-right"></i> View Announcements
+            </button>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+            <!-- Images Section -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+                <i class="fas fa-image"></i>
+              </div>
+              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Images</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Photos from announcements</p>
+            </div>
+
+            <!-- Videos Section -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+                <i class="fas fa-video"></i>
+              </div>
+              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Videos</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Video attachments</p>
+            </div>
+
+            <!-- Documents Section -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Documents</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">PDFs, docs, and files</p>
+            </div>
+
+            <!-- Links Section -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+                <i class="fas fa-link"></i>
+              </div>
+              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Links</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Shared links from announcements</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; padding: 20px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px;">
+            <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text);">
+              <i class="fas fa-info-circle"></i> About Announcements Folder
+            </h3>
+            <p style="margin: 0; font-size: 13px; color: var(--ig-secondary-text); line-height: 1.6;">
+              All files, images, videos, and links shared in announcements are organized here for easy access.
+              Click on any category above to view the files.
+            </p>
+          </div>
         </div>
       `;
     }
@@ -1290,17 +1380,21 @@
       
       if (announcements.length === 0) {
         content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📢</div>
-            <div class="empty-title">No announcements</div>
-            <div class="empty-text">Admins can post important updates here</div>
+          <div class="empty-state" style="padding: 60px 20px; text-align: center;">
+            <div style="width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">No announcements</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Admins can post important updates here</div>
           </div>
         `;
         centerContent.innerHTML = `
-          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <div class="empty-icon">📢</div>
-            <div class="empty-title">Welcome to Announcements</div>
-            <div class="empty-text">Create your first announcement with messages, attachments, links, and location</div>
+          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px;">
+            <div style="width: 96px; height: 96px; margin-bottom: 24px; border-radius: 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <div style="font-size: 24px; font-weight: 700; margin-bottom: 12px; color: var(--ig-primary-text);">Welcome to Announcements</div>
+            <div style="font-size: 15px; color: var(--ig-secondary-text); max-width: 500px; line-height: 1.6;">Create your first announcement with messages, attachments, links, and location</div>
           </div>
         `;
         return;
@@ -1350,28 +1444,30 @@
           centerContent.innerHTML = `
             <div style="padding: 24px; max-width: 800px; margin: 0 auto;">
               <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-                <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
+                <div style="width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
                   <i class="fas fa-bullhorn"></i>
                 </div>
                 <div style="flex: 1;">
-                  <h2 style="margin: 0; font-size: 20px;">${ann.title}</h2>
-                  <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
-                    ${ann.author_username} · ${InnovateAPI.formatDate(ann.created_at)}
-                    ${ann.is_pinned ? ' · <i class="fas fa-thumbtack"></i> Pinned' : ''}
+                  <h2 style="margin: 0; font-size: 22px; font-weight: 700;">${ann.title}</h2>
+                  <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span><i class="fas fa-user"></i> ${ann.author_username}</span>
+                    <span>•</span>
+                    <span><i class="far fa-clock"></i> ${InnovateAPI.formatDate(ann.created_at)}</span>
+                    ${ann.is_pinned ? '<span>•</span><span style="color: var(--ig-blue);"><i class="fas fa-thumbtack"></i> Pinned</span>' : ''}
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                  <button class="btn btn-secondary" onclick="pinAnnouncement(${ann.id}, ${!ann.is_pinned})">
+                  <button onclick="pinAnnouncement(${ann.id}, ${!ann.is_pinned})" style="padding: 10px 16px; background: ${ann.is_pinned ? 'var(--ig-secondary-background)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: ${ann.is_pinned ? 'var(--ig-primary-text)' : 'white'}; border: ${ann.is_pinned ? '2px solid var(--ig-border)' : 'none'}; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     <i class="fas fa-thumbtack"></i> ${ann.is_pinned ? 'Unpin' : 'Pin'}
                   </button>
-                  <button class="btn btn-danger" onclick="deleteAnnouncement(${ann.id})">
+                  <button onclick="deleteAnnouncement(${ann.id})" style="padding: 10px 16px; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(220, 53, 69, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(220, 53, 69, 0.3)'">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
               </div>
               
-              <div style="background: var(--ig-secondary-background); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <p style="white-space: pre-wrap; line-height: 1.6; margin: 0;">${ann.body || ann.content || 'No content'}</p>
+              <div style="background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
+                <p style="white-space: pre-wrap; line-height: 1.8; margin: 0; font-size: 15px;">${ann.body || ann.content || 'No content'}</p>
               </div>
               
               ${attachments.length > 0 ? `
@@ -1379,16 +1475,75 @@
                   <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
                     <i class="fas fa-paperclip"></i> Attachments (${attachments.length})
                   </h3>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
-                    ${attachments.map(file => `
-                      <a href="${file.url}" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; text-decoration: none; color: inherit; border: 1px solid var(--ig-border);">
-                        <i class="fas fa-file" style="font-size: 24px; color: var(--ig-blue);"></i>
-                        <div style="flex: 1; min-width: 0;">
-                          <div style="font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</div>
-                          <div style="font-size: 12px; color: var(--ig-secondary-text);">${file.size || 'Unknown size'}</div>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                    ${attachments.map(file => {
+                      // Extract file extension from name
+                      const extension = file.name.split('.').pop().toLowerCase();
+                      const mimeType = file.type || '';
+                      
+                      // Fix URL if it's relative
+                      const fileUrl = file.url.startsWith('http') ? file.url : window.location.origin + file.url;
+                      
+                      // Determine file type
+                      const isImage = mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension);
+                      const isVideo = mimeType.startsWith('video/') || ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v'].includes(extension);
+                      const isPDF = mimeType === 'application/pdf' || extension === 'pdf';
+                      const isDoc = ['doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp'].includes(extension) || 
+                                    mimeType.includes('document') || mimeType.includes('spreadsheet') || mimeType.includes('presentation');
+                      
+                      return `
+                        <div style="background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden; border: 1px solid var(--ig-border); transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                          ${isImage ? `
+                            <div style="width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; cursor: pointer; position: relative;" onclick="window.open('${fileUrl}', '_blank')">
+                              <img src="${fileUrl}" alt="${file.name}" style="width: 100%; height: 100%; object-fit: contain; display: block;" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#888;\\'><i class=\\'fas fa-image\\' style=\\'font-size:48px;\\'></i></div>'">
+                            </div>
+                          ` : isVideo ? `
+                            <div style="width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden;">
+                              <video controls style="width: 100%; height: 100%; object-fit: contain; display: block;" preload="metadata">
+                                <source src="${fileUrl}#t=0.1" type="${mimeType || 'video/mp4'}">
+                                Your browser does not support video playback.
+                              </video>
+                            </div>
+                          ` : isPDF ? `
+                            <div style="width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; gap: 12px;" onclick="window.open('${fileUrl}', '_blank')">
+                              <i class="fas fa-file-pdf" style="font-size: 72px; color: rgba(255,255,255,0.95);"></i>
+                              <span style="color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 600;">Click to view PDF</span>
+                            </div>
+                          ` : isDoc ? `
+                            <div style="width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, ${extension.includes('xls') || extension.includes('ods') ? '#217346 0%, #4caf50 100%' : extension.includes('ppt') || extension.includes('odp') ? '#d24726 0%, #ff6b35 100%' : '#2b579a 0%, #4285f4 100%'}); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; gap: 12px;" onclick="window.open('${fileUrl}', '_blank')">
+                              <i class="fas fa-file-${extension.includes('xls') || extension.includes('ods') ? 'excel' : extension.includes('ppt') || extension.includes('odp') ? 'powerpoint' : extension.includes('txt') ? 'alt' : 'word'}" style="font-size: 72px; color: rgba(255,255,255,0.95);"></i>
+                              <span style="color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 600;">Click to open document</span>
+                            </div>
+                          ` : `
+                            <div style="width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, #434343 0%, #000000 100%); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; gap: 12px;" onclick="window.open('${fileUrl}', '_blank')">
+                              <i class="fas fa-file" style="font-size: 72px; color: rgba(255,255,255,0.95);"></i>
+                              <span style="color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 600;">Click to download</span>
+                            </div>
+                          `}
+                          
+                          <div style="padding: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                              <i class="fas fa-${isImage ? 'image' : isVideo ? 'video' : isPDF ? 'file-pdf' : isDoc ? 'file-alt' : 'file'}" style="color: var(--ig-blue); font-size: 16px;"></i>
+                              <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ig-primary-text);">${file.name}</div>
+                                <div style="font-size: 12px; color: var(--ig-secondary-text);">${file.size || 'Unknown size'}</div>
+                              </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 8px;">
+                              ${isImage || isVideo ? `
+                                <button onclick="event.stopPropagation(); window.open('${fileUrl}', '_blank')" style="flex: 1; padding: 8px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                                  <i class="fas fa-expand"></i> View
+                                </button>
+                              ` : ''}
+                              <a href="${fileUrl}" download="${file.name}" style="flex: 1; padding: 8px 12px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                                <i class="fas fa-download"></i> Save
+                              </a>
+                            </div>
+                          </div>
                         </div>
-                      </a>
-                    `).join('')}
+                      `;
+                    }).join('')}
                   </div>
                 </div>
               ` : ''}
@@ -1436,11 +1591,16 @@
 
     // ==================== TAB SWITCHING ====================
     function switchLeftTab(tab) {
+      // Remove active class from all tabs
       document.querySelectorAll('.left-tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      
+      // Add active class to the clicked tab
+      const clickedTab = event?.target || document.querySelector(`.left-tab[onclick*="'${tab}'"]`);
+      if (clickedTab) clickedTab.classList.add('active');
 
       const leftFooterBtn = document.getElementById('leftFooterBtn');
       const leftFooter = document.getElementById('leftFooter');
+      const centerFooter = document.getElementById('centerFooter');
       const centerTabs = document.getElementById('centerTabs');
       const centerTitle = document.getElementById('centerTitle');
       const centerSubtitle = document.getElementById('centerSubtitle');
@@ -1455,48 +1615,68 @@
         centerTitle.textContent = 'Announcements';
         centerSubtitle.textContent = 'Community updates and news';
         
-        // Load announcements
-        loadAnnouncements();
-        
-        // Show Create Announcement button
+        // Show Create Announcement button in left footer
         leftFooter.style.display = 'block';
         leftFooterBtn.innerHTML = '<i class="fas fa-plus"></i> Create Announcement';
         leftFooterBtn.onclick = showCreateAnnouncementModal;
+        
+        // Load announcements (will also set centerFooter)
+        loadAnnouncements();
       } else if (tab === 'groups') {
-        // Groups tab (previously Community)
+        // Groups tab
         centerIcon.innerHTML = '<i class="fas fa-users"></i>';
         centerTitle.textContent = 'Select a group';
         centerSubtitle.textContent = 'Choose from the left sidebar';
         
-        // Load groups
-        renderGroupsList();
-        
-        // Show Create Group button
+        // Show Create Group button in left footer
         leftFooter.style.display = 'block';
         leftFooterBtn.innerHTML = '<i class="fas fa-plus"></i> Create Group';
         leftFooterBtn.onclick = showCreateGroupModal;
+        
+        // Show Create Group button in center footer
+        centerFooter.innerHTML = `
+          <button class="btn btn-primary" style="width: 100%;" onclick="showCreateGroupModal()">
+            <i class="fas fa-plus"></i> Create Group
+          </button>
+        `;
+        centerFooter.style.display = 'block';
+        
+        // Load groups
+        renderGroupsList();
       } else if (tab === 'folders') {
         // Update center header
         centerIcon.innerHTML = '<i class="fas fa-folder"></i>';
         centerTitle.textContent = 'Folders';
         centerSubtitle.textContent = 'Organized by groups';
         
+        // Show Create Group button in left footer (folders are created with groups)
+        leftFooter.style.display = 'block';
+        leftFooterBtn.innerHTML = '<i class="fas fa-plus"></i> Create Group';
+        leftFooterBtn.onclick = showCreateGroupModal;
+        
+        // Show Create Group button in center footer too
+        centerFooter.innerHTML = `
+          <button class="btn btn-primary" style="width: 100%;" onclick="showCreateGroupModal()">
+            <i class="fas fa-plus"></i> Create Group
+          </button>
+        `;
+        centerFooter.style.display = 'block';
+        
         // Load folders
         renderFoldersList();
-        
-        // Hide left footer button
-        leftFooter.style.display = 'none';
       } else if (tab === 'github') {
         // GitHub Integration tab
         centerIcon.innerHTML = '<i class="fab fa-github"></i>';
         centerTitle.textContent = 'GitHub Integration';
         centerSubtitle.textContent = 'Connect your repositories';
         
+        // Hide both footers (GitHub has its own connect button in content)
+        leftFooter.style.display = 'none';
+        centerFooter.style.display = 'none';
+        centerFooter.innerHTML = '';
+        
         // Load GitHub view
         renderGitHubView();
-        
-        // Hide left footer button
-        leftFooter.style.display = 'none';
       }
     }
 
@@ -1592,10 +1772,12 @@
 
       // Load messages (implement API call)
       content.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">💬</div>
-          <div class="empty-title">No messages yet</div>
-          <div class="empty-text">Start the conversation!</div>
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px;">
+          <div style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 20px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
+            <i class="fas fa-comments"></i>
+          </div>
+          <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">No messages yet</div>
+          <div style="font-size: 14px; color: var(--ig-secondary-text);">Start the conversation!</div>
         </div>
       `;
 
@@ -1626,18 +1808,20 @@
       footer.style.display = 'none';
 
       content.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📞</div>
-          <div class="empty-title">Start a call</div>
-          <div class="empty-text">Voice, video, or screen sharing</div>
-          <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center;">
-            <button class="btn btn-primary" onclick="startVoiceCall()">
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px;">
+          <div style="width: 96px; height: 96px; margin-bottom: 24px; border-radius: 24px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+            <i class="fas fa-phone-alt"></i>
+          </div>
+          <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">Start a call</div>
+          <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 32px;">Voice, video, or screen sharing</div>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="startVoiceCall()" style="padding: 14px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">
               <i class="fas fa-phone"></i> Voice Call
             </button>
-            <button class="btn btn-primary" onclick="startVideoCall()">
+            <button onclick="startVideoCall()" style="padding: 14px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(17, 153, 142, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(17, 153, 142, 0.3)'">
               <i class="fas fa-video"></i> Video Call
             </button>
-            <button class="btn btn-primary" onclick="startScreenShare()">
+            <button onclick="startScreenShare()" style="padding: 14px 24px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(250, 112, 154, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(250, 112, 154, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(250, 112, 154, 0.3)'">
               <i class="fas fa-desktop"></i> Screen Share
             </button>
           </div>
@@ -1652,7 +1836,6 @@
         // Implement WebRTC signaling
       } catch (error) {
         console.error('Error starting voice call:', error);
-        InnovateAPI.showAlert('Microphone access denied', 'error');
       }
     }
 
@@ -1663,7 +1846,6 @@
         // Implement WebRTC signaling
       } catch (error) {
         console.error('Error starting video call:', error);
-        InnovateAPI.showAlert('Camera/microphone access denied', 'error');
       }
     }
 
@@ -1959,22 +2141,46 @@
     // ==================== MODALS ====================
     function showCreateGroupModal() {
       showModal(`
-        <div class="modal-header">
-          <div class="modal-title">Create New Group</div>
-          <button class="modal-close" onclick="closeModal()">×</button>
+        <div class="modal-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+              <i class="fas fa-users"></i>
+            </div>
+            <div>
+              <div class="modal-title" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Create New Group</div>
+              <div style="font-size: 13px; opacity: 0.9;">Organize your community members</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
-        <form onsubmit="createGroup(event)">
-          <div class="form-group">
-            <label class="form-label">Group Name *</label>
-            <input type="text" class="form-input" id="groupName" required placeholder="e.g., CSE A, Development Team">
+        <form onsubmit="createGroup(event)" style="padding: 24px;">
+          <!-- Group Name Input -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-tag" style="color: #11998e;"></i>
+              <span>Group Name *</span>
+            </label>
+            <input type="text" id="groupName" placeholder="e.g., CSE A, Development Team, Study Group" required style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 15px; transition: all 0.2s; outline: none;" onfocus="this.style.borderColor='#11998e'" onblur="this.style.borderColor='var(--ig-border)'">
           </div>
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea class="form-textarea" id="groupDescription" placeholder="What is this group about?"></textarea>
+          
+          <!-- Description Textarea -->
+          <div style="margin-bottom: 24px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-align-left" style="color: #11998e;"></i>
+              <span>Description</span>
+              <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
+            </label>
+            <textarea id="groupDescription" rows="4" placeholder="What is this group about? Who should join?" style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical; font-size: 15px; line-height: 1.6; transition: all 0.2s; outline: none; font-family: inherit;" onfocus="this.style.borderColor='#11998e'" onblur="this.style.borderColor='var(--ig-border)'"></textarea>
           </div>
-          <div class="btn-group">
-            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary">Create Group</button>
+          
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid var(--ig-border);">
+            <button type="submit" style="flex: 1; padding: 14px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(17, 153, 142, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(17, 153, 142, 0.3)'">
+              <i class="fas fa-check-circle"></i> Create Group
+            </button>
+            <button type="button" onclick="closeModal()" style="padding: 14px 24px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 2px solid var(--ig-border); border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#f5576c'; this.style.background='rgba(245, 87, 108, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-secondary-background)'">
+              Cancel
+            </button>
           </div>
         </form>
       `);
@@ -2000,67 +2206,111 @@
         }
       } catch (error) {
         console.error('Error creating group:', error);
-        InnovateAPI.showAlert('Error creating group', 'error');
       }
     }
     
     // ==================== ANNOUNCEMENT FUNCTIONS ====================
     function showCreateAnnouncementModal() {
       showModal(`
-        <div class="modal-header">
-          <div class="modal-title"><i class="fas fa-bullhorn"></i> Create Announcement</div>
-          <button class="modal-close" onclick="closeModal()">×</button>
+        <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <div>
+              <div class="modal-title" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Create Announcement</div>
+              <div style="font-size: 13px; opacity: 0.9;">Share important updates with your community</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
-        <form onsubmit="createAnnouncement(event)" style="padding: 20px;">
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Title *</label>
-            <input type="text" id="announcementTitle" placeholder="Important Update" required style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background);">
+        <form onsubmit="createAnnouncement(event)" style="padding: 24px; max-height: 70vh; overflow-y: auto;">
+          <!-- Title Input -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-heading" style="color: #667eea;"></i>
+              <span>Title *</span>
+            </label>
+            <input type="text" id="announcementTitle" placeholder="e.g., Important Update, New Event, Community News" required style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 15px; transition: all 0.2s; outline: none;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='var(--ig-border)'">
           </div>
           
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Message *</label>
-            <textarea id="announcementMessage" rows="6" placeholder="Write your announcement message here..." required style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); resize: vertical;"></textarea>
+          <!-- Message Textarea -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-align-left" style="color: #667eea;"></i>
+              <span>Message *</span>
+            </label>
+            <textarea id="announcementMessage" rows="5" placeholder="Write your announcement message here... Be clear and concise." required style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical; font-size: 15px; line-height: 1.6; transition: all 0.2s; outline: none; font-family: inherit;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='var(--ig-border)'"></textarea>
           </div>
           
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Attachments (optional)</label>
-            <input type="file" id="announcementFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background);">
-            <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
-              <i class="fas fa-info-circle"></i> You can upload images, videos, PDFs, and documents
+          <!-- Attachments -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-paperclip" style="color: #667eea;"></i>
+              <span>Attachments</span>
+              <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
+            </label>
+            <div style="position: relative; border: 2px dashed var(--ig-border); border-radius: 12px; padding: 24px; text-align: center; background: var(--ig-secondary-background); transition: all 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='var(--ig-border)'">
+              <input type="file" id="announcementFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+              <div style="pointer-events: none;">
+                <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <div style="font-weight: 600; margin-bottom: 6px; color: var(--ig-primary-text);">Choose Files or Drag & Drop</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text); display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap;">
+                  <span><i class="fas fa-image"></i> Images</span>
+                  <span>•</span>
+                  <span><i class="fas fa-video"></i> Videos</span>
+                  <span>•</span>
+                  <span><i class="fas fa-file-pdf"></i> PDFs</span>
+                  <span>•</span>
+                  <span><i class="fas fa-file-word"></i> Documents</span>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Links (optional)</label>
-            <div id="announcementLinks"></div>
-            <button type="button" onclick="addAnnouncementLink()" class="btn btn-secondary" style="width: 100%;">
-              <i class="fas fa-plus"></i> Add Link
+          <!-- Links Section -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-link" style="color: #667eea;"></i>
+              <span>Links</span>
+              <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
+            </label>
+            <div id="announcementLinks" style="margin-bottom: 12px;"></div>
+            <button type="button" onclick="addAnnouncementLink()" style="width: 100%; padding: 12px; background: var(--ig-secondary-background); border: 2px dashed var(--ig-border); border-radius: 10px; color: var(--ig-primary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;" onmouseover="this.style.borderColor='#667eea'; this.style.background='rgba(102, 126, 234, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-secondary-background)'">
+              <i class="fas fa-plus-circle"></i> Add Link
             </button>
           </div>
           
-          <div style="margin-bottom: 20px;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="announcementAddLocation" onchange="toggleAnnouncementLocation()">
-              <span style="font-weight: 600;"><i class="fas fa-map-marker-alt"></i> Add Location</span>
-            </label>
-            <div id="announcementLocationInput" style="display: none; margin-top: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; border: 1px solid var(--ig-border);">
-              <input type="text" id="announcementLocationName" placeholder="Location name (e.g., Main Campus)" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-              <input type="text" id="announcementLocationAddress" placeholder="Address" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <input type="number" step="any" id="announcementLocationLat" placeholder="Latitude" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-                <input type="number" step="any" id="announcementLocationLng" placeholder="Longitude" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
+          <!-- Location Section -->
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--ig-secondary-background); border-radius: 12px; border: 1px solid var(--ig-border);">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="announcementAddLocation" onchange="toggleAnnouncementLocation()" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+              <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px;">
+                <i class="fas fa-map-marker-alt" style="color: #f5576c;"></i>
+                <span>Add Location</span>
               </div>
-              <button type="button" onclick="getCurrentLocation()" class="btn btn-secondary" style="width: 100%; margin-top: 8px;">
+            </label>
+            <div id="announcementLocationInput" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ig-border);">
+              <input type="text" id="announcementLocationName" placeholder="Location name (e.g., Main Campus, Conference Room)" style="width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+              <input type="text" id="announcementLocationAddress" placeholder="Full address" style="width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <input type="number" step="any" id="announcementLocationLat" placeholder="Latitude" style="padding: 12px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+                <input type="number" step="any" id="announcementLocationLng" placeholder="Longitude" style="padding: 12px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+              </div>
+              <button type="button" onclick="getCurrentLocation()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(245, 87, 108, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                 <i class="fas fa-crosshairs"></i> Use Current Location
               </button>
             </div>
           </div>
           
-          <div style="display: flex; gap: 12px;">
-            <button type="submit" class="btn btn-primary" style="flex: 1;">
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid var(--ig-border);">
+            <button type="submit" style="flex: 1; padding: 14px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">
               <i class="fas fa-paper-plane"></i> Post Announcement
             </button>
-            <button type="button" onclick="closeModal()" class="btn btn-secondary">
+            <button type="button" onclick="closeModal()" style="padding: 14px 24px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 2px solid var(--ig-border); border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#f5576c'; this.style.background='rgba(245, 87, 108, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-secondary-background)'">
               Cancel
             </button>
           </div>
@@ -2076,15 +2326,20 @@
       
       const linkDiv = document.createElement('div');
       linkDiv.id = linkId;
-      linkDiv.style.cssText = 'margin-bottom: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; border: 1px solid var(--ig-border);';
+      linkDiv.style.cssText = 'margin-bottom: 12px; padding: 16px; background: var(--ig-secondary-background); border-radius: 12px; border: 2px solid var(--ig-border);';
       linkDiv.innerHTML = `
-        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" class="announcement-link-title" placeholder="Link title" style="flex: 1; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-          <button type="button" onclick="document.getElementById('${linkId}').remove()" class="btn btn-danger" style="padding: 8px 12px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+          <div style="flex: 1;">
+            <input type="text" class="announcement-link-title" placeholder="Link title (e.g., Event Page, Registration Form)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+          </div>
+          <button type="button" onclick="document.getElementById('${linkId}').remove()" style="width: 44px; height: 44px; background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
             <i class="fas fa-trash"></i>
           </button>
         </div>
-        <input type="url" class="announcement-link-url" placeholder="https://example.com" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
+        <div style="position: relative;">
+          <i class="fas fa-globe" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text);"></i>
+          <input type="url" class="announcement-link-url" placeholder="https://example.com" style="width: 100%; padding: 12px 12px 12px 40px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none;">
+        </div>
       `;
       container.appendChild(linkDiv);
     }
@@ -2097,7 +2352,7 @@
     
     function getCurrentLocation() {
       if (!navigator.geolocation) {
-        InnovateAPI.showAlert('Geolocation not supported', 'error');
+        console.error('Geolocation not supported');
         return;
       }
       
@@ -2108,7 +2363,7 @@
           InnovateAPI.showAlert('Location detected!', 'success');
         },
         (error) => {
-          InnovateAPI.showAlert('Could not get location: ' + error.message, 'error');
+          console.error('Could not get location:', error.message);
         }
       );
     }
@@ -2180,7 +2435,6 @@
         }
       } catch (error) {
         console.error('Error creating announcement:', error);
-        InnovateAPI.showAlert('Error posting announcement: ' + error.message, 'error');
       }
     }
     
@@ -2199,7 +2453,6 @@
         }
       } catch (error) {
         console.error('Error pinning announcement:', error);
-        InnovateAPI.showAlert('Error updating announcement', 'error');
       }
     }
     
@@ -2216,7 +2469,6 @@
         await loadAnnouncements();
       } catch (error) {
         console.error('Error deleting announcement:', error);
-        InnovateAPI.showAlert('Error deleting announcement', 'error');
       }
     }
 
@@ -2238,26 +2490,47 @@
     // ==================== GITHUB INTEGRATION ====================
     function showGitHubIntegration() {
       showModal(`
-        <div class="modal-header">
-          <div class="modal-title">GitHub Integration</div>
-          <button class="modal-close" onclick="closeModal()">×</button>
+        <div class="modal-header" style="background: linear-gradient(135deg, #24292e 0%, #6e5494 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+              <i class="fab fa-github"></i>
+            </div>
+            <div>
+              <div class="modal-title" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">GitHub Integration</div>
+              <div style="font-size: 13px; opacity: 0.9;">Connect your repository</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
-        <div style="padding: 20px 0;">
+        <div style="padding: 24px;">
           ${state.githubIntegration ? `
-            <div class="github-connected">
-              <div class="github-icon"><i class="fab fa-github"></i></div>
-              <div>
-                <div style="font-weight: 600;">${state.githubIntegration.org || state.githubIntegration.repo}</div>
-                <div style="font-size: 13px; color: var(--ig-secondary-text);">Connected</div>
+            <div style="padding: 20px; background: var(--ig-secondary-background); border-radius: 12px; border: 2px solid #28a745; margin-bottom: 20px;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #24292e 0%, #6e5494 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px;">
+                  <i class="fab fa-github"></i>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: var(--ig-primary-text);">${state.githubIntegration.org || state.githubIntegration.repo}</div>
+                  <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; color: #28a745;">
+                    <i class="fas fa-check-circle"></i>
+                    <span style="font-weight: 600;">Connected</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <button class="btn btn-danger" style="width: 100%;" onclick="disconnectGitHub()">Disconnect</button>
+            <button onclick="disconnectGitHub()" style="width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(220, 53, 69, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(220, 53, 69, 0.3)'">
+              <i class="fas fa-unlink"></i> Disconnect GitHub
+            </button>
           ` : `
             <div style="text-align: center; padding: 40px 20px;">
-              <i class="fab fa-github" style="font-size: 64px; color: var(--ig-secondary-text); margin-bottom: 16px;"></i>
-              <h3 style="margin-bottom: 8px;">Connect GitHub</h3>
-              <p style="color: var(--ig-secondary-text); margin-bottom: 24px;">Link your repository to push code directly from the app</p>
-              <button class="btn btn-primary" onclick="connectGitHub()">
+              <div style="width: 96px; height: 96px; margin: 0 auto 20px; background: linear-gradient(135deg, #24292e 0%, #6e5494 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+                <i class="fab fa-github"></i>
+              </div>
+              <h3 style="margin-bottom: 12px; font-size: 20px; font-weight: 700; color: var(--ig-primary-text);">Connect GitHub Repository</h3>
+              <p style="color: var(--ig-secondary-text); margin-bottom: 28px; font-size: 14px; line-height: 1.6; max-width: 400px; margin-left: auto; margin-right: auto;">
+                Link your GitHub repository to manage code, issues, and pull requests directly from the community
+              </p>
+              <button onclick="connectGitHub()" style="padding: 14px 32px; background: linear-gradient(135deg, #24292e 0%, #6e5494 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(36, 41, 46, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(36, 41, 46, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(36, 41, 46, 0.3)'">
                 <i class="fab fa-github"></i> Connect GitHub
               </button>
             </div>

@@ -513,9 +513,14 @@ router.post('/:communityId/announcements', authMiddleware, upload.array('files',
 
       // Add uploaded files to attachments
       if (req.files && req.files.length > 0) {
+        // Get the base URL from the request
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
+        
         attachmentsData.files = req.files.map(file => ({
           name: file.originalname,
-          url: `/uploads/${file.filename}`,
+          url: `${baseUrl}/uploads/${file.filename}`,
           size: `${(file.size / 1024).toFixed(1)} KB`,
           type: file.mimetype
         }));
