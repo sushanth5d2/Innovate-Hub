@@ -829,18 +829,16 @@
       </div>
 
       <div class="left-tabs">
-        <button class="left-tab active" onclick="switchLeftTab('announcements')">Announcements</button>
-        <button class="left-tab" onclick="switchLeftTab('groups')">Groups</button>
-        <button class="left-tab" onclick="switchLeftTab('folders')">Folders</button>
-        <button class="left-tab" onclick="switchLeftTab('github')">GitHub</button>
+        <button class="left-tab active" onclick="switchLeftTab('community')">Community</button>
+        <button class="left-tab" onclick="switchLeftTab('announcements')">Announcements</button>
       </div>
 
       <div class="left-content" id="leftContent">
         <!-- Content loads here -->
       </div>
 
-      <div class="left-footer" id="leftFooter">
-        <button class="btn btn-primary" style="width: 100%;" onclick="showCreateGroupModal()" id="leftFooterBtn">
+      <div class="left-footer">
+        <button class="btn btn-primary" style="width: 100%;" onclick="showCreateGroupModal()">
           <i class="fas fa-plus"></i> Create Group
         </button>
       </div>
@@ -963,7 +961,6 @@
     let state = {
       communityId: null,
       currentGroupId: null,
-      currentAnnouncementId: null,
       currentView: 'announcements', // announcements, chat, calls, folders, tasks, notes
       socket: null,
       user: null,
@@ -988,11 +985,9 @@
 
       await Promise.all([
         loadCommunityData(),
-        loadGroups()
+        loadGroups(),
+        loadAnnouncements()
       ]);
-
-      // Show announcements by default (Announcements tab is active)
-      loadAnnouncements();
 
       setupSocketListeners();
       setupResponsive();
@@ -1041,7 +1036,7 @@
 
     async function loadGroups() {
       try {
-        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`);
+        const res = await InnovateAPI.apiRequest(`/api/communities/${state.communityId}/groups`);
         if (res.success) {
           state.groups = res.groups || [];
           document.getElementById('groupCountBadge').textContent = `(${state.groups.length})`;
@@ -1089,204 +1084,8 @@
       `).join('');
     }
 
-    function renderFoldersList() {
-      const content = document.getElementById('leftContent');
-      const centerContent = document.getElementById('centerContent');
-      
-      if (state.groups.length === 0) {
-        content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📁</div>
-            <div class="empty-title">No folders yet</div>
-            <div class="empty-text">Create groups first to see their folders here</div>
-          </div>
-        `;
-        centerContent.innerHTML = `
-          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <div class="empty-icon">📁</div>
-            <div class="empty-title">Welcome to Folders</div>
-            <div class="empty-text">Each group has its own folder for organizing files and resources</div>
-          </div>
-        `;
-        return;
-      }
-
-      // Show folders organized by group names
-      content.innerHTML = state.groups.map(group => `
-        <div class="group-item" onclick="openGroupFolder(${group.id})">
-          <div class="group-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <i class="fas fa-folder"></i>
-          </div>
-          <div class="group-info">
-            <div class="group-name">${group.name}</div>
-            <div class="group-desc">Group folder · Files & resources</div>
-          </div>
-          <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text); font-size: 14px;"></i>
-        </div>
-      `).join('');
-
-      // Show empty state in center
-      centerContent.innerHTML = `
-        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-          <div class="empty-icon">📂</div>
-          <div class="empty-title">Select a folder</div>
-          <div class="empty-text">Click on a group folder from the left to view its contents</div>
-        </div>
-      `;
-    }
-
-    function openGroupFolder(groupId) {
-      const group = state.groups.find(g => g.id == groupId);
-      if (!group) return;
-
-      const centerContent = document.getElementById('centerContent');
-      
-      centerContent.innerHTML = `
-        <div style="padding: 24px; max-width: 900px; margin: 0 auto;">
-          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-            <div style="width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
-              <i class="fas fa-folder-open"></i>
-            </div>
-            <div style="flex: 1;">
-              <h2 style="margin: 0; font-size: 22px;">${group.name}</h2>
-              <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
-                Group folder · ${group.description || 'No description'}
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="selectGroup(${group.id})">
-              <i class="fas fa-arrow-right"></i> Open Group
-            </button>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
-            <!-- Files Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('folders');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
-                <i class="fas fa-file-alt"></i>
-              </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Files</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Documents, images, and more</p>
-            </div>
-
-            <!-- Links Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id});">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
-                <i class="fas fa-link"></i>
-              </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Links</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Shared links and resources</p>
-            </div>
-
-            <!-- Tasks Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('tasks');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
-                <i class="fas fa-tasks"></i>
-              </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">To-Do</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Group tasks and assignments</p>
-            </div>
-
-            <!-- Notes Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('notes');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
-                <i class="fas fa-sticky-note"></i>
-              </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Notes</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Collaborative documents</p>
-            </div>
-          </div>
-
-          <div style="margin-top: 24px; padding: 20px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px;">
-            <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text);">
-              <i class="fas fa-info-circle"></i> About Folders
-            </h3>
-            <p style="margin: 0; font-size: 13px; color: var(--ig-secondary-text); line-height: 1.6;">
-              Each group has its own dedicated folder to organize files, links, tasks, and notes. 
-              Click on any section above or use the "Open Group" button to access the full workspace.
-            </p>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderGitHubView() {
-      const content = document.getElementById('leftContent');
-      const centerContent = document.getElementById('centerContent');
-
-      // Check if GitHub integration exists for this community
-      content.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">
-            <i class="fab fa-github" style="font-size: 48px;"></i>
-          </div>
-          <div class="empty-title">GitHub Integration</div>
-          <div class="empty-text">Connect your GitHub repositories to this community</div>
-        </div>
-      `;
-
-      centerContent.innerHTML = `
-        <div style="padding: 24px; max-width: 900px; margin: 0 auto;">
-          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-            <div style="width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #24292e 0%, #586069 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
-              <i class="fab fa-github"></i>
-            </div>
-            <div style="flex: 1;">
-              <h2 style="margin: 0; font-size: 22px;">GitHub Integration</h2>
-              <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
-                Sync repositories, issues, and pull requests
-              </div>
-            </div>
-          </div>
-
-          <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
-            <h3 style="margin: 0 0 16px 0; font-size: 16px;">
-              <i class="fas fa-link"></i> Connect GitHub Repository
-            </h3>
-            <p style="margin: 0 0 20px 0; color: var(--ig-secondary-text); font-size: 14px; line-height: 1.6;">
-              Link a GitHub repository to this community to automatically sync issues, pull requests, and commits. 
-              Members can view repository activity directly in the community workspace.
-            </p>
-            
-            <div style="display: grid; gap: 12px;">
-              <input type="text" placeholder="Organization name (e.g., facebook)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text);">
-              <input type="text" placeholder="Repository name (e.g., react)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text);">
-              <input type="password" placeholder="GitHub Access Token (optional)" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text);">
-              
-              <button class="btn btn-primary" style="margin-top: 8px;">
-                <i class="fab fa-github"></i> Connect Repository
-              </button>
-            </div>
-          </div>
-
-          <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 24px;">
-            <h3 style="margin: 0 0 12px 0; font-size: 16px;">
-              <i class="fas fa-info-circle"></i> Features
-            </h3>
-            <ul style="margin: 0; padding-left: 20px; color: var(--ig-secondary-text); font-size: 14px; line-height: 1.8;">
-              <li>View repository issues and pull requests</li>
-              <li>Track commits and branch activity</li>
-              <li>Create issues directly from community</li>
-              <li>Link tasks to GitHub issues</li>
-              <li>Receive notifications for repository updates</li>
-              <li>Collaborate on code reviews</li>
-            </ul>
-          </div>
-        </div>
-      `;
-    }
-
     function renderAnnouncements(announcements) {
       const content = document.getElementById('leftContent');
-      const centerContent = document.getElementById('centerContent');
-      const footer = document.getElementById('centerFooter');
-      
-      // Show create announcement button for admins/moderators
-      footer.innerHTML = `
-        <button class="btn btn-primary" style="width: 100%;" onclick="showCreateAnnouncementModal()">
-          <i class="fas fa-bullhorn"></i> Create Announcement
-        </button>
-      `;
-      footer.style.display = 'block';
       
       if (announcements.length === 0) {
         content.innerHTML = `
@@ -1296,142 +1095,18 @@
             <div class="empty-text">Admins can post important updates here</div>
           </div>
         `;
-        centerContent.innerHTML = `
-          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <div class="empty-icon">📢</div>
-            <div class="empty-title">Welcome to Announcements</div>
-            <div class="empty-text">Create your first announcement with messages, attachments, links, and location</div>
-          </div>
-        `;
         return;
       }
 
       content.innerHTML = announcements.map(ann => `
-        <div class="group-item ${state.currentAnnouncementId == ann.id ? 'active' : ''}" onclick="viewAnnouncement(${ann.id})">
+        <div class="group-item" onclick="viewAnnouncement(${ann.id})">
           <div class="group-avatar"><i class="fas fa-bullhorn"></i></div>
           <div class="group-info">
             <div class="group-name">${ann.title || 'Announcement'}</div>
             <div class="group-desc">${InnovateAPI.formatDate(ann.created_at)} · ${ann.author_username}</div>
           </div>
-          ${ann.is_pinned ? '<i class="fas fa-thumbtack" style="color: var(--ig-blue);"></i>' : ''}
         </div>
       `).join('');
-      
-      // Show first announcement by default
-      if (announcements.length > 0 && !state.currentAnnouncementId) {
-        viewAnnouncement(announcements[0].id);
-      }
-    }
-    
-    function viewAnnouncement(announcementId) {
-      state.currentAnnouncementId = announcementId;
-      const centerContent = document.getElementById('centerContent');
-      
-      // Find announcement
-      InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements`)
-        .then(res => {
-          const ann = res.announcements.find(a => a.id == announcementId);
-          if (!ann) return;
-          
-          // Parse attachments
-          let attachments = [];
-          let links = [];
-          let location = null;
-          
-          try {
-            if (ann.attachments) {
-              const parsed = JSON.parse(ann.attachments);
-              attachments = parsed.files || [];
-              links = parsed.links || [];
-              location = parsed.location || null;
-            }
-          } catch (e) {}
-          
-          centerContent.innerHTML = `
-            <div style="padding: 24px; max-width: 800px; margin: 0 auto;">
-              <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-                <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
-                  <i class="fas fa-bullhorn"></i>
-                </div>
-                <div style="flex: 1;">
-                  <h2 style="margin: 0; font-size: 20px;">${ann.title}</h2>
-                  <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
-                    ${ann.author_username} · ${InnovateAPI.formatDate(ann.created_at)}
-                    ${ann.is_pinned ? ' · <i class="fas fa-thumbtack"></i> Pinned' : ''}
-                  </div>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                  <button class="btn btn-secondary" onclick="pinAnnouncement(${ann.id}, ${!ann.is_pinned})">
-                    <i class="fas fa-thumbtack"></i> ${ann.is_pinned ? 'Unpin' : 'Pin'}
-                  </button>
-                  <button class="btn btn-danger" onclick="deleteAnnouncement(${ann.id})">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </div>
-              
-              <div style="background: var(--ig-secondary-background); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                <p style="white-space: pre-wrap; line-height: 1.6; margin: 0;">${ann.body || ann.content || 'No content'}</p>
-              </div>
-              
-              ${attachments.length > 0 ? `
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
-                    <i class="fas fa-paperclip"></i> Attachments (${attachments.length})
-                  </h3>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
-                    ${attachments.map(file => `
-                      <a href="${file.url}" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; text-decoration: none; color: inherit; border: 1px solid var(--ig-border);">
-                        <i class="fas fa-file" style="font-size: 24px; color: var(--ig-blue);"></i>
-                        <div style="flex: 1; min-width: 0;">
-                          <div style="font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</div>
-                          <div style="font-size: 12px; color: var(--ig-secondary-text);">${file.size || 'Unknown size'}</div>
-                        </div>
-                      </a>
-                    `).join('')}
-                  </div>
-                </div>
-              ` : ''}
-              
-              ${links.length > 0 ? `
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
-                    <i class="fas fa-link"></i> Links (${links.length})
-                  </h3>
-                  <div style="display: flex; flex-direction: column; gap: 8px;">
-                    ${links.map(link => `
-                      <a href="${link.url}" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; text-decoration: none; color: var(--ig-blue); border: 1px solid var(--ig-border);">
-                        <i class="fas fa-external-link-alt"></i>
-                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${link.title || link.url}</span>
-                      </a>
-                    `).join('')}
-                  </div>
-                </div>
-              ` : ''}
-              
-              ${location ? `
-                <div style="margin-bottom: 20px;">
-                  <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
-                    <i class="fas fa-map-marker-alt"></i> Location
-                  </h3>
-                  <a href="https://www.google.com/maps?q=${location.lat},${location.lng}" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--ig-secondary-background); border-radius: 8px; text-decoration: none; color: inherit; border: 1px solid var(--ig-border);">
-                    <i class="fas fa-map-marked-alt" style="font-size: 32px; color: var(--ig-error);"></i>
-                    <div>
-                      <div style="font-weight: 600;">${location.name || 'Shared Location'}</div>
-                      <div style="font-size: 13px; color: var(--ig-secondary-text);">${location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}</div>
-                    </div>
-                  </a>
-                </div>
-              ` : ''}
-            </div>
-          `;
-          
-          // Update active state
-          renderAnnouncements(res.announcements);
-        })
-        .catch(err => {
-          console.error('Error loading announcement:', err);
-        });
     }
 
     // ==================== TAB SWITCHING ====================
@@ -1439,64 +1114,10 @@
       document.querySelectorAll('.left-tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
 
-      const leftFooterBtn = document.getElementById('leftFooterBtn');
-      const leftFooter = document.getElementById('leftFooter');
-      const centerTabs = document.getElementById('centerTabs');
-      const centerTitle = document.getElementById('centerTitle');
-      const centerSubtitle = document.getElementById('centerSubtitle');
-      const centerIcon = document.getElementById('centerIcon');
-
-      // Hide center tabs when switching to announcements or folders
-      centerTabs.style.display = 'none';
-
       if (tab === 'announcements') {
-        // Update center header
-        centerIcon.innerHTML = '<i class="fas fa-bullhorn"></i>';
-        centerTitle.textContent = 'Announcements';
-        centerSubtitle.textContent = 'Community updates and news';
-        
-        // Load announcements
         loadAnnouncements();
-        
-        // Show Create Announcement button
-        leftFooter.style.display = 'block';
-        leftFooterBtn.innerHTML = '<i class="fas fa-plus"></i> Create Announcement';
-        leftFooterBtn.onclick = showCreateAnnouncementModal;
-      } else if (tab === 'groups') {
-        // Groups tab (previously Community)
-        centerIcon.innerHTML = '<i class="fas fa-users"></i>';
-        centerTitle.textContent = 'Select a group';
-        centerSubtitle.textContent = 'Choose from the left sidebar';
-        
-        // Load groups
+      } else {
         renderGroupsList();
-        
-        // Show Create Group button
-        leftFooter.style.display = 'block';
-        leftFooterBtn.innerHTML = '<i class="fas fa-plus"></i> Create Group';
-        leftFooterBtn.onclick = showCreateGroupModal;
-      } else if (tab === 'folders') {
-        // Update center header
-        centerIcon.innerHTML = '<i class="fas fa-folder"></i>';
-        centerTitle.textContent = 'Folders';
-        centerSubtitle.textContent = 'Organized by groups';
-        
-        // Load folders
-        renderFoldersList();
-        
-        // Hide left footer button
-        leftFooter.style.display = 'none';
-      } else if (tab === 'github') {
-        // GitHub Integration tab
-        centerIcon.innerHTML = '<i class="fab fa-github"></i>';
-        centerTitle.textContent = 'GitHub Integration';
-        centerSubtitle.textContent = 'Connect your repositories';
-        
-        // Load GitHub view
-        renderGitHubView();
-        
-        // Hide left footer button
-        leftFooter.style.display = 'none';
       }
     }
 
@@ -1780,7 +1401,7 @@
     }
 
     function openFolder(type) {
-      console.log(`Opening ${type} folder...`);
+      InnovateAPI.showAlert(`Opening ${type} folder...`, 'info');
       // Implement folder view
     }
 
@@ -1790,7 +1411,7 @@
       input.multiple = true;
       input.onchange = async (e) => {
         const files = Array.from(e.target.files);
-        console.log(`Uploading ${files.length} file(s)...`);
+        InnovateAPI.showAlert(`Uploading ${files.length} file(s)...`, 'info');
         // Implement file upload
       };
       input.click();
@@ -1803,7 +1424,7 @@
       footer.style.display = 'none';
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/tasks`);
+        const res = await InnovateAPI.apiRequest(`/api/community-groups/${groupId}/tasks`);
         const tasks = res.tasks || [];
 
         content.innerHTML = `
@@ -1851,7 +1472,7 @@
       const description = prompt('Description (optional):');
 
       try {
-        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-text`, {
+        await InnovateAPI.apiRequest(`/api/community-groups/${state.currentGroupId}/tasks/from-text`, {
           method: 'POST',
           body: JSON.stringify({ description: `${title}\n${description || ''}` })
         });
@@ -1874,7 +1495,7 @@
         formData.append('image', file);
 
         try {
-          const res = await fetch(`/community-groups/${state.currentGroupId}/tasks/from-image`, {
+          const res = await fetch(`/api/community-groups/${state.currentGroupId}/tasks/from-image`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
             body: formData
@@ -1901,7 +1522,7 @@
       footer.style.display = 'none';
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/notes`);
+        const res = await InnovateAPI.apiRequest(`/api/community-groups/${groupId}/notes`);
         const notes = res.notes || [];
 
         content.innerHTML = `
@@ -1941,7 +1562,7 @@
       if (!title) return;
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/notes`, {
+        const res = await InnovateAPI.apiRequest(`/api/community-groups/${state.currentGroupId}/notes`, {
           method: 'POST',
           body: JSON.stringify({ title, content_md: '# Start writing...' })
         });
@@ -1986,7 +1607,7 @@
       const description = document.getElementById('groupDescription').value;
 
       try {
-        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`, {
+        const res = await InnovateAPI.apiRequest(`/api/communities/${state.communityId}/groups`, {
           method: 'POST',
           body: JSON.stringify({ name, description })
         });
@@ -2001,222 +1622,6 @@
       } catch (error) {
         console.error('Error creating group:', error);
         InnovateAPI.showAlert('Error creating group', 'error');
-      }
-    }
-    
-    // ==================== ANNOUNCEMENT FUNCTIONS ====================
-    function showCreateAnnouncementModal() {
-      showModal(`
-        <div class="modal-header">
-          <div class="modal-title"><i class="fas fa-bullhorn"></i> Create Announcement</div>
-          <button class="modal-close" onclick="closeModal()">×</button>
-        </div>
-        <form onsubmit="createAnnouncement(event)" style="padding: 20px;">
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Title *</label>
-            <input type="text" id="announcementTitle" placeholder="Important Update" required style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background);">
-          </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Message *</label>
-            <textarea id="announcementMessage" rows="6" placeholder="Write your announcement message here..." required style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); resize: vertical;"></textarea>
-          </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Attachments (optional)</label>
-            <input type="file" id="announcementFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background);">
-            <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
-              <i class="fas fa-info-circle"></i> You can upload images, videos, PDFs, and documents
-            </div>
-          </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Links (optional)</label>
-            <div id="announcementLinks"></div>
-            <button type="button" onclick="addAnnouncementLink()" class="btn btn-secondary" style="width: 100%;">
-              <i class="fas fa-plus"></i> Add Link
-            </button>
-          </div>
-          
-          <div style="margin-bottom: 20px;">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="announcementAddLocation" onchange="toggleAnnouncementLocation()">
-              <span style="font-weight: 600;"><i class="fas fa-map-marker-alt"></i> Add Location</span>
-            </label>
-            <div id="announcementLocationInput" style="display: none; margin-top: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; border: 1px solid var(--ig-border);">
-              <input type="text" id="announcementLocationName" placeholder="Location name (e.g., Main Campus)" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-              <input type="text" id="announcementLocationAddress" placeholder="Address" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <input type="number" step="any" id="announcementLocationLat" placeholder="Latitude" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-                <input type="number" step="any" id="announcementLocationLng" placeholder="Longitude" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-              </div>
-              <button type="button" onclick="getCurrentLocation()" class="btn btn-secondary" style="width: 100%; margin-top: 8px;">
-                <i class="fas fa-crosshairs"></i> Use Current Location
-              </button>
-            </div>
-          </div>
-          
-          <div style="display: flex; gap: 12px;">
-            <button type="submit" class="btn btn-primary" style="flex: 1;">
-              <i class="fas fa-paper-plane"></i> Post Announcement
-            </button>
-            <button type="button" onclick="closeModal()" class="btn btn-secondary">
-              Cancel
-            </button>
-          </div>
-        </form>
-      `);
-    }
-    
-    let announcementLinkCounter = 0;
-    function addAnnouncementLink() {
-      const container = document.getElementById('announcementLinks');
-      announcementLinkCounter++;
-      const linkId = `link_${announcementLinkCounter}`;
-      
-      const linkDiv = document.createElement('div');
-      linkDiv.id = linkId;
-      linkDiv.style.cssText = 'margin-bottom: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px; border: 1px solid var(--ig-border);';
-      linkDiv.innerHTML = `
-        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" class="announcement-link-title" placeholder="Link title" style="flex: 1; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-          <button type="button" onclick="document.getElementById('${linkId}').remove()" class="btn btn-danger" style="padding: 8px 12px;">
-            <i class="fas fa-trash"></i>
-          </button>
-        </div>
-        <input type="url" class="announcement-link-url" placeholder="https://example.com" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 6px;">
-      `;
-      container.appendChild(linkDiv);
-    }
-    
-    function toggleAnnouncementLocation() {
-      const checkbox = document.getElementById('announcementAddLocation');
-      const locationInput = document.getElementById('announcementLocationInput');
-      locationInput.style.display = checkbox.checked ? 'block' : 'none';
-    }
-    
-    function getCurrentLocation() {
-      if (!navigator.geolocation) {
-        InnovateAPI.showAlert('Geolocation not supported', 'error');
-        return;
-      }
-      
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          document.getElementById('announcementLocationLat').value = position.coords.latitude;
-          document.getElementById('announcementLocationLng').value = position.coords.longitude;
-          InnovateAPI.showAlert('Location detected!', 'success');
-        },
-        (error) => {
-          InnovateAPI.showAlert('Could not get location: ' + error.message, 'error');
-        }
-      );
-    }
-    
-    async function createAnnouncement(e) {
-      e.preventDefault();
-      
-      const title = document.getElementById('announcementTitle').value;
-      const message = document.getElementById('announcementMessage').value;
-      const filesInput = document.getElementById('announcementFiles');
-      
-      // Collect links
-      const links = [];
-      document.querySelectorAll('#announcementLinks > div').forEach(linkDiv => {
-        const titleInput = linkDiv.querySelector('.announcement-link-title');
-        const urlInput = linkDiv.querySelector('.announcement-link-url');
-        if (titleInput.value && urlInput.value) {
-          links.push({ title: titleInput.value, url: urlInput.value });
-        }
-      });
-      
-      // Collect location
-      let location = null;
-      if (document.getElementById('announcementAddLocation').checked) {
-        const name = document.getElementById('announcementLocationName').value;
-        const address = document.getElementById('announcementLocationAddress').value;
-        const lat = parseFloat(document.getElementById('announcementLocationLat').value);
-        const lng = parseFloat(document.getElementById('announcementLocationLng').value);
-        
-        if (lat && lng) {
-          location = { name, address, lat, lng };
-        }
-      }
-      
-      try {
-        const formData = new FormData();
-        formData.append('title', title);
-        formData.append('body', message);
-        
-        // Add files
-        if (filesInput.files.length > 0) {
-          for (let i = 0; i < filesInput.files.length; i++) {
-            formData.append('files', filesInput.files[i]);
-          }
-        }
-        
-        // Add structured data
-        const attachmentsData = { links, location, files: [] };
-        formData.append('attachments', JSON.stringify(attachmentsData));
-        
-        const res = await fetch(`/api/communities/${state.communityId}/announcements`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
-          body: formData
-        });
-        
-        const data = await res.json();
-        
-        if (data.success) {
-          console.log('Announcement posted successfully');
-          closeModal();
-          await loadAnnouncements();
-          
-          if (state.socket) {
-            state.socket.emit('announcement:new', { communityId: state.communityId });
-          }
-        } else {
-          throw new Error(data.error || 'Failed to create announcement');
-        }
-      } catch (error) {
-        console.error('Error creating announcement:', error);
-        InnovateAPI.showAlert('Error posting announcement: ' + error.message, 'error');
-      }
-    }
-    
-    async function pinAnnouncement(announcementId, isPinned) {
-      try {
-        await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements/${announcementId}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_pinned: isPinned })
-        });
-        
-        console.log(isPinned ? 'Announcement pinned' : 'Announcement unpinned');
-        await loadAnnouncements();
-        
-        if (state.socket) {
-          state.socket.emit('announcement:pinned', { communityId: state.communityId, announcementId, isPinned });
-        }
-      } catch (error) {
-        console.error('Error pinning announcement:', error);
-        InnovateAPI.showAlert('Error updating announcement', 'error');
-      }
-    }
-    
-    async function deleteAnnouncement(announcementId) {
-      if (!confirm('Are you sure you want to delete this announcement?')) return;
-      
-      try {
-        await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements/${announcementId}`, {
-          method: 'DELETE'
-        });
-        
-        console.log('Announcement deleted successfully');
-        state.currentAnnouncementId = null;
-        await loadAnnouncements();
-      } catch (error) {
-        console.error('Error deleting announcement:', error);
-        InnovateAPI.showAlert('Error deleting announcement', 'error');
       }
     }
 
@@ -2311,6 +1716,10 @@
 
     function showGroupActions() {
       InnovateAPI.showAlert('Group actions coming soon', 'info');
+    }
+
+    function viewAnnouncement(id) {
+      InnovateAPI.showAlert('View announcement: ' + id, 'info');
     }
 
     function setupResponsive() {

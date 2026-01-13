@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="/js/instagram-theme.js"></script>
+  <style>
+    /* WhatsApp-style Community Layout */
+    .community-container {
+      display: flex;
+      height: calc(100vh - 60px);
+      margin-top: 60px;
+      background: var(--ig-primary-background);
+    }
+
+    /* Left Sidebar - Groups List */
+    .community-sidebar {
+      width: 360px;
+      border-right: 1px solid var(--ig-border);
+      display: flex;
+      flex-direction: column;
+      background: var(--ig-primary-background);
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--ig-border);
+      background: var(--ig-secondary-background);
+    }
+
+    .sidebar-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+      margin-top: 4px;
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+    }
+
+    .sidebar-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-secondary-text);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      background: none;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .sidebar-tab.active {
+      color: var(--ig-blue);
+      border-bottom-color: var(--ig-blue);
+    }
+
+    .groups-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .group-item {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-bottom: 1px solid var(--ig-border);
+    }
+
+    .group-item:hover {
+      background: var(--ig-hover);
+    }
+
+    .group-item.active {
+      background: var(--ig-hover);
+    }
+
+    .group-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .group-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .group-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 2px;
+    }
+
+    .group-desc {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Center Panel - Announcements */
+    .community-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--ig-secondary-background);
+    }
+
+    .main-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+    }
+
+    .header-text h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+      margin: 2px 0 0 0;
+    }
+
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .announcement-banner {
+      background: var(--ig-blue);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .announcement-card {
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .announcement-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .announcement-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+    }
+
+    .announcement-info {
+      flex: 1;
+    }
+
+    .announcement-author {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+
+    .announcement-date {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+    }
+
+    .announcement-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--ig-primary-text);
+    }
+
+    .announcement-body {
+      font-size: 14px;
+      color: var(--ig-primary-text);
+      line-height: 1.5;
+    }
+
+    .pinned-badge {
+      background: #FFA500;
+      color: white;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    /* Right Sidebar - Community Info */
+    .community-info {
+      width: 360px;
+      border-left: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .info-header {
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid var(--ig-border);
+    }
+
+    .info-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 48px;
+      margin: 0 auto 16px;
+    }
+
+    .info-name {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .info-meta {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+    }
+
+    .info-actions {
+      padding: 16px;
+      display: flex;
+      justify-content: space-around;
+      border-bottom: 1px solid var(--ig-border);
+    }
+
+    .info-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .info-action:hover {
+      opacity: 0.7;
+    }
+
+    .action-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    .action-label {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+    }
+
+    .info-section {
+      padding: 20px;
+      border-bottom: 1px solid var(--ig-border);
+    }
+
+    .info-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--ig-secondary-text);
+    }
+
+    .info-description {
+      font-size: 14px;
+      color: var(--ig-primary-text);
+      line-height: 1.5;
+    }
+
+    .info-menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--ig-border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .info-menu-item:hover {
+      background: var(--ig-hover);
+    }
+
+    .menu-item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .menu-item-icon {
+      width: 24px;
+      text-align: center;
+      color: var(--ig-secondary-text);
+    }
+
+    .menu-item-text {
+      font-size: 14px;
+      color: var(--ig-primary-text);
+    }
+
+    .menu-item-count {
+      font-size: 14px;
+      color: var(--ig-secondary-text);
+    }
+
+    /* Message Input */
+    .message-input {
+      padding: 12px 16px;
+      border-top: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .message-input input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--ig-border);
+      border-radius: 24px;
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      outline: none;
+    }
+
+    .send-btn {
+      background: var(--ig-blue);
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Empty States */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ig-secondary-text);
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .empty-state-text {
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .community-info {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .community-sidebar {
+        width: 100%;
+      }
+      
+      .community-main {
+        display: none;
+      }
+      
+      .community-main.active {
+        display: flex;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      
+      <div class="ig-search-box">
+        <input type="text" class="ig-search-input" placeholder="Search..." id="searchInput">
+      </div>
+      
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/home'">
+          <i class="fas fa-home"></i>
+        </div>
+        
+        <div class="ig-nav-icon" onclick="window.location.href='/notifications'">
+          <i class="fas fa-bell"></i>
+        </div>
+        
+        <div class="ig-nav-icon" onclick="toggleCommunityInfo()">
+          <i class="fas fa-info-circle"></i>
+        </div>
+        
+        <div class="ig-nav-icon" onclick="window.location.href='/settings'">
+          <i class="fas fa-cog"></i>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="community-container">
+    <!-- Left Sidebar - Groups -->
+    <div class="community-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <i class="fas fa-users"></i>
+          <span id="communityName">Loading...</span>
+        </div>
+        <div class="sidebar-subtitle" id="communitySubtitle">Community</div>
+      </div>
+
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="community" onclick="switchTab('community')">
+          Community
+        </button>
+        <button class="sidebar-tab" data-tab="announcements" onclick="switchTab('announcements')">
+          Announcements
+        </button>
+      </div>
+
+      <div class="groups-list" id="groupsList">
+        <!-- Groups will be loaded here -->
+      </div>
+
+      <div style="padding: 16px; border-top: 1px solid var(--ig-border);">
+        <button onclick="createGroup()" style="width: 100%; padding: 12px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+          <i class="fas fa-plus"></i> Create Group
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Panel - Announcements/Content -->
+    <div class="community-main">
+      <div class="main-header">
+        <div class="header-info">
+          <div class="header-icon">
+            <i class="fas fa-bullhorn"></i>
+          </div>
+          <div class="header-text">
+            <h2 id="mainTitle">Announcements</h2>
+            <p id="mainSubtitle">Important community updates</p>
+          </div>
+        </div>
+        <button onclick="createAnnouncement()" style="background: var(--ig-blue); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+          <i class="fas fa-plus"></i> New
+        </button>
+      </div>
+
+      <div class="main-content" id="mainContent">
+        <div class="announcement-banner">
+          <div>
+            <i class="fas fa-info-circle"></i>
+            <strong>Welcome to your community!</strong>
+            <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">
+              Send important admin updates to all your members at once.
+            </p>
+          </div>
+        </div>
+
+        <div id="announcementsList">
+          <!-- Announcements will be loaded here -->
+        </div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+          <div class="empty-state-icon">📢</div>
+          <div class="empty-state-title">No announcements yet</div>
+          <div class="empty-state-text">Admins can create announcements to share important updates</div>
+        </div>
+      </div>
+
+      <div class="message-input" id="messageInput" style="display: none;">
+        <input type="text" placeholder="Type a message..." id="messageText">
+        <button class="send-btn" onclick="sendMessage()">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Sidebar - Community Info -->
+    <div class="community-info" id="communityInfo">
+      <div class="info-header">
+        <div class="info-avatar" id="infoAvatar">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="info-name" id="infoName">Community Name</div>
+        <div class="info-meta" id="infoMeta">Community • 1 group</div>
+      </div>
+
+      <div class="info-actions">
+        <div class="info-action" onclick="inviteMembers()">
+          <div class="action-icon">
+            <i class="fas fa-link"></i>
+          </div>
+          <div class="action-label">Invite</div>
+        </div>
+
+        <div class="info-action" onclick="addMembers()">
+          <div class="action-icon">
+            <i class="fas fa-user-plus"></i>
+          </div>
+          <div class="action-label">Add members</div>
+        </div>
+
+        <div class="info-action" onclick="addGroups()">
+          <div class="action-icon">
+            <i class="fas fa-users-cog"></i>
+          </div>
+          <div class="action-label">Add groups</div>
+        </div>
+      </div>
+
+      <div class="info-section">
+        <div class="info-section-title">DESCRIPTION</div>
+        <div class="info-description" id="infoDescription">
+          Hi everyone! This community is for members to chat in topic-based groups and get important announcements...
+        </div>
+      </div>
+
+      <div class="info-menu-item" onclick="manageGroups()">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="menu-item-text">Manage groups</div>
+        </div>
+        <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text);"></i>
+      </div>
+
+      <div class="info-menu-item" onclick="communitySettings()">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">
+            <i class="fas fa-cog"></i>
+          </div>
+          <div class="menu-item-text">Community settings</div>
+        </div>
+        <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text);"></i>
+      </div>
+
+      <div class="info-menu-item" onclick="viewGroups()">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">
+            <i class="fas fa-list"></i>
+          </div>
+          <div class="menu-item-text">View groups</div>
+        </div>
+        <div class="menu-item-count" id="groupCount">(0)</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Initialize
+    let currentCommunityId = null;
+    let currentGroupId = null;
+    let socket = null;
+
+    // Get community ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    currentCommunityId = urlParams.get('id') || window.location.pathname.split('/').pop();
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!InnovateAPI.requireAuth()) return;
+      
+      socket = InnovateAPI.initSocket();
+      await loadCommunityData();
+      await loadGroups();
+      await loadAnnouncements();
+
+      // Socket listeners
+      if (socket) {
+        socket.on('announcement:new', (data) => {
+          if (data.communityId == currentCommunityId) {
+            loadAnnouncements();
+          }
+        });
+
+        socket.on('group:new', (data) => {
+          if (data.communityId == currentCommunityId) {
+            loadGroups();
+          }
+        });
+      }
+    });
+
+    // Load community data
+    async function loadCommunityData() {
+      try {
+        const response = await InnovateAPI.apiRequest(`/communities/${currentCommunityId}`);
+        if (response.success) {
+          const community = response.community;
+          document.getElementById('communityName').textContent = community.name;
+          document.getElementById('communitySubtitle').textContent = community.description || 'Community';
+          document.getElementById('infoName').textContent = community.name;
+          document.getElementById('infoDescription').textContent = community.description || 'No description available';
+          document.getElementById('infoMeta').textContent = `Community • ${community.member_count || 0} members`;
+        }
+      } catch (error) {
+        console.error('Error loading community:', error);
+        InnovateAPI.showAlert('Error loading community', 'error');
+      }
+    }
+
+    // Load groups
+    async function loadGroups() {
+      try {
+        const response = await InnovateAPI.apiRequest(`/api/community-groups/${currentCommunityId}/groups`);
+        if (response.success) {
+          const groupsList = document.getElementById('groupsList');
+          const groups = response.groups || [];
+
+          document.getElementById('groupCount').textContent = `(${groups.length})`;
+
+          if (groups.length === 0) {
+            groupsList.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-title">No groups yet</div>
+                <div class="empty-state-text">Create your first group to get started</div>
+              </div>
+            `;
+            return;
+          }
+
+          groupsList.innerHTML = groups.map(group => `
+            <div class="group-item" onclick="selectGroup(${group.id})">
+              <div class="group-avatar">
+                ${group.name.charAt(0).toUpperCase()}
+              </div>
+              <div class="group-info">
+                <div class="group-name">${group.name}</div>
+                <div class="group-desc">${group.description || 'No description'}</div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      }
+    }
+
+    // Load announcements
+    async function loadAnnouncements() {
+      try {
+        const response = await InnovateAPI.apiRequest(`/communities/${currentCommunityId}/announcements`);
+        if (response.success) {
+          const announcements = response.announcements || [];
+          const announcementsList = document.getElementById('announcementsList');
+          const emptyState = document.getElementById('emptyState');
+
+          if (announcements.length === 0) {
+            announcementsList.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+          }
+
+          emptyState.style.display = 'none';
+          announcementsList.innerHTML = announcements.map(ann => `
+            <div class="announcement-card">
+              <div class="announcement-header">
+                <div class="announcement-avatar">
+                  ${ann.author_username.charAt(0).toUpperCase()}
+                </div>
+                <div class="announcement-info">
+                  <div class="announcement-author">${ann.author_username}</div>
+                  <div class="announcement-date">${InnovateAPI.formatDate(ann.created_at)}</div>
+                </div>
+                ${ann.is_pinned ? '<span class="pinned-badge">PINNED</span>' : ''}
+              </div>
+              ${ann.title ? `<div class="announcement-title">${ann.title}</div>` : ''}
+              <div class="announcement-body">${ann.body || ''}</div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading announcements:', error);
+      }
+    }
+
+    // Switch tabs
+    function switchTab(tab) {
+      document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+
+      if (tab === 'announcements') {
+        document.getElementById('mainTitle').textContent = 'Announcements';
+        document.getElementById('mainSubtitle').textContent = 'Important community updates';
+        loadAnnouncements();
+      } else {
+        document.getElementById('mainTitle').textContent = 'Community';
+        document.getElementById('mainSubtitle').textContent = 'Select a group to view';
+      }
+    }
+
+    // Select group
+    function selectGroup(groupId) {
+      currentGroupId = groupId;
+      document.querySelectorAll('.group-item').forEach(item => item.classList.remove('active'));
+      event.target.closest('.group-item').classList.add('active');
+      
+      // Load group content
+      window.location.href = `/group.html?id=${groupId}`;
+    }
+
+    // Create group
+    async function createGroup() {
+      const name = prompt('Enter group name:');
+      if (!name) return;
+
+      const description = prompt('Enter group description (optional):');
+
+      try {
+        const response = await InnovateAPI.apiRequest(`/api/community-groups/${currentCommunityId}/groups`, {
+          method: 'POST',
+          body: JSON.stringify({ name, description })
+        });
+
+        if (response.success) {
+          InnovateAPI.showAlert('Group created successfully', 'success');
+          loadGroups();
+          
+          if (socket) {
+            socket.emit('group:new', { communityId: currentCommunityId });
+          }
+        }
+      } catch (error) {
+        console.error('Error creating group:', error);
+        InnovateAPI.showAlert('Error creating group', 'error');
+      }
+    }
+
+    // Create announcement
+    async function createAnnouncement() {
+      const title = prompt('Announcement title:');
+      if (!title) return;
+
+      const body = prompt('Announcement message:');
+      if (!body) return;
+
+      try {
+        const response = await InnovateAPI.apiRequest(`/communities/${currentCommunityId}/announcements`, {
+          method: 'POST',
+          body: JSON.stringify({ title, body, is_pinned: false })
+        });
+
+        if (response.success) {
+          InnovateAPI.showAlert('Announcement created', 'success');
+          loadAnnouncements();
+          
+          if (socket) {
+            socket.emit('announcement:new', { communityId: currentCommunityId });
+          }
+        }
+      } catch (error) {
+        console.error('Error creating announcement:', error);
+        InnovateAPI.showAlert(error.message || 'Error creating announcement', 'error');
+      }
+    }
+
+    // Toggle community info (mobile)
+    function toggleCommunityInfo() {
+      const info = document.getElementById('communityInfo');
+      info.style.display = info.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    // Actions
+    function inviteMembers() {
+      const link = `${window.location.origin}/communities?join=${currentCommunityId}`;
+      navigator.clipboard.writeText(link);
+      InnovateAPI.showAlert('Invite link copied!', 'success');
+    }
+
+    function addMembers() {
+      InnovateAPI.showAlert('Add members feature coming soon', 'info');
+    }
+
+    function addGroups() {
+      createGroup();
+    }
+
+    function manageGroups() {
+      InnovateAPI.showAlert('Manage groups feature coming soon', 'info');
+    }
+
+    function communitySettings() {
+      InnovateAPI.showAlert('Community settings coming soon', 'info');
+    }
+
+    function viewGroups() {
+      loadGroups();
+    }
+
+    function sendMessage() {
+      InnovateAPI.showAlert('Messaging feature coming soon', 'info');
+    }
+  </script>
+</body>
+</html>

@@ -484,11 +484,11 @@ router.get('/:communityId/announcements', authMiddleware, (req, res) => {
 });
 
 // Create community announcement (admin/moderator)
-router.post('/:communityId/announcements', authMiddleware, (req, res) => {
+router.post('/:communityId/announcements', authMiddleware, upload.array('files', 10), (req, res) => {
   const db = getDb();
   const { communityId } = req.params;
   const userId = req.user.userId;
-  const { title, body = '', is_pinned = 0 } = req.body || {};
+  const { title, body = '', is_pinned = 0, attachments: attachmentsJson } = req.body || {};
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
@@ -501,10 +501,32 @@ router.post('/:communityId/announcements', authMiddleware, (req, res) => {
         return res.status(403).json({ error: 'Only admins/moderators can post announcements' });
       }
 
+      // Process attachments
+      let attachmentsData = {};
+      try {
+        if (attachmentsJson) {
+          attachmentsData = JSON.parse(attachmentsJson);
+        }
+      } catch (e) {
+        attachmentsData = {};
+      }
+
+      // Add uploaded files to attachments
+      if (req.files && req.files.length > 0) {
+        attachmentsData.files = req.files.map(file => ({
+          name: file.originalname,
+          url: `/uploads/${file.filename}`,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          type: file.mimetype
+        }));
+      }
+
+      const attachmentsString = JSON.stringify(attachmentsData);
+
       db.run(
-        `INSERT INTO community_announcements (community_id, author_id, title, body, is_pinned)
-         VALUES (?, ?, ?, ?, ?)`,
-        [communityId, userId, title, body, is_pinned ? 1 : 0],
+        `INSERT INTO community_announcements (community_id, author_id, title, body, is_pinned, attachments)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [communityId, userId, title, body, is_pinned ? 1 : 0, attachmentsString],
         function(e) {
           if (e) return res.status(500).json({ error: 'Error creating announcement' });
           res.json({
@@ -515,7 +537,8 @@ router.post('/:communityId/announcements', authMiddleware, (req, res) => {
               author_id: userId,
               title,
               body,
-              is_pinned: is_pinned ? 1 : 0
+              is_pinned: is_pinned ? 1 : 0,
+              attachments: attachmentsString
             }
           });
         }

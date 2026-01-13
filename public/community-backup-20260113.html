@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community Workspace - Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css" />
+  <link rel="stylesheet" href="/css/workspace.css" />
+  <script src="/js/instagram-theme.js"></script>
+</head>
+<body class="ws-body">
+  <div class="ws-shell">
+    <!-- Sidebar -->
+    <aside class="ws-sidebar" id="wsSidebar">
+      <div class="ws-sidebar-inner">
+        <div class="ws-topbar">
+          <div class="ws-brand">
+            <a href="/home">Innovate</a>
+          </div>
+          <button class="ws-icon-btn" id="wsThemeToggle" type="button">Theme</button>
+        </div>
+
+        <div class="ws-card">
+          <div class="ws-row">
+            <div style="min-width:0;">
+              <div class="ws-card-title" id="wsCommunityName">Community</div>
+              <div class="ws-card-sub" id="wsCommunityMeta">Loading…</div>
+            </div>
+            <button class="ws-pill danger" id="wsLeaveCommunity" type="button" style="display:none;">Leave</button>
+          </div>
+        </div>
+
+        <div class="ws-section">
+          <div class="ws-section-header">
+            <h3>Groups</h3>
+            <button class="ws-pill" id="wsCreateGroup" type="button">+ New</button>
+          </div>
+          <div class="ws-list" id="wsGroupsList"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="ws-main">
+      <div class="ws-main-header">
+        <button class="ws-icon-btn ws-mobile-menu" id="wsSidebarToggle" type="button" aria-label="Open sidebar">☰</button>
+
+        <div class="ws-context">
+          <div class="ws-context-title" id="wsContextTitle">Select a group</div>
+          <div class="ws-context-sub" id="wsContextSub">Teams + Notion style workspace</div>
+        </div>
+
+        <div class="ws-tabs">
+          <button class="ws-tab active" data-ws-tab="announcements" type="button">📢 Announcements</button>
+          <button class="ws-tab" data-ws-tab="chat" type="button">Chat</button>
+          <button class="ws-tab" data-ws-tab="calls" type="button">Calls</button>
+          <button class="ws-tab" data-ws-tab="todo" type="button">To-Do</button>
+          <button class="ws-tab" data-ws-tab="notes" type="button">Notes</button>
+        </div>
+      </div>
+
+      <div class="ws-main-body">
+        <!-- Announcements Section -->
+        <section class="ws-view active" id="view-announcements" style="padding: 20px;">
+          <div style="margin-bottom: 24px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h2 style="font-size: 24px; font-weight: 600; margin: 0;">📢 Community Announcements</h2>
+              <button class="ws-pill primary" id="wsCreateAnnouncement" type="button" style="font-size: 16px; padding: 12px 24px;">+ New Announcement</button>
+            </div>
+            <p style="color: var(--ig-secondary-text); margin: 0;">Important updates from admins and moderators visible to everyone in the community.</p>
+          </div>
+
+          <!-- Pinned Announcements -->
+          <div id="wsPinnedAnnouncements" style="margin-bottom: 24px;"></div>
+
+          <!-- Recent Announcements -->
+          <div id="wsAnnouncementsList"></div>
+
+          <!-- Empty State -->
+          <div id="wsAnnouncementsEmpty" style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text); display: none;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📢</div>
+            <h3 style="font-size: 18px; margin-bottom: 8px;">No announcements yet</h3>
+            <p>Admins and moderators can post important updates here.</p>
+          </div>
+        </section>
+
+        <div class="ws-empty" id="wsEmptyState" aria-live="polite" style="display: none;">
+          <div class="ws-empty-title">Select a group to start</div>
+          <div class="ws-empty-sub">Open a group from the left sidebar to use Chat, Calls, To‑Do and Notes.</div>
+        </div>
+        <!-- Chat -->
+        <section class="ws-view ws-chat" id="view-chat">
+          <div class="ws-chat-messages" id="wsChatMessages"></div>
+          <div class="ws-chat-input">
+            <textarea class="ws-input" id="wsChatInput" rows="3" placeholder="Message… (Enter to send, Shift+Enter for new line)"></textarea>
+            <div class="ws-input-row">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="wsChatAttach" multiple />
+                <button class="ws-pill" id="wsChatLocation" type="button">Share location</button>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="ws-help" id="wsChatHint">Select a group to start.</div>
+                <button class="ws-pill primary" id="wsChatSend" type="button">Send</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Calls -->
+        <section class="ws-view ws-calls" id="view-calls">
+          <div class="ws-calls-top">
+            <button class="ws-pill" id="wsStartVoice" type="button">Start voice</button>
+            <button class="ws-pill" id="wsStartVideo" type="button">Start video</button>
+            <button class="ws-pill primary" id="wsJoinCall" type="button">Join</button>
+            <button class="ws-pill danger" id="wsLeaveCall" type="button" style="display:none;">Leave</button>
+            <button class="ws-pill" id="wsMute" type="button" disabled>Mute</button>
+            <button class="ws-pill" id="wsCamera" type="button" disabled>Camera off</button>
+            <button class="ws-pill" id="wsScreen" type="button" disabled>Share screen</button>
+            <div class="ws-help" id="wsParticipants" style="margin-left:auto;">Not in a call</div>
+          </div>
+          <div class="ws-video-grid" id="wsVideoGrid"></div>
+        </section>
+
+        <!-- To-Do -->
+        <section class="ws-view ws-board" id="view-todo">
+          <div class="ws-board-top">
+            <div class="ws-help">Create tasks from text or an image (OCR via ML service when available).</div>
+            <div style="display:grid; gap:10px;">
+              <textarea class="ws-input" id="wsTodoText" rows="3" placeholder="One task per line…"></textarea>
+              <div class="ws-input-row">
+                <button class="ws-pill primary" id="wsTodoCreateFromText" type="button">Create from text</button>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <input type="file" id="wsTodoImage" accept="image/*" />
+                  <button class="ws-pill" id="wsTodoCreateFromImage" type="button">Create from image</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ws-columns">
+            <div class="ws-col">
+              <div class="ws-col-head">To do</div>
+              <div class="ws-col-body" id="wsColTodo"></div>
+            </div>
+            <div class="ws-col">
+              <div class="ws-col-head">In progress</div>
+              <div class="ws-col-body" id="wsColInProgress"></div>
+            </div>
+            <div class="ws-col">
+              <div class="ws-col-head">Done</div>
+              <div class="ws-col-body" id="wsColDone"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notes -->
+        <section class="ws-view ws-notes" id="view-notes">
+          <div class="ws-notes-list">
+            <div class="ws-section-header" style="padding: 0 0 10px 0;">
+              <h3>Notes</h3>
+              <button class="ws-pill" id="wsNoteNew" type="button">+ New</button>
+            </div>
+            <div id="wsNotesList"></div>
+          </div>
+
+          <div class="ws-notes-editor">
+            <div class="ws-notes-head">
+              <input class="ws-input" id="wsNoteTitle" placeholder="Note title" />
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button class="ws-pill" id="wsNoteVersions" type="button">Versions</button>
+                <button class="ws-pill primary" id="wsNoteSave" type="button">Save</button>
+              </div>
+            </div>
+            <div class="ws-editor">
+              <textarea class="ws-textarea" id="wsNoteContent" placeholder="Write markdown…"></textarea>
+            </div>
+            <div class="ws-foot">
+              <div class="ws-help" id="wsNoteStatus">Not opened</div>
+              <div class="ws-help">Saved versions are automatic on update.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Right panel -->
+    <aside class="ws-right">
+      <div class="ws-right-inner">
+        <div class="ws-right-tabs">
+          <button class="ws-right-tab active" data-ws-right="files" type="button">Files</button>
+          <button class="ws-right-tab" data-ws-right="members" type="button">Members</button>
+          <button class="ws-right-tab" data-ws-right="announcements" type="button">News</button>
+          <button class="ws-right-tab" data-ws-right="github" type="button">GitHub</button>
+        </div>
+        <div class="ws-right-body" id="wsRightBody"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Ensure auth and socket are ready before the workspace bootstraps.
+    window.InnovateAPI?.requireAuth?.();
+    window.InnovateAPI?.initSocket?.();
+  </script>
+  <script src="/js/community-workspace.js"></script>
+</body>
+</html>
+<!--
+      } catch (error) {
+        console.error('Error loading posts:', error);
+      }
+    }
+
+    async function loadChat() {
+      if (!isMember) {
+        document.getElementById('community-chat-messages').innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Join the community to chat</div>';
+        return;
+      }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/chat`);
+        const container = document.getElementById('community-chat-messages');
+        container.innerHTML = '';
+
+        data.messages.forEach(msg => {
+          const div = document.createElement('div');
+          div.className = 'chat-message';
+          div.innerHTML = `
+            <div class="chat-bubble">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;">${msg.username}</div>
+              ${msg.message}
+              <div style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">${InnovateAPI.formatDate(msg.created_at)}</div>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (error) {
+        console.error('Error loading chat:', error);
+      }
+    }
+
+    async function loadMembers() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/members`);
+        const container = document.getElementById('community-members');
+        container.innerHTML = '';
+
+        data.members.forEach(member => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem;';
+          div.innerHTML = `
+            <img src="${InnovateAPI.getUserAvatar(member.profile_picture)}" style="width: 50px; height: 50px; border-radius: 50%;" alt="${member.username}">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">${member.username}</div>
+              <div style="font-size: 0.875rem; color: var(--text-secondary);">${member.role}</div>
+            </div>
+            ${member.is_online ? '<span class="online-indicator"></span>' : ''}
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading members:', error);
+      }
+    }
+
+    async function loadFiles() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/files`);
+        const container = document.getElementById('community-files');
+        container.innerHTML = '';
+
+        if (data.files.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No files uploaded</div>';
+          return;
+        }
+
+        data.files.forEach(file => {
+          const div = document.createElement('div');
+          div.style.cssText = 'padding: 1rem; border-bottom: 1px solid var(--border-color);';
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600;">📎 ${file.filename}</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                  Uploaded by ${file.username} • ${InnovateAPI.formatDate(file.created_at)}
+                </div>
+              </div>
+              <a href="${file.filepath}" download class="btn btn-outline btn-sm">Download</a>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      } catch (error) {
+        console.error('Error loading files:', error);
+      }
+    }
+
+    async function joinCommunity() {
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined community!', 'success');
+        loadCommunity();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function leaveCommunity() {
+      if (confirm('Are you sure you want to leave this community?')) {
+        try {
+          await InnovateAPI.apiRequest(`/communities/${communityId}/leave`, { method: 'POST' });
+          InnovateAPI.showAlert('Left community', 'success');
+          window.location.href = '/communities';
+        } catch (error) {
+          InnovateAPI.showAlert(error.message, 'error');
+        }
+      }
+    }
+
+    document.getElementById('create-post-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const content = document.getElementById('post-content').value;
+      const images = document.getElementById('post-images').files;
+      const files = document.getElementById('post-files').files;
+
+      const formData = new FormData();
+      formData.append('content', content);
+
+      for (let file of images) {
+        formData.append('images', file);
+      }
+
+      for (let file of files) {
+        formData.append('files', file);
+      }
+
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/posts`, {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('Post created!', 'success');
+        document.getElementById('create-post-form').reset();
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chat-message-input');
+      const message = input.value.trim();
+
+      if (!message) return;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/chat`, {
+          method: 'POST',
+          body: JSON.stringify({ message })
+        });
+
+        socketInstance.emit('community:message', {
+          communityId,
+          message: data.chatMessage
+        });
+
+        input.value = '';
+        loadChat();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('file-upload');
+      const file = fileInput.files[0];
+
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/files`, {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert('File uploaded!', 'success');
+        fileInput.value = '';
+        loadFiles();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Socket listeners
+    socketInstance.on('community:message:receive', (message) => {
+      if (currentTab === 'chat') {
+        loadChat();
+      }
+    });
+
+    // Load groups
+    async function loadGroups() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/groups`);
+        const container = document.getElementById('community-groups');
+        container.innerHTML = '';
+
+        // Show create button if member
+        if (isMember) {
+          document.getElementById('create-group-section').style.display = 'block';
+        }
+
+        if (data.groups.length === 0) {
+          container.innerHTML = '<div class="card" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No groups yet. Create one to get started!</div>';
+          return;
+        }
+
+        data.groups.forEach(group => {
+          const groupEl = document.createElement('div');
+          groupEl.className = 'card';
+          groupEl.style.cursor = 'pointer';
+          groupEl.innerHTML = `
+            <div style="display: flex; gap: 1rem; align-items: start; padding: 1rem;">
+              <div style="flex: 1;">
+                <h3 style="margin: 0 0 0.5rem 0;">${group.name}</h3>
+                <p style="color: var(--text-secondary); margin: 0 0 0.5rem 0;">${group.description || 'No description'}</p>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                  ${group.member_count} members · Created by ${group.creator_username}
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.location.href='/group.html?id=${group.id}'">
+                ${group.is_member ? 'Open' : 'Join'}
+              </button>
+            </div>
+          `;
+          groupEl.onclick = () => window.location.href = `/group.html?id=${group.id}`;
+          container.appendChild(groupEl);
+        });
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      }
+    }
+
+    // Create group form
+    document.getElementById('create-group-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('group-name').value;
+      const description = document.getElementById('group-description').value;
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/communities/${communityId}/groups`, {
+          method: 'POST',
+          body: JSON.stringify({ name, description })
+        });
+
+        InnovateAPI.showAlert('Group created successfully!', 'success');
+        document.getElementById('create-group-form').reset();
+        loadGroups();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    });
+
+    document.getElementById('chat-message-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendChatMessage();
+      }
+    });
+
+    // Add event listeners for tabs
+    document.getElementById('posts-tab').addEventListener('click', () => switchTab('posts'));
+    document.getElementById('groups-tab').addEventListener('click', () => switchTab('groups'));
+    document.getElementById('chat-tab').addEventListener('click', () => switchTab('chat'));
+    document.getElementById('members-tab').addEventListener('click', () => switchTab('members'));
+    document.getElementById('files-tab').addEventListener('click', () => switchTab('files'));
+
+    // Add event listeners for buttons
+    document.getElementById('send-chat-btn')?.addEventListener('click', sendChatMessage);
+    document.getElementById('file-upload')?.addEventListener('change', uploadFile);
+
+    // Initialize
+    loadCommunity();
+    switchTab('posts');
+  </script>
+</body>
+</html>
+
+-->
