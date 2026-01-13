@@ -48,6 +48,12 @@
 
     communityName: document.getElementById('wsCommunityName'),
     communityMeta: document.getElementById('wsCommunityMeta'),
+    
+    // Announcements
+    createAnnouncement: document.getElementById('wsCreateAnnouncement'),
+    announcementsList: document.getElementById('wsAnnouncementsList'),
+    pinnedAnnouncements: document.getElementById('wsPinnedAnnouncements'),
+    announcementsEmpty: document.getElementById('wsAnnouncementsEmpty'),
     leaveBtn: document.getElementById('wsLeaveCommunity'),
 
     groupsList: document.getElementById('wsGroupsList'),
@@ -182,15 +188,25 @@
 
   function setActiveView(view) {
     state.activeView = view;
+    
+    // Handle views object
     for (const [k, node] of Object.entries(el.views)) {
       node.classList.toggle('active', k === view);
     }
+    
+    // Handle announcements view separately
+    const announcementsView = document.getElementById('view-announcements');
+    if (announcementsView) {
+      announcementsView.classList.toggle('active', view === 'announcements');
+    }
+    
     el.tabs.forEach(b => b.classList.toggle('active', b.dataset.wsTab === view));
 
     // lazy load data per view
     if (view === 'chat') loadGroupChat();
     if (view === 'todo') loadGroupTasks();
     if (view === 'notes') loadNotes();
+    if (view === 'announcements') loadAnnouncements();
   }
 
   function setRightTab(tab) {
@@ -276,6 +292,252 @@
     const data = await InnovateAPI.apiRequest(`/communities/${communityId}`);
     state.community = data.community;
     renderCommunity();
+    await loadAnnouncements(); // Load announcements when community loads
+  }
+
+  async function loadAnnouncements() {
+    try {
+      const data = await InnovateAPI.apiRequest(`/communities/${communityId}/announcements`);
+      state.announcements = data.announcements || [];
+      renderAnnouncements();
+    } catch (e) {
+      console.error('Error loading announcements:', e);
+    }
+  }
+
+  function renderAnnouncements() {
+    if (!el.announcementsList || !el.pinnedAnnouncements) return;
+
+    const pinned = state.announcements.filter(a => a.is_pinned);
+    const regular = state.announcements.filter(a => !a.is_pinned);
+
+    // Show create button for ALL members (for testing) - in production, restrict to admins
+    const user = InnovateAPI.getCurrentUser();
+    // Temporarily allow everyone to create announcements for testing
+    // TODO: In production, restrict to: state.community && (state.community.admin_id === user.id || state.community.role === 'moderator')
+    const isAdminOrMod = true;
+    
+    if (el.createAnnouncement) {
+      el.createAnnouncement.style.display = isAdminOrMod ? 'inline-block' : 'none';
+      console.log('Create announcement button should be visible:', isAdminOrMod);
+    }
+
+    // Render pinned announcements
+    el.pinnedAnnouncements.innerHTML = '';
+    pinned.forEach(a => {
+      const card = createAnnouncementCard(a, true);
+      el.pinnedAnnouncements.appendChild(card);
+    });
+
+    // Render regular announcements
+    el.announcementsList.innerHTML = '';
+    regular.forEach(a => {
+      const card = createAnnouncementCard(a, false);
+      el.announcementsList.appendChild(card);
+    });
+
+    // Show empty state if no announcements
+    if (el.announcementsEmpty) {
+      el.announcementsEmpty.style.display = state.announcements.length === 0 ? 'block' : 'none';
+    }
+  }
+
+  function createAnnouncementCard(announcement, isPinned) {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      ${isPinned ? 'border-left: 4px solid #0095f6;' : ''}
+    `;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;';
+    
+    const headerLeft = document.createElement('div');
+    headerLeft.style.flex = '1';
+    
+    const titleRow = document.createElement('div');
+    titleRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 4px;';
+    
+    if (isPinned) {
+      const pin = document.createElement('span');
+      pin.textContent = '📌';
+      pin.style.fontSize = '18px';
+      titleRow.appendChild(pin);
+    }
+    
+    const title = document.createElement('h3');
+    title.textContent = announcement.title;
+    title.style.cssText = 'font-size: 18px; font-weight: 600; margin: 0;';
+    titleRow.appendChild(title);
+    
+    const author = document.createElement('div');
+    author.style.cssText = 'font-size: 13px; color: var(--ig-secondary-text);';
+    author.textContent = `By ${announcement.author_username} • ${InnovateAPI.formatDate(announcement.created_at)}`;
+    
+    headerLeft.appendChild(titleRow);
+    headerLeft.appendChild(author);
+    
+    // Actions for admin/moderator
+    const user = InnovateAPI.getCurrentUser();
+    const isAdminOrMod = state.community && (
+      state.community.admin_id === user.id || 
+      announcement.author_id === user.id
+    );
+    
+    if (isAdminOrMod) {
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display: flex; gap: 8px;';
+      
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'ws-pill';
+      pinBtn.textContent = isPinned ? 'Unpin' : 'Pin';
+      pinBtn.onclick = () => togglePinAnnouncement(announcement.id, !isPinned);
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'ws-pill danger';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.onclick = () => deleteAnnouncement(announcement.id);
+      
+      actions.appendChild(pinBtn);
+      actions.appendChild(deleteBtn);
+      header.appendChild(actions);
+    }
+    
+    header.appendChild(headerLeft);
+    
+    const body = document.createElement('div');
+    body.style.cssText = 'color: var(--ig-primary-text); line-height: 1.6; white-space: pre-wrap;';
+    body.textContent = announcement.body;
+    
+    card.appendChild(header);
+    card.appendChild(body);
+    
+    return card;
+  }
+
+  async function createAnnouncement() {
+    const title = prompt('Announcement title:');
+    if (!title) return;
+    // Create a modal for better UX
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+    
+    const form = document.createElement('div');
+    form.style.cssText = `
+      background: var(--ig-primary-background);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    `;
+    
+    form.innerHTML = `
+      <h3 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">📢 Create Announcement</h3>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Title:</label>
+        <input type="text" id="announcementTitle" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; font-size: 14px; background: var(--ig-secondary-background); color: var(--ig-primary-text);" placeholder="e.g., Exam Schedule Updated">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Message:</label>
+        <textarea id="announcementBody" rows="5" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; font-size: 14px; resize: vertical; background: var(--ig-secondary-background); color: var(--ig-primary-text);" placeholder="Write your announcement message here..."></textarea>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button id="cancelAnnouncement" class="ws-pill" style="padding: 10px 20px;">Cancel</button>
+        <button id="submitAnnouncement" class="ws-pill primary" style="padding: 10px 20px;">Create Announcement</button>
+      </div>
+    `;
+    
+    modal.appendChild(form);
+    document.body.appendChild(modal);
+    
+    const titleInput = document.getElementById('announcementTitle');
+    const bodyInput = document.getElementById('announcementBody');
+    
+    titleInput.focus();
+    
+    document.getElementById('cancelAnnouncement').onclick = () => {
+      document.body.removeChild(modal);
+    };
+    
+    document.getElementById('submitAnnouncement').onclick = async () => {
+      const title = titleInput.value.trim();
+      const body = bodyInput.value.trim();
+      
+      if (!title) {
+        InnovateAPI.showAlert('Please enter a title', 'error');
+        return;
+      }
+      
+      if (!body) {
+        InnovateAPI.showAlert('Please enter a message', 'error');
+        return;
+      }
+      
+      try {
+        await InnovateAPI.apiRequest(`/communities/${communityId}/announcements`, {
+          method: 'POST',
+          body: JSON.stringify({ title, body, is_pinned: false })
+        });
+        
+        InnovateAPI.showAlert('Announcement created! Everyone can see it now.', 'success');
+        document.body.removeChild(modal);
+        await loadAnnouncements();
+      } catch (e) {
+        InnovateAPI.showAlert(e.message || 'Failed to create announcement', 'error');
+      }
+    };
+    
+    // Close on background click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    };
+  }
+
+  async function togglePinAnnouncement(announcementId, isPinned) {
+    try {
+      await InnovateAPI.apiRequest(`/communities/${communityId}/announcements/${announcementId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_pinned: isPinned })
+      });
+      
+      InnovateAPI.showAlert(isPinned ? 'Announcement pinned!' : 'Announcement unpinned!', 'success');
+      await loadAnnouncements();
+    } catch (e) {
+      InnovateAPI.showAlert(e.message || 'Failed to update announcement', 'error');
+    }
+  }
+
+  async function deleteAnnouncement(announcementId) {
+    if (!confirm('Delete this announcement?')) return;
+    
+    try {
+      await InnovateAPI.apiRequest(`/communities/${communityId}/announcements/${announcementId}`, {
+        method: 'DELETE'
+      });
+      
+      InnovateAPI.showAlert('Announcement deleted!', 'success');
+      await loadAnnouncements();
+    } catch (e) {
+      InnovateAPI.showAlert(e.message || 'Failed to delete announcement', 'error');
+    }
   }
 
   async function loadGroups() {
@@ -1115,6 +1377,13 @@
       createGroup().catch(e => InnovateAPI.showAlert(e.message, 'error'));
     });
 
+    // Announcements
+    if (el.createAnnouncement) {
+      el.createAnnouncement.addEventListener('click', () => {
+        createAnnouncement().catch(e => InnovateAPI.showAlert(e.message, 'error'));
+      });
+    }
+
     el.tabs.forEach(b => b.addEventListener('click', () => setActiveView(b.dataset.wsTab)));
     el.rightTabs.forEach(b => b.addEventListener('click', async () => {
       setRightTab(b.dataset.wsRight);
@@ -1159,10 +1428,10 @@
     // initial theme label
     el.themeToggle.textContent = igTheme.getTheme() === 'dark' ? 'Light' : 'Dark';
 
-    setActiveView('chat');
+    setActiveView('announcements'); // Start with announcements
     setRightTab('files');
     renderParticipants();
-  }
+  } // End bind()
 
   async function init() {
     bind();
@@ -1175,3 +1444,4 @@
     InnovateAPI.showAlert(err.message || 'Failed to load workspace', 'error');
   });
 })();
+

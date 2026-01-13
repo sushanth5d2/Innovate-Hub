@@ -51,7 +51,8 @@
         </div>
 
         <div class="ws-tabs">
-          <button class="ws-tab active" data-ws-tab="chat" type="button">Chat</button>
+          <button class="ws-tab active" data-ws-tab="announcements" type="button">📢 Announcements</button>
+          <button class="ws-tab" data-ws-tab="chat" type="button">Chat</button>
           <button class="ws-tab" data-ws-tab="calls" type="button">Calls</button>
           <button class="ws-tab" data-ws-tab="todo" type="button">To-Do</button>
           <button class="ws-tab" data-ws-tab="notes" type="button">Notes</button>
@@ -59,12 +60,36 @@
       </div>
 
       <div class="ws-main-body">
-        <div class="ws-empty" id="wsEmptyState" aria-live="polite">
+        <!-- Announcements Section -->
+        <section class="ws-view active" id="view-announcements" style="padding: 20px;">
+          <div style="margin-bottom: 24px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h2 style="font-size: 24px; font-weight: 600; margin: 0;">📢 Community Announcements</h2>
+              <button class="ws-pill primary" id="wsCreateAnnouncement" type="button" style="font-size: 16px; padding: 12px 24px;">+ New Announcement</button>
+            </div>
+            <p style="color: var(--ig-secondary-text); margin: 0;">Important updates from admins and moderators visible to everyone in the community.</p>
+          </div>
+
+          <!-- Pinned Announcements -->
+          <div id="wsPinnedAnnouncements" style="margin-bottom: 24px;"></div>
+
+          <!-- Recent Announcements -->
+          <div id="wsAnnouncementsList"></div>
+
+          <!-- Empty State -->
+          <div id="wsAnnouncementsEmpty" style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text); display: none;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📢</div>
+            <h3 style="font-size: 18px; margin-bottom: 8px;">No announcements yet</h3>
+            <p>Admins and moderators can post important updates here.</p>
+          </div>
+        </section>
+
+        <div class="ws-empty" id="wsEmptyState" aria-live="polite" style="display: none;">
           <div class="ws-empty-title">Select a group to start</div>
           <div class="ws-empty-sub">Open a group from the left sidebar to use Chat, Calls, To‑Do and Notes.</div>
         </div>
         <!-- Chat -->
-        <section class="ws-view ws-chat active" id="view-chat">
+        <section class="ws-view ws-chat" id="view-chat">
           <div class="ws-chat-messages" id="wsChatMessages"></div>
           <div class="ws-chat-input">
             <textarea class="ws-input" id="wsChatInput" rows="3" placeholder="Message… (Enter to send, Shift+Enter for new line)"></textarea>

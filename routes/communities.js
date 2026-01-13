@@ -566,4 +566,45 @@ router.patch('/:communityId/announcements/:announcementId', authMiddleware, (req
   );
 });
 
+// Delete announcement (admin/moderator/author)
+router.delete('/:communityId/announcements/:announcementId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, announcementId } = req.params;
+  const userId = req.user.userId;
+
+  // Check if user is member with proper role
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      // Check if user is author or admin/moderator
+      db.get(
+        'SELECT * FROM community_announcements WHERE id = ? AND community_id = ?',
+        [announcementId, communityId],
+        (e, existing) => {
+          if (e || !existing) return res.status(404).json({ error: 'Announcement not found' });
+
+          const isAuthor = existing.author_id === userId;
+          const isAdminOrMod = member.role === 'admin' || member.role === 'moderator';
+
+          if (!isAuthor && !isAdminOrMod) {
+            return res.status(403).json({ error: 'Only author or admins/moderators can delete' });
+          }
+
+          db.run(
+            'DELETE FROM community_announcements WHERE id = ?',
+            [announcementId],
+            function(err2) {
+              if (err2) return res.status(500).json({ error: 'Error deleting announcement' });
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;
