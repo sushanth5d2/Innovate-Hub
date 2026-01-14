@@ -513,17 +513,21 @@ router.post('/:communityId/announcements', authMiddleware, upload.array('files',
 
       // Add uploaded files to attachments
       if (req.files && req.files.length > 0) {
-        // Get the base URL from the request
-        const protocol = req.protocol;
-        const host = req.get('host');
-        const baseUrl = `${protocol}://${host}`;
-        
-        attachmentsData.files = req.files.map(file => ({
-          name: file.originalname,
-          url: `${baseUrl}/uploads/${file.filename}`,
-          size: `${(file.size / 1024).toFixed(1)} KB`,
-          type: file.mimetype
-        }));
+        // Store relative paths - frontend will construct full URL
+        // Determine correct folder based on file type (matching multer logic)
+        attachmentsData.files = req.files.map(file => {
+          let folder = 'files';
+          if (file.mimetype.startsWith('image/')) {
+            folder = 'images';
+          }
+          
+          return {
+            name: file.originalname,
+            url: `/uploads/${folder}/${file.filename}`,
+            size: `${(file.size / 1024).toFixed(1)} KB`,
+            type: file.mimetype
+          };
+        });
       }
 
       const attachmentsString = JSON.stringify(attachmentsData);
@@ -627,6 +631,109 @@ router.delete('/:communityId/announcements/:announcementId', authMiddleware, (re
             function(err2) {
               if (err2) return res.status(500).json({ error: 'Error deleting announcement' });
               res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Vote on poll
+router.post('/:communityId/announcements/:announcementId/vote', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, announcementId } = req.params;
+  const { optionIndex } = req.body;
+  const userId = req.user.userId;
+
+  if (typeof optionIndex !== 'number' || optionIndex < 0) {
+    return res.status(400).json({ error: 'Invalid option index' });
+  }
+
+  // Check if user is member
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member to vote' });
+
+      // Get announcement
+      db.get(
+        'SELECT * FROM community_announcements WHERE id = ? AND community_id = ?',
+        [announcementId, communityId],
+        (err, announcement) => {
+          if (err || !announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+          }
+
+          let attachments = {};
+          try {
+            attachments = JSON.parse(announcement.attachments || '{}');
+          } catch (e) {
+            attachments = {};
+          }
+
+          if (!attachments.poll) {
+            return res.status(400).json({ error: 'This announcement has no poll' });
+          }
+
+          // Validate option index
+          if (optionIndex >= attachments.poll.options.length) {
+            return res.status(400).json({ error: 'Invalid option index' });
+          }
+
+          // Initialize votes structure if not exists
+          if (!attachments.poll.votes) {
+            attachments.poll.votes = [];
+          }
+
+          // Remove any previous vote from this user
+          attachments.poll.votes = attachments.poll.votes.filter(vote => vote.userId !== userId);
+
+          // Add new vote
+          attachments.poll.votes.push({
+            userId: userId,
+            optionIndex: optionIndex,
+            timestamp: new Date().toISOString()
+          });
+
+          // Calculate vote counts
+          const voteCounts = new Array(attachments.poll.options.length).fill(0);
+          attachments.poll.votes.forEach(vote => {
+            if (vote.optionIndex >= 0 && vote.optionIndex < voteCounts.length) {
+              voteCounts[vote.optionIndex]++;
+            }
+          });
+
+          // Update announcement
+          db.run(
+            'UPDATE community_announcements SET attachments = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [JSON.stringify(attachments), announcementId],
+            function(err) {
+              if (err) {
+                console.error('Vote update error:', err);
+                return res.status(500).json({ error: 'Error recording vote' });
+              }
+
+              const totalVotes = attachments.poll.votes.length;
+              const results = {
+                options: attachments.poll.options,
+                voteCounts: voteCounts,
+                totalVotes: totalVotes,
+                userVote: optionIndex,
+                percentages: voteCounts.map(count => totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0)
+              };
+
+              // Emit socket event for real-time updates
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`community_${communityId}`).emit('poll:voted', {
+                  announcementId,
+                  results
+                });
+              }
+
+              res.json({ success: true, results });
             }
           );
         }

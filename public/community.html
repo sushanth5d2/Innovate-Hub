@@ -821,11 +821,23 @@
     <!-- LEFT SIDEBAR -->
     <div class="community-left" id="communityLeft">
       <div class="left-header">
-        <div class="community-title">
-          <i class="fas fa-users"></i>
-          <span id="communityName">Loading...</span>
+        <div style="display: flex; align-items: center; gap: 8px; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+            <button onclick="window.location.href='/communities'" style="width: 40px; height: 40px; border-radius: 10px; background: var(--ig-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; font-size: 18px; box-shadow: 0 2px 4px rgba(0, 149, 246, 0.3);" onmouseover="this.style.background='#0081d5'" onmouseout="this.style.background='var(--ig-blue)'" title="Back to Communities">
+              <i class="fas fa-arrow-left"></i>
+            </button>
+            <div style="flex: 1; min-width: 0;">
+              <div class="community-title">
+                <i class="fas fa-users"></i>
+                <span id="communityName">Loading...</span>
+              </div>
+              <div class="community-subtitle" id="communitySubtitle">Community</div>
+            </div>
+          </div>
+          <button onclick="toggleTheme()" style="width: 40px; height: 40px; border-radius: 50%; background: #FFD700; color: #000; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; font-size: 18px; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);" onmouseover="this.style.background='#FFC700'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#FFD700'; this.style.transform='scale(1)'" title="Toggle Theme">
+            <i class="fas fa-moon" id="themeIcon"></i>
+          </button>
         </div>
-        <div class="community-subtitle" id="communitySubtitle">Community</div>
       </div>
 
       <div class="left-tabs">
@@ -982,6 +994,9 @@
       state.user = InnovateAPI.getCurrentUser();
       state.socket = InnovateAPI.initSocket();
       
+      // Initialize theme icon
+      initializeThemeIcon();
+      
       // Get community ID from URL
       const urlParams = new URLSearchParams(window.location.search);
       state.communityId = urlParams.get('id') || window.location.pathname.split('/').pop();
@@ -1013,6 +1028,22 @@
 
       state.socket.on('group:message', (data) => {
         if (data.groupId == state.currentGroupId) appendChatMessage(data.message);
+      });
+      
+      state.socket.on('poll:voted', (data) => {
+        // Update poll display in real-time if viewing this announcement
+        const pollElement = document.getElementById(`poll-${data.announcementId}`);
+        if (pollElement) {
+          const poll = {
+            question: data.results.options.join(' / '), // This will be replaced by actual poll data
+            options: data.results.options,
+            votes: [] // Backend sends counts directly, not individual votes
+          };
+          // Just reload the announcement to get fresh data
+          if (state.currentLeftTab === 'announcements' && state.currentAnnouncementId === data.announcementId) {
+            viewAnnouncement(data.announcementId);
+          }
+        }
       });
 
       state.socket.on('call:offer', handleCallOffer);
@@ -1176,7 +1207,7 @@
           
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
             <!-- Images Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+            <div onclick="loadAnnouncementFiles('images')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-image"></i>
               </div>
@@ -1185,7 +1216,7 @@
             </div>
 
             <!-- Videos Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+            <div onclick="loadAnnouncementFiles('videos')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-video"></i>
               </div>
@@ -1194,7 +1225,7 @@
             </div>
 
             <!-- Documents Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+            <div onclick="loadAnnouncementFiles('documents')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-file-alt"></i>
               </div>
@@ -1203,7 +1234,7 @@
             </div>
 
             <!-- Links Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;">
+            <div onclick="loadAnnouncementFiles('links')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-link"></i>
               </div>
@@ -1297,6 +1328,172 @@
           </div>
         </div>
       `;
+    }
+    
+    async function loadAnnouncementFiles(type) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements`);
+        const announcements = res.announcements || [];
+        
+        // Extract all files from announcements
+        const allFiles = [];
+        announcements.forEach(ann => {
+          if (ann.attachments) {
+            try {
+              const attachments = JSON.parse(ann.attachments);
+              if (attachments.files && Array.isArray(attachments.files)) {
+                attachments.files.forEach(file => {
+                  allFiles.push({
+                    ...file,
+                    announcementId: ann.id,
+                    announcementTitle: ann.title,
+                    createdAt: ann.created_at
+                  });
+                });
+              }
+              
+              // Add links if type is 'links'
+              if (type === 'links' && attachments.links && Array.isArray(attachments.links)) {
+                attachments.links.forEach(link => {
+                  allFiles.push({
+                    ...link,
+                    type: 'link',
+                    announcementId: ann.id,
+                    announcementTitle: ann.title,
+                    createdAt: ann.created_at
+                  });
+                });
+              }
+            } catch (e) {
+              console.error('Error parsing attachments:', e);
+            }
+          }
+        });
+        
+        // Filter by type
+        let filteredFiles = allFiles;
+        if (type === 'images') {
+          filteredFiles = allFiles.filter(f => f.type && f.type.startsWith('image/'));
+        } else if (type === 'videos') {
+          filteredFiles = allFiles.filter(f => f.type && f.type.startsWith('video/'));
+        } else if (type === 'documents') {
+          filteredFiles = allFiles.filter(f => f.type && (f.type.includes('pdf') || f.type.includes('document') || f.type.includes('msword')));
+        } else if (type === 'links') {
+          filteredFiles = allFiles.filter(f => f.type === 'link');
+        }
+        
+        // Display files
+        const centerContent = document.getElementById('centerContent');
+        const typeIcon = type === 'images' ? 'fa-image' : type === 'videos' ? 'fa-video' : type === 'documents' ? 'fa-file-alt' : 'fa-link';
+        const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+        
+        centerContent.innerHTML = `
+          <div style="padding: 24px; max-width: 1200px; margin: 0 auto;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <button onclick="openAnnouncementsFolder()" style="width: 44px; height: 44px; border-radius: 12px; background: var(--ig-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,149,246,0.3);" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,149,246,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px rgba(0,149,246,0.3)'">
+                  <i class="fas fa-arrow-left" style="font-size: 18px;"></i>
+                </button>
+                <div>
+                  <h2 style="margin: 0; font-size: 22px; display: flex; align-items: center; gap: 12px;">
+                    <i class="fas ${typeIcon}" style="color: var(--ig-blue);"></i>
+                    ${typeLabel}
+                  </h2>
+                  <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
+                    ${filteredFiles.length} ${filteredFiles.length === 1 ? 'item' : 'items'} found
+                  </div>
+                </div>
+              </div>
+              <button onclick="openAnnouncementsFolder()" style="padding: 10px 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='var(--ig-hover)'" onmouseout="this.style.background='var(--ig-secondary-background)'">
+                <i class="fas fa-arrow-left"></i> Back to Folders
+              </button>
+            </div>
+            
+            ${filteredFiles.length === 0 ? `
+              <div class="empty-state">
+                <div class="empty-icon"><i class="fas ${typeIcon}"></i></div>
+                <div class="empty-title">No ${type} found</div>
+                <div class="empty-text">Upload files in announcements to see them here</div>
+              </div>
+            ` : `
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(${type === 'links' ? '100%' : '280px'}, 1fr)); gap: 16px;">
+                ${filteredFiles.map(file => {
+                  if (type === 'links') {
+                    return `
+                      <a href="${file.url}" target="_blank" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; text-decoration: none; transition: all 0.2s; display: flex; align-items: center; gap: 16px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="width: 48px; height: 48px; border-radius: 10px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                          <i class="fas fa-external-link-alt" style="color: white; font-size: 20px;"></i>
+                        </div>
+                        <div style="flex: 1; min-width: 0;">
+                          <div style="font-weight: 600; font-size: 15px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.title || 'Untitled Link'}</div>
+                          <div style="font-size: 13px; color: var(--ig-blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;">${file.url}</div>
+                          <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">From: ${file.announcementTitle}</div>
+                        </div>
+                        <i class="fas fa-chevron-right" style="color: var(--ig-secondary-text);"></i>
+                      </a>
+                    `;
+                  }
+                  
+                  // Normalize URL
+                  let fileUrl = file.url;
+                  if (!fileUrl.startsWith('http')) {
+                    fileUrl = window.location.origin + (fileUrl.startsWith('/') ? fileUrl : '/' + fileUrl);
+                  } else {
+                    try {
+                      const urlObj = new URL(fileUrl);
+                      urlObj.protocol = window.location.protocol;
+                      urlObj.host = window.location.host;
+                      fileUrl = urlObj.toString();
+                    } catch (e) {
+                      const pathMatch = fileUrl.match(/\/uploads\/.+$/);
+                      if (pathMatch) {
+                        fileUrl = window.location.origin + pathMatch[0];
+                      }
+                    }
+                  }
+                  
+                  const extension = file.name.split('.').pop().toLowerCase();
+                  const isImage = type === 'images';
+                  const isVideo = type === 'videos';
+                  
+                  return `
+                    <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; overflow: hidden; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                      ${isImage ? `
+                        <div onclick="window.open('${fileUrl}', '_blank')" style="width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; cursor: pointer; position: relative;">
+                          <img src="${fileUrl}" alt="${file.name}" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#888;\\'><i class=\\'fas fa-image\\' style=\\'font-size:48px;\\'></i></div>'">
+                        </div>
+                      ` : isVideo ? `
+                        <div style="width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden;">
+                          <video controls style="width: 100%; height: 100%; object-fit: contain; display: block;">
+                            <source src="${fileUrl}" type="${file.type}">
+                          </video>
+                        </div>
+                      ` : `
+                        <div onclick="window.open('${fileUrl}', '_blank')" style="width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; gap: 12px;">
+                          <i class="fas fa-file-pdf" style="font-size: 72px; color: rgba(255,255,255,0.95);"></i>
+                          <span style="color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 600;">Click to view</span>
+                        </div>
+                      `}
+                      
+                      <div style="padding: 12px;">
+                        <div style="font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ig-primary-text); margin-bottom: 4px;" title="${file.name}">${file.name}</div>
+                        <div style="font-size: 12px; color: var(--ig-secondary-text); margin-bottom: 8px;">${file.size || 'Unknown size'}</div>
+                        <div style="font-size: 11px; color: var(--ig-secondary-text); border-top: 1px solid var(--ig-border); padding-top: 8px;">
+                          From: ${file.announcementTitle}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        `;
+        
+      } catch (error) {
+        console.error('Error loading files:', error);
+        InnovateAPI.showAlert('Error loading files', 'error');
+      }
     }
 
     function renderGitHubView() {
@@ -1431,6 +1628,7 @@
           let attachments = [];
           let links = [];
           let location = null;
+          let poll = null;
           
           try {
             if (ann.attachments) {
@@ -1438,6 +1636,7 @@
               attachments = parsed.files || [];
               links = parsed.links || [];
               location = parsed.location || null;
+              poll = parsed.poll || null;
             }
           } catch (e) {}
           
@@ -1481,8 +1680,27 @@
                       const extension = file.name.split('.').pop().toLowerCase();
                       const mimeType = file.type || '';
                       
-                      // Fix URL if it's relative
-                      const fileUrl = file.url.startsWith('http') ? file.url : window.location.origin + file.url;
+                      // Normalize URL - handle both full URLs and relative paths
+                      let fileUrl = file.url;
+                      if (!fileUrl.startsWith('http')) {
+                        // Relative path - prepend origin
+                        fileUrl = window.location.origin + (fileUrl.startsWith('/') ? fileUrl : '/' + fileUrl);
+                      } else {
+                        // Full URL - ensure it uses the correct protocol and host
+                        try {
+                          const urlObj = new URL(fileUrl);
+                          // Replace the URL's origin with current origin to avoid protocol/host mismatches
+                          urlObj.protocol = window.location.protocol;
+                          urlObj.host = window.location.host;
+                          fileUrl = urlObj.toString();
+                        } catch (e) {
+                          // If URL parsing fails, try to extract just the path
+                          const pathMatch = fileUrl.match(/\/uploads\/.+$/);
+                          if (pathMatch) {
+                            fileUrl = window.location.origin + pathMatch[0];
+                          }
+                        }
+                      }
                       
                       // Determine file type
                       const isImage = mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension);
@@ -1576,6 +1794,15 @@
                       <div style="font-size: 13px; color: var(--ig-secondary-text);">${location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}</div>
                     </div>
                   </a>
+                </div>
+              ` : ''}
+              
+              ${poll ? `
+                <div style="margin-bottom: 20px;" id="poll-${announcement.id}">
+                  <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
+                    <i class="fas fa-poll" style="color: #4facfe;"></i> Poll
+                  </h3>
+                  ${renderPollResults(announcement.id, poll)}
                 </div>
               ` : ''}
             </div>
@@ -2037,7 +2264,7 @@
           method: 'POST',
           body: JSON.stringify({ description: `${title}\n${description || ''}` })
         });
-        InnovateAPI.showAlert('Task created!', 'success');
+        console.log('Task created successfully');
         loadTasksView(state.currentGroupId);
       } catch (error) {
         console.error('Error creating task:', error);
@@ -2062,7 +2289,7 @@
             body: formData
           });
           const data = await res.json();
-          InnovateAPI.showAlert('Tasks extracted from image!', 'success');
+          console.log('Tasks extracted from image successfully');
           loadTasksView(state.currentGroupId);
         } catch (error) {
           console.error('Error:', error);
@@ -2072,7 +2299,7 @@
     }
 
     function createTaskFromVoice() {
-      InnovateAPI.showAlert('Voice-to-task feature coming soon!', 'info');
+      console.log('Voice-to-task feature coming soon!');
       // Implement voice recording and transcription
     }
 
@@ -2197,7 +2424,7 @@
           body: JSON.stringify({ name, description })
         });
         
-        InnovateAPI.showAlert('Group created!', 'success');
+        console.log('Group created successfully');
         closeModal();
         await loadGroups();
         
@@ -2251,7 +2478,7 @@
               <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
             </label>
             <div style="position: relative; border: 2px dashed var(--ig-border); border-radius: 12px; padding: 24px; text-align: center; background: var(--ig-secondary-background); transition: all 0.2s; cursor: pointer;" onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='var(--ig-border)'">
-              <input type="file" id="announcementFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+              <input type="file" id="announcementFiles" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;" onchange="handleAnnouncementFilesChange(event)">
               <div style="pointer-events: none;">
                 <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
                   <i class="fas fa-cloud-upload-alt"></i>
@@ -2267,6 +2494,20 @@
                   <span><i class="fas fa-file-word"></i> Documents</span>
                 </div>
               </div>
+            </div>
+            
+            <!-- Selected Files Preview -->
+            <div id="announcementFilesPreview" style="display: none; margin-top: 16px; padding: 16px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+                  <i class="fas fa-file-alt" style="color: #667eea;"></i>
+                  <span id="announcementFilesCount">0 files selected</span>
+                </div>
+                <button type="button" onclick="clearAnnouncementFiles()" style="padding: 6px 12px; background: var(--ig-error); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                  <i class="fas fa-times"></i> Clear All
+                </button>
+              </div>
+              <div id="announcementFilesList" style="display: grid; gap: 8px; max-height: 200px; overflow-y: auto;"></div>
             </div>
           </div>
           
@@ -2301,6 +2542,24 @@
               </div>
               <button type="button" onclick="getCurrentLocation()" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(245, 87, 108, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                 <i class="fas fa-crosshairs"></i> Use Current Location
+              </button>
+            </div>
+          </div>
+          
+          <!-- Poll Section -->
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--ig-secondary-background); border-radius: 12px; border: 1px solid var(--ig-border);">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="announcementAddPoll" onchange="toggleAnnouncementPoll()" style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+              <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px;">
+                <i class="fas fa-poll" style="color: #4facfe;"></i>
+                <span>Add Poll</span>
+              </div>
+            </label>
+            <div id="announcementPollInput" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ig-border);">
+              <input type="text" id="pollQuestion" placeholder="Poll question (e.g., What's your favorite feature?)" style="width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none; font-weight: 600;">
+              <div id="pollOptions" style="margin-bottom: 12px;"></div>
+              <button type="button" onclick="addPollOption()" style="width: 100%; padding: 10px; background: var(--ig-secondary-background); border: 2px dashed var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px;" onmouseover="this.style.borderColor='#4facfe'; this.style.background='rgba(79, 172, 254, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-secondary-background)'">
+                <i class="fas fa-plus-circle"></i> Add Option
               </button>
             </div>
           </div>
@@ -2360,12 +2619,264 @@
         (position) => {
           document.getElementById('announcementLocationLat').value = position.coords.latitude;
           document.getElementById('announcementLocationLng').value = position.coords.longitude;
-          InnovateAPI.showAlert('Location detected!', 'success');
+          console.log('Location detected:', position.coords.latitude, position.coords.longitude);
         },
         (error) => {
           console.error('Could not get location:', error.message);
         }
       );
+    }
+    
+    // Poll functions
+    function toggleAnnouncementPoll() {
+      const checkbox = document.getElementById('announcementAddPoll');
+      const pollInput = document.getElementById('announcementPollInput');
+      pollInput.style.display = checkbox.checked ? 'block' : 'none';
+      
+      // Add default 2 options when enabling poll
+      if (checkbox.checked) {
+        const container = document.getElementById('pollOptions');
+        if (container.children.length === 0) {
+          addPollOption();
+          addPollOption();
+        }
+      }
+    }
+    
+    let pollOptionCounter = 0;
+    function addPollOption() {
+      const container = document.getElementById('pollOptions');
+      pollOptionCounter++;
+      const optionId = `pollOption_${pollOptionCounter}`;
+      
+      const optionDiv = document.createElement('div');
+      optionDiv.id = optionId;
+      optionDiv.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+      optionDiv.innerHTML = `
+        <div style="width: 28px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ig-secondary-text);">
+          ${container.children.length + 1}
+        </div>
+        <input type="text" class="poll-option-text" placeholder="Option ${container.children.length + 1}" style="flex: 1; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none; font-size: 14px;">
+        ${container.children.length >= 2 ? `
+          <button type="button" onclick="document.getElementById('${optionId}').remove(); updatePollOptionNumbers()" style="width: 40px; height: 40px; background: var(--ig-error); color: white; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fas fa-times"></i>
+          </button>
+        ` : ''}
+      `;
+      container.appendChild(optionDiv);
+    }
+    
+    function updatePollOptionNumbers() {
+      const container = document.getElementById('pollOptions');
+      Array.from(container.children).forEach((div, index) => {
+        const numberEl = div.querySelector('div');
+        if (numberEl) numberEl.textContent = index + 1;
+        const input = div.querySelector('input');
+        if (input && !input.value) input.placeholder = `Option ${index + 1}`;
+      });
+    }
+    
+    // Poll voting functions
+    function renderPollResults(announcementId, poll) {
+      const votes = poll.votes || [];
+      const totalVotes = votes.length;
+      const voteCounts = new Array(poll.options.length).fill(0);
+      
+      // Count votes
+      votes.forEach(vote => {
+        if (vote.optionIndex >= 0 && vote.optionIndex < voteCounts.length) {
+          voteCounts[vote.optionIndex]++;
+        }
+      });
+      
+      // Check if current user has voted
+      const currentUserId = InnovateAPI.getCurrentUser()?.id;
+      const userVote = votes.find(v => v.userId === currentUserId);
+      const userVotedIndex = userVote ? userVote.optionIndex : -1;
+      
+      return `
+        <div style="background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; padding: 20px;">
+          <div style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--ig-primary-text);">${poll.question}</div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${poll.options.map((option, index) => {
+              const count = voteCounts[index];
+              const percentage = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+              const isUserVote = index === userVotedIndex;
+              const borderColor = isUserVote ? '#4facfe' : 'var(--ig-border)';
+              
+              return `
+                <div 
+                  onclick="votePoll(${announcementId}, ${index})" 
+                  style="position: relative; background: var(--ig-primary-background); border: 2px solid ${borderColor}; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; overflow: hidden;"
+                  onmouseover="if (!${isUserVote}) this.style.borderColor='#4facfe'; this.style.transform='translateX(4px)'" 
+                  onmouseout="if (!${isUserVote}) this.style.borderColor='var(--ig-border)'; this.style.transform='translateX(0)'"
+                >
+                  <!-- Progress bar background -->
+                  <div style="position: absolute; left: 0; top: 0; height: 100%; width: ${percentage}%; background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%); transition: width 0.3s ease; border-radius: 8px;"></div>
+                  
+                  <!-- Content -->
+                  <div style="position: relative; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;">${index + 1}</div>
+                  <div style="position: relative; flex: 1; font-size: 15px; font-weight: 500; color: var(--ig-primary-text);">${option}</div>
+                  ${totalVotes > 0 ? `
+                    <div style="position: relative; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text); margin-right: 8px;">${count} (${percentage}%)</div>
+                  ` : ''}
+                  ${isUserVote ? `
+                    <i class="fas fa-check-circle" style="position: relative; color: #4facfe; font-size: 18px;"></i>
+                  ` : `
+                    <i class="far fa-circle" style="position: relative; color: var(--ig-secondary-text); font-size: 18px;"></i>
+                  `}
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ig-border); font-size: 13px; color: var(--ig-secondary-text); text-align: center;">
+            ${totalVotes === 0 ? `
+              <i class="fas fa-info-circle"></i> Be the first to vote!
+            ` : `
+              <i class="fas fa-chart-bar"></i> ${totalVotes} ${totalVotes === 1 ? 'vote' : 'votes'} total
+            `}
+          </div>
+        </div>
+      `;
+    }
+    
+    async function votePoll(announcementId, optionIndex) {
+      try {
+        const communityId = new URLSearchParams(window.location.search).get('id');
+        
+        const response = await InnovateAPI.apiRequest(
+          `/communities/${communityId}/announcements/${announcementId}/vote`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ optionIndex })
+          }
+        );
+        
+        if (response.success) {
+          console.log('Vote recorded successfully');
+          
+          // Reload the announcement to show updated results
+          viewAnnouncement(announcementId);
+        }
+      } catch (error) {
+        console.error('Error voting:', error);
+        alert('Failed to record vote: ' + error.message);
+      }
+    }
+    
+    // File handling functions
+    let accumulatedFiles = [];
+    
+    function handleAnnouncementFilesChange(event) {
+      const newFiles = Array.from(event.target.files);
+      
+      if (newFiles.length === 0) {
+        // User cancelled - keep existing files
+        if (accumulatedFiles.length === 0) {
+          document.getElementById('announcementFilesPreview').style.display = 'none';
+        }
+        return;
+      }
+      
+      // Add new files to accumulated list (avoid duplicates by name)
+      newFiles.forEach(newFile => {
+        const isDuplicate = accumulatedFiles.some(f => f.name === newFile.name && f.size === newFile.size);
+        if (!isDuplicate) {
+          accumulatedFiles.push(newFile);
+        }
+      });
+      
+      // Update the file input with all accumulated files
+      const dt = new DataTransfer();
+      accumulatedFiles.forEach(file => dt.items.add(file));
+      event.target.files = dt.files;
+      
+      // Update preview
+      updateFilesPreview();
+    }
+    
+    function updateFilesPreview() {
+      const files = accumulatedFiles;
+      
+      if (files.length === 0) {
+        document.getElementById('announcementFilesPreview').style.display = 'none';
+        return;
+      }
+      
+      const preview = document.getElementById('announcementFilesPreview');
+      const filesList = document.getElementById('announcementFilesList');
+      const filesCount = document.getElementById('announcementFilesCount');
+      
+      preview.style.display = 'block';
+      filesCount.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected`;
+      
+      filesList.innerHTML = '';
+      
+      files.forEach((file, index) => {
+        const fileDiv = document.createElement('div');
+        fileDiv.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; transition: all 0.2s;';
+        fileDiv.onmouseover = function() { this.style.background = 'var(--ig-hover)'; };
+        fileDiv.onmouseout = function() { this.style.background = 'var(--ig-secondary-background)'; };
+        
+        // Determine file type icon
+        const ext = file.name.split('.').pop().toLowerCase();
+        let icon = 'fa-file';
+        let iconColor = '#888';
+        
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+          icon = 'fa-image';
+          iconColor = '#667eea';
+        } else if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
+          icon = 'fa-video';
+          iconColor = '#f5576c';
+        } else if (ext === 'pdf') {
+          icon = 'fa-file-pdf';
+          iconColor = '#e74c3c';
+        } else if (['doc', 'docx'].includes(ext)) {
+          icon = 'fa-file-word';
+          iconColor = '#2b579a';
+        }
+        
+        const fileSize = (file.size / 1024).toFixed(1);
+        const sizeUnit = fileSize > 1024 ? `${(fileSize / 1024).toFixed(1)} MB` : `${fileSize} KB`;
+        
+        fileDiv.innerHTML = `
+          <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: ${iconColor}15; border-radius: 8px;">
+            <i class="fas ${icon}" style="font-size: 18px; color: ${iconColor};"></i>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 13px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">${file.name}</div>
+            <div style="font-size: 12px; color: var(--ig-secondary-text);">${sizeUnit}</div>
+          </div>
+          <button type="button" onclick="removeAnnouncementFile(${index})" style="width: 32px; height: 32px; background: var(--ig-error); color: white; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; flex-shrink: 0;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" title="Remove file">
+            <i class="fas fa-times"></i>
+          </button>
+        `;
+        
+        filesList.appendChild(fileDiv);
+      });
+    }
+    
+    function removeAnnouncementFile(index) {
+      // Remove from accumulated files array
+      accumulatedFiles.splice(index, 1);
+      
+      // Update the file input
+      const filesInput = document.getElementById('announcementFiles');
+      const dt = new DataTransfer();
+      accumulatedFiles.forEach(file => dt.items.add(file));
+      filesInput.files = dt.files;
+      
+      // Update preview
+      updateFilesPreview();
+    }
+    
+    function clearAnnouncementFiles() {
+      const filesInput = document.getElementById('announcementFiles');
+      filesInput.value = '';
+      accumulatedFiles = [];
+      document.getElementById('announcementFilesPreview').style.display = 'none';
+      document.getElementById('announcementFilesList').innerHTML = '';
     }
     
     async function createAnnouncement(e) {
@@ -2398,6 +2909,22 @@
         }
       }
       
+      // Collect poll
+      let poll = null;
+      if (document.getElementById('announcementAddPoll').checked) {
+        const question = document.getElementById('pollQuestion').value;
+        const options = [];
+        document.querySelectorAll('.poll-option-text').forEach(input => {
+          if (input.value.trim()) {
+            options.push(input.value.trim());
+          }
+        });
+        
+        if (question && options.length >= 2) {
+          poll = { question, options };
+        }
+      }
+      
       try {
         const formData = new FormData();
         formData.append('title', title);
@@ -2411,7 +2938,7 @@
         }
         
         // Add structured data
-        const attachmentsData = { links, location, files: [] };
+        const attachmentsData = { links, location, poll, files: [] };
         formData.append('attachments', JSON.stringify(attachmentsData));
         
         const res = await fetch(`/api/communities/${state.communityId}/announcements`, {
@@ -2424,6 +2951,18 @@
         
         if (data.success) {
           console.log('Announcement posted successfully');
+          
+          // Clear the form
+          document.getElementById('announcementTitle').value = '';
+          document.getElementById('announcementMessage').value = '';
+          clearAnnouncementFiles();
+          document.getElementById('announcementLinks').innerHTML = '';
+          document.getElementById('announcementAddLocation').checked = false;
+          toggleAnnouncementLocation();
+          document.getElementById('announcementAddPoll').checked = false;
+          document.getElementById('pollOptions').innerHTML = '';
+          toggleAnnouncementPoll();
+          
           closeModal();
           await loadAnnouncements();
           
@@ -2540,13 +3079,13 @@
     }
 
     function connectGitHub() {
-      InnovateAPI.showAlert('GitHub OAuth flow coming soon!', 'info');
+      console.log('GitHub OAuth flow coming soon!');
       // Implement GitHub OAuth
     }
 
     function disconnectGitHub() {
       state.githubIntegration = null;
-      InnovateAPI.showAlert('GitHub disconnected', 'success');
+      console.log('GitHub disconnected');
       closeModal();
     }
 
@@ -2567,15 +3106,15 @@
     }
 
     function addMembers() {
-      InnovateAPI.showAlert('Add members feature coming soon', 'info');
+      console.log('Add members feature coming soon');
     }
 
     function manageGroups() {
-      InnovateAPI.showAlert('Manage groups feature coming soon', 'info');
+      console.log('Manage groups feature coming soon');
     }
 
     function showCommunitySettings() {
-      InnovateAPI.showAlert('Community settings coming soon', 'info');
+      console.log('Community settings coming soon');
     }
 
     function viewAllGroups() {
@@ -2583,7 +3122,7 @@
     }
 
     function showGroupActions() {
-      InnovateAPI.showAlert('Group actions coming soon', 'info');
+      console.log('Group actions coming soon');
     }
 
     function setupResponsive() {
@@ -2606,6 +3145,31 @@
 
     function toggleLeftSidebar() {
       document.getElementById('communityLeft').classList.toggle('mobile-active');
+    }
+
+    // Theme toggle function
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('ig-theme', newTheme);
+      
+      // Update icon
+      const themeIcon = document.getElementById('themeIcon');
+      if (themeIcon) {
+        themeIcon.className = newTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+      }
+      
+      console.log(`Switched to ${newTheme} mode`);
+    }
+
+    // Initialize theme icon on page load
+    function initializeThemeIcon() {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const themeIcon = document.getElementById('themeIcon');
+      if (themeIcon) {
+        themeIcon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+      }
     }
 
     // WebRTC Handlers (placeholders)
