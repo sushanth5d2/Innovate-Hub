@@ -275,7 +275,14 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
               try {
                 if (fs.existsSync(file.path)) {
                   fs.renameSync(file.path, targetPath);
-                  attachments.push(publicUrl);
+                  
+                  // Push attachment object with all required properties
+                  attachments.push({
+                    filepath: publicUrl,
+                    filename: file.originalname,
+                    type: fileType,
+                    size: file.size
+                  });
                   
                   // Save file record
                   db.run(
@@ -307,6 +314,10 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
           }
 
           // Create post
+          console.log('=== SAVING TO DATABASE ===');
+          console.log('Attachments array before stringify:', attachments);
+          console.log('Attachments JSON:', JSON.stringify(attachments));
+          
           db.run(
             `INSERT INTO community_group_posts (group_id, user_id, content, attachments)
              VALUES (?, ?, ?, ?)`,
@@ -346,6 +357,11 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
                     ...postRow,
                     attachments: postRow.attachments ? JSON.parse(postRow.attachments) : []
                   };
+
+                  console.log('=== SENDING TO CLIENT ===');
+                  console.log('Post row from DB:', postRow);
+                  console.log('Attachments from DB (raw):', postRow.attachments);
+                  console.log('Attachments parsed:', hydrated.attachments);
 
                   if (io) {
                     io.to(`community_group_${groupId}`).emit('community-group:post:new', hydrated);

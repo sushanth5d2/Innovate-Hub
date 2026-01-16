@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Get group ID from URL
   const urlParams = new URLSearchParams(window.location.search);
-  currentGroupId = urlParams.get('groupId');
+  currentGroupId = urlParams.get('id');
   currentCommunityId = urlParams.get('communityId');
 
   if (!currentGroupId) {
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load group data
 async function loadGroupData() {
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentCommunityId}/groups/${currentGroupId}`);
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}`);
     const group = response.group;
 
     document.getElementById('group-name').textContent = group.name;
@@ -220,7 +220,7 @@ function setupTabs() {
 // Load group chat messages
 async function loadGroupChat() {
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentCommunityId}/groups/${currentGroupId}/posts`);
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/posts`);
     const messages = response.posts || [];
 
     const chatContainer = document.getElementById('group-chat-messages');
@@ -311,7 +311,7 @@ async function sendChatMessage() {
       formData.append('attachments', JSON.stringify(attachments));
     }
 
-    const response = await fetch(`/api/community-groups/${currentCommunityId}/groups/${currentGroupId}/posts`, {
+    const response = await fetch(`/api/community-groups/${currentGroupId}/posts`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${InnovateAPI.getToken()}`
@@ -375,7 +375,7 @@ async function handleFileSelect(file, type) {
   formData.append('file', file);
 
   try {
-    const response = await fetch(`/api/community-groups/${currentCommunityId}/groups/${currentGroupId}/files`, {
+    const response = await fetch(`/api/community-groups/${currentGroupId}/files`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${InnovateAPI.getToken()}`
@@ -448,7 +448,7 @@ function shareLocation() {
 // Load links
 async function loadLinks() {
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentCommunityId}/groups/${currentGroupId}/links`);
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/links`);
     const links = response.links || [];
 
     const linksList = document.getElementById('links-list');
@@ -483,7 +483,7 @@ async function loadLinks() {
 // Load files by type
 async function loadFiles(fileType) {
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentCommunityId}/groups/${currentGroupId}/files?type=${fileType}`);
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/files?type=${fileType}`);
     const files = response.files || [];
 
     const containerId = fileType === 'image' ? 'images-grid' : 
@@ -536,7 +536,7 @@ async function loadFiles(fileType) {
 // Load group members
 async function loadGroupMembers() {
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentCommunityId}/groups/${currentGroupId}/members`);
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/members`);
     const members = response.members || [];
 
     const membersList = document.getElementById('members-list');

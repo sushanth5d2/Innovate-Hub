@@ -1000,15 +1000,43 @@
       // Get community ID from URL
       const urlParams = new URLSearchParams(window.location.search);
       state.communityId = urlParams.get('id') || window.location.pathname.split('/').pop();
+      
+      // Check if there's a group parameter in URL
+      const groupIdFromUrl = urlParams.get('groupId');
+      console.log('=== DOMContentLoaded Initialization ===');
+      console.log('Community ID:', state.communityId);
+      console.log('Group ID from URL:', groupIdFromUrl);
 
       await Promise.all([
         loadCommunityData()
       ]);
+      console.log('Community data loaded');
 
-      // Show announcements by default (Announcements tab is active)
-      await loadAnnouncements();
-      // Load groups in background but don't display them
-      loadGroups();
+      // Load groups first
+      await loadGroups();
+      console.log('Groups loaded, count:', state.groups.length);
+      
+      // If groupId in URL or last selected group, auto-select it
+      if (groupIdFromUrl) {
+        console.log('=== AUTO-SELECTING GROUP ===');
+        console.log('Auto-selecting group from URL:', groupIdFromUrl);
+        
+        // Switch to Groups tab FIRST
+        console.log('Step 1: Switching to groups tab');
+        switchLeftTab('groups');
+        
+        // Wait a bit for tab switch to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log('Step 2: Tab switch complete, now selecting group');
+        
+        // Select the group
+        await selectGroup(parseInt(groupIdFromUrl));
+        console.log('Step 3: Group selection complete');
+      } else {
+        console.log('No groupId in URL, showing announcements');
+        // Show announcements by default (Announcements tab is active)
+        await loadAnnouncements();
+      }
 
       setupSocketListeners();
       setupResponsive();
@@ -1028,6 +1056,16 @@
 
       state.socket.on('group:message', (data) => {
         if (data.groupId == state.currentGroupId) appendChatMessage(data.message);
+      });
+      
+      // Listen for community group posts (real-time messages)
+      state.socket.on('community-group:post:new', (data) => {
+        console.log('Real-time message received:', data);
+        if (data.group_id == state.currentGroupId) {
+          appendChatMessage(data);
+        }
+        // Update groups list to show latest message
+        loadGroups();
       });
       
       state.socket.on('poll:voted', (data) => {
@@ -1075,6 +1113,21 @@
         const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`);
         if (res.success) {
           state.groups = res.groups || [];
+          
+          // Fetch latest message for each group
+          for (let group of state.groups) {
+            try {
+              const postsRes = await InnovateAPI.apiRequest(`/community-groups/${group.id}/posts`);
+              if (postsRes.success && postsRes.posts && postsRes.posts.length > 0) {
+                const sortedPosts = postsRes.posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                group.latest_message = sortedPosts[0].content || 'Attachment';
+                group.unread_count = 0; // TODO: Implement unread tracking
+              }
+            } catch (err) {
+              // No posts for this group
+            }
+          }
+          
           document.getElementById('groupCountBadge').textContent = `(${state.groups.length})`;
           renderGroupsList();
         }
@@ -1096,24 +1149,37 @@
 
     // ==================== UI RENDERING ====================
     function renderGroupsList() {
+      console.log('renderGroupsList called');
+      console.log('Current groups count:', state.groups.length);
+      
       // Only render if groups tab is active
       const groupsTab = document.querySelector('.left-tab[onclick*="groups"]');
+      console.log('Groups tab element:', groupsTab);
+      console.log('Groups tab active?:', groupsTab?.classList.contains('active'));
+      
       if (!groupsTab || !groupsTab.classList.contains('active')) {
-        console.log('Groups loaded but not displayed (wrong tab active)');
+        console.log('Groups loaded but not displayed (wrong tab active) - EXITING renderGroupsList');
         return;
       }
+      
+      console.log('Groups tab is active, proceeding with render');
       
       const content = document.getElementById('leftContent');
       const centerContent = document.getElementById('centerContent');
       
-      // Show default center content
-      centerContent.innerHTML = `
-        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
-          <div class="empty-icon">👥</div>
-          <div class="empty-title">Select a group</div>
-          <div class="empty-text">Choose from the left sidebar</div>
-        </div>
-      `;
+      // Only show default center content if no group is currently selected
+      if (!state.currentGroupId) {
+        console.log('No group selected, showing default empty state');
+        centerContent.innerHTML = `
+          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
+            <div class="empty-icon">👥</div>
+            <div class="empty-title">Select a group</div>
+            <div class="empty-text">Choose from the left sidebar</div>
+          </div>
+        `;
+      } else {
+        console.log('Group is selected (ID:', state.currentGroupId, '), NOT clearing center content');
+      }
       
       if (state.groups.length === 0) {
         content.innerHTML = `
@@ -1128,15 +1194,26 @@
         return;
       }
 
-      content.innerHTML = state.groups.map(group => `
-        <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
-          <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
-          <div class="group-info">
-            <div class="group-name">${group.name}</div>
-            <div class="group-desc">${group.description || 'No description'}</div>
+      content.innerHTML = state.groups.map(group => {
+        const latestMsg = group.latest_message || '';
+        const unreadCount = group.unread_count || 0;
+        const truncatedMsg = latestMsg.length > 30 ? latestMsg.substring(0, 30) + '...' : latestMsg;
+        
+        return `
+          <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
+            <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
+            <div class="group-info">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <div class="group-name">${group.name}</div>
+                ${unreadCount > 0 ? `<span style="background: var(--ig-blue); color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600;">${unreadCount}</span>` : ''}
+              </div>
+              <div class="group-desc" style="color: ${latestMsg ? 'var(--ig-primary-text)' : 'var(--ig-secondary-text)'}; font-weight: ${unreadCount > 0 ? '600' : '400'};">
+                ${latestMsg ? truncatedMsg : (group.description || 'No messages yet')}
+              </div>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function renderFoldersList() {
@@ -1817,12 +1894,22 @@
 
     // ==================== TAB SWITCHING ====================
     function switchLeftTab(tab) {
+      console.log('switchLeftTab called with tab:', tab);
+      
       // Remove active class from all tabs
       document.querySelectorAll('.left-tab').forEach(t => t.classList.remove('active'));
       
       // Add active class to the clicked tab
+      // When called programmatically (no event), find the tab by matching the onclick attribute
       const clickedTab = event?.target || document.querySelector(`.left-tab[onclick*="'${tab}'"]`);
-      if (clickedTab) clickedTab.classList.add('active');
+      console.log('clickedTab element:', clickedTab);
+      
+      if (clickedTab) {
+        clickedTab.classList.add('active');
+        console.log('Tab set to active:', clickedTab);
+      } else {
+        console.error('Could not find tab element for:', tab);
+      }
 
       const leftFooterBtn = document.getElementById('leftFooterBtn');
       const leftFooter = document.getElementById('leftFooter');
@@ -1920,6 +2007,11 @@
       const group = state.groups.find(g => g.id == groupId);
       console.log('Found group:', group);
       if (!group) return;
+      
+      // Update URL to include groupId so it persists on refresh
+      const url = new URL(window.location);
+      url.searchParams.set('groupId', groupId);
+      window.history.pushState({}, '', url);
 
       // Auto-join group if not already a member
       try {
@@ -2003,7 +2095,8 @@
       content.innerHTML = '<div class="loading"><div class="spinner"></div>Loading messages...</div>';
       footer.style.display = 'flex';
       footer.innerHTML = `
-        <button class="ws-icon-btn" onclick="attachFile()">
+        <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx">
+        <button class="ws-icon-btn" onclick="document.getElementById('fileInput').click()">
           <i class="fas fa-paperclip"></i>
         </button>
         <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;" onkeypress="if(event.key==='Enter')sendMessage()">
@@ -2017,12 +2110,41 @@
         console.log('Fetching posts from:', `/community-groups/${groupId}/posts`);
         const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
         console.log('Posts response:', res);
+        console.log('Posts array:', res.posts);
+        console.log('Posts length:', res.posts?.length);
         if (res.success && res.posts && res.posts.length > 0) {
+          console.log('Rendering', res.posts.length, 'messages');
+          
+          // Sort messages by created_at (oldest first)
+          const sortedPosts = res.posts.sort((a, b) => {
+            return new Date(a.created_at) - new Date(b.created_at);
+          });
+          console.log('Messages sorted oldest first');
+          
+          // Render messages with error handling
+          const messagesHTML = sortedPosts.map((msg, index) => {
+            try {
+              const html = renderMessage(msg);
+              console.log(`Message ${index} rendered:`, html.substring(0, 50));
+              return html;
+            } catch (err) {
+              console.error(`Error rendering message ${index}:`, err, msg);
+              return `<div style="color: red;">Error rendering message</div>`;
+            }
+          }).join('');
+          
+          console.log('Messages HTML length:', messagesHTML.length);
+          
           content.innerHTML = `
             <div id="messagesList" style="padding: 20px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 12px;">
-              ${res.posts.map(msg => renderMessage(msg)).join('')}
+              ${messagesHTML}
             </div>
           `;
+          
+          console.log('Messages HTML set, checking element');
+          const checkList = document.getElementById('messagesList');
+          console.log('messagesList after setting:', checkList, 'children:', checkList?.children.length);
+          
           // Scroll to bottom
           setTimeout(() => {
             const list = document.getElementById('messagesList');
@@ -2060,33 +2182,66 @@
 
     async function sendMessage() {
       const input = document.getElementById('chatInput');
+      const fileInput = document.getElementById('fileInput');
       const message = input.value.trim();
-      if (!message || !state.currentGroupId) return;
+      console.log('=== sendMessage called ===');
+      console.log('Message text:', message);
+      console.log('GroupId:', state.currentGroupId);
+      console.log('Files:', fileInput?.files?.length || 0);
+      
+      if ((!message && (!fileInput || !fileInput.files || fileInput.files.length === 0)) || !state.currentGroupId) {
+        console.log('Aborting: no message/files or no groupId');
+        return;
+      }
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/posts`, {
+        console.log('Sending POST to:', `/community-groups/${state.currentGroupId}/posts`);
+        
+        const formData = new FormData();
+        if (message) {
+          formData.append('content', message);
+          console.log('Added content to FormData:', message);
+        }
+        
+        // Add files if any
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          for (let i = 0; i < fileInput.files.length; i++) {
+            formData.append('attachments', fileInput.files[i]);
+            console.log(`Added file ${i + 1}:`, fileInput.files[i].name);
+          }
+          console.log('Total files added:', fileInput.files.length);
+        }
+        
+        const res = await fetch(`/api/community-groups/${state.currentGroupId}/posts`, {
           method: 'POST',
-          body: JSON.stringify({ content: message })
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
         });
         
-        if (res.success) {
+        const data = await res.json();
+        console.log('=== Send message response ===');
+        console.log('Success:', data.success);
+        console.log('Post data:', data.post);
+        console.log('Post content:', data.post?.content);
+        console.log('Post created_at:', data.post?.created_at);
+        
+        if (data.success) {
           input.value = '';
-          console.log('Message sent successfully');
-          
-          // Append message to UI immediately
-          appendChatMessage(res.post);
-          
-          // Emit socket event for real-time
-          if (state.socket) {
-            state.socket.emit('group:message', {
-              groupId: state.currentGroupId,
-              message: res.post
-            });
+          if (fileInput) {
+            fileInput.value = '';
+            input.placeholder = 'Type a message...';
           }
+          console.log('Message sent successfully, reloading groups...');
+          
+          // Message will appear via socket event
+          // Reload groups to update latest message
+          loadGroups();
         }
       } catch (error) {
         console.error('Error sending message:', error);
-        // Don't show alert, just log
+        InnovateAPI.showAlert('Failed to send message', 'error');
       }
     }
 
@@ -3326,29 +3481,204 @@
 
     // WebRTC Handlers (placeholders)
     function handleCallOffer(data) { }
+    
+    // Format timestamp in IST (India Standard Time)
+    function formatTimestampIST(dateString) {
+      if (!dateString) return '';
+      
+      // Parse the date - SQLite returns UTC timestamps
+      let date;
+      if (dateString.includes('T') || dateString.includes('Z')) {
+        // ISO format with timezone
+        date = new Date(dateString);
+      } else {
+        // SQLite format without timezone - treat as UTC
+        date = new Date(dateString + 'Z');
+      }
+      
+      const now = new Date();
+      
+      // Debug logging
+      console.log('Timestamp formatting:', {
+        input: dateString,
+        parsed: date.toISOString(),
+        now: now.toISOString(),
+        diffMs: now - date
+      });
+      
+      // Calculate difference in milliseconds
+      const diffMs = now - date;
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      
+      // Less than 1 minute
+      if (diffSecs < 60) return 'Just now';
+      
+      // Less than 1 hour
+      if (diffMins < 60) return `${diffMins}m ago`;
+      
+      // Less than 24 hours
+      if (diffHours < 24) return `${diffHours}h ago`;
+      
+      // Less than 7 days
+      if (diffDays < 7) return `${diffDays}d ago`;
+      
+      // Show full date in IST
+      const options = { 
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      };
+      
+      return date.toLocaleString('en-IN', options);
+    }
+    
     function renderMessage(msg) {
       // Handle both group_messages (sender_id, sender_username) and community_group_posts (user_id, username)
       const senderId = msg.sender_id || msg.user_id;
       const senderName = msg.sender_username || msg.username || 'User';
-      const isOwn = senderId === state.user.id;
+      const profilePic = msg.profile_picture || msg.sender_profile_picture || '/images/default-avatar.svg';
+      const isOwn = senderId == state.user?.id; // Use == for loose comparison
       
-      return `
-        <div style="display: flex; ${isOwn ? 'justify-content: flex-end;' : 'justify-content: flex-start;'}">
-          <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; ${isOwn ? 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;' : 'background: var(--ig-secondary-background); color: var(--ig-primary-text);'}">
-            ${!isOwn ? `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; opacity: 0.8;">${senderName}</div>` : ''}
-            <div style="word-wrap: break-word;">${msg.content}</div>
-            <div style="font-size: 11px; margin-top: 4px; opacity: 0.7; text-align: right;">${InnovateAPI.formatDate(msg.created_at)}</div>
+      console.log('=== renderMessage called ===');
+      console.log('Message ID:', msg.id);
+      console.log('Content:', msg.content);
+      console.log('Attachments raw:', msg.attachments);
+      console.log('Attachments type:', typeof msg.attachments);
+      
+      // Parse attachments FIRST
+      let attachments = [];
+      if (msg.attachments) {
+        try {
+          attachments = typeof msg.attachments === 'string' ? JSON.parse(msg.attachments) : msg.attachments;
+          console.log('Parsed attachments:', attachments);
+          console.log('Attachments is array:', Array.isArray(attachments));
+          console.log('Attachments length:', attachments.length);
+          if (attachments.length > 0) {
+            console.log('First attachment:', attachments[0]);
+          }
+        } catch (e) {
+          console.error('Error parsing attachments:', e);
+        }
+        }
+      }
+      
+      // Render attachments HTML
+      let attachmentsHTML = '';
+      if (attachments && attachments.length > 0) {
+        attachmentsHTML = attachments.map((att, index) => {
+          console.log(`Rendering attachment ${index}:`, att);
+          
+          // Handle both formats: string URL or object with properties
+          let filepath, filename, type;
+          
+          if (typeof att === 'string') {
+            // Old format: just URL string
+            filepath = att;
+            filename = att.split('/').pop();
+            type = getFileTypeFromUrl(att);
+          } else {
+            // New format: object with properties
+            filepath = att.filepath || att.url || att.path;
+            filename = att.filename || att.name || 'file';
+            type = att.type || att.file_type || getFileTypeFromUrl(filepath);
+          }
+          
+          console.log(`  filepath: ${filepath}`);
+          console.log(`  filename: ${filename}`);
+          console.log(`  type: ${type}`);
+          
+          const isImage = type === 'image' || /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
+          const isVideo = type === 'video' || /\.(mp4|mov|webm)$/i.test(filename);
+          
+          if (isImage) {
+            return `<img src="${filepath}" style="max-width: 100%; border-radius: 8px; margin-top: 8px; cursor: pointer;" onclick="window.open('${filepath}', '_blank')" alt="${filename}" />`;
+          } else if (isVideo) {
+            return `<video controls style="max-width: 100%; border-radius: 8px; margin-top: 8px;"><source src="${filepath}" type="video/mp4"></video>`;
+          } else {
+            return `
+              <a href="${filepath}" target="_blank" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 8px; text-decoration: none; color: inherit;">
+                <i class="fas fa-file"></i>
+                <span>${filename}</span>
+              </a>
+            `;
+          }
+        }).join('');
+      }
+      
+      // Helper function to determine file type from URL
+      function getFileTypeFromUrl(url) {
+        if (!url) return 'file';
+        const ext = url.split('.').pop().toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
+        if (['mp4', 'mov', 'webm'].includes(ext)) return 'video';
+        if (['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx'].includes(ext)) return 'document';
+        return 'file';
+      }
+      
+      // Get the actual content text, treating null/undefined as empty string
+      const contentText = msg.content || '';
+      const hasContent = contentText && contentText.trim() !== '';
+      
+      if (isOwn) {
+        // Own message - on the right with gradient
+        return `
+          <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px;">
+            <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${contentText}</div>` : ''}
+              ${attachmentsHTML}
+              <div style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        // Other user's message - on the left with DP
+        return `
+          <div style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px;">
+            <img 
+              src="${profilePic}" 
+              alt="${senderName}"
+              onclick="viewUserProfile(${senderId})"
+              style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; flex-shrink: 0;"
+              title="View ${senderName}'s profile"
+            />
+            <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+              <div 
+                style="font-weight: 600; font-size: 13px; margin-bottom: 6px; opacity: 0.9; cursor: pointer; color: var(--ig-blue);"
+                onclick="viewUserProfile(${senderId})"
+                title="View profile"
+              >
+                ${senderName}
+              </div>
+              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${contentText}</div>` : ''}
+              ${attachmentsHTML}
+              <div style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
+            </div>
+          </div>
+        `;
+      }
     }
     
     function appendChatMessage(msg) {
-      const list = document.getElementById('messagesList');
-      if (!list) return;
+      console.log('appendChatMessage called with:', msg);
+      let list = document.getElementById('messagesList');
+      console.log('messagesList element:', list);
+      
+      // If messagesList doesn't exist, don't append - wait for loadChatView to set it up
+      if (!list) {
+        console.log('messagesList not found - cannot append message yet');
+        return;
+      }
       
       const emptyState = list.querySelector('.empty-state');
       if (emptyState) {
+        console.log('Removing empty state');
         emptyState.remove();
       }
       
@@ -3356,6 +3686,48 @@
       messageEl.innerHTML = renderMessage(msg);
       list.appendChild(messageEl.firstElementChild);
       list.scrollTop = list.scrollHeight;
+      console.log('Message appended successfully');
+    }
+    
+    // Handle file selection and show preview
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      if (files.length > 0) {
+        const fileNames = Array.from(files).map(f => f.name).join(', ');
+        const truncated = fileNames.length > 50 ? fileNames.substring(0, 50) + '...' : fileNames;
+        const input = document.getElementById('chatInput');
+        input.placeholder = `${files.length} file(s) selected: ${truncated}`;
+        console.log('Files selected:', files.length);
+      }
+    }
+    
+    // Handle file selection
+    function handleFileSelect(event) {
+      const fileInput = event.target;
+      const chatInput = document.getElementById('chatInput');
+      
+      if (!fileInput || !chatInput) return;
+      
+      if (fileInput.files && fileInput.files.length > 0) {
+        const fileNames = Array.from(fileInput.files).map(f => f.name).join(', ');
+        const truncated = fileNames.length > 40 ? fileNames.substring(0, 40) + '...' : fileNames;
+        chatInput.placeholder = `${fileInput.files.length} file(s) selected: ${truncated}`;
+      } else {
+        chatInput.placeholder = 'Type a message...';
+      }
+    }
+    
+    // View user profile
+    function viewUserProfile(userId) {
+      if (!userId) {
+        console.error('No userId provided');
+        return;
+      }
+      
+      console.log('Opening profile for user:', userId);
+      
+      // Open profile in new tab
+      window.open(`/profile/${userId}`, '_blank');
     }
     
     function handleCallAnswer(data) { }
