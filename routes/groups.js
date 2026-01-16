@@ -100,13 +100,55 @@ router.post('/:groupId/messages', (req, res) => {
 
   if (!content) return res.status(400).json({ error: 'Content is required' });
 
-  db.run(
-    `INSERT INTO group_messages (group_id, sender_id, content, type, timer, expires_at)
-     VALUES (?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN datetime('now', '+' || ? || ' seconds') ELSE NULL END)`,
-    [groupId, senderId, content, type, timer, timer, timer],
-    function(err) {
-      if (err) return res.status(500).json({ error: 'Failed to send message' });
-      res.json({ success: true, message_id: this.lastID });
+  // Check if user is a member of this group (check both regular and community groups)
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+     UNION
+     SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, senderId, groupId, senderId],
+    (err, member) => {
+      if (err) {
+        console.error('Error checking group membership:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      if (!member) {
+        console.log('User', senderId, 'is not a member of group', groupId);
+        return res.status(403).json({ error: 'You are not a member of this group' });
+      }
+      
+      // User is a member, proceed with message
+      db.run(
+        `INSERT INTO group_messages (group_id, sender_id, content, type, timer, expires_at)
+         VALUES (?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN datetime('now', '+' || ? || ' seconds') ELSE NULL END)`,
+        [groupId, senderId, content, type, timer, timer, timer],
+        function(err) {
+          if (err) {
+            console.error('Error inserting group message:', err);
+            console.error('groupId:', groupId, 'senderId:', senderId, 'type:', type);
+            return res.status(500).json({ error: 'Failed to send message', details: err.message });
+          }
+      
+      const messageId = this.lastID;
+      
+      // Fetch the complete message with sender info
+      db.get(
+        `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.attachments,
+                gm.timer, gm.expires_at, gm.is_read, gm.created_at
+         FROM group_messages gm
+         INNER JOIN users u ON (u.id = gm.sender_id)
+         WHERE gm.id = ?`,
+        [messageId],
+        (err2, message) => {
+          if (err2) {
+            console.error('Error fetching sent message:', err2);
+            return res.status(500).json({ error: 'Message sent but failed to retrieve' });
+          }
+          res.json({ success: true, message: message });
+        }
+      );
+    }
+  );
     }
   );
 });

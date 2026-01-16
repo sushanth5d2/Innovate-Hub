@@ -1492,7 +1492,6 @@
         
       } catch (error) {
         console.error('Error loading files:', error);
-        InnovateAPI.showAlert('Error loading files', 'error');
       }
     }
 
@@ -1798,11 +1797,11 @@
               ` : ''}
               
               ${poll ? `
-                <div style="margin-bottom: 20px;" id="poll-${announcement.id}">
+                <div style="margin-bottom: 20px;" id="poll-${ann.id}">
                   <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">
                     <i class="fas fa-poll" style="color: #4facfe;"></i> Poll
                   </h3>
-                  ${renderPollResults(announcement.id, poll)}
+                  ${renderPollResults(ann.id, poll)}
                 </div>
               ` : ''}
             </div>
@@ -1916,9 +1915,21 @@
 
     // ==================== GROUP SELECTION ====================
     async function selectGroup(groupId) {
+      console.log('selectGroup called with groupId:', groupId);
       state.currentGroupId = groupId;
       const group = state.groups.find(g => g.id == groupId);
+      console.log('Found group:', group);
       if (!group) return;
+
+      // Auto-join group if not already a member
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, {
+          method: 'POST'
+        });
+        console.log('Joined group successfully');
+      } catch (error) {
+        console.log('Already a member or error joining:', error.message);
+      }
 
       // Update header
       document.getElementById('centerTitle').textContent = group.name;
@@ -1952,12 +1963,15 @@
       `;
 
       state.currentView = 'chat';
+      console.log('About to call loadGroupView with groupId:', groupId);
       await loadGroupView(groupId);
+      console.log('loadGroupView completed');
       renderGroupsList(); // Update active state
     }
 
     // ==================== VIEW LOADING ====================
     async function loadGroupView(groupId) {
+      console.log('loadGroupView called, currentView:', state.currentView);
       const content = document.getElementById('centerContent');
       const footer = document.getElementById('centerFooter');
 
@@ -1982,6 +1996,7 @@
 
     // ==================== CHAT VIEW ====================
     async function loadChatView(groupId) {
+      console.log('loadChatView called with groupId:', groupId);
       const content = document.getElementById('centerContent');
       const footer = document.getElementById('centerFooter');
 
@@ -1991,22 +2006,51 @@
         <button class="ws-icon-btn" onclick="attachFile()">
           <i class="fas fa-paperclip"></i>
         </button>
-        <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;">
+        <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;" onkeypress="if(event.key==='Enter')sendMessage()">
         <button class="btn btn-primary" onclick="sendMessage()">
           <i class="fas fa-paper-plane"></i>
         </button>
       `;
 
-      // Load messages (implement API call)
-      content.innerHTML = `
-        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px;">
-          <div style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 20px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
-            <i class="fas fa-comments"></i>
+      // Load messages
+      try {
+        console.log('Fetching posts from:', `/community-groups/${groupId}/posts`);
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
+        console.log('Posts response:', res);
+        if (res.success && res.posts && res.posts.length > 0) {
+          content.innerHTML = `
+            <div id="messagesList" style="padding: 20px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 12px;">
+              ${res.posts.map(msg => renderMessage(msg)).join('')}
+            </div>
+          `;
+          // Scroll to bottom
+          setTimeout(() => {
+            const list = document.getElementById('messagesList');
+            if (list) list.scrollTop = list.scrollHeight;
+          }, 100);
+        } else {
+          content.innerHTML = `
+            <div id="messagesList" style="padding: 20px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 12px;">
+              <div class="empty-state" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                <div style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 20px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
+                  <i class="fas fa-comments"></i>
+                </div>
+                <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">No messages yet</div>
+                <div style="font-size: 14px; color: var(--ig-secondary-text);">Start the conversation!</div>
+              </div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        content.innerHTML = `
+          <div id="messagesList" style="padding: 20px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 12px;">
+            <div class="empty-state" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <div style="color: var(--ig-error);">Failed to load messages</div>
+            </div>
           </div>
-          <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text);">No messages yet</div>
-          <div style="font-size: 14px; color: var(--ig-secondary-text);">Start the conversation!</div>
-        </div>
-      `;
+        `;
+      }
 
       // Join room
       if (state.socket) {
@@ -2017,14 +2061,32 @@
     async function sendMessage() {
       const input = document.getElementById('chatInput');
       const message = input.value.trim();
-      if (!message) return;
+      if (!message || !state.currentGroupId) return;
 
       try {
-        // Implement send message API
-        input.value = '';
-        InnovateAPI.showAlert('Message sent', 'success');
+        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/posts`, {
+          method: 'POST',
+          body: JSON.stringify({ content: message })
+        });
+        
+        if (res.success) {
+          input.value = '';
+          console.log('Message sent successfully');
+          
+          // Append message to UI immediately
+          appendChatMessage(res.post);
+          
+          // Emit socket event for real-time
+          if (state.socket) {
+            state.socket.emit('group:message', {
+              groupId: state.currentGroupId,
+              message: res.post
+            });
+          }
+        }
       } catch (error) {
         console.error('Error sending message:', error);
+        // Don't show alert, just log
       }
     }
 
@@ -2354,7 +2416,7 @@
           method: 'POST',
           body: JSON.stringify({ title, content_md: '# Start writing...' })
         });
-        InnovateAPI.showAlert('Note created!', 'success');
+        console.log('Note created successfully');
         openNote(res.note.id);
       } catch (error) {
         console.error('Error creating note:', error);
@@ -2742,10 +2804,8 @@
     
     async function votePoll(announcementId, optionIndex) {
       try {
-        const communityId = new URLSearchParams(window.location.search).get('id');
-        
         const response = await InnovateAPI.apiRequest(
-          `/communities/${communityId}/announcements/${announcementId}/vote`,
+          `/communities/${state.communityId}/announcements/${announcementId}/vote`,
           {
             method: 'POST',
             body: JSON.stringify({ optionIndex })
@@ -3094,15 +3154,107 @@
         showGitHubIntegration();
         return;
       }
-      InnovateAPI.showAlert('Showing GitHub repositories...', 'info');
+      console.log('Showing GitHub repositories...');
       // Implement GitHub repo browser
     }
 
     // ==================== UTILITY FUNCTIONS ====================
-    function inviteMembers() {
+    async function inviteMembers() {
       const link = `${window.location.origin}/communities?join=${state.communityId}`;
+      const title = state.community ? `Join ${state.community.name} on Innovate Hub` : 'Join Community on Innovate Hub';
+      const text = state.community ? `Hey! Check out ${state.community.name} community on Innovate Hub` : 'Join this awesome community!';
+      
+      // Try native share API (works on mobile)
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: title,
+            text: text,
+            url: link
+          });
+          console.log('Shared successfully');
+        } catch (error) {
+          // User cancelled or error
+          if (error.name !== 'AbortError') {
+            console.log('Share failed, copying to clipboard');
+            navigator.clipboard.writeText(link);
+            console.log('Invite link copied:', link);
+          }
+        }
+      } else {
+        // Fallback: Show share modal with options
+        showShareModal(link, title, text);
+      }
+    }
+    
+    function showShareModal(link, title, text) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div style="background: var(--ig-secondary-background); border-radius: 16px; padding: 24px; max-width: 450px; width: 90%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">Share Community</h3>
+            <button onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 0; width: 32px; height: 32px;">&times;</button>
+          </div>
+          
+          <div style="background: var(--ig-primary-background); padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; border: 1px solid var(--ig-border);">
+            <input type="text" value="${link}" readonly style="flex: 1; background: none; border: none; color: var(--ig-primary-text); font-size: 14px; outline: none;">
+            <button onclick="navigator.clipboard.writeText('${link}'); console.log('Link copied'); this.innerHTML='<i class=\\'fas fa-check\\'></i> Copied'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-copy\\'></i> Copy', 2000)" style="padding: 8px 16px; background: var(--ig-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+              <i class="fas fa-copy"></i> Copy
+            </button>
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--ig-secondary-text);">Share via</div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+              <a href="https://wa.me/?text=${encodeURIComponent(text + ' ' + link)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#25D366'; this.style.background='rgba(37, 211, 102, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-whatsapp" style="font-size: 28px; color: #25D366;"></i>
+                <span style="font-size: 12px;">WhatsApp</span>
+              </a>
+              
+              <a href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#0088cc'; this.style.background='rgba(0, 136, 204, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-telegram" style="font-size: 28px; color: #0088cc;"></i>
+                <span style="font-size: 12px;">Telegram</span>
+              </a>
+              
+              <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#1DA1F2'; this.style.background='rgba(29, 161, 242, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-twitter" style="font-size: 28px; color: #1DA1F2;"></i>
+                <span style="font-size: 12px;">Twitter</span>
+              </a>
+              
+              <a href="mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + '\n\n' + link)}" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#ea4335'; this.style.background='rgba(234, 67, 53, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fas fa-envelope" style="font-size: 28px; color: #ea4335;"></i>
+                <span style="font-size: 12px;">Email</span>
+              </a>
+              
+              <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#1877f2'; this.style.background='rgba(24, 119, 242, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-facebook" style="font-size: 28px; color: #1877f2;"></i>
+                <span style="font-size: 12px;">Facebook</span>
+              </a>
+              
+              <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#0077b5'; this.style.background='rgba(0, 119, 181, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-linkedin" style="font-size: 28px; color: #0077b5;"></i>
+                <span style="font-size: 12px;">LinkedIn</span>
+              </a>
+              
+              <a href="https://reddit.com/submit?url=${encodeURIComponent(link)}&title=${encodeURIComponent(title)}" target="_blank" style="display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ig-primary-text); padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); transition: all 0.2s;" onmouseover="this.style.borderColor='#FF4500'; this.style.background='rgba(255, 69, 0, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fab fa-reddit" style="font-size: 28px; color: #FF4500;"></i>
+                <span style="font-size: 12px;">Reddit</span>
+              </a>
+              
+              <button onclick="navigator.clipboard.writeText('${link}'); console.log('Link copied'); this.innerHTML='<i class=\\'fas fa-check\\'></i><br><span style=\\'font-size: 12px;\\'>Copied!</span>'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-link\\'></i><br><span style=\\'font-size: 12px;\\'>Copy Link</span>', 2000)" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; background: var(--ig-primary-background); border-radius: 12px; border: 1px solid var(--ig-border); cursor: pointer; transition: all 0.2s; color: var(--ig-primary-text);" onmouseover="this.style.borderColor='var(--ig-blue)'; this.style.background='rgba(0, 149, 246, 0.1)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.background='var(--ig-primary-background)'">
+                <i class="fas fa-link" style="font-size: 28px; color: var(--ig-blue);"></i>
+                <span style="font-size: 12px;">Copy Link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      
+      // Copy to clipboard as fallback
       navigator.clipboard.writeText(link);
-      InnovateAPI.showAlert('Invite link copied!', 'success');
+      console.log('Invite link copied:', link);
     }
 
     function addMembers() {
@@ -3174,13 +3326,80 @@
 
     // WebRTC Handlers (placeholders)
     function handleCallOffer(data) { }
+    function renderMessage(msg) {
+      // Handle both group_messages (sender_id, sender_username) and community_group_posts (user_id, username)
+      const senderId = msg.sender_id || msg.user_id;
+      const senderName = msg.sender_username || msg.username || 'User';
+      const isOwn = senderId === state.user.id;
+      
+      return `
+        <div style="display: flex; ${isOwn ? 'justify-content: flex-end;' : 'justify-content: flex-start;'}">
+          <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; ${isOwn ? 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;' : 'background: var(--ig-secondary-background); color: var(--ig-primary-text);'}">
+            ${!isOwn ? `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; opacity: 0.8;">${senderName}</div>` : ''}
+            <div style="word-wrap: break-word;">${msg.content}</div>
+            <div style="font-size: 11px; margin-top: 4px; opacity: 0.7; text-align: right;">${InnovateAPI.formatDate(msg.created_at)}</div>
+          </div>
+        </div>
+      `;
+    }
+    
+    function appendChatMessage(msg) {
+      const list = document.getElementById('messagesList');
+      if (!list) return;
+      
+      const emptyState = list.querySelector('.empty-state');
+      if (emptyState) {
+        emptyState.remove();
+      }
+      
+      const messageEl = document.createElement('div');
+      messageEl.innerHTML = renderMessage(msg);
+      list.appendChild(messageEl.firstElementChild);
+      list.scrollTop = list.scrollHeight;
+    }
+    
     function handleCallAnswer(data) { }
     function handleIceCandidate(data) { }
     function handlePeerJoined(data) { }
     function handlePeerLeft(data) { }
     function toggleScreenShare() { }
-    function attachFile() { }
-    function appendChatMessage(msg) { }
+    function attachFile() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt';
+      input.onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        try {
+          const formData = new FormData();
+          files.forEach(file => formData.append('attachments', file));
+          
+          const res = await fetch(`/api/community-groups/${state.currentGroupId}/posts`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${InnovateAPI.getToken()}`
+            },
+            body: formData
+          });
+          
+          if (!res.ok) {
+            console.error('Upload failed:', res.status);
+            return;
+          }
+          
+          const data = await res.json();
+          if (data.success && data.post) {
+            console.log('Files uploaded successfully');
+            appendChatMessage(data.post);
+          }
+        } catch (error) {
+          console.error('Error uploading files:', error);
+        }
+      };
+      input.click();
+    }
     function editTask(id) { }
   </script>
 </body>
