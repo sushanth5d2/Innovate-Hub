@@ -2003,6 +2003,13 @@
     // ==================== GROUP SELECTION ====================
     async function selectGroup(groupId) {
       console.log('selectGroup called with groupId:', groupId);
+      
+      // Leave previous room if switching groups
+      if (state.currentGroupId && state.currentGroupId != groupId && state.socket) {
+        state.socket.emit('community-group:leave', state.currentGroupId);
+        console.log('Left room for group:', state.currentGroupId);
+      }
+      
       state.currentGroupId = groupId;
       const group = state.groups.find(g => g.id == groupId);
       console.log('Found group:', group);
@@ -2176,7 +2183,7 @@
 
       // Join room
       if (state.socket) {
-        state.socket.emit('group:join', groupId);
+        state.socket.emit('community-group:join', groupId);
       }
     }
 
@@ -3565,7 +3572,6 @@
           }
         } catch (e) {
           console.error('Error parsing attachments:', e);
-        }
         }
       }
       
