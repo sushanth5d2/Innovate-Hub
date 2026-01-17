@@ -55,14 +55,13 @@
 
     <!-- Tabs -->
     <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 24px;">
-      <div style="display: flex; gap: 0; border-bottom: 1px solid var(--ig-border);">
-        <button class="tab-btn active" id="feed-tab">Feed</button>
-        <button class="tab-btn" id="links-tab">Links</button>
-        <button class="tab-btn" id="images-tab">Images</button>
-        <button class="tab-btn" id="documents-tab">Documents</button>
-        <button class="tab-btn" id="videos-tab">Videos</button>
-        <button class="tab-btn" id="files-tab">Files</button>
-        <button class="tab-btn" id="members-tab">Members</button>
+      <div style="display: flex; gap: 0; border-bottom: 1px solid var(--ig-border); overflow-x: auto;">
+        <button class="tab-btn active" id="feed-tab">💬 Feed</button>
+        <button class="tab-btn" id="links-tab">🔗 Links</button>
+        <button class="tab-btn" id="media-tab">🎬 Media</button>
+        <button class="tab-btn" id="documents-tab">📄 Documents</button>
+        <button class="tab-btn" id="files-tab">📎 Other</button>
+        <button class="tab-btn" id="members-tab">👥 Members</button>
       </div>
     </div>
 
@@ -89,19 +88,19 @@
             <div style="display: flex; gap: 8px; flex-wrap: wrap; flex: 1;">
               <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
                 📷 Photo
-                <input type="file" id="chat-photo" accept="image/*" style="display: none;">
+                <input type="file" id="chat-photo" accept="image/*" multiple style="display: none;">
               </label>
               <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
                 🎥 Video
-                <input type="file" id="chat-video" accept="video/*" style="display: none;">
+                <input type="file" id="chat-video" accept="video/*" multiple style="display: none;">
               </label>
               <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
                 📎 File
-                <input type="file" id="chat-file" style="display: none;">
+                <input type="file" id="chat-file" multiple style="display: none;">
               </label>
               <label class="ig-action-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
                 🎵 Audio
-                <input type="file" id="chat-audio" accept="audio/*" style="display: none;">
+                <input type="file" id="chat-audio" accept="audio/*" multiple style="display: none;">
               </label>
               <button type="button" class="ig-action-btn" id="share-location-btn" style="cursor: pointer; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
                 📍 Location
@@ -175,23 +174,27 @@
       <div id="links-list"></div>
     </div>
 
-    <!-- Images Tab -->
-    <div id="images-content" style="display: none;">
-      <div id="images-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;"></div>
+    <!-- Media Tab (Images + Videos Combined) -->
+    <div id="media-content" style="display: none;">
+      <div style="margin-bottom: 32px;">
+        <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600; padding-bottom: 8px; border-bottom: 2px solid var(--ig-border);">📷 Images</h3>
+        <div id="images-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;"></div>
+      </div>
+      <div>
+        <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600; padding-bottom: 8px; border-bottom: 2px solid var(--ig-border);">🎥 Videos</h3>
+        <div id="videos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;"></div>
+      </div>
     </div>
 
     <!-- Documents Tab -->
     <div id="documents-content" style="display: none;">
+      <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">📄 Documents (PDF, DOC, XLS, etc.)</h3>
       <div id="documents-list"></div>
-    </div>
-
-    <!-- Videos Tab -->
-    <div id="videos-content" style="display: none;">
-      <div id="videos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;"></div>
     </div>
 
     <!-- Files Tab -->
     <div id="files-content" style="display: none;">
+      <h3 style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">📎 Other Files</h3>
       <div id="files-list"></div>
     </div>
 
@@ -278,9 +281,8 @@
       // Hide all
       document.getElementById('feed-content').style.display = 'none';
       document.getElementById('links-content').style.display = 'none';
-      document.getElementById('images-content').style.display = 'none';
+      document.getElementById('media-content').style.display = 'none';
       document.getElementById('documents-content').style.display = 'none';
-      document.getElementById('videos-content').style.display = 'none';
       document.getElementById('files-content').style.display = 'none';
       document.getElementById('members-content').style.display = 'none';
 
@@ -296,15 +298,13 @@
       } else if (tab === 'links') {
         document.getElementById('links-content').style.display = 'block';
         loadLinks();
-      } else if (tab === 'images') {
-        document.getElementById('images-content').style.display = 'block';
+      } else if (tab === 'media') {
+        document.getElementById('media-content').style.display = 'block';
         loadFiles('image', 'images-grid');
+        loadFiles('video', 'videos-grid');
       } else if (tab === 'documents') {
         document.getElementById('documents-content').style.display = 'block';
         loadFiles('document', 'documents-list');
-      } else if (tab === 'videos') {
-        document.getElementById('videos-content').style.display = 'block';
-        loadFiles('video', 'videos-grid');
       } else if (tab === 'files') {
         document.getElementById('files-content').style.display = 'block';
         loadFiles('other', 'files-list');
@@ -409,20 +409,32 @@
       try {
         const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/files?type=${type}`);
         const container = document.getElementById(containerId);
-        container.innerHTML = '';
-
-        if (data.files.length === 0) {
-          container.innerHTML = '<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-secondary-text);">No files yet</div>';
+        
+        if (!container) {
+          console.error(`Container ${containerId} not found`);
           return;
         }
+        
+        container.innerHTML = '';
+
+        if (!data.files || data.files.length === 0) {
+          const emptyMsg = type === 'image' ? 'No images yet. Upload photos in chat!' :
+                          type === 'video' ? 'No videos yet. Share videos in chat!' :
+                          type === 'document' ? 'No documents yet. Share PDFs, Word docs, Excel files in chat!' :
+                          'No files yet. Upload files in chat!';
+          container.innerHTML = `<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-secondary-text);">${emptyMsg}</div>`;
+          return;
+        }
+
+        console.log(`Loading ${data.files.length} files of type ${type}`);
 
         if (type === 'image') {
           data.files.forEach(file => {
             const fileEl = document.createElement('div');
-            fileEl.style.cssText = 'position: relative; cursor: pointer;';
+            fileEl.style.cssText = 'position: relative; cursor: pointer; background: var(--ig-secondary-background); border-radius: 8px; overflow: hidden;';
             fileEl.innerHTML = `
-              <img src="${file.filepath}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;" alt="${file.filename}">
-              <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${file.filename}</div>
+              <img src="${file.filepath}" style="width: 100%; aspect-ratio: 1; object-fit: cover;" alt="${file.filename}" onerror="this.src='/images/default-avatar.svg';">
+              <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.filename}</div>
             `;
             fileEl.onclick = () => window.open(file.filepath, '_blank');
             container.appendChild(fileEl);
@@ -430,32 +442,52 @@
         } else if (type === 'video') {
           data.files.forEach(file => {
             const fileEl = document.createElement('div');
+            fileEl.style.cssText = 'background: var(--ig-secondary-background); border-radius: 8px; overflow: hidden; padding: 8px;';
             fileEl.innerHTML = `
-              <video src="${file.filepath}" controls style="width: 100%; border-radius: 8px;"></video>
-              <div style="padding: 8px; font-size: 14px;">${file.filename}</div>
+              <video src="${file.filepath}" controls style="width: 100%; border-radius: 8px;" preload="metadata"></video>
+              <div style="padding: 8px 4px; font-size: 13px; font-weight: 500;">${file.filename}</div>
+              <div style="padding: 0 4px; font-size: 11px; color: var(--ig-secondary-text);">Uploaded by ${file.username} · ${InnovateAPI.formatDate(file.created_at)}</div>
             `;
             container.appendChild(fileEl);
           });
         } else {
+          // Documents and other files
           data.files.forEach(file => {
             const fileEl = document.createElement('div');
             fileEl.style.cssText = 'background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+            
+            // Get file icon based on extension
+            const ext = file.filename.split('.').pop().toLowerCase();
+            let fileIcon = '📎';
+            if (['pdf'].includes(ext)) fileIcon = '📄';
+            else if (['doc', 'docx'].includes(ext)) fileIcon = '📝';
+            else if (['xls', 'xlsx'].includes(ext)) fileIcon = '📊';
+            else if (['txt'].includes(ext)) fileIcon = '📃';
+            else if (['zip', 'rar'].includes(ext)) fileIcon = '🗜️';
+            
             fileEl.innerHTML = `
               <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between;">
-                <div style="flex: 1;">
-                  <div style="font-weight: 600;">${file.filename}</div>
-                  <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
-                    ${(file.filesize / 1024).toFixed(1)} KB · Uploaded by ${file.username} · ${InnovateAPI.formatDate(file.created_at)}
+                <div style="display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0;">
+                  <div style="font-size: 32px;">${fileIcon}</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.filename}</div>
+                    <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
+                      ${(file.filesize / 1024).toFixed(1)} KB · Uploaded by ${file.username} · ${InnovateAPI.formatDate(file.created_at)}
+                    </div>
                   </div>
                 </div>
-                <a href="${file.filepath}" download class="btn btn-primary btn-sm">Download</a>
+                <a href="${file.filepath}" download class="btn btn-primary btn-sm" style="flex-shrink: 0;">Download</a>
               </div>
             `;
             container.appendChild(fileEl);
           });
         }
       } catch (error) {
-        console.error('Error loading files:', error);
+        console.error(`Error loading ${type} files:`, error);
+        const container = document.getElementById(containerId);
+        if (container) {
+          container.innerHTML = `<div style="background: var(--ig-primary-background); border: 1px solid var(--ig-error); border-radius: 8px; padding: 40px; text-align: center; color: var(--ig-error);">Error loading files. Please try refreshing.</div>`;
+        }
       }
     }
 
@@ -600,12 +632,20 @@
     // Handle chat attachments
     function handleChatAttachment(input, type) {
       input.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
-        chatAttachments.push({ file, type });
+        // Add all selected files to attachments (cumulative)
+        files.forEach(file => {
+          chatAttachments.push({ file, type });
+        });
+        
+        // Show success message for added files
+        const count = files.length;
+        InnovateAPI.showAlert(`Added ${count} file${count > 1 ? 's' : ''}!`, 'success');
+        
         displayChatAttachments();
-        e.target.value = ''; // Clear input
+        e.target.value = ''; // Clear input but keep attachments array
       });
     }
 
@@ -613,9 +653,42 @@
       const preview = document.getElementById('chat-attachment-preview');
       preview.innerHTML = '';
 
+      if (chatAttachments.length === 0) {
+        preview.style.display = 'none';
+        return;
+      }
+
+      preview.style.display = 'flex';
+      
+      // Always show file count summary at the top
+      if (chatAttachments.length > 0) {
+        const summary = document.createElement('div');
+        summary.style.cssText = 'padding: 8px 16px; background: var(--ig-blue); color: white; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 8px;';
+        
+        // Count by type
+        const photos = chatAttachments.filter(a => a.type === 'photo').length;
+        const videos = chatAttachments.filter(a => a.type === 'video').length;
+        const files = chatAttachments.filter(a => a.type === 'file').length;
+        const audios = chatAttachments.filter(a => a.type === 'audio').length;
+        
+        let countText = `${chatAttachments.length} file${chatAttachments.length !== 1 ? 's' : ''}`;
+        let detailsText = [];
+        if (photos > 0) detailsText.push(`${photos} 📷`);
+        if (videos > 0) detailsText.push(`${videos} 🎥`);
+        if (files > 0) detailsText.push(`${files} 📎`);
+        if (audios > 0) detailsText.push(`${audios} 🎵`);
+        
+        summary.innerHTML = `
+          <span>${countText}</span>
+          ${detailsText.length > 0 ? `<span style="font-size: 11px; opacity: 0.9;">(${detailsText.join(', ')})</span>` : ''}
+          <button onclick="chatAttachments = []; displayChatAttachments();" style="background: rgba(255,255,255,0.2); border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: white; font-size: 11px; margin-left: auto;">Clear All</button>
+        `;
+        preview.appendChild(summary);
+      }
+
       chatAttachments.forEach((attachment, index) => {
         const item = document.createElement('div');
-        item.style.cssText = 'position: relative; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; display: inline-flex; align-items: center; gap: 8px;';
+        item.style.cssText = 'position: relative; padding: 8px 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; max-width: 200px;';
         
         let icon = '📎';
         if (attachment.type === 'photo') icon = '📷';
@@ -623,10 +696,13 @@
         else if (attachment.type === 'audio') icon = '🎵';
         else if (attachment.type === 'location') icon = '📍';
         
+        const fileName = attachment.file ? attachment.file.name : attachment.type;
+        const truncatedName = fileName.length > 20 ? fileName.substring(0, 17) + '...' : fileName;
+        
         item.innerHTML = `
           <span>${icon}</span>
-          <span style="font-size: 12px;">${attachment.file ? attachment.file.name : attachment.type}</span>
-          <button onclick="removeAttachment(${index})" style="background: none; border: none; cursor: pointer; color: var(--ig-error); padding: 0; margin-left: 4px;">×</button>
+          <span style="font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${fileName}">${truncatedName}</span>
+          <button onclick="removeAttachment(${index})" style="background: none; border: none; cursor: pointer; color: var(--ig-error); padding: 0; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
         `;
         preview.appendChild(item);
       });
@@ -674,6 +750,17 @@
         InnovateAPI.showAlert('Message sent!', 'success');
         loadGroupChat();
         loadFeed(); // Refresh feed to show new message
+        
+        // Auto-refresh folders to show newly uploaded files
+        const currentTab = document.querySelector('.group-tab.active')?.dataset?.tab;
+        if (currentTab === 'media') {
+          loadFiles('image', 'images-grid');
+          loadFiles('video', 'videos-grid');
+        } else if (currentTab === 'documents') {
+          loadFiles('document', 'documents-list');
+        } else if (currentTab === 'files') {
+          loadFiles('other', 'files-list');
+        }
       } catch (error) {
         InnovateAPI.showAlert(error.message, 'error');
       }
@@ -719,9 +806,8 @@
     // Tab event listeners
     document.getElementById('feed-tab').addEventListener('click', () => switchTab('feed'));
     document.getElementById('links-tab').addEventListener('click', () => switchTab('links'));
-    document.getElementById('images-tab').addEventListener('click', () => switchTab('images'));
+    document.getElementById('media-tab').addEventListener('click', () => switchTab('media'));
     document.getElementById('documents-tab').addEventListener('click', () => switchTab('documents'));
-    document.getElementById('videos-tab').addEventListener('click', () => switchTab('videos'));
     document.getElementById('files-tab').addEventListener('click', () => switchTab('files'));
     document.getElementById('members-tab').addEventListener('click', () => switchTab('members'));
 

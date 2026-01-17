@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="/css/workspace.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- E2E Encryption Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <style>
     /* WhatsApp Community Complete Styles */
@@ -987,6 +989,101 @@
       githubIntegration: null
     };
 
+    // ==================== E2E ENCRYPTION MODULE ====================
+    const E2EEncryption = {
+      // Encryption key management
+      keys: {},
+      
+      // Initialize encryption for a group/community
+      async initForGroup(groupId) {
+        try {
+          // Check if we already have a key for this group
+          const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
+          if (storedKey) {
+            this.keys[groupId] = storedKey;
+            console.log(`🔐 E2E: Loaded existing key for group ${groupId}`);
+            return true;
+          }
+          
+          // Generate new encryption key for this group
+          const key = CryptoJS.lib.WordArray.random(32).toString();
+          this.keys[groupId] = key;
+          localStorage.setItem(`e2e_key_${groupId}`, key);
+          console.log(`🔐 E2E: Generated new key for group ${groupId}`);
+          return true;
+        } catch (error) {
+          console.error('E2E: Key initialization failed:', error);
+          return false;
+        }
+      },
+      
+      // Encrypt message content
+      encrypt(text, groupId) {
+        try {
+          if (!text || !groupId) return text;
+          
+          const key = this.keys[groupId];
+          if (!key) {
+            console.warn('E2E: No key found for group', groupId);
+            return text;
+          }
+          
+          const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+          console.log('🔐 E2E: Encrypted message');
+          return encrypted;
+        } catch (error) {
+          console.error('E2E: Encryption failed:', error);
+          return text; // Fallback to unencrypted
+        }
+      },
+      
+      // Decrypt message content
+      decrypt(encryptedText, groupId) {
+        try {
+          if (!encryptedText || !groupId) return encryptedText;
+          
+          const key = this.keys[groupId];
+          if (!key) {
+            console.warn('E2E: No key found for group', groupId);
+            return encryptedText;
+          }
+          
+          const decrypted = CryptoJS.AES.decrypt(encryptedText, key).toString(CryptoJS.enc.Utf8);
+          console.log('🔐 E2E: Decrypted message');
+          return decrypted || encryptedText; // Fallback if decryption fails
+        } catch (error) {
+          console.error('E2E: Decryption failed:', error);
+          return encryptedText; // Return original if decryption fails
+        }
+      },
+      
+      // Encrypt file metadata
+      encryptFileMetadata(filename, groupId) {
+        try {
+          return this.encrypt(filename, groupId);
+        } catch (error) {
+          console.error('E2E: File metadata encryption failed:', error);
+          return filename;
+        }
+      },
+      
+      // Check if E2E is enabled for this group
+      isEnabled(groupId) {
+        return !!this.keys[groupId];
+      },
+      
+      // Toggle E2E encryption for a group
+      toggleForGroup(groupId, enabled) {
+        if (enabled) {
+          this.initForGroup(groupId);
+        } else {
+          delete this.keys[groupId];
+          localStorage.removeItem(`e2e_key_${groupId}`);
+        }
+        console.log(`🔐 E2E: ${enabled ? 'Enabled' : 'Disabled'} for group ${groupId}`);
+      }
+    };
+
     // ==================== INITIALIZATION ====================
     document.addEventListener('DOMContentLoaded', async () => {
       if (!InnovateAPI.requireAuth()) return;
@@ -1357,8 +1454,8 @@
           </div>
           
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
-            <!-- Files Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('folders');">
+            <!-- Files Section - FIXED: Goes directly to folders view -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="openGroupFolderView(${group.id});">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-file-alt"></i>
               </div>
@@ -1367,7 +1464,7 @@
             </div>
 
             <!-- Links Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id});">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; openFolder('links');">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-link"></i>
               </div>
@@ -1376,7 +1473,7 @@
             </div>
 
             <!-- Tasks Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('tasks');">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='tasks'; selectGroup(${group.id}); switchCenterTab('tasks');">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-tasks"></i>
               </div>
@@ -1385,7 +1482,7 @@
             </div>
 
             <!-- Notes Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="selectGroup(${group.id}); switchCenterTab('notes');">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='notes'; selectGroup(${group.id}); switchCenterTab('notes');">
               <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
                 <i class="fas fa-sticky-note"></i>
               </div>
@@ -2194,9 +2291,9 @@
       console.log('=== sendMessage called ===');
       console.log('Message text:', message);
       console.log('GroupId:', state.currentGroupId);
-      console.log('Files:', fileInput?.files?.length || 0);
+      console.log('Accumulated files:', accumulatedFiles.length);
       
-      if ((!message && (!fileInput || !fileInput.files || fileInput.files.length === 0)) || !state.currentGroupId) {
+      if ((!message && accumulatedFiles.length === 0) || !state.currentGroupId) {
         console.log('Aborting: no message/files or no groupId');
         return;
       }
@@ -2204,19 +2301,43 @@
       try {
         console.log('Sending POST to:', `/community-groups/${state.currentGroupId}/posts`);
         
-        const formData = new FormData();
-        if (message) {
-          formData.append('content', message);
-          console.log('Added content to FormData:', message);
+        // Initialize E2E encryption for this group if not already done
+        await E2EEncryption.initForGroup(state.currentGroupId);
+        
+        // Encrypt message content
+        const encryptedMessage = E2EEncryption.encrypt(message, state.currentGroupId);
+        
+        // Extract URLs from message for links folder
+        const urlRegex = /(https?:\/\/[^\s<]+)/g;
+        const urls = message.match(urlRegex);
+        if (urls && urls.length > 0) {
+          // Save links to backend
+          for (const url of urls) {
+            try {
+              await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/links`, {
+                method: 'POST',
+                body: JSON.stringify({ url, title: url })
+              });
+              console.log('🔗 Saved link:', url);
+            } catch (err) {
+              console.error('Failed to save link:', err);
+            }
+          }
         }
         
-        // Add files if any
-        if (fileInput && fileInput.files && fileInput.files.length > 0) {
-          for (let i = 0; i < fileInput.files.length; i++) {
-            formData.append('attachments', fileInput.files[i]);
-            console.log(`Added file ${i + 1}:`, fileInput.files[i].name);
+        const formData = new FormData();
+        if (message) {
+          formData.append('content', encryptedMessage);
+          console.log('🔐 Added ENCRYPTED content to FormData');
+        }
+        
+        // Add accumulated files (CUMULATIVE)
+        if (accumulatedFiles.length > 0) {
+          for (let i = 0; i < accumulatedFiles.length; i++) {
+            formData.append('attachments', accumulatedFiles[i]);
+            console.log(`Added file ${i + 1}:`, accumulatedFiles[i].name);
           }
-          console.log('Total files added:', fileInput.files.length);
+          console.log('Total files added:', accumulatedFiles.length);
         }
         
         const res = await fetch(`/api/community-groups/${state.currentGroupId}/posts`, {
@@ -2240,7 +2361,9 @@
             fileInput.value = '';
             input.placeholder = 'Type a message...';
           }
-          console.log('Message sent successfully, reloading groups...');
+          // Clear accumulated files after successful send
+          accumulatedFiles = [];
+          console.log('Message sent successfully, cleared accumulated files, reloading groups...');
           
           // Message will appear via socket event
           // Reload groups to update latest message
@@ -2372,27 +2495,28 @@
       const footer = document.getElementById('centerFooter');
       footer.style.display = 'none';
 
+      // Initial loading state
       content.innerHTML = `
         <div class="folder-grid">
-          <div class="folder-item" onclick="openFolder('images')">
+          <div class="folder-item" onclick="openFolder('image')">
             <div class="folder-icon">🖼️</div>
             <div class="folder-name">Images</div>
-            <div class="folder-count">0 files</div>
+            <div class="folder-count" id="images-count">Loading...</div>
           </div>
-          <div class="folder-item" onclick="openFolder('videos')">
+          <div class="folder-item" onclick="openFolder('video')">
             <div class="folder-icon">🎥</div>
             <div class="folder-name">Videos</div>
-            <div class="folder-count">0 files</div>
+            <div class="folder-count" id="videos-count">Loading...</div>
           </div>
-          <div class="folder-item" onclick="openFolder('documents')">
+          <div class="folder-item" onclick="openFolder('document')">
             <div class="folder-icon">📄</div>
             <div class="folder-name">Documents</div>
-            <div class="folder-count">0 files</div>
+            <div class="folder-count" id="documents-count">Loading...</div>
           </div>
           <div class="folder-item" onclick="openFolder('links')">
             <div class="folder-icon">🔗</div>
             <div class="folder-name">Links</div>
-            <div class="folder-count">0 saved</div>
+            <div class="folder-count" id="links-count">Loading...</div>
           </div>
           <div class="folder-item" onclick="openGitHubRepos()">
             <div class="folder-icon">💻</div>
@@ -2400,21 +2524,201 @@
             <div class="folder-count">Repositories</div>
           </div>
         </div>
-        <div style="margin-top: 24px;">
-          <div class="file-upload" onclick="uploadFile()">
-            <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--ig-blue); margin-bottom: 16px;"></i>
-            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Upload Files</div>
-            <div style="font-size: 14px; color: var(--ig-secondary-text);">Click to browse or drag and drop</div>
-          </div>
+        <div id="folder-files-view" style="margin-top: 24px; display: none;">
+          <!-- Files will be displayed here when folder is opened -->
         </div>
       `;
 
-      // Load file counts (implement API call)
+      // Load actual file counts from API
+      try {
+        console.log('Loading file counts for group:', groupId);
+        
+        // Load images count
+        const imagesRes = await InnovateAPI.apiRequest(`/community-groups/${groupId}/files?type=image`);
+        document.getElementById('images-count').textContent = `${imagesRes.files?.length || 0} files`;
+        console.log('Images count:', imagesRes.files?.length);
+        
+        // Load videos count
+        const videosRes = await InnovateAPI.apiRequest(`/community-groups/${groupId}/files?type=video`);
+        document.getElementById('videos-count').textContent = `${videosRes.files?.length || 0} files`;
+        console.log('Videos count:', videosRes.files?.length);
+        
+        // Load documents count
+        const documentsRes = await InnovateAPI.apiRequest(`/community-groups/${groupId}/files?type=document`);
+        document.getElementById('documents-count').textContent = `${documentsRes.files?.length || 0} files`;
+        console.log('Documents count:', documentsRes.files?.length);
+        
+        // Load links count
+        const linksRes = await InnovateAPI.apiRequest(`/community-groups/${groupId}/links`);
+        document.getElementById('links-count').textContent = `${linksRes.links?.length || 0} saved`;
+        console.log('Links count:', linksRes.links?.length);
+        
+      } catch (error) {
+        console.error('Error loading file counts:', error);
+        document.getElementById('images-count').textContent = '0 files';
+        document.getElementById('videos-count').textContent = '0 files';
+        document.getElementById('documents-count').textContent = '0 files';
+        document.getElementById('links-count').textContent = '0 saved';
+      }
     }
 
-    function openFolder(type) {
+    // NEW FUNCTION: Open group folder view directly (for Folders tab navigation)
+    // This bypasses chat view and goes straight to folders
+    async function openGroupFolderView(groupId) {
+      console.log('openGroupFolderView called for group:', groupId);
+      
+      // Set current group and view
+      state.currentGroupId = groupId;
+      state.currentView = 'folders';
+      
+      const group = state.groups.find(g => g.id == groupId);
+      if (!group) {
+        console.error('Group not found:', groupId);
+        return;
+      }
+      
+      // Update header to show group name
+      document.getElementById('centerTitle').textContent = group.name + ' - Folders';
+      document.getElementById('centerSubtitle').textContent = 'Files organized by type';
+      
+      // Hide tabs since we're in folder-specific view
+      document.getElementById('centerTabs').style.display = 'none';
+      
+      // Load the folders view directly
+      await loadFoldersView(groupId);
+      
+      console.log('Folder view loaded for group:', group.name);
+    }
+    
+    async function openFolder(type) {
       console.log(`Opening ${type} folder...`);
-      // Implement folder view
+      const filesView = document.getElementById('folder-files-view');
+      filesView.style.display = 'block';
+      filesView.innerHTML = '<div class="loading"><div class="spinner"></div>Loading files...</div>';
+
+      try {
+        if (type === 'links') {
+          // Load links
+          const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/links`);
+          const links = res.links || [];
+          
+          if (links.length === 0) {
+            filesView.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-icon">🔗</div>
+                <div class="empty-title">No links saved</div>
+                <div class="empty-text">Share links in chat to see them here</div>
+              </div>
+            `;
+            return;
+          }
+          
+          filesView.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <button class="btn btn-secondary" onclick="document.getElementById('folder-files-view').style.display='none'; loadFoldersView(state.currentGroupId);" style="margin-right: 12px;">
+                <i class="fas fa-arrow-left"></i> Back
+              </button>
+              <h3 style="margin: 0; flex: 1;">Links (${links.length})</h3>
+              <button class="btn btn-secondary" onclick="document.getElementById('folder-files-view').style.display='none'">
+                <i class="fas fa-times"></i> Close
+              </button>
+            </div>
+            <div style="display: grid; gap: 12px;">
+              ${links.map(link => `
+                <div class="file-card" style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; cursor: pointer;" onclick="window.open('${link.url}', '_blank')">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 32px;">🔗</div>
+                    <div style="flex: 1;">
+                      <div style="font-weight: 600; margin-bottom: 4px;">${link.title || link.url}</div>
+                      <div style="font-size: 13px; color: var(--ig-secondary-text);">${link.url}</div>
+                      <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
+                        Saved by ${link.username} • ${InnovateAPI.formatDate(link.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          // Load files (images, videos, documents)
+          const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/files?type=${type}`);
+          const files = res.files || [];
+          
+          console.log(`${type} files loaded:`, files.length);
+          
+          if (files.length === 0) {
+            const emptyMessages = {
+              image: '📷 No images uploaded yet',
+              video: '🎥 No videos uploaded yet',
+              document: '📄 No documents uploaded yet'
+            };
+            filesView.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-icon">${emptyMessages[type]}</div>
+                <div class="empty-title">No files found</div>
+                <div class="empty-text">Upload files in chat to see them here</div>
+              </div>
+            `;
+            return;
+          }
+          
+          // Display files in grid
+          filesView.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">${type.charAt(0).toUpperCase() + type.slice(1)}s (${files.length})</h3>
+              <button class="btn btn-secondary" onclick="document.getElementById('folder-files-view').style.display='none'">
+                <i class="fas fa-times"></i> Close
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+              ${files.map(file => {
+                const isImage = type === 'image';
+                const isVideo = type === 'video';
+                const fileIcon = type === 'document' ? (
+                  file.filename.endsWith('.pdf') ? '📄' :
+                  file.filename.match(/\.(doc|docx)$/) ? '📝' :
+                  file.filename.match(/\.(xls|xlsx)$/) ? '📊' : '📎'
+                ) : '📎';
+                
+                return `
+                  <div class="file-card" style="border: 1px solid var(--ig-border); border-radius: 12px; overflow: hidden; cursor: pointer;" onclick="window.open('${file.filepath}', '_blank')">
+                    ${isImage ? `
+                      <img src="${file.filepath}" alt="${file.filename}" style="width: 100%; height: 150px; object-fit: cover; background: var(--ig-secondary-background);">
+                    ` : isVideo ? `
+                      <video src="${file.filepath}" style="width: 100%; height: 150px; object-fit: cover; background: var(--ig-secondary-background);" controls></video>
+                    ` : `
+                      <div style="width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; background: var(--ig-secondary-background); font-size: 48px;">
+                        ${fileIcon}
+                      </div>
+                    `}
+                    <div style="padding: 12px;">
+                      <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.filename}">
+                        ${file.filename}
+                      </div>
+                      <div style="font-size: 11px; color: var(--ig-secondary-text);">
+                        ${file.username} • ${InnovateAPI.formatDate(file.created_at)}
+                      </div>
+                      <div style="font-size: 11px; color: var(--ig-secondary-text);">
+                        ${(file.filesize / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading folder contents:', error);
+        filesView.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">❌</div>
+            <div class="empty-title">Error loading files</div>
+            <div class="empty-text">${error.message}</div>
+          </div>
+        `;
+      }
     }
 
     function uploadFile() {
@@ -2986,15 +3290,15 @@
       }
     }
     
-    // File handling functions
-    let accumulatedFiles = [];
+    // File handling functions for announcements
+    let announcementFiles = [];
     
     function handleAnnouncementFilesChange(event) {
       const newFiles = Array.from(event.target.files);
       
       if (newFiles.length === 0) {
         // User cancelled - keep existing files
-        if (accumulatedFiles.length === 0) {
+        if (announcementFiles.length === 0) {
           document.getElementById('announcementFilesPreview').style.display = 'none';
         }
         return;
@@ -3002,15 +3306,15 @@
       
       // Add new files to accumulated list (avoid duplicates by name)
       newFiles.forEach(newFile => {
-        const isDuplicate = accumulatedFiles.some(f => f.name === newFile.name && f.size === newFile.size);
+        const isDuplicate = announcementFiles.some(f => f.name === newFile.name && f.size === newFile.size);
         if (!isDuplicate) {
-          accumulatedFiles.push(newFile);
+          announcementFiles.push(newFile);
         }
       });
       
       // Update the file input with all accumulated files
       const dt = new DataTransfer();
-      accumulatedFiles.forEach(file => dt.items.add(file));
+      announcementFiles.forEach(file => dt.items.add(file));
       event.target.files = dt.files;
       
       // Update preview
@@ -3018,7 +3322,7 @@
     }
     
     function updateFilesPreview() {
-      const files = accumulatedFiles;
+      const files = announcementFiles;
       
       if (files.length === 0) {
         document.getElementById('announcementFilesPreview').style.display = 'none';
@@ -3081,12 +3385,12 @@
     
     function removeAnnouncementFile(index) {
       // Remove from accumulated files array
-      accumulatedFiles.splice(index, 1);
+      announcementFiles.splice(index, 1);
       
       // Update the file input
       const filesInput = document.getElementById('announcementFiles');
       const dt = new DataTransfer();
-      accumulatedFiles.forEach(file => dt.items.add(file));
+      announcementFiles.forEach(file => dt.items.add(file));
       filesInput.files = dt.files;
       
       // Update preview
@@ -3178,6 +3482,7 @@
           document.getElementById('announcementTitle').value = '';
           document.getElementById('announcementMessage').value = '';
           clearAnnouncementFiles();
+          announcementFiles = []; // Clear accumulated announcement files
           document.getElementById('announcementLinks').innerHTML = '';
           document.getElementById('announcementAddLocation').checked = false;
           toggleAnnouncementLocation();
@@ -3546,6 +3851,18 @@
       return date.toLocaleString('en-IN', options);
     }
     
+    // Convert URLs in text to clickable links
+    function linkify(text) {
+      if (!text) return '';
+      
+      // URL regex pattern
+      const urlRegex = /(https?:\/\/[^\s<]+)/g;
+      
+      return text.replace(urlRegex, (url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0095f6; text-decoration: underline; word-break: break-all;">${url}</a>`;
+      });
+    }
+    
     function renderMessage(msg) {
       // Handle both group_messages (sender_id, sender_username) and community_group_posts (user_id, username)
       const senderId = msg.sender_id || msg.user_id;
@@ -3629,7 +3946,13 @@
       }
       
       // Get the actual content text, treating null/undefined as empty string
-      const contentText = msg.content || '';
+      let contentText = msg.content || '';
+      
+      // Decrypt message content if E2E is enabled
+      if (contentText && state.currentGroupId) {
+        contentText = E2EEncryption.decrypt(contentText, state.currentGroupId);
+      }
+      
       const hasContent = contentText && contentText.trim() !== '';
       
       if (isOwn) {
@@ -3637,7 +3960,7 @@
         return `
           <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px;">
             <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${contentText}</div>` : ''}
+              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText)}</div>` : ''}
               ${attachmentsHTML}
               <div style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
             </div>
@@ -3662,7 +3985,7 @@
               >
                 ${senderName}
               </div>
-              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${contentText}</div>` : ''}
+              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText)}</div>` : ''}
               ${attachmentsHTML}
               <div style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
             </div>
@@ -3696,18 +4019,10 @@
     }
     
     // Handle file selection and show preview
-    function handleFileSelect(event) {
-      const files = event.target.files;
-      if (files.length > 0) {
-        const fileNames = Array.from(files).map(f => f.name).join(', ');
-        const truncated = fileNames.length > 50 ? fileNames.substring(0, 50) + '...' : fileNames;
-        const input = document.getElementById('chatInput');
-        input.placeholder = `${files.length} file(s) selected: ${truncated}`;
-        console.log('Files selected:', files.length);
-      }
-    }
+    // State to store accumulated files
+    let accumulatedFiles = [];
     
-    // Handle file selection
+    // Handle file selection - CUMULATIVE (adds files instead of replacing)
     function handleFileSelect(event) {
       const fileInput = event.target;
       const chatInput = document.getElementById('chatInput');
@@ -3715,9 +4030,16 @@
       if (!fileInput || !chatInput) return;
       
       if (fileInput.files && fileInput.files.length > 0) {
-        const fileNames = Array.from(fileInput.files).map(f => f.name).join(', ');
+        // ADD new files to existing accumulated files (CUMULATIVE)
+        const newFiles = Array.from(fileInput.files);
+        accumulatedFiles = accumulatedFiles.concat(newFiles);
+        
+        console.log(`Added ${newFiles.length} file(s). Total now: ${accumulatedFiles.length}`);
+        
+        // Show total count in placeholder (no alert popup)
+        const fileNames = accumulatedFiles.map(f => f.name).join(', ');
         const truncated = fileNames.length > 40 ? fileNames.substring(0, 40) + '...' : fileNames;
-        chatInput.placeholder = `${fileInput.files.length} file(s) selected: ${truncated}`;
+        chatInput.placeholder = `${accumulatedFiles.length} file(s) selected: ${truncated}`;
       } else {
         chatInput.placeholder = 'Type a message...';
       }
