@@ -645,7 +645,7 @@ router.post('/community-groups/:groupId/tasks/from-text', authMiddleware, async 
   const db = getDb();
   const userId = req.user.userId;
   const groupId = req.params.groupId;
-  const { text, priority = 'medium', due_date = null, assignees = [] } = req.body || {};
+  const { text, priority = 'medium', due_date = null, assignees = [], description = '', subtasks = '[]', progress = 0 } = req.body || {};
 
   try {
     const member = await requireGroupMember(db, groupId, userId);
@@ -656,18 +656,20 @@ router.post('/community-groups/:groupId/tasks/from-text', authMiddleware, async 
 
     const created = [];
     const stmt = db.prepare(
-      `INSERT INTO community_group_tasks (group_id, title, description, priority, status, due_date, assignees, progress, source_type, source_ref, created_by)
-       VALUES (?, ?, ?, ?, 'todo', ?, ?, 0, 'text', ?, ?)`
+      `INSERT INTO community_group_tasks (group_id, title, description, priority, status, due_date, assignees, progress, subtasks, source_type, source_ref, created_by)
+       VALUES (?, ?, ?, ?, 'todo', ?, ?, ?, ?, 'text', ?, ?)`
     );
 
     tasks.forEach(t => {
       stmt.run(
         groupId,
         t.title,
-        '',
+        description,
         priority,
         due_date,
         JSON.stringify(Array.isArray(assignees) ? assignees : []),
+        progress,
+        subtasks,
         text || '',
         userId,
         function(err) {
@@ -747,7 +749,7 @@ router.patch('/community-groups/:groupId/tasks/:taskId', authMiddleware, async (
   const db = getDb();
   const userId = req.user.userId;
   const { groupId, taskId } = req.params;
-  const { title, description, priority, status, due_date, assignees, progress } = req.body || {};
+  const { title, description, priority, status, due_date, assignees, progress, subtasks } = req.body || {};
 
   try {
     const member = await requireGroupMember(db, groupId, userId);
@@ -766,12 +768,13 @@ router.patch('/community-groups/:groupId/tasks/:taskId', authMiddleware, async (
           status: typeof status === 'string' ? status : existing.status,
           due_date: typeof due_date === 'undefined' ? existing.due_date : due_date,
           assignees: typeof assignees === 'undefined' ? existing.assignees : JSON.stringify(Array.isArray(assignees) ? assignees : []),
-          progress: typeof progress === 'number' ? progress : existing.progress
+          progress: typeof progress === 'number' ? progress : existing.progress,
+          subtasks: typeof subtasks === 'string' ? subtasks : existing.subtasks
         };
 
         db.run(
           `UPDATE community_group_tasks
-           SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, assignees = ?, progress = ?, updated_at = CURRENT_TIMESTAMP
+           SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, assignees = ?, progress = ?, subtasks = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND group_id = ?`,
           [
             next.title,
@@ -781,6 +784,7 @@ router.patch('/community-groups/:groupId/tasks/:taskId', authMiddleware, async (
             next.due_date,
             next.assignees,
             next.progress,
+            next.subtasks,
             taskId,
             groupId
           ],
@@ -793,6 +797,37 @@ router.patch('/community-groups/:groupId/tasks/:taskId', authMiddleware, async (
     );
   } catch (e) {
     res.status(500).json({ error: 'Error updating task' });
+  }
+});
+
+// Delete a task
+router.delete('/community-groups/:groupId/tasks/:taskId', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { groupId, taskId } = req.params;
+
+  try {
+    const member = await requireGroupMember(db, groupId, userId);
+    if (!member) return res.status(403).json({ error: 'You must be a member to delete tasks' });
+
+    db.get(
+      'SELECT * FROM community_group_tasks WHERE id = ? AND group_id = ?',
+      [taskId, groupId],
+      (err, existing) => {
+        if (err || !existing) return res.status(404).json({ error: 'Task not found' });
+
+        db.run(
+          'DELETE FROM community_group_tasks WHERE id = ? AND group_id = ?',
+          [taskId, groupId],
+          (delErr) => {
+            if (delErr) return res.status(500).json({ error: 'Error deleting task' });
+            res.json({ success: true, message: 'Task deleted' });
+          }
+        );
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: 'Error deleting task' });
   }
 });
 

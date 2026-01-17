@@ -655,6 +655,13 @@ const createTables = () => {
         }
       });
 
+      // Add subtasks column to community_group_tasks
+      db.run(`ALTER TABLE community_group_tasks ADD COLUMN subtasks TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: subtasks column migration - ', err.message);
+        }
+      });
+
       // Add action buttons columns to posts
       db.run(`ALTER TABLE posts ADD COLUMN enable_contact BOOLEAN DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column')) {

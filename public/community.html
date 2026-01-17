@@ -544,6 +544,446 @@
       font-size: 12px;
       color: var(--ig-secondary-text);
     }
+    
+    /* ========== KANBAN BOARD STYLES ========== */
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+    
+    @media (max-width: 1024px) {
+      .kanban-board {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .kanban-column {
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 400px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .kanban-column-header {
+      padding: 16px;
+      border-bottom: 2px solid var(--ig-border);
+      background: linear-gradient(135deg, rgba(0, 149, 246, 0.05), rgba(0, 149, 246, 0.02));
+    }
+    
+    .kanban-column-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .kanban-column-title h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      flex: 1;
+    }
+    
+    .kanban-icon {
+      font-size: 20px;
+    }
+    
+    .kanban-count {
+      background: var(--ig-blue);
+      color: white;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .kanban-column-body {
+      padding: 12px;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 200px;
+    }
+    
+    .kanban-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--ig-secondary-text);
+      font-size: 14px;
+      border: 2px dashed var(--ig-border);
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .kanban-task {
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: grab;
+      transition: all 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .kanban-task:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border-color: var(--ig-blue);
+    }
+    
+    .kanban-task:active {
+      cursor: grabbing;
+    }
+    
+    .kanban-task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .kanban-task-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: var(--ig-primary-text);
+      line-height: 1.4;
+    }
+    
+    .kanban-task-desc {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    
+    .kanban-task-subtasks {
+      color: var(--ig-blue);
+      font-size: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    .kanban-task-subtasks i {
+      font-size: 14px;
+    }
+    
+    .kanban-task-footer {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .task-due {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .task-progress-chip {
+      background: var(--ig-blue);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .task-delete {
+      background: none;
+      border: none;
+      color: var(--ig-secondary-text);
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .task-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    
+    .task-edit {
+      background: none;
+      border: none;
+      color: var(--ig-secondary-text);
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .kanban-task:hover .task-delete,
+    .kanban-task:hover .task-edit {
+      opacity: 1;
+    }
+    
+    .task-edit:hover {
+      color: var(--ig-blue);
+    }
+    
+    .task-delete:hover {
+      color: #ed4956;
+    }
+
+    /* Task Modal */
+    .task-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: fadeIn 0.2s;
+    }
+
+    .task-modal {
+      background: var(--ig-primary-background);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .task-modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--ig-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .task-modal-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+
+    .task-modal-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      color: var(--ig-secondary-text);
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .task-modal-close:hover {
+      background: var(--ig-hover);
+    }
+
+    .task-modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .task-form-group {
+      margin-bottom: 20px;
+    }
+
+    .task-form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+    }
+
+    .task-form-group input[type="text"],
+    .task-form-group input[type="date"],
+    .task-form-group select,
+    .task-form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .task-form-group input:focus,
+    .task-form-group select:focus,
+    .task-form-group textarea:focus {
+      border-color: var(--ig-blue);
+    }
+
+    .task-form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .subtasks-list {
+      margin-bottom: 12px;
+    }
+
+    .subtask-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: var(--ig-secondary-background);
+      border-radius: 8px;
+    }
+
+    .subtask-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .subtask-item input[type="text"] {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--ig-border);
+      border-radius: 6px;
+      background: var(--ig-primary-background);
+      color: var(--ig-primary-text);
+      font-size: 14px;
+    }
+
+    .subtask-remove {
+      background: none;
+      border: none;
+      color: var(--ig-secondary-text);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .subtask-remove:hover {
+      background: var(--ig-hover);
+      color: #ed4956;
+    }
+
+    .add-subtask-btn {
+      background: var(--ig-secondary-background);
+      border: 1px dashed var(--ig-border);
+      color: var(--ig-blue);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s;
+    }
+
+    .add-subtask-btn:hover {
+      background: var(--ig-hover);
+      border-color: var(--ig-blue);
+    }
+
+    .progress-display {
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .progress-percentage {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--ig-blue);
+      margin-bottom: 4px;
+    }
+
+    .progress-label {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+    }
+
+    .task-modal-footer {
+      padding: 20px;
+      border-top: 1px solid var(--ig-border);
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .task-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .task-btn-secondary {
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+    }
+
+    .task-btn-secondary:hover {
+      background: var(--ig-hover);
+    }
+
+    .task-btn-primary {
+      background: var(--ig-blue);
+      color: white;
+    }
+
+    .task-btn-primary:hover {
+      background: #0081d6;
+    }
 
     /* Note Editor */
     .note-editor {
@@ -1042,7 +1482,16 @@
         try {
           if (!encryptedText || !groupId) return encryptedText;
           
-          const key = this.keys[groupId];
+          // Try cached key first, then fall back to localStorage
+          let key = this.keys[groupId];
+          if (!key) {
+            const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
+            if (storedKey) {
+              this.keys[groupId] = storedKey;
+              key = storedKey;
+              console.log(`🔐 E2E: Loaded key from storage for group ${groupId}`);
+            }
+          }
           if (!key) {
             console.warn('E2E: No key found for group', groupId);
             return encryptedText;
@@ -1293,8 +1742,10 @@
 
       content.innerHTML = state.groups.map(group => {
         const latestMsg = group.latest_message || '';
+        // Attempt decryption for preview if content appears encrypted
+        const previewMsg = E2EEncryption.decrypt(latestMsg, group.id);
         const unreadCount = group.unread_count || 0;
-        const truncatedMsg = latestMsg.length > 30 ? latestMsg.substring(0, 30) + '...' : latestMsg;
+        const truncatedMsg = previewMsg.length > 30 ? previewMsg.substring(0, 30) + '...' : previewMsg;
         
         return `
           <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
@@ -1304,8 +1755,8 @@
                 <div class="group-name">${group.name}</div>
                 ${unreadCount > 0 ? `<span style="background: var(--ig-blue); color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600;">${unreadCount}</span>` : ''}
               </div>
-              <div class="group-desc" style="color: ${latestMsg ? 'var(--ig-primary-text)' : 'var(--ig-secondary-text)'}; font-weight: ${unreadCount > 0 ? '600' : '400'};">
-                ${latestMsg ? truncatedMsg : (group.description || 'No messages yet')}
+              <div class="group-desc" style="color: ${previewMsg ? 'var(--ig-primary-text)' : 'var(--ig-secondary-text)'}; font-weight: ${unreadCount > 0 ? '600' : '400'};">
+                ${previewMsg ? truncatedMsg : (group.description || 'No messages yet')}
               </div>
             </div>
           </div>
@@ -2733,7 +3184,7 @@
       input.click();
     }
 
-    // ==================== TASKS VIEW ====================
+    // ==================== TASKS VIEW (KANBAN BOARD) ====================
     async function loadTasksView(groupId) {
       const content = document.getElementById('centerContent');
       const footer = document.getElementById('centerFooter');
@@ -2742,9 +3193,16 @@
       try {
         const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/tasks`);
         const tasks = res.tasks || [];
+        
+        // Group tasks by status
+        const tasksByStatus = {
+          todo: tasks.filter(t => t.status === 'todo'),
+          in_progress: tasks.filter(t => t.status === 'in_progress'),
+          done: tasks.filter(t => t.status === 'done')
+        };
 
         content.innerHTML = `
-          <div style="margin-bottom: 16px; display: flex; gap: 12px;">
+          <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn btn-primary" onclick="createTaskFromText()">
               <i class="fas fa-plus"></i> Add Task
             </button>
@@ -2755,49 +3213,352 @@
               <i class="fas fa-microphone"></i> From Voice
             </button>
           </div>
-          <div id="tasksList">
-            ${tasks.length === 0 ? `
-              <div class="empty-state">
-                <div class="empty-icon">✅</div>
-                <div class="empty-title">No tasks yet</div>
-                <div class="empty-text">Create tasks using text, image, or voice</div>
-              </div>
-            ` : tasks.map(task => `
-              <div class="task-card" onclick="editTask(${task.id})">
-                <div class="task-header">
-                  <div class="task-title">${task.title}</div>
-                  <span class="task-priority priority-${task.priority || 'medium'}">${task.priority || 'medium'}</span>
-                </div>
-                <div class="task-desc">${task.description || 'No description'}</div>
-                <div class="task-meta">
-                  <span><i class="fas fa-calendar"></i> ${task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}</span>
-                  <span><i class="fas fa-chart-line"></i> ${task.progress || 0}%</span>
+          
+          <div class="kanban-board">
+            <!-- TO DO Column -->
+            <div class="kanban-column" data-status="todo">
+              <div class="kanban-column-header">
+                <div class="kanban-column-title">
+                  <span class="kanban-icon">📋</span>
+                  <h3>To Do</h3>
+                  <span class="kanban-count">${tasksByStatus.todo.length}</span>
                 </div>
               </div>
-            `).join('')}
+              <div class="kanban-column-body" id="column-todo" ondrop="handleDrop(event, 'todo')" ondragover="handleDragOver(event)">
+                ${renderKanbanTasks(tasksByStatus.todo)}
+              </div>
+            </div>
+            
+            <!-- IN PROGRESS Column -->
+            <div class="kanban-column" data-status="in_progress">
+              <div class="kanban-column-header">
+                <div class="kanban-column-title">
+                  <span class="kanban-icon">⚡</span>
+                  <h3>In Progress</h3>
+                  <span class="kanban-count">${tasksByStatus.in_progress.length}</span>
+                </div>
+              </div>
+              <div class="kanban-column-body" id="column-in_progress" ondrop="handleDrop(event, 'in_progress')" ondragover="handleDragOver(event)">
+                ${renderKanbanTasks(tasksByStatus.in_progress)}
+              </div>
+            </div>
+            
+            <!-- DONE Column -->
+            <div class="kanban-column" data-status="done">
+              <div class="kanban-column-header">
+                <div class="kanban-column-title">
+                  <span class="kanban-icon">✅</span>
+                  <h3>Done</h3>
+                  <span class="kanban-count">${tasksByStatus.done.length}</span>
+                </div>
+              </div>
+              <div class="kanban-column-body" id="column-done" ondrop="handleDrop(event, 'done')" ondragover="handleDragOver(event)">
+                ${renderKanbanTasks(tasksByStatus.done)}
+              </div>
+            </div>
           </div>
+          
+          ${tasks.length === 0 ? `
+            <div class="empty-state" style="margin-top: 40px;">
+              <div class="empty-icon">✅</div>
+              <div class="empty-title">No tasks yet</div>
+              <div class="empty-text">Create your first task to get started!</div>
+            </div>
+          ` : ''}
         `;
       } catch (error) {
         console.error('Error loading tasks:', error);
       }
     }
-
-    async function createTaskFromText() {
-      const title = prompt('Task title:');
-      if (!title) return;
-      const description = prompt('Description (optional):');
-
+    
+    function renderKanbanTasks(tasks) {
+      if (tasks.length === 0) {
+        return '<div class="kanban-empty">Drop tasks here</div>';
+      }
+      
+      return tasks.map(task => {
+        let subtasks = [];
+        try {
+          subtasks = task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [];
+        } catch (e) {
+          console.error('Error parsing subtasks:', e);
+        }
+        
+        const totalSubtasks = subtasks.length;
+        const completedSubtasks = subtasks.filter(st => st.completed).length;
+        
+        return `
+        <div class="kanban-task" draggable="true" ondragstart="handleDragStart(event, ${task.id})" onclick="editTask(${task.id})">
+          <div class="kanban-task-header">
+            <span class="task-priority priority-${task.priority || 'medium'}">${task.priority || 'medium'}</span>
+            <div class="task-actions">
+              <button class="task-edit" onclick="event.stopPropagation(); editTask(${task.id})" title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="task-delete" onclick="event.stopPropagation(); deleteTask(${task.id})" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="kanban-task-title">${task.title}</div>
+          ${task.description ? `<div class="kanban-task-desc">${task.description.substring(0, 80)}${task.description.length > 80 ? '...' : ''}</div>` : ''}
+          ${totalSubtasks > 0 ? `<div class="kanban-task-subtasks"><i class="fas fa-check-circle"></i> ${completedSubtasks}/${totalSubtasks} steps</div>` : ''}
+          <div class="kanban-task-footer">
+            ${task.due_date ? `<span class="task-due"><i class="fas fa-calendar"></i> ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>` : ''}
+            ${task.progress !== null && task.progress !== undefined ? `<span class="task-progress-chip">${task.progress}%</span>` : ''}
+          </div>
+        </div>
+      `}).join('');
+    }
+    
+    let draggedTaskId = null;
+    
+    function handleDragStart(event, taskId) {
+      draggedTaskId = taskId;
+      event.target.style.opacity = '0.5';
+    }
+    
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.currentTarget.style.background = 'rgba(0, 149, 246, 0.1)';
+    }
+    
+    async function handleDrop(event, newStatus) {
+      event.preventDefault();
+      event.currentTarget.style.background = '';
+      
+      if (!draggedTaskId) return;
+      
       try {
-        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-text`, {
-          method: 'POST',
-          body: JSON.stringify({ description: `${title}\n${description || ''}` })
+        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${draggedTaskId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: newStatus })
         });
-        console.log('Task created successfully');
+        
         loadTasksView(state.currentGroupId);
+        InnovateAPI.showAlert('Task moved to ' + newStatus.replace('_', ' '), 'success');
       } catch (error) {
-        console.error('Error creating task:', error);
+        console.error('Error updating task:', error);
+        InnovateAPI.showAlert('Failed to move task', 'error');
+      } finally {
+        draggedTaskId = null;
       }
     }
+
+    window.createTaskFromText = function() {
+      openTaskModal();
+    };
+
+    window.openTaskModal = function(task = null) {
+      const isEdit = !!task;
+      let subtasks = [];
+      
+      if (task?.subtasks) {
+        try {
+          subtasks = typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks;
+        } catch (e) {
+          console.error('Error parsing subtasks:', e);
+          subtasks = [];
+        }
+      }
+      
+      const modalHTML = `
+        <div class="task-modal-overlay" id="taskModalOverlay">
+          <div class="task-modal">
+            <div class="task-modal-header">
+              <h3>${isEdit ? 'Edit Task' : 'Create Task'}</h3>
+              <button class="task-modal-close" onclick="closeTaskModal()">&times;</button>
+            </div>
+            <div class="task-modal-body">
+              <form id="taskForm">
+                <div class="task-form-group">
+                  <label>Title *</label>
+                  <input type="text" id="taskTitle" placeholder="Enter task title" value="${task?.title || ''}" required>
+                </div>
+                
+                <div class="task-form-group">
+                  <label>Description</label>
+                  <textarea id="taskDescription" placeholder="Add details about this task">${task?.description || ''}</textarea>
+                </div>
+                
+                <div class="task-form-group">
+                  <label>Due Date</label>
+                  <input type="date" id="taskDueDate" value="${task?.due_date ? task.due_date.split('T')[0] : ''}">
+                </div>
+                
+                <div class="task-form-group">
+                  <label>Priority</label>
+                  <select id="taskPriority">
+                    <option value="low" ${task?.priority === 'low' ? 'selected' : ''}>Low</option>
+                    <option value="medium" ${task?.priority === 'medium' || !task ? 'selected' : ''}>Medium</option>
+                    <option value="high" ${task?.priority === 'high' ? 'selected' : ''}>High</option>
+                  </select>
+                </div>
+                
+                <div class="task-form-group">
+                  <label>Subtasks (Steps)</label>
+                  <div class="subtasks-list" id="subtasksList">
+                    ${subtasks.map((st, i) => `
+                      <div class="subtask-item">
+                        <input type="checkbox" ${st.completed ? 'checked' : ''} onchange="updateTaskProgress()">
+                        <input type="text" value="${st.text}" placeholder="Step ${i + 1}">
+                        <button type="button" class="subtask-remove" onclick="removeSubtask(this)">×</button>
+                      </div>
+                    `).join('')}
+                  </div>
+                  <button type="button" class="add-subtask-btn" onclick="addSubtask()">+ Add Step</button>
+                </div>
+                
+                <div class="task-form-group">
+                  <label>Progress</label>
+                  <div class="progress-display">
+                    <div class="progress-percentage" id="progressPercentage">${task?.progress || 0}%</div>
+                    <div class="progress-label" id="progressLabel">0 of 0 steps completed</div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="task-modal-footer">
+              <button class="task-btn task-btn-secondary" onclick="closeTaskModal()">Cancel</button>
+              <button class="task-btn task-btn-primary" onclick="saveTask(${task?.id || null})">${isEdit ? 'Update' : 'Create'} Task</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+      updateTaskProgress();
+    }
+
+    window.closeTaskModal = function() {
+      const modal = document.getElementById('taskModalOverlay');
+      if (modal) modal.remove();
+    };
+
+    window.addSubtask = function() {
+      const list = document.getElementById('subtasksList');
+      const count = list.querySelectorAll('.subtask-item').length + 1;
+      const html = `
+        <div class="subtask-item">
+          <input type="checkbox" onchange="updateTaskProgress()">
+          <input type="text" placeholder="Step ${count}">
+          <button type="button" class="subtask-remove" onclick="removeSubtask(this)">×</button>
+        </div>
+      `;
+      list.insertAdjacentHTML('beforeend', html);
+      updateTaskProgress();
+    };
+
+    window.removeSubtask = function(btn) {
+      btn.closest('.subtask-item').remove();
+      updateTaskProgress();
+    };
+
+    window.updateTaskProgress = function() {
+      const subtaskItems = document.querySelectorAll('.subtask-item');
+      const total = subtaskItems.length;
+      const completed = Array.from(subtaskItems).filter(item => 
+        item.querySelector('input[type="checkbox"]').checked
+      ).length;
+      
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      
+      document.getElementById('progressPercentage').textContent = percentage + '%';
+      document.getElementById('progressLabel').textContent = `${completed} of ${total} steps completed`;
+    };
+
+    window.saveTask = async function(taskId) {
+      const title = document.getElementById('taskTitle').value.trim();
+      if (!title) {
+        InnovateAPI.showAlert('Please enter a task title', 'error');
+        return;
+      }
+      
+      const description = document.getElementById('taskDescription').value.trim();
+      const dueDate = document.getElementById('taskDueDate').value;
+      const priority = document.getElementById('taskPriority').value;
+      
+      // Collect subtasks
+      const subtaskItems = document.querySelectorAll('.subtask-item');
+      const subtasks = Array.from(subtaskItems).map(item => ({
+        text: item.querySelector('input[type="text"]').value.trim(),
+        completed: item.querySelector('input[type="checkbox"]').checked
+      })).filter(st => st.text);
+      
+      // Calculate progress
+      const total = subtasks.length;
+      const completed = subtasks.filter(st => st.completed).length;
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+      
+      try {
+        if (taskId) {
+          // Update existing task
+          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${taskId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              title,
+              description,
+              due_date: dueDate || null,
+              priority,
+              subtasks: JSON.stringify(subtasks),
+              progress
+            })
+          });
+          InnovateAPI.showAlert('Task updated!', 'success');
+        } else {
+          // Create new task
+          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-text`, {
+            method: 'POST',
+            body: JSON.stringify({
+              text: title,
+              description,
+              due_date: dueDate || null,
+              priority,
+              subtasks: JSON.stringify(subtasks),
+              progress
+            })
+          });
+          InnovateAPI.showAlert('Task created!', 'success');
+        }
+        
+        closeTaskModal();
+        loadTasksView(state.currentGroupId);
+      } catch (error) {
+        console.error('Save task error:', error);
+        InnovateAPI.showAlert('Failed to save task', 'error');
+      }
+    };
+    
+    window.editTask = async function(taskId) {
+      try {
+        // Fetch the task details
+        const tasks = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks`);
+        const task = tasks.tasks.find(t => t.id === taskId);
+        if (!task) {
+          InnovateAPI.showAlert('Task not found', 'error');
+          return;
+        }
+        openTaskModal(task);
+      } catch (error) {
+        console.error('Edit task error:', error);
+        InnovateAPI.showAlert('Failed to load task', 'error');
+      }
+    };
+    
+    window.deleteTask = async function(taskId) {
+      if (!confirm('Delete this task? This cannot be undone.')) return;
+      
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${taskId}`, {
+          method: 'DELETE'
+        });
+        loadTasksView(state.currentGroupId);
+        InnovateAPI.showAlert('Task deleted successfully', 'success');
+      } catch (error) {
+        console.error('Delete task error:', error);
+        InnovateAPI.showAlert('Failed to delete task: ' + (error.message || 'Unknown error'), 'error');
+      }
+    };
 
     function createTaskFromImage() {
       const input = document.createElement('input');
@@ -2811,16 +3572,16 @@
         formData.append('image', file);
 
         try {
-          const res = await fetch(`/community-groups/${state.currentGroupId}/tasks/from-image`, {
+          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-image`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
             body: formData
           });
-          const data = await res.json();
+
           console.log('Tasks extracted from image successfully');
           loadTasksView(state.currentGroupId);
         } catch (error) {
           console.error('Error:', error);
+          InnovateAPI.showAlert(error.message || 'Failed to create tasks from image', 'error');
         }
       };
       input.click();
