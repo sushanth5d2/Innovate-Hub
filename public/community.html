@@ -741,6 +741,354 @@
       color: #ed4956;
     }
 
+    /* Due Date Warnings */
+    .task-due.overdue {
+      color: #ed4956;
+      font-weight: 600;
+      animation: pulse 2s infinite;
+    }
+    
+    .task-due.due-today {
+      color: #ff9500;
+      font-weight: 600;
+    }
+    
+    .task-due.due-soon {
+      color: #ff9500;
+    }
+    
+    .task-due.due-upcoming {
+      color: var(--ig-secondary-text);
+    }
+    
+    .kanban-task.overdue {
+      border-left: 4px solid #ed4956;
+    }
+    
+    .kanban-task.due-today {
+      border-left: 4px solid #ff9500;
+    }
+    
+    .kanban-task.due-soon {
+      border-left: 4px solid #ff9500;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Calendar View */
+    .calendar-container {
+      background: var(--ig-primary-background);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    
+    .calendar-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .calendar-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.overdue { background: #ed4956; }
+    .legend-dot.today { background: #ff9500; }
+    .legend-dot.soon { background: #ffcc00; }
+    .legend-dot.upcoming { background: #34c759; }
+    
+    .calendar-tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .calendar-date-group {
+      background: var(--ig-secondary-background);
+      border-radius: 8px;
+      padding: 12px;
+      border-left: 4px solid var(--ig-border);
+    }
+    
+    .calendar-date-group.overdue {
+      border-left-color: #ed4956;
+    }
+    
+    .calendar-date-group.today {
+      border-left-color: #ff9500;
+    }
+    
+    .calendar-date-group.soon {
+      border-left-color: #ffcc00;
+    }
+    
+    .calendar-date-group.upcoming {
+      border-left-color: #34c759;
+    }
+    
+    .calendar-date-header {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .calendar-task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .calendar-task-item {
+      background: var(--ig-primary-background);
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .calendar-task-item:hover {
+      background: var(--ig-hover);
+    }
+    
+    .calendar-task-content {
+      flex: 1;
+    }
+    
+    .calendar-task-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    
+    .calendar-task-meta {
+      font-size: 11px;
+      color: var(--ig-secondary-text);
+      display: flex;
+      gap: 8px;
+    }
+    
+    /* Calendar Grid View */
+    .calendar-grid-container {
+      background: var(--ig-primary-background);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--ig-border);
+    }
+    
+    .calendar-grid-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--ig-border);
+    }
+    
+    .calendar-month-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ig-primary-text);
+    }
+    
+    .calendar-nav-btn {
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--ig-primary-text);
+      font-size: 16px;
+    }
+    
+    .calendar-nav-btn:hover {
+      background: var(--ig-hover);
+      border-color: var(--ig-blue);
+    }
+    
+    .calendar-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-bottom: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    
+    .calendar-weekday {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ig-secondary-text);
+      text-transform: uppercase;
+      padding: 4px;
+    }
+    
+    .calendar-days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    
+    .calendar-day {
+      aspect-ratio: 1;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 80px;
+    }
+    
+    .calendar-day:not(.empty):hover {
+      background: var(--ig-hover);
+      border-color: var(--ig-blue);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .calendar-day.empty {
+      background: var(--ig-secondary-background);
+      opacity: 0.3;
+      cursor: default;
+      border: 1px solid transparent;
+    }
+    
+    .calendar-day.past {
+      opacity: 0.5;
+    }
+    
+    .calendar-day.today {
+      border: 2px solid var(--ig-blue);
+      background: rgba(0, 149, 246, 0.1);
+      font-weight: 700;
+    }
+    
+    .calendar-day.today .calendar-day-number {
+      color: var(--ig-blue);
+    }
+    
+    .calendar-day.has-overdue {
+      border-color: #ed4956;
+      background: rgba(237, 73, 86, 0.08);
+    }
+    
+    .calendar-day.has-due-today {
+      border-color: #ff9500;
+      background: rgba(255, 149, 0, 0.08);
+    }
+    
+    .calendar-day.has-upcoming {
+      border-color: #34c759;
+      background: rgba(52, 199, 89, 0.05);
+    }
+    
+    .calendar-day-number {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 4px;
+    }
+    
+    .calendar-day-indicator {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      background: var(--ig-blue);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 10px;
+      min-width: 18px;
+      text-align: center;
+    }
+    
+    .calendar-day.has-overdue .calendar-day-indicator {
+      background: #ed4956;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .calendar-day.has-due-today .calendar-day-indicator {
+      background: #ff9500;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+    
+    /* Mobile responsiveness for calendar */
+    @media (max-width: 768px) {
+      .calendar-grid-container {
+        padding: 12px;
+      }
+      
+      .calendar-month-title {
+        font-size: 16px;
+      }
+      
+      .calendar-nav-btn {
+        padding: 6px 12px;
+        font-size: 14px;
+      }
+      
+      .calendar-weekday {
+        font-size: 10px;
+      }
+      
+      .calendar-day {
+        min-height: 60px;
+        padding: 4px;
+      }
+      
+      .calendar-day-number {
+        font-size: 12px;
+      }
+      
+      .calendar-day-indicator {
+        font-size: 9px;
+        padding: 1px 4px;
+      }
+    }
+
     /* Task Modal */
     .task-modal-overlay {
       position: fixed;
@@ -2633,7 +2981,7 @@
           await loadFoldersView(groupId);
           break;
         case 'tasks':
-          await loadTasksView(groupId);
+          await showTaskCalendar(groupId, 'list');
           break;
         case 'notes':
           await loadNotesView(groupId);
@@ -3202,7 +3550,7 @@
         };
 
         content.innerHTML = `
-          <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
             <button class="btn btn-primary" onclick="createTaskFromText()">
               <i class="fas fa-plus"></i> Add Task
             </button>
@@ -3211,6 +3559,12 @@
             </button>
             <button class="btn btn-secondary" onclick="createTaskFromVoice()">
               <i class="fas fa-microphone"></i> From Voice
+            </button>
+            <button class="btn btn-secondary" onclick="showTaskCalendar(${groupId})">
+              <i class="fas fa-calendar"></i> Calendar View
+            </button>
+            <button class="btn btn-secondary" onclick="loadTasksView(${groupId})">
+              <i class="fas fa-th"></i> Board View
             </button>
           </div>
           
@@ -3287,8 +3641,40 @@
         const totalSubtasks = subtasks.length;
         const completedSubtasks = subtasks.filter(st => st.completed).length;
         
+        // Calculate due date status
+        let dueDateClass = '';
+        let dueDateText = '';
+        if (task.due_date) {
+          const dueDate = new Date(task.due_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          const diffTime = dueDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays < 0) {
+            dueDateClass = 'overdue';
+            dueDateText = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? 's' : ''}`;
+          } else if (diffDays === 0) {
+            dueDateClass = 'due-today';
+            dueDateText = 'Due today';
+          } else if (diffDays === 1) {
+            dueDateClass = 'due-soon';
+            dueDateText = 'Due tomorrow';
+          } else if (diffDays <= 3) {
+            dueDateClass = 'due-soon';
+            dueDateText = `Due in ${diffDays} days`;
+          } else if (diffDays <= 7) {
+            dueDateClass = 'due-upcoming';
+            dueDateText = `Due in ${diffDays} days`;
+          } else {
+            dueDateText = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+        }
+        
         return `
-        <div class="kanban-task" draggable="true" ondragstart="handleDragStart(event, ${task.id})" onclick="editTask(${task.id})">
+        <div class="kanban-task ${dueDateClass}" draggable="true" ondragstart="handleDragStart(event, ${task.id})" onclick="editTask(${task.id})">
           <div class="kanban-task-header">
             <span class="task-priority priority-${task.priority || 'medium'}">${task.priority || 'medium'}</span>
             <div class="task-actions">
@@ -3304,7 +3690,7 @@
           ${task.description ? `<div class="kanban-task-desc">${task.description.substring(0, 80)}${task.description.length > 80 ? '...' : ''}</div>` : ''}
           ${totalSubtasks > 0 ? `<div class="kanban-task-subtasks"><i class="fas fa-check-circle"></i> ${completedSubtasks}/${totalSubtasks} steps</div>` : ''}
           <div class="kanban-task-footer">
-            ${task.due_date ? `<span class="task-due"><i class="fas fa-calendar"></i> ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>` : ''}
+            ${task.due_date ? `<span class="task-due ${dueDateClass}"><i class="fas fa-calendar"></i> ${dueDateText}</span>` : ''}
             ${task.progress !== null && task.progress !== undefined ? `<span class="task-progress-chip">${task.progress}%</span>` : ''}
           </div>
         </div>
@@ -3591,6 +3977,365 @@
       console.log('Voice-to-task feature coming soon!');
       // Implement voice recording and transcription
     }
+
+    // Calendar View for Tasks
+    window.showTaskCalendar = async function(groupId, viewMode = 'list') {
+      const content = document.getElementById('centerContent');
+      
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/tasks`);
+        const tasks = res.tasks || [];
+        
+        // Persist calendar state per group so month navigation works
+        const taskCalendarState = (window.taskCalendarState = window.taskCalendarState || {});
+        const calendarKey = String(groupId);
+        const savedState = taskCalendarState[calendarKey] || {};
+        const now = new Date();
+        let currentMonth = Number.isInteger(savedState.month) ? savedState.month : now.getMonth();
+        let currentYear = Number.isInteger(savedState.year) ? savedState.year : now.getFullYear();
+        taskCalendarState[calendarKey] = { ...savedState, month: currentMonth, year: currentYear, viewMode };
+        
+        const renderCalendar = (month, year) => {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Get first day of month and days in month
+          const firstDay = new Date(year, month, 1);
+          const lastDay = new Date(year, month + 1, 0);
+          const daysInMonth = lastDay.getDate();
+          const startingDayOfWeek = firstDay.getDay();
+          
+          // Group tasks by date
+          const tasksByDate = {};
+          tasks.filter(t => t.due_date && t.status !== 'done').forEach(task => {
+            const dueDate = new Date(task.due_date);
+            const dateKey = `${dueDate.getFullYear()}-${dueDate.getMonth()}-${dueDate.getDate()}`;
+            if (!tasksByDate[dateKey]) tasksByDate[dateKey] = [];
+            tasksByDate[dateKey].push(task);
+          });
+          
+          // Month names
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+          
+          // Build calendar grid
+          let calendarHTML = `
+            <div class="calendar-grid-container">
+              <div class="calendar-grid-header">
+                <button class="calendar-nav-btn" onclick="changeMonth(-1)">
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="calendar-month-title">${monthNames[month]} ${year}</div>
+                <button class="calendar-nav-btn" onclick="changeMonth(1)">
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+              
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">Sun</div>
+                <div class="calendar-weekday">Mon</div>
+                <div class="calendar-weekday">Tue</div>
+                <div class="calendar-weekday">Wed</div>
+                <div class="calendar-weekday">Thu</div>
+                <div class="calendar-weekday">Fri</div>
+                <div class="calendar-weekday">Sat</div>
+              </div>
+              
+              <div class="calendar-days-grid">
+          `;
+          
+          // Empty cells for days before month starts
+          for (let i = 0; i < startingDayOfWeek; i++) {
+            calendarHTML += '<div class="calendar-day empty"></div>';
+          }
+          
+          // Days of month
+          for (let day = 1; day <= daysInMonth; day++) {
+            const dateObj = new Date(year, month, day);
+            const dateKey = `${year}-${month}-${day}`;
+            const tasksForDay = tasksByDate[dateKey] || [];
+            
+            const isToday = dateObj.getTime() === today.getTime();
+            const isPast = dateObj < today;
+            const hasTasks = tasksForDay.length > 0;
+            
+            // Determine urgency class
+            let urgencyClass = '';
+            if (hasTasks) {
+              const overdue = tasksForDay.some(t => new Date(t.due_date) < today);
+              const dueToday = tasksForDay.some(t => {
+                const td = new Date(t.due_date);
+                return td.getTime() === today.getTime();
+              });
+              
+              if (overdue) urgencyClass = 'has-overdue';
+              else if (dueToday) urgencyClass = 'has-due-today';
+              else urgencyClass = 'has-upcoming';
+            }
+            
+            calendarHTML += `
+              <div class="calendar-day ${isToday ? 'today' : ''} ${isPast ? 'past' : ''} ${urgencyClass}" 
+                   onclick="showTasksForDate('${dateKey}', '${monthNames[month]} ${day}, ${year}')">
+                <div class="calendar-day-number">${day}</div>
+                ${hasTasks ? `<div class="calendar-day-indicator">${tasksForDay.length}</div>` : ''}
+              </div>
+            `;
+          }
+          
+          calendarHTML += `
+              </div>
+            </div>
+          `;
+          
+          return calendarHTML;
+        };
+        
+        window.changeMonth = function(direction) {
+          currentMonth += direction;
+          if (currentMonth > 11) {
+            currentMonth = 0;
+            currentYear++;
+          } else if (currentMonth < 0) {
+            currentMonth = 11;
+            currentYear--;
+          }
+          taskCalendarState[calendarKey] = { ...taskCalendarState[calendarKey], month: currentMonth, year: currentYear, viewMode: 'grid' };
+          showTaskCalendar(groupId, 'grid');
+        };
+        
+        window.showTasksForDate = function(dateKey, dateString) {
+          const [year, month, day] = dateKey.split('-').map(Number);
+          const targetDate = new Date(year, month, day);
+          targetDate.setHours(0, 0, 0, 0);
+          
+          const tasksForDate = tasks.filter(t => {
+            if (!t.due_date) return false;
+            const dueDate = new Date(t.due_date);
+            dueDate.setHours(0, 0, 0, 0);
+            return dueDate.getTime() === targetDate.getTime();
+          });
+          
+          const statusColors = {
+            todo: '#8e8e8e',
+            in_progress: '#0095f6',
+            done: '#34c759'
+          };
+          
+          const modal = document.createElement('div');
+          modal.className = 'task-modal-overlay';
+          modal.innerHTML = `
+            <div class="task-modal" style="max-width: 600px;">
+              <div class="task-modal-header">
+                <h3>📅 Tasks for ${dateString}</h3>
+                <button class="task-modal-close" onclick="this.closest('.task-modal-overlay').remove()">&times;</button>
+              </div>
+              <div class="task-modal-body" style="max-height: 60vh; overflow-y: auto;">
+                ${tasksForDate.length === 0 ? `
+                  <div class="empty-state" style="padding: 40px;">
+                    <div class="empty-icon">📅</div>
+                    <div class="empty-title">No tasks for this date</div>
+                  </div>
+                ` : `
+                  <div class="calendar-task-list">
+                    ${tasksForDate.map(task => {
+                      const subtasks = task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [];
+                      const totalSubtasks = subtasks.length;
+                      const completedSubtasks = subtasks.filter(st => st.completed).length;
+                      
+                      return `
+                        <div class="calendar-task-item" onclick="this.closest('.task-modal-overlay').remove(); editTask(${task.id});" style="margin-bottom: 12px;">
+                          <div style="width: 4px; height: 60px; border-radius: 2px; background: ${statusColors[task.status] || '#8e8e8e'};"></div>
+                          <div class="calendar-task-content">
+                            <div class="calendar-task-title" style="font-size: 14px; margin-bottom: 6px;">${task.title}</div>
+                            ${task.description ? `<div style="font-size: 12px; color: var(--ig-secondary-text); margin-bottom: 4px;">${task.description.substring(0, 100)}</div>` : ''}
+                            <div class="calendar-task-meta">
+                              <span class="priority-${task.priority || 'medium'}" style="padding: 3px 8px; border-radius: 4px; font-size: 11px;">${task.priority || 'medium'}</span>
+                              ${totalSubtasks > 0 ? `<span><i class="fas fa-check-circle"></i> ${completedSubtasks}/${totalSubtasks} steps</span>` : ''}
+                              ${task.progress ? `<span>${task.progress}%</span>` : ''}
+                              <span style="text-transform: capitalize; color: ${statusColors[task.status]};">${task.status.replace('_', ' ')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `}
+              </div>
+              <div class="task-modal-footer">
+                <button class="task-btn task-btn-secondary" onclick="this.closest('.task-modal-overlay').remove()">Close</button>
+                <button class="task-btn task-btn-primary" onclick="this.closest('.task-modal-overlay').remove(); createTaskFromText();">Add Task</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(modal);
+        };
+        
+        // Filter tasks with due dates and not completed
+        const tasksWithDueDates = tasks
+          .filter(t => t.due_date && t.status !== 'done')
+          .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+        
+        // Group tasks by date category
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const groupedTasks = {
+          overdue: [],
+          today: [],
+          tomorrow: [],
+          thisWeek: [],
+          later: []
+        };
+        
+        tasksWithDueDates.forEach(task => {
+          const dueDate = new Date(task.due_date);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          const diffTime = dueDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays < 0) {
+            groupedTasks.overdue.push(task);
+          } else if (diffDays === 0) {
+            groupedTasks.today.push(task);
+          } else if (diffDays === 1) {
+            groupedTasks.tomorrow.push(task);
+          } else if (diffDays <= 7) {
+            groupedTasks.thisWeek.push(task);
+          } else {
+            groupedTasks.later.push(task);
+          }
+        });
+        
+        const renderTaskGroup = (tasks, title, category, icon) => {
+          if (tasks.length === 0) return '';
+          
+          const statusColors = {
+            todo: '#8e8e8e',
+            in_progress: '#0095f6',
+            done: '#34c759'
+          };
+          
+          return `
+            <div class="calendar-date-group ${category}">
+              <div class="calendar-date-header">
+                <span>${icon} ${title}</span>
+                <span style="font-weight: normal; font-size: 12px;">${tasks.length} task${tasks.length > 1 ? 's' : ''}</span>
+              </div>
+              <div class="calendar-task-list">
+                ${tasks.map(task => {
+                  const subtasks = task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [];
+                  const totalSubtasks = subtasks.length;
+                  const completedSubtasks = subtasks.filter(st => st.completed).length;
+                  
+                  // Format due date
+                  const dueDate = new Date(task.due_date);
+                  const formattedDate = dueDate.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  });
+                  
+                  return `
+                    <div class="calendar-task-item" onclick="editTask(${task.id})">
+                      <div style="width: 4px; height: 50px; border-radius: 2px; background: ${statusColors[task.status] || '#8e8e8e'};"></div>
+                      <div class="calendar-task-content">
+                        <div class="calendar-task-title">${task.title}</div>
+                        <div class="calendar-task-meta">
+                          <span class="priority-${task.priority || 'medium'}" style="padding: 2px 6px; border-radius: 4px; font-size: 10px;">${task.priority || 'medium'}</span>
+                          <span style="color: var(--ig-secondary-text);"><i class="fas fa-calendar"></i> ${formattedDate}</span>
+                          ${totalSubtasks > 0 ? `<span><i class="fas fa-check-circle"></i> ${completedSubtasks}/${totalSubtasks}</span>` : ''}
+                          ${task.progress ? `<span>${task.progress}%</span>` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        };
+        // Render based on view mode
+        if (viewMode === 'grid') {
+          // Grid calendar view
+          content.innerHTML = `
+            <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-primary" onclick="createTaskFromText()">
+                <i class="fas fa-plus"></i> Add Task
+              </button>
+              <button class="btn btn-secondary" onclick="createTaskFromImage()">
+                <i class="fas fa-image"></i> From Image
+              </button>
+              <button class="btn btn-secondary" onclick="createTaskFromVoice()">
+                <i class="fas fa-microphone"></i> From Voice
+              </button>
+              <button class="btn btn-secondary" onclick="showTaskCalendar(${groupId}, 'list')">
+                <i class="fas fa-list"></i> List View
+              </button>
+              <button class="btn btn-secondary" onclick="loadTasksView(${groupId})">
+                <i class="fas fa-th"></i> Board View
+              </button>
+            </div>
+            
+            ${renderCalendar(currentMonth, currentYear)}
+          `;
+        } else {
+          // List view (default)
+          content.innerHTML = `
+            <div style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+              <button class="btn btn-primary" onclick="createTaskFromText()">
+                <i class="fas fa-plus"></i> Add Task
+              </button>
+              <button class="btn btn-secondary" onclick="createTaskFromImage()">
+                <i class="fas fa-image"></i> From Image
+              </button>
+              <button class="btn btn-secondary" onclick="createTaskFromVoice()">
+                <i class="fas fa-microphone"></i> From Voice
+              </button>
+              <button class="btn btn-secondary" onclick="showTaskCalendar(${groupId}, 'grid')">
+                <i class="fas fa-calendar"></i> Calendar View
+              </button>
+              <button class="btn btn-secondary" onclick="loadTasksView(${groupId})">
+                <i class="fas fa-th"></i> Board View
+              </button>
+            </div>
+            
+            <div class="calendar-container">
+              <div class="calendar-header">
+                <div class="calendar-title">📅 Task Calendar - Upcoming Deadlines</div>
+                <div class="calendar-legend">
+                  <div class="legend-item"><div class="legend-dot overdue"></div><span>Overdue</span></div>
+                  <div class="legend-item"><div class="legend-dot today"></div><span>Today</span></div>
+                  <div class="legend-item"><div class="legend-dot soon"></div><span>This Week</span></div>
+                  <div class="legend-item"><div class="legend-dot upcoming"></div><span>Later</span></div>
+                </div>
+              </div>
+              
+              ${tasksWithDueDates.length === 0 ? `
+                <div class="empty-state" style="margin-top: 40px;">
+                  <div class="empty-icon">📅</div>
+                  <div class="empty-title">No upcoming deadlines</div>
+                  <div class="empty-text">All your tasks are up to date!</div>
+                </div>
+              ` : `
+                <div class="calendar-tasks">
+                  ${renderTaskGroup(groupedTasks.overdue, 'Overdue', 'overdue', '🚨')}
+                  ${renderTaskGroup(groupedTasks.today, 'Due Today', 'today', '⚡')}
+                  ${renderTaskGroup(groupedTasks.tomorrow, 'Due Tomorrow', 'soon', '📌')}
+                  ${renderTaskGroup(groupedTasks.thisWeek, 'Due This Week', 'soon', '📍')}
+                  ${renderTaskGroup(groupedTasks.later, 'Due Later', 'upcoming', '📆')}
+                </div>
+              `}
+            </div>
+          `;
+        }
+        
+      } catch (error) {
+        console.error('Error loading calendar:', error);
+        InnovateAPI.showAlert('Failed to load calendar', 'error');
+      }
+    };
 
     // ==================== NOTES VIEW ====================
     async function loadNotesView(groupId) {

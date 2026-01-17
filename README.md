@@ -131,10 +131,10 @@ npx cap open ios
 ```
 
 ### Complete Documentation
-- 📘 **[Deployment Guide](DEPLOYMENT_GUIDE.md)** - Complete guide for all platforms
-- 🤖 **[Android Build](ANDROID_BUILD.md)** - Google Play Store submission
-- 🍎 **[iOS Build](IOS_BUILD.md)** - Apple App Store submission
-- 🎉 **[Mobile Deployment Complete](MOBILE_DEPLOYMENT_COMPLETE.md)** - What's ready now
+- 📘 **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Complete guide for all platforms
+- 🤖 **[Android Build](docs/ANDROID_BUILD.md)** - Google Play Store submission
+- 🍎 **[iOS Build](docs/IOS_BUILD.md)** - Apple App Store submission
+- 🎉 **[Mobile Deployment Complete](docs/MOBILE_DEPLOYMENT_COMPLETE.md)** - What's ready now
 
 ### App Store Requirements
 **Google Play Store:**

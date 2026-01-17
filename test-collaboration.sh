@@ -141,7 +141,7 @@ main() {
     echo "📖 Quick Links:"
     echo "   • Main App: http://localhost:3000"
     echo "   • Communities: http://localhost:3000/communities"
-    echo "   • Documentation: ./COMMUNITY_COLLABORATION_COMPLETE.md"
+    echo "   • Documentation: ./docs/COMMUNITY_COLLABORATION_COMPLETE.md"
     echo ""
     echo "🧪 Manual Testing Steps:"
     echo "   1. Create a community"
@@ -150,7 +150,7 @@ main() {
     echo "   4. Try creating tasks via text/image/voice"
     echo "   5. Test collaborative notes editing"
     echo ""
-    echo "📚 For detailed testing: See TESTING_GUIDE.md"
+    echo "📚 For detailed testing: See docs/TESTING_GUIDE.md"
     echo ""
 }
 
