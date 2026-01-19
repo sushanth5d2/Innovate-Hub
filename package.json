@@ -41,5 +41,8 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "nodemon": "^3.0.1"
+  },
+  "overrides": {
+    "tar": "7.5.3"
   }
 }
