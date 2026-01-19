@@ -200,10 +200,30 @@
         const card = document.createElement('div');
         card.className = 'ig-post';
         card.style.cursor = 'pointer';
+        
+        // Determine button text and action based on community privacy, membership, and request status
+        let buttonText = 'Join';
+        let buttonAction = `toggleJoin(${community.id}, this, event, ${community.is_public})`;
+        let buttonStyle = 'background: var(--ig-blue); color: white; border: none;';
+        let buttonDisabled = '';
+        
+        if (community.is_member) {
+          buttonText = 'Joined';
+          buttonStyle = 'background: transparent; color: var(--ig-primary-text); border: 1px solid var(--ig-border);';
+        } else if (community.join_request_status === 'pending') {
+          buttonText = '<i class="fas fa-clock"></i> Pending';
+          buttonStyle = 'background: #f59e0b; color: white; border: none; cursor: not-allowed;';
+          buttonDisabled = 'disabled';
+        } else if (!community.is_public) {
+          buttonText = '<i class="fas fa-lock"></i> Request to Join';
+          buttonStyle = 'background: var(--ig-blue); color: white; border: none;';
+        }
+        
         card.innerHTML = `
           <div style="padding: 0; overflow: hidden;">
             <div style="height: 150px; background: linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()}); display: flex; align-items: center; justify-content: center; position: relative;">
               ${community.banner_image ? `<img src="${community.banner_image}" style="width: 100%; height: 100%; object-fit: cover;">` : `<div style="font-size: 48px;">👥</div>`}
+              ${!community.is_public ? '<div style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;"><i class="fas fa-lock"></i> Private</div>' : ''}
             </div>
             <div style="padding: 16px;">
               <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">${community.name}</h3>
@@ -213,8 +233,8 @@
                 ${community.is_public ? '<span><i class="fas fa-globe"></i> Public</span>' : '<span><i class="fas fa-lock"></i> Private</span>'}
               </div>
               <p style="color: var(--ig-secondary-text); font-size: 14px; margin: 0 0 16px 0;">${community.description || ''}</p>
-              <button class="ig-action-btn ${community.is_member ? 'joined' : ''}" onclick="toggleJoin(${community.id}, this, event)" style="width: 100%; padding: 10px; background: ${community.is_member ? 'transparent' : 'var(--ig-blue)'}; color: ${community.is_member ? 'var(--ig-primary-text)' : 'white'}; border: ${community.is_member ? '1px solid var(--ig-border)' : 'none'}; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                ${community.is_member ? 'Joined' : 'Join'}
+              <button class="ig-action-btn ${community.is_member ? 'joined' : ''}" onclick="${buttonAction}" style="width: 100%; padding: 10px; ${buttonStyle} border-radius: 8px; font-weight: 600;" ${buttonDisabled}>
+                ${buttonText}
               </button>
             </div>
           </div>
@@ -233,31 +253,83 @@
       return colors[Math.floor(Math.random() * colors.length)];
     }
 
-    async function toggleJoin(communityId, button, event) {
+    async function toggleJoin(communityId, button, event, isPublic) {
       event.stopPropagation();
       const isJoined = button.classList.contains('joined');
 
       try {
-        const endpoint = isJoined
-          ? `/api/communities/${communityId}/leave`
-          : `/api/communities/${communityId}/join`;
+        // If user is already a member, allow them to leave
+        if (isJoined) {
+          const endpoint = `/api/communities/${communityId}/leave`;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          if (!response.ok) throw new Error('Failed to leave community');
+          
+          button.classList.remove('joined');
+          if (isPublic) {
+            button.textContent = 'Join';
+            button.style.background = 'var(--ig-blue)';
+            button.style.color = 'white';
+            button.style.border = 'none';
+          } else {
+            button.innerHTML = '<i class="fas fa-lock"></i> Request to Join';
+            button.style.background = 'var(--ig-blue)';
+            button.style.color = 'white';
+            button.style.border = 'none';
           }
-        });
+          return;
+        }
 
-        if (!response.ok) throw new Error('Failed to join/leave community');
-        
-        button.classList.toggle('joined');
-        button.textContent = isJoined ? 'Join' : 'Joined';
-        button.style.background = isJoined ? 'var(--ig-blue)' : 'transparent';
-        button.style.color = isJoined ? 'white' : 'var(--ig-primary-text)';
-        button.style.border = isJoined ? 'none' : '1px solid var(--ig-border)';
+        // If community is public, join immediately
+        if (isPublic) {
+          const endpoint = `/api/communities/${communityId}/join`;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!response.ok) throw new Error('Failed to join community');
+          
+          button.classList.add('joined');
+          button.textContent = 'Joined';
+          button.style.background = 'transparent';
+          button.style.color = 'var(--ig-primary-text)';
+          button.style.border = '1px solid var(--ig-border)';
+        } else {
+          // If community is private, create join request
+          const endpoint = `/api/communities/${communityId}/request-join`;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to send join request');
+          }
+          
+          // Update button to show request is pending
+          button.innerHTML = '<i class="fas fa-clock"></i> Pending';
+          button.style.background = '#f59e0b';
+          button.style.color = 'white';
+          button.style.border = 'none';
+          button.disabled = true;
+          button.style.cursor = 'not-allowed';
+          
+          InnovateAPI.showAlert('Join request sent! Waiting for admin approval.', 'success');
+        }
       } catch (error) {
         console.error('Error toggling join:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to perform action', 'error');
       }
     }
 

@@ -14,13 +14,15 @@ router.get('/', authMiddleware, (req, res) => {
     SELECT c.*,
            u.username as admin_username,
            (SELECT COUNT(*) FROM community_members WHERE community_id = c.id) as member_count,
-           (SELECT COUNT(*) FROM community_members WHERE community_id = c.id AND user_id = ?) as is_member
+           (SELECT COUNT(*) FROM community_members WHERE community_id = c.id AND user_id = ?) as is_member,
+           jr.status as join_request_status
     FROM communities c
     JOIN users u ON c.admin_id = u.id
-    WHERE c.is_public = 1
+    LEFT JOIN community_join_requests jr ON c.id = jr.community_id AND jr.user_id = ? AND jr.status = 'pending'
+    WHERE 1=1
   `;
 
-  const params = [userId];
+  const params = [userId, userId];
 
   if (search) {
     query += ' AND (c.name LIKE ? OR c.team_name LIKE ? OR c.description LIKE ?)';
@@ -738,6 +740,384 @@ router.post('/:communityId/announcements/:announcementId/vote', authMiddleware, 
           );
         }
       );
+    }
+  );
+});
+
+// Update community profile
+router.put('/:id', authMiddleware, upload.single('banner'), async (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+  const { name, description, is_public, team_name } = req.body;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, userId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can update community' });
+      }
+
+      let updateQuery = 'UPDATE communities SET updated_at = CURRENT_TIMESTAMP';
+      const params = [];
+
+      if (name !== undefined) {
+        updateQuery += ', name = ?';
+        params.push(name);
+      }
+      if (description !== undefined) {
+        updateQuery += ', description = ?';
+        params.push(description);
+      }
+      if (is_public !== undefined) {
+        updateQuery += ', is_public = ?';
+        params.push(is_public);
+      }
+      if (team_name !== undefined) {
+        updateQuery += ', team_name = ?';
+        params.push(team_name);
+      }
+      if (req.file) {
+        updateQuery += ', banner_image = ?';
+        params.push(`/uploads/${req.file.filename}`);
+      }
+
+      updateQuery += ' WHERE id = ?';
+      params.push(communityId);
+
+      db.run(updateQuery, params, function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error updating community' });
+        }
+        res.json({ success: true });
+      });
+    }
+  );
+});
+
+// Delete community
+router.delete('/:id', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, userId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can delete community' });
+      }
+
+      // Delete community (CASCADE will handle related data)
+      db.run('DELETE FROM communities WHERE id = ?', [communityId], function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error deleting community' });
+        }
+        res.json({ success: true });
+      });
+    }
+  );
+});
+
+// Request to join a private community
+router.post('/:id/request-join', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+
+  // Check if community exists and is private
+  db.get(
+    'SELECT * FROM communities WHERE id = ?',
+    [communityId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking community' });
+      }
+      if (!community) {
+        return res.status(404).json({ error: 'Community not found' });
+      }
+
+      // Check if user is already a member
+      db.get(
+        'SELECT * FROM community_members WHERE community_id = ? AND user_id = ?',
+        [communityId, userId],
+        (err, member) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error checking membership' });
+          }
+          if (member) {
+            return res.status(400).json({ error: 'You are already a member of this community' });
+          }
+
+          // Check if request already exists
+          db.get(
+            'SELECT * FROM community_join_requests WHERE community_id = ? AND user_id = ?',
+            [communityId, userId],
+            (err, existingRequest) => {
+              if (err) {
+                return res.status(500).json({ error: 'Error checking existing request' });
+              }
+              if (existingRequest) {
+                if (existingRequest.status === 'pending') {
+                  return res.status(400).json({ error: 'You already have a pending request for this community' });
+                } else if (existingRequest.status === 'declined') {
+                  return res.status(400).json({ error: 'Your previous request was declined. Please contact the admin.' });
+                }
+              }
+
+              // Create join request
+              db.run(
+                `INSERT INTO community_join_requests (community_id, user_id, status) 
+                 VALUES (?, ?, 'pending')`,
+                [communityId, userId],
+                function(err) {
+                  if (err) {
+                    return res.status(500).json({ error: 'Error creating join request' });
+                  }
+
+                  // Create notification for admin
+                  db.get('SELECT username FROM users WHERE id = ?', [userId], (err, user) => {
+                    if (!err && user) {
+                      db.run(
+                        `INSERT INTO notifications (user_id, type, content, related_id, created_by) 
+                         VALUES (?, 'join_request', ?, ?, ?)`,
+                        [
+                          community.admin_id,
+                          `${user.username} requested to join ${community.name}`,
+                          communityId,
+                          userId
+                        ]
+                      );
+
+                      // Emit socket event for real-time notification
+                      const io = req.app.get('io');
+                      if (io) {
+                        io.to(`user_${community.admin_id}`).emit('notification:receive', {
+                          type: 'join_request',
+                          content: `${user.username} requested to join ${community.name}`,
+                          related_id: communityId,
+                          created_at: new Date().toISOString()
+                        });
+                      }
+                    }
+                  });
+
+                  res.json({ success: true, message: 'Join request sent successfully' });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get join requests (for private communities)
+router.get('/:id/join-requests', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, userId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can view join requests' });
+      }
+
+      // Get pending join requests
+      db.all(
+        `SELECT jr.*, u.username, u.profile_picture, u.bio,
+         jr.created_at as requested_at
+         FROM community_join_requests jr
+         JOIN users u ON jr.user_id = u.id
+         WHERE jr.community_id = ? AND jr.status = 'pending'
+         ORDER BY jr.created_at DESC`,
+        [communityId],
+        (err, requests) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error fetching join requests' });
+          }
+          res.json({ success: true, requests: requests || [] });
+        }
+      );
+    }
+  );
+});
+
+// Approve join request
+router.post('/:id/join-requests/:userId/approve', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const requestUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, adminId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can approve requests' });
+      }
+
+      // Update request status
+      db.run(
+        'UPDATE community_join_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE community_id = ? AND user_id = ?',
+        ['approved', communityId, requestUserId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error approving request' });
+          }
+
+          // Add user to community members
+          db.run(
+            'INSERT INTO community_members (community_id, user_id, role) VALUES (?, ?, ?)',
+            [communityId, requestUserId, 'member'],
+            function(err) {
+              if (err) {
+                // Ignore if already a member
+                console.log('Member already exists or error:', err);
+              }
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Decline join request
+router.post('/:id/join-requests/:userId/decline', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const requestUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, adminId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can decline requests' });
+      }
+
+      // Update request status
+      db.run(
+        'UPDATE community_join_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE community_id = ? AND user_id = ?',
+        ['declined', communityId, requestUserId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error declining request' });
+          }
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Clear all announcements
+router.delete('/:id/announcements/clear', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM communities WHERE id = ? AND admin_id = ?',
+    [communityId, userId],
+    (err, community) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!community) {
+        return res.status(403).json({ error: 'Only admin can clear announcements' });
+      }
+
+      // Delete all announcements for this community
+      db.run('DELETE FROM community_announcements WHERE community_id = ?', [communityId], function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error clearing announcements' });
+        }
+        res.json({ success: true });
+      });
+    }
+  );
+});
+
+// Invite user to community
+router.post('/:id/invite', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const inviterId = req.user.userId;
+  const { userId } = req.body;
+
+  // Check if inviter is a member
+  db.get(
+    'SELECT * FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, inviterId],
+    (err, member) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error checking permissions' });
+      }
+      if (!member) {
+        return res.status(403).json({ error: 'Only members can invite others' });
+      }
+
+      // Get community details
+      db.get('SELECT * FROM communities WHERE id = ?', [communityId], (err, community) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error fetching community' });
+        }
+
+        // Create notification for invited user
+        db.run(
+          'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+          [userId, 'community_invite', `You've been invited to join ${community.name}`, communityId],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error sending invitation' });
+            }
+
+            // Emit socket notification
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`user_${userId}`).emit('notification:receive', {
+                type: 'community_invite',
+                content: `You've been invited to join ${community.name}`,
+                communityId: communityId
+              });
+            }
+
+            res.json({ success: true });
+          }
+        );
+      });
     }
   );
 });

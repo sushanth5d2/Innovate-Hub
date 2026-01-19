@@ -201,6 +201,21 @@ const createTables = () => {
       )
     `);
 
+    // Community join requests table (for private communities)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_join_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(community_id, user_id)
+      )
+    `);
+
     // Community posts table
     db.run(`
       CREATE TABLE IF NOT EXISTS community_posts (

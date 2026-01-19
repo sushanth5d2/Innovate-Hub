@@ -212,6 +212,91 @@ router.post('/community-groups/:groupId/leave', authMiddleware, (req, res) => {
   );
 });
 
+// Update group
+router.put('/community-groups/:groupId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const groupId = req.params.groupId;
+  const { name, description } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: 'Group name is required' });
+  }
+
+  // Check if user is admin or creator
+  db.get(
+    `SELECT cg.*, cgm.role 
+     FROM community_groups cg
+     LEFT JOIN community_group_members cgm ON cg.id = cgm.group_id AND cgm.user_id = ?
+     WHERE cg.id = ?`,
+    [userId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+      
+      if (group.creator_id !== userId && group.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can update the group' });
+      }
+
+      db.run(
+        'UPDATE community_groups SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [name, description, groupId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error updating group' });
+          }
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Delete group
+router.delete('/community-groups/:groupId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const groupId = req.params.groupId;
+
+  // Check if user is creator or community admin
+  db.get(
+    `SELECT cg.*, c.admin_id as community_admin_id
+     FROM community_groups cg
+     JOIN communities c ON cg.community_id = c.id
+     WHERE cg.id = ?`,
+    [groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+      
+      if (group.creator_id !== userId && group.community_admin_id !== userId) {
+        return res.status(403).json({ error: 'Only the creator or community admin can delete the group' });
+      }
+
+      // Delete group (CASCADE will handle related data)
+      db.run('DELETE FROM community_groups WHERE id = ?', [groupId], function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error deleting group' });
+        }
+
+        // Try to delete group folder
+        try {
+          const basePath = path.join(__dirname, '../uploads/communities', group.community_id.toString(), 'groups', groupId.toString());
+          if (fs.existsSync(basePath)) {
+            fs.rmSync(basePath, { recursive: true, force: true });
+          }
+        } catch (error) {
+          console.error('Error deleting group folder:', error);
+        }
+
+        res.json({ success: true });
+      });
+    }
+  );
+});
+
 // Post in group
 router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next) => {
   // Log all fields before multer processing

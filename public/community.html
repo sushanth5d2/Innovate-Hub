@@ -1736,21 +1736,24 @@
 
       <div class="right-section">
         <div class="section-title">DESCRIPTION</div>
-        <div id="rightDescription">Loading...</div>
+        <div id="rightDescription" style="margin-bottom: 8px;">Loading...</div>
+        <button class="btn-text" onclick="editCommunityProfile()" style="color: var(--ig-blue); font-size: 14px; font-weight: 600; background: none; border: none; cursor: pointer; padding: 0;">
+          <i class="fas fa-edit"></i> Edit Profile
+        </button>
+      </div>
+
+      <div class="menu-item" onclick="addMembers()">
+        <div class="menu-left">
+          <div class="menu-icon"><i class="fas fa-user-plus"></i></div>
+          <div>Add members</div>
+        </div>
+        <i class="fas fa-chevron-right"></i>
       </div>
 
       <div class="menu-item" onclick="manageGroups()">
         <div class="menu-left">
           <div class="menu-icon"><i class="fas fa-users"></i></div>
           <div>Manage groups</div>
-        </div>
-        <i class="fas fa-chevron-right"></i>
-      </div>
-
-      <div class="menu-item" onclick="showCommunitySettings()">
-        <div class="menu-left">
-          <div class="menu-icon"><i class="fas fa-cog"></i></div>
-          <div>Community settings</div>
         </div>
         <i class="fas fa-chevron-right"></i>
       </div>
@@ -1763,12 +1766,51 @@
         <div id="groupCountBadge" style="color: var(--ig-secondary-text);">(0)</div>
       </div>
 
+      <div class="menu-item" onclick="showCommunitySettings()">
+        <div class="menu-left">
+          <div class="menu-icon"><i class="fas fa-cog"></i></div>
+          <div>Community settings</div>
+        </div>
+        <i class="fas fa-chevron-right"></i>
+      </div>
+
       <div class="menu-item" onclick="showGitHubIntegration()">
         <div class="menu-left">
           <div class="menu-icon"><i class="fab fa-github"></i></div>
           <div>GitHub Integration</div>
         </div>
         <i class="fas fa-chevron-right"></i>
+      </div>
+
+      <!-- Admin Only Features -->
+      <div id="adminOnlyFeatures" style="display: none;">
+        <div style="margin: 16px 0; padding-top: 16px; border-top: 1px solid var(--ig-border);">
+          <div class="section-title">ADMIN ACTIONS</div>
+        </div>
+
+        <div class="menu-item" onclick="showJoinRequests()" id="joinRequestsMenuItem" style="display: none;">
+          <div class="menu-left">
+            <div class="menu-icon"><i class="fas fa-user-check"></i></div>
+            <div>Join Requests</div>
+          </div>
+          <div id="joinRequestsBadge" style="background: var(--ig-error); color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">0</div>
+        </div>
+
+        <div class="menu-item" onclick="clearAllAnnouncements()">
+          <div class="menu-left">
+            <div class="menu-icon"><i class="fas fa-trash-alt"></i></div>
+            <div>Clear announcements</div>
+          </div>
+          <i class="fas fa-chevron-right"></i>
+        </div>
+
+        <div class="menu-item" onclick="deleteCommunity()" style="color: var(--ig-error);">
+          <div class="menu-left">
+            <div class="menu-icon" style="color: var(--ig-error);"><i class="fas fa-exclamation-triangle"></i></div>
+            <div>Delete community</div>
+          </div>
+          <i class="fas fa-chevron-right"></i>
+        </div>
       </div>
     </div>
   </div>
@@ -2005,6 +2047,17 @@
           document.getElementById('rightName').textContent = res.community.name;
           document.getElementById('rightDescription').textContent = res.community.description || 'No description';
           document.getElementById('rightMeta').textContent = `Community · ${res.community.member_count || 0} members`;
+          
+          // Update community avatar/banner
+          const rightAvatar = document.getElementById('rightAvatar');
+          if (res.community.banner_image) {
+            rightAvatar.innerHTML = `<img src="${res.community.banner_image}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+          } else {
+            rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
+          }
+          
+          // Update admin features visibility
+          updateAdminFeatures();
         }
       } catch (error) {
         console.error('Error loading community:', error);
@@ -5454,20 +5507,644 @@
       console.log('Invite link copied:', link);
     }
 
+    // ==================== COMMUNITY MANAGEMENT ====================
+    
+    // Edit Community Profile
+    function editCommunityProfile() {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 600px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;">Edit Community Profile</h3>
+          </div>
+          <div style="padding: 24px;">
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Community Name</label>
+              <input type="text" id="editCommunityName" value="${state.community.name}" 
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Description</label>
+              <textarea id="editCommunityDesc" rows="4" 
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical;">${state.community.description || ''}</textarea>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Community Banner</label>
+              <input type="file" id="editCommunityBanner" accept="image/*"
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+              <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Recommended: 1500x500px</div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Cancel
+              </button>
+              <button onclick="saveCommunityProfile()" 
+                style="padding: 12px 24px; border: none; border-radius: 8px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function saveCommunityProfile() {
+      const name = document.getElementById('editCommunityName').value.trim();
+      const description = document.getElementById('editCommunityDesc').value.trim();
+      const bannerInput = document.getElementById('editCommunityBanner');
+      
+      if (!name) {
+        InnovateAPI.showAlert('Community name is required', 'error');
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        
+        if (bannerInput.files[0]) {
+          formData.append('banner', bannerInput.files[0]);
+        }
+
+        const res = await fetch(`${InnovateAPI.API_URL}/communities/${state.communityId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          InnovateAPI.showAlert('Community profile updated!', 'success');
+          document.querySelector('.ig-modal-overlay').remove();
+          await loadCommunityData();
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to update community', 'error');
+      }
+    }
+
+    // Add Members
     function addMembers() {
-      console.log('Add members feature coming soon');
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;">Add Members</h3>
+          </div>
+          <div style="padding: 24px;">
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Search Users</label>
+              <input type="text" id="searchUsers" placeholder="Type username to search..." 
+                oninput="searchUsersToAdd()"
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            </div>
+            
+            <div id="searchResults" style="max-height: 300px; overflow-y: auto;"></div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
     }
 
+    async function searchUsersToAdd() {
+      const query = document.getElementById('searchUsers').value.trim();
+      const resultsDiv = document.getElementById('searchResults');
+      
+      if (query.length < 2) {
+        resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-secondary-text);">Type at least 2 characters</div>';
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(query)}`);
+        if (res.success && res.users.length > 0) {
+          resultsDiv.innerHTML = res.users.map(user => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+              <img src="${user.profile_picture || '/images/default-avatar.svg'}" 
+                style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${user.username}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">${user.bio || ''}</div>
+              </div>
+              <button onclick="inviteUserToCommunity(${user.id})" 
+                style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+                Invite
+              </button>
+            </div>
+          `).join('');
+        } else {
+          resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-secondary-text);">No users found</div>';
+        }
+      } catch (error) {
+        resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-error);">Error searching users</div>';
+      }
+    }
+
+    async function inviteUserToCommunity(userId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/invite`, {
+          method: 'POST',
+          body: JSON.stringify({ userId })
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Invitation sent!', 'success');
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to send invitation', 'error');
+      }
+    }
+
+    // Manage Groups
     function manageGroups() {
-      console.log('Manage groups feature coming soon');
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 700px; max-height: 80vh;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 20px;">Manage Groups</h3>
+            <button onclick="showCreateGroupModal(); this.closest('.ig-modal-overlay').remove();" 
+              style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-plus"></i> Create Group
+            </button>
+          </div>
+          <div style="padding: 24px; overflow-y: auto; max-height: calc(80vh - 140px);" id="manageGroupsList">
+            Loading groups...
+          </div>
+          <div style="padding: 24px; border-top: 1px solid var(--ig-border); display: flex; justify-content: flex-end;">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadManageGroupsList();
     }
 
+    async function loadManageGroupsList() {
+      const listDiv = document.getElementById('manageGroupsList');
+      
+      if (state.groups.length === 0) {
+        listDiv.innerHTML = `
+          <div style="padding: 40px; text-align: center; color: var(--ig-secondary-text);">
+            <i class="fas fa-users" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No groups yet</div>
+            <div>Create your first group to get started</div>
+          </div>
+        `;
+        return;
+      }
+
+      listDiv.innerHTML = state.groups.map(group => `
+        <div style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
+          <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
+            <i class="fas fa-users"></i>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 16px;">${group.name}</div>
+            <div style="font-size: 13px; color: var(--ig-secondary-text);">${group.description || 'No description'}</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onclick="editGroup(${group.id})" 
+              style="padding: 8px 16px; border: 1px solid var(--ig-border); border-radius: 6px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button onclick="deleteGroup(${group.id}, '${group.name}')" 
+              style="padding: 8px 16px; border: 1px solid var(--ig-error); border-radius: 6px; background: transparent; color: var(--ig-error); cursor: pointer;">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function editGroup(groupId) {
+      const group = state.groups.find(g => g.id === groupId);
+      if (!group) return;
+
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;">Edit Group</h3>
+          </div>
+          <div style="padding: 24px;">
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Group Name</label>
+              <input type="text" id="editGroupName" value="${group.name}" 
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Description</label>
+              <textarea id="editGroupDesc" rows="3" 
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical;">${group.description || ''}</textarea>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Cancel
+              </button>
+              <button onclick="saveGroupEdit(${groupId})" 
+                style="padding: 12px 24px; border: none; border-radius: 8px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function saveGroupEdit(groupId) {
+      const name = document.getElementById('editGroupName').value.trim();
+      const description = document.getElementById('editGroupDesc').value.trim();
+      
+      if (!name) {
+        InnovateAPI.showAlert('Group name is required', 'error');
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, description })
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Group updated!', 'success');
+          document.querySelector('.ig-modal-overlay').remove();
+          await loadGroups();
+          loadManageGroupsList();
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to update group', 'error');
+      }
+    }
+
+    async function deleteGroup(groupId, groupName) {
+      if (!confirm(`Are you sure you want to delete "${groupName}"? This will delete all messages, files, and notes in this group. This action cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}`, {
+          method: 'DELETE'
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Group deleted successfully', 'success');
+          await loadGroups();
+          
+          // Close manage groups modal if open and reload
+          const manageModal = document.getElementById('manageGroupsList');
+          if (manageModal) {
+            loadManageGroupsList();
+          }
+          
+          // If deleted group was selected, clear selection
+          if (state.currentGroupId === groupId) {
+            state.currentGroupId = null;
+            switchLeftTab('groups');
+          }
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to delete group', 'error');
+      }
+    }
+
+    // Community Settings
     function showCommunitySettings() {
-      console.log('Community settings coming soon');
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 600px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;">Community Settings</h3>
+          </div>
+          <div style="padding: 24px;">
+            <div style="margin-bottom: 24px;">
+              <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                <div>
+                  <div style="font-weight: 600; margin-bottom: 4px;">Private Community</div>
+                  <div style="font-size: 13px; color: var(--ig-secondary-text);">Require approval for new members</div>
+                </div>
+                <input type="checkbox" id="isPrivate" ${state.community.is_public === 0 ? 'checked' : ''} 
+                  style="width: 20px; height: 20px; cursor: pointer;">
+              </label>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Team Name (Optional)</label>
+              <input type="text" id="teamName" value="${state.community.team_name || ''}" placeholder="e.g., Manchester United"
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+              <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Display a sports team or organization name</div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Cancel
+              </button>
+              <button onclick="saveCommunitySettings()" 
+                style="padding: 12px 24px; border: none; border-radius: 8px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function saveCommunitySettings() {
+      const isPrivate = document.getElementById('isPrivate').checked;
+      const teamName = document.getElementById('teamName').value.trim();
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            is_public: isPrivate ? 0 : 1,
+            team_name: teamName
+          })
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Settings saved!', 'success');
+          document.querySelector('.ig-modal-overlay').remove();
+          await loadCommunityData();
+          
+          // Show/hide join requests menu if privacy changed
+          updateAdminFeatures();
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to save settings', 'error');
+      }
+    }
+
+    // Join Requests (Private Communities)
+    function showJoinRequests() {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 600px; max-height: 80vh;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;">Join Requests</h3>
+          </div>
+          <div style="padding: 24px; overflow-y: auto; max-height: calc(80vh - 140px);" id="joinRequestsList">
+            Loading requests...
+          </div>
+          <div style="padding: 24px; border-top: 1px solid var(--ig-border); display: flex; justify-content: flex-end;">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadJoinRequests();
+    }
+
+    async function loadJoinRequests() {
+      const listDiv = document.getElementById('joinRequestsList');
+      
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/join-requests`);
+        
+        if (res.success && res.requests.length > 0) {
+          listDiv.innerHTML = res.requests.map(request => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
+              <img src="${request.profile_picture || '/images/default-avatar.svg'}" 
+                style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${request.username}</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">Requested ${InnovateAPI.formatDate(request.requested_at)}</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="approveJoinRequest(${request.user_id})" 
+                  style="padding: 8px 16px; border: none; border-radius: 6px; background: #10b981; color: white; cursor: pointer; font-weight: 600;">
+                  <i class="fas fa-check"></i> Accept
+                </button>
+                <button onclick="declineJoinRequest(${request.user_id})" 
+                  style="padding: 8px 16px; border: 1px solid var(--ig-error); border-radius: 6px; background: transparent; color: var(--ig-error); cursor: pointer;">
+                  <i class="fas fa-times"></i> Decline
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          listDiv.innerHTML = `
+            <div style="padding: 40px; text-align: center; color: var(--ig-secondary-text);">
+              <i class="fas fa-user-check" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+              <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No pending requests</div>
+              <div>Join requests will appear here</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        listDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-error);">Error loading requests</div>';
+      }
+    }
+
+    async function approveJoinRequest(userId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/join-requests/${userId}/approve`, {
+          method: 'POST'
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Request approved!', 'success');
+          loadJoinRequests();
+          updateJoinRequestsBadge();
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to approve request', 'error');
+      }
+    }
+
+    async function declineJoinRequest(userId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/join-requests/${userId}/decline`, {
+          method: 'POST'
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Request declined', 'success');
+          loadJoinRequests();
+          updateJoinRequestsBadge();
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to decline request', 'error');
+      }
+    }
+
+    async function updateJoinRequestsBadge() {
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/join-requests`);
+        const badge = document.getElementById('joinRequestsBadge');
+        const menuItem = document.getElementById('joinRequestsMenuItem');
+        
+        if (res.success) {
+          const count = res.requests.length;
+          badge.textContent = count;
+          
+          // Show menu item for private communities (even if count is 0)
+          if (state.community && state.community.is_public === 0) {
+            menuItem.style.display = 'flex';
+            
+            // Visual indicator: highlight if there are pending requests
+            if (count > 0) {
+              badge.style.background = 'var(--ig-error)';
+              badge.style.display = 'block';
+            } else {
+              badge.textContent = '0';
+              badge.style.background = 'var(--ig-secondary-text)';
+              badge.style.display = 'block';
+            }
+          } else {
+            menuItem.style.display = 'none';
+          }
+        }
+      } catch (error) {
+        console.error('Error updating join requests badge:', error);
+        // Still show the menu for private communities even if request fails
+        const menuItem = document.getElementById('joinRequestsMenuItem');
+        if (state.community && state.community.is_public === 0 && state.community.admin_id === state.user.id) {
+          menuItem.style.display = 'flex';
+        }
+      }
+    }
+
+    // Clear All Announcements
+    async function clearAllAnnouncements() {
+      if (!confirm('Are you sure you want to delete ALL announcements? This action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements/clear`, {
+          method: 'DELETE'
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('All announcements cleared!', 'success');
+          await loadAnnouncements();
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to clear announcements', 'error');
+      }
+    }
+
+    // Delete Community
+    async function deleteCommunity() {
+      const communityName = state.community.name;
+      
+      if (!confirm(`⚠️ WARNING: This will permanently delete "${communityName}" and ALL its data including:\n\n- All groups and their messages\n- All announcements\n- All files and notes\n- All member associations\n\nThis action CANNOT be undone!\n\nType the community name to confirm deletion.`)) {
+        return;
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px; color: var(--ig-error);">
+              <i class="fas fa-exclamation-triangle"></i> Delete Community
+            </h3>
+          </div>
+          <div style="padding: 24px;">
+            <div style="background: #fee; border: 1px solid var(--ig-error); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+              <div style="font-weight: 600; margin-bottom: 8px;">This is permanent and cannot be undone!</div>
+              <div style="font-size: 13px;">Type <strong>${communityName}</strong> to confirm</div>
+            </div>
+            
+            <input type="text" id="confirmCommunityName" placeholder="Type community name here" 
+              style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); margin-bottom: 20px;">
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Cancel
+              </button>
+              <button onclick="confirmDeleteCommunity('${communityName}')" 
+                style="padding: 12px 24px; border: none; border-radius: 8px; background: var(--ig-error); color: white; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-trash"></i> Delete Forever
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function confirmDeleteCommunity(expectedName) {
+      const inputName = document.getElementById('confirmCommunityName').value.trim();
+      
+      if (inputName !== expectedName) {
+        InnovateAPI.showAlert('Community name does not match', 'error');
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}`, {
+          method: 'DELETE'
+        });
+        
+        if (res.success) {
+          InnovateAPI.showAlert('Community deleted', 'success');
+          setTimeout(() => {
+            window.location.href = '/communities';
+          }, 1500);
+        }
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to delete community', 'error');
+      }
+    }
+
+    // Update admin features visibility
+    function updateAdminFeatures() {
+      const adminSection = document.getElementById('adminOnlyFeatures');
+      const isAdmin = state.community && state.community.admin_id === state.user.id;
+      
+      if (isAdmin) {
+        adminSection.style.display = 'block';
+        
+        // Show join requests only if community is private
+        if (state.community.is_public === 0) {
+          updateJoinRequestsBadge();
+        }
+      } else {
+        adminSection.style.display = 'none';
+      }
     }
 
     function viewAllGroups() {
-      switchLeftTab('community');
+      switchLeftTab('groups');
     }
 
     function showGroupActions() {
