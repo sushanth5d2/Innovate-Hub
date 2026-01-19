@@ -82,6 +82,7 @@ class NotesEditor {
   renderNoteCard(note) {
     const updatedAt = new Date(note.updated_at);
     const preview = this.getPlainTextPreview(note.content_md || '');
+    const updateBy = note.updated_by_username || note.created_by_username || 'Unknown';
     
     return `
       <div class="note-card" onclick="notesEditor.openNote(${note.id})">
@@ -94,7 +95,7 @@ class NotesEditor {
         </div>
         <div class="note-card-preview">${preview}</div>
         <div class="note-card-footer">
-          <span>Updated ${InnovateAPI.formatDate(note.updated_at)}</span>
+          <span>${InnovateAPI.formatDate(note.updated_at)} by ${updateBy}</span>
         </div>
       </div>
     `;
@@ -150,20 +151,28 @@ class NotesEditor {
     }
     editorContainer.innerHTML = '';
 
-    // Initialize Quill with full toolbar
+    // Initialize Quill with full toolbar including custom attachment buttons
     this.quill = new Quill('#notes-editor', {
       theme: 'snow',
       placeholder: 'Start writing your note...',
       modules: {
-        toolbar: [
-          [{ 'header': [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          ['blockquote', 'code-block'],
-          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-          [{ 'color': [] }, { 'background': [] }],
-          ['link', 'image'],
-          ['clean']
-        ],
+        toolbar: {
+          container: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'align': [] }],
+            ['link', 'image', 'video'],
+            ['clean']
+          ],
+          handlers: {
+            'image': () => this.handleImageUpload(),
+            'video': () => this.handleVideoUpload()
+          }
+        },
         syntax: true
       }
     });
@@ -555,4 +564,191 @@ document.head.appendChild(notesStyles);
 // Export for use in group page
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = NotesEditor;
+}
+
+  // Handle image upload in editor
+  handleImageUpload() {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      const range = this.quill.getSelection(true);
+      this.quill.insertText(range.index, 'Uploading...', 'user');
+
+      try {
+        const formData = new FormData();
+        formData.append('images', file);
+        
+        const response = await fetch(`/api/community-groups/${this.groupId}/files`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+        
+        const data = await response.json();
+        const imageUrl = data.files && data.files[0] ? data.files[0] : null;
+
+        this.quill.deleteText(range.index, 'Uploading...'.length);
+        
+        if (imageUrl) {
+          this.quill.insertEmbed(range.index, 'image', imageUrl, 'user');
+          this.quill.setSelection(range.index + 1);
+          InnovateAPI.showAlert('Image uploaded!', 'success');
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        this.quill.deleteText(range.index, 'Uploading...'.length);
+        InnovateAPI.showAlert('Failed to upload image', 'error');
+      }
+    };
+  }
+
+  // Handle video/file upload
+  handleVideoUpload() {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'video/*,audio/*,.pdf,.doc,.docx');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      const range = this.quill.getSelection(true);
+      this.quill.insertText(range.index, `Uploading...`, 'user');
+
+      try {
+        const formData = new FormData();
+        formData.append('files', file);
+        
+        const response = await fetch(`/api/community-groups/${this.groupId}/files`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+        
+        const data = await response.json();
+        const fileUrl = data.files && data.files[0] ? data.files[0] : null;
+
+        this.quill.deleteText(range.index, 'Uploading...'.length);
+        
+        if (fileUrl) {
+          if (file.type.startsWith('video/')) {
+            this.quill.insertEmbed(range.index, 'video', fileUrl, 'user');
+          } else {
+            this.quill.insertText(range.index, `📎 ${file.name}`, 'user');
+            this.quill.formatText(range.index, file.name.length + 2, 'link', fileUrl);
+          }
+          InnovateAPI.showAlert('File uploaded!', 'success');
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        this.quill.deleteText(range.index, 'Uploading...'.length);
+        InnovateAPI.showAlert('Failed to upload file', 'error');
+      }
+    };
+  }
+
+  // Show templates modal
+  showTemplatesModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+          <h3>📝 Note Templates</h3>
+          <button onclick="this.closest('.modal-overlay').remove()">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px;">
+            ${this.getTemplates().map(template => `
+              <div onclick="notesEditor.applyTemplate('${template.id}'); this.closest('.modal-overlay').remove();" style="cursor: pointer; padding: 20px; border: 1px solid var(--ig-border); border-radius: 12px; text-align: center; transition: all 0.2s; background: var(--ig-secondary-background);">
+                <div style="font-size: 32px; margin-bottom: 8px;">${template.icon}</div>
+                <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600;">${template.name}</h4>
+                <p style="margin: 0; font-size: 12px; color: var(--ig-secondary-text);">${template.description}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Get available templates
+  getTemplates() {
+    return [
+      {
+        id: 'meeting',
+        name: 'Meeting Notes',
+        icon: '🤝',
+        description: 'Agenda & actions',
+        content: `<h2>Meeting Notes</h2><p><br></p><p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p><p><br></p><h3>Agenda</h3><ul><li>Topic 1</li></ul><p><br></p><h3>Action Items</h3><ul><li>[ ] Task 1</li></ul><p><br></p>`
+      },
+      {
+        id: 'project',
+        name: 'Project Plan',
+        icon: '📊',
+        description: 'Goals & timeline',
+        content: `<h2>Project Plan</h2><p><br></p><h3>🎯 Goals</h3><ul><li>Goal 1</li></ul><p><br></p><h3>📅 Timeline</h3><p><br></p>`
+      },
+      {
+        id: 'research',
+        name: 'Research',
+        icon: '🔬',
+        description: 'Findings & sources',
+        content: `<h2>Research Notes</h2><p><br></p><h3>📚 Findings</h3><ul><li>Finding 1</li></ul><p><br></p><h3>🔗 Sources</h3><ol><li></li></ol><p><br></p>`
+      },
+      {
+        id: 'brainstorm',
+        name: 'Brainstorm',
+        icon: '💡',
+        description: 'Ideas & pros/cons',
+        content: `<h2>Brainstorming</h2><p><br></p><h3>💡 Ideas</h3><ul><li>Idea 1</li></ul><p><br></p><h3>👍 Pros</h3><ul><li></li></ul><p><br></p>`
+      },
+      {
+        id: 'documentation',
+        name: 'Docs',
+        icon: '📖',
+        description: 'Technical docs',
+        content: `<h2>Documentation</h2><p><br></p><h3>📋 Overview</h3><p><br></p><h3>💻 Usage</h3><pre class="ql-syntax">// Code</pre><p><br></p>`
+      },
+      {
+        id: 'blank',
+        name: 'Blank',
+        icon: '📄',
+        description: 'Start from scratch',
+        content: '<p><br></p>'
+      }
+    ];
+  }
+
+  // Apply template
+  applyTemplate(templateId) {
+    const template = this.getTemplates().find(t => t.id === templateId);
+    if (!template || !this.quill) return;
+
+    const delta = this.quill.clipboard.convert(template.content);
+    this.quill.setContents(delta);
+    
+    const titleInput = document.getElementById('note-title');
+    if (titleInput && !titleInput.value) {
+      titleInput.value = template.name + ' - ' + new Date().toLocaleDateString();
+    }
+
+    InnovateAPI.showAlert(`Applied ${template.name} template!`, 'success');
+  }
 }

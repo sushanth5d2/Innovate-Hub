@@ -85,11 +85,16 @@ class TodoBoard {
   }
 
   // Load tasks from server
-  async loadTasks() {
+  async loadTasks(showBoardView = true) {
     try {
       const response = await InnovateAPI.apiRequest(`/community-groups/${this.groupId}/tasks`);
       this.tasks = response.tasks || [];
-      this.renderBoard();
+      
+      if (showBoardView) {
+        this.renderBoard(); // Default to Board/Kanban view
+      } else {
+        this.renderCalendar(); // Alternative: Calendar view
+      }
     } catch (error) {
       console.error('Error loading tasks:', error);
       InnovateAPI.showAlert('Failed to load tasks', 'error');

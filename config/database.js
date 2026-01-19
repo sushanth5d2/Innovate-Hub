@@ -682,6 +682,25 @@ const createTables = () => {
         }
       });
 
+      // Add note management columns
+      db.run(`ALTER TABLE community_group_notes ADD COLUMN is_pinned BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: is_pinned column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE community_group_notes ADD COLUMN is_locked BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: is_locked column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE community_group_notes ADD COLUMN is_archived BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: is_archived column migration - ', err.message);
+        }
+      });
+
       // Create hashtags table
       db.run(`
         CREATE TABLE IF NOT EXISTS hashtags (

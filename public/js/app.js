@@ -88,7 +88,16 @@
   }
 
   function formatDate(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return 'Unknown';
+    
+    // Handle SQLite datetime format: "2026-01-19 11:40:38"
+    // Parse as local time (don't add 'Z' to avoid UTC conversion)
+    let dateStr = dateString;
+    if (dateStr.includes(' ') && !dateStr.includes('T')) {
+      dateStr = dateStr.replace(' ', 'T'); // Convert to ISO format WITHOUT timezone
+    }
+    
+    const date = new Date(dateStr);
     const now = new Date();
     const diff = now - date;
 

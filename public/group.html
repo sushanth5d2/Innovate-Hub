@@ -144,7 +144,10 @@
       <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Group Notes</h3>
-          <button class="btn btn-primary" id="create-note-btn">➕ Create Note</button>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary" id="templates-btn" onclick="notesEditor?.showTemplatesModal()" style="display: none;">📝 Templates</button>
+            <button class="btn btn-primary" id="create-note-btn">➕ Create Note</button>
+          </div>
         </div>
         <div id="notes-list" style="margin-bottom: 24px;"></div>
         <div id="notes-editor-container" style="display: none;">
@@ -152,8 +155,9 @@
             <input type="text" id="note-title" placeholder="Note Title" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 18px; font-weight: 600;">
           </div>
           <div id="notes-editor" style="min-height: 400px; background: var(--ig-primary-background);"></div>
-          <div style="margin-top: 16px; display: flex; gap: 12px;">
+          <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn btn-primary" id="save-note-btn">💾 Save Note</button>
+            <button class="btn btn-secondary" id="templates-btn-editor" onclick="notesEditor?.showTemplatesModal()">📝 Use Template</button>
             <button class="btn btn-secondary" id="cancel-note-btn">Cancel</button>
           </div>
         </div>

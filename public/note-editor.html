@@ -163,6 +163,15 @@
   <div class="editor-header">
     <div class="editor-title">📝 Note Editor</div>
     <div class="editor-actions">
+      <button class="btn btn-secondary" id="templates-btn" title="Choose template">
+        <span style="font-size: 16px;">📄</span> Templates
+      </button>
+      <button class="btn btn-secondary" id="upload-image-btn" title="Upload image">
+        <span style="font-size: 16px;">🖼️</span> Image
+      </button>
+      <button class="btn btn-secondary" id="upload-file-btn" title="Upload file">
+        <span style="font-size: 16px;">📎</span> File
+      </button>
       <button class="btn btn-secondary" id="back-btn">Close</button>
       <button class="btn btn-primary" id="save-btn">💾 Save</button>
     </div>
@@ -217,6 +226,19 @@
       try {
         const { note } = await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}`);
         titleEl.value = note.title || '';
+        
+        // Check if note is locked
+        if (note.is_locked) {
+          quill.disable();
+          titleEl.disabled = true;
+          document.getElementById('save-btn').disabled = true;
+          document.getElementById('templates-btn').disabled = true;
+          document.getElementById('upload-image-btn').disabled = true;
+          document.getElementById('upload-file-btn').disabled = true;
+          statusEl.textContent = '🔒 This note is locked (read-only)';
+          statusEl.className = 'status error';
+          statusEl.style.display = 'block';
+        }
         
         // Set content
         if (note.content_md) {
@@ -274,6 +296,15 @@
         statusEl.textContent = silent ? '✓ Saved' : '✓ Saved successfully';
         statusEl.className = 'status success';
         
+        // Notify parent window to refresh notes list
+        if (window.opener && !window.opener.closed) {
+          try {
+            window.opener.postMessage({ type: 'note-updated', noteId }, '*');
+          } catch (e) {
+            console.log('Could not notify parent window');
+          }
+        }
+        
         if (!silent) {
           setTimeout(() => {
             statusEl.textContent = `Last updated ${new Date().toLocaleString()}`;
@@ -293,6 +324,226 @@
         window.close();
       }
     });
+
+    // Template button handler
+    document.getElementById('templates-btn').addEventListener('click', () => {
+      showTemplateModal();
+    });
+
+    // Image upload handler
+    document.getElementById('upload-image-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          await uploadImage(file);
+        }
+      };
+      input.click();
+    });
+
+    // File upload handler
+    document.getElementById('upload-file-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,.doc,.docx,.txt,.xlsx,.xls';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          await uploadFile(file);
+        }
+      };
+      input.click();
+    });
+
+    async function uploadImage(file) {
+      const formData = new FormData();
+      formData.append('images', file);
+      
+      try {
+        statusEl.textContent = 'Uploading image...';
+        statusEl.className = 'status info';
+        
+        const res = await fetch('/api/community-groups/upload-image', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error('Upload failed');
+        
+        const data = await res.json();
+        const imageUrl = data.url || data.imageUrl;
+        
+        // Insert image into editor
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', imageUrl);
+        quill.setSelection(range.index + 1);
+        
+        statusEl.textContent = '✓ Image uploaded';
+        statusEl.className = 'status success';
+        setTimeout(() => {
+          statusEl.textContent = 'Ready';
+          statusEl.className = 'status info';
+        }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Failed to upload image';
+        statusEl.className = 'status error';
+      }
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('files', file);
+      
+      try {
+        statusEl.textContent = 'Uploading file...';
+        statusEl.className = 'status info';
+        
+        const res = await fetch('/api/community-groups/upload-file', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error('Upload failed');
+        
+        const data = await res.json();
+        const fileUrl = data.url || data.fileUrl;
+        const fileName = file.name;
+        
+        // Insert file link into editor
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, `📎 ${fileName}`, 'link', fileUrl);
+        quill.setSelection(range.index + fileName.length + 3);
+        
+        statusEl.textContent = '✓ File uploaded';
+        statusEl.className = 'status success';
+        setTimeout(() => {
+          statusEl.textContent = 'Ready';
+          statusEl.className = 'status info';
+        }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Failed to upload file';
+        statusEl.className = 'status error';
+      }
+    }
+
+    function showTemplateModal() {
+      const templates = [
+        { id: 'meeting', name: '📋 Meeting Notes', icon: '📋' },
+        { id: 'todo', name: '✅ To-Do List', icon: '✅' },
+        { id: 'brainstorm', name: '💡 Brainstorm', icon: '💡' },
+        { id: 'project', name: '🚀 Project Plan', icon: '🚀' },
+        { id: 'research', name: '📚 Research Notes', icon: '📚' },
+        { id: 'blank', name: '📄 Blank Page', icon: '📄' }
+      ];
+      
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center;';
+      
+      modal.innerHTML = `
+        <div style="background: var(--ig-primary-background); border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+          <h2 style="margin: 0 0 20px 0; font-size: 20px; color: var(--ig-primary-text);">Choose Template</h2>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+            ${templates.map(t => `
+              <button onclick="applyTemplate('${t.id}')" style="padding: 20px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; transition: all 0.2s;">
+                <span style="font-size: 32px;">${t.icon}</span>
+                ${t.name}
+              </button>
+            `).join('')}
+          </div>
+          <button onclick="this.closest('.template-modal').remove()" style="margin-top: 20px; width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">Cancel</button>
+        </div>
+      `;
+      
+      modal.className = 'template-modal';
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+      
+      document.body.appendChild(modal);
+    }
+
+    window.applyTemplate = function(templateId) {
+      const templates = {
+        meeting: {
+          ops: [
+            { insert: '📋 Meeting Notes\n', attributes: { header: 1 } },
+            { insert: '\nDate: ' + new Date().toLocaleDateString() + '\n' },
+            { insert: 'Attendees:\n', attributes: { bold: true } },
+            { insert: '• \n• \n• \n\n' },
+            { insert: 'Agenda:\n', attributes: { bold: true } },
+            { insert: '1. \n2. \n3. \n\n' },
+            { insert: 'Action Items:\n', attributes: { bold: true } },
+            { insert: '• \n• \n\n' },
+            { insert: 'Next Steps:\n', attributes: { bold: true } },
+            { insert: '• \n' }
+          ]
+        },
+        todo: {
+          ops: [
+            { insert: '✅ To-Do List\n', attributes: { header: 1 } },
+            { insert: '\n' },
+            { insert: 'High Priority\n', attributes: { header: 2 } },
+            { insert: '☐ \n☐ \n\n' },
+            { insert: 'Medium Priority\n', attributes: { header: 2 } },
+            { insert: '☐ \n☐ \n\n' },
+            { insert: 'Low Priority\n', attributes: { header: 2 } },
+            { insert: '☐ \n' }
+          ]
+        },
+        brainstorm: {
+          ops: [
+            { insert: '💡 Brainstorm Session\n', attributes: { header: 1 } },
+            { insert: '\nTopic: \n\n' },
+            { insert: 'Ideas:\n', attributes: { bold: true } },
+            { insert: '• \n• \n• \n\n' },
+            { insert: 'Top Picks:\n', attributes: { bold: true } },
+            { insert: '1. \n2. \n3. \n' }
+          ]
+        },
+        project: {
+          ops: [
+            { insert: '🚀 Project Plan\n', attributes: { header: 1 } },
+            { insert: '\nProject Name: \n\n' },
+            { insert: 'Objective:\n', attributes: { bold: true } },
+            { insert: '\n\n' },
+            { insert: 'Timeline:\n', attributes: { bold: true } },
+            { insert: '• Start: \n• End: \n\n' },
+            { insert: 'Milestones:\n', attributes: { bold: true } },
+            { insert: '1. \n2. \n3. \n\n' },
+            { insert: 'Resources:\n', attributes: { bold: true } },
+            { insert: '• \n' }
+          ]
+        },
+        research: {
+          ops: [
+            { insert: '📚 Research Notes\n', attributes: { header: 1 } },
+            { insert: '\nTopic: \n\n' },
+            { insert: 'Key Points:\n', attributes: { bold: true } },
+            { insert: '• \n• \n• \n\n' },
+            { insert: 'Sources:\n', attributes: { bold: true } },
+            { insert: '1. \n2. \n\n' },
+            { insert: 'Conclusions:\n', attributes: { bold: true } },
+            { insert: '\n' }
+          ]
+        },
+        blank: {
+          ops: [{ insert: '\n' }]
+        }
+      };
+      
+      const template = templates[templateId];
+      if (template) {
+        quill.setContents(template);
+        quill.setSelection(0, 0);
+      }
+      
+      document.querySelector('.template-modal')?.remove();
+    };
     
     // Keyboard shortcut: Cmd+S / Ctrl+S to save
     document.addEventListener('keydown', (e) => {

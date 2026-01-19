@@ -1457,6 +1457,24 @@
       transform: translateY(-1px);
     }
 
+    .btn-icon {
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-icon:hover {
+      background: var(--ig-hover);
+      transform: translateY(-2px);
+    }
+
     .btn-group {
       display: flex;
       gap: 12px;
@@ -2095,6 +2113,13 @@
         const unreadCount = group.unread_count || 0;
         const truncatedMsg = previewMsg.length > 30 ? previewMsg.substring(0, 30) + '...' : previewMsg;
         
+        // Check if description is a URL and make it clickable
+        let displayDesc = group.description || 'No messages yet';
+        const urlPattern = /^(https?:\/\/[^\s]+)$/;
+        if (urlPattern.test(displayDesc)) {
+          displayDesc = `<a href="${displayDesc}" target="_blank" onclick="event.stopPropagation()" style="color: var(--ig-blue); text-decoration: none; font-weight: 500;">🔗 ${displayDesc}</a>`;
+        }
+        
         return `
           <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
             <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
@@ -2104,7 +2129,7 @@
                 ${unreadCount > 0 ? `<span style="background: var(--ig-blue); color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600;">${unreadCount}</span>` : ''}
               </div>
               <div class="group-desc" style="color: ${previewMsg ? 'var(--ig-primary-text)' : 'var(--ig-secondary-text)'}; font-weight: ${unreadCount > 0 ? '600' : '400'};">
-                ${previewMsg ? truncatedMsg : (group.description || 'No messages yet')}
+                ${previewMsg ? truncatedMsg : displayDesc}
               </div>
             </div>
           </div>
@@ -2981,7 +3006,7 @@
           await loadFoldersView(groupId);
           break;
         case 'tasks':
-          await showTaskCalendar(groupId, 'list');
+          await loadTasksView(groupId);
           break;
         case 'notes':
           await loadNotesView(groupId);
@@ -4342,35 +4367,65 @@
       const content = document.getElementById('centerContent');
       const footer = document.getElementById('centerFooter');
       footer.style.display = 'none';
+      
+      // Set current view
+      state.currentView = 'notes';
+      state.showArchivedNotes = state.showArchivedNotes || false;
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/notes`);
-        const notes = res.notes || [];
+        console.log('Loading notes for group:', groupId);
+        // Add timestamp to prevent caching
+        const timestamp = new Date().getTime();
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/notes?_t=${timestamp}`);
+        let notes = res.notes || [];
+        console.log('Loaded notes:', notes.length);
+        
+        // Log first note to check timestamp
+        if (notes.length > 0) {
+          console.log('First note updated_at:', notes[0].updated_at);
+          console.log('Formatted:', InnovateAPI.formatDate(notes[0].updated_at));
+        }
+        
+        // Sort: Pinned first, then by updated_at
+        notes.sort((a, b) => {
+          if (a.is_pinned && !b.is_pinned) return -1;
+          if (!a.is_pinned && b.is_pinned) return 1;
+          return new Date(b.updated_at) - new Date(a.updated_at);
+        });
+        
+        // Filter archived notes based on toggle
+        const activeNotes = state.showArchivedNotes ? notes : notes.filter(n => !n.is_archived);
+        const archivedCount = notes.filter(n => n.is_archived).length;
 
         content.innerHTML = `
-          <div style="margin-bottom: 16px;">
-            <button class="btn btn-primary" onclick="createNote()">
+          <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="showCreateNoteModal()">
               <i class="fas fa-plus"></i> New Note
             </button>
+            <div style="flex: 1; position: relative; min-width: 200px;">
+              <input 
+                type="text" 
+                id="note-search-input"
+                placeholder="🔍 Search notes..." 
+                style="width: 100%; padding: 10px 16px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);"
+                oninput="filterNotes()"
+              />
+            </div>
+            ${archivedCount > 0 ? `
+              <button class="btn btn-secondary" onclick="toggleArchivedNotes()" style="white-space: nowrap;">
+                ${state.showArchivedNotes ? '📤' : '📥'} ${state.showArchivedNotes ? 'Hide' : 'Show'} Archived (${archivedCount})
+              </button>
+            ` : ''}
           </div>
-          ${notes.length === 0 ? `
+          ${activeNotes.length === 0 ? `
             <div class="empty-state">
               <div class="empty-icon">📝</div>
-              <div class="empty-title">No notes yet</div>
-              <div class="empty-text">Create shared notes for your group</div>
+              <div class="empty-title">No notes ${state.showArchivedNotes ? 'in archive' : 'yet'}</div>
+              <div class="empty-text">${state.showArchivedNotes ? 'Archived notes will appear here' : 'Create shared notes for your group'}</div>
             </div>
           ` : `
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              ${notes.map(note => `
-                <div class="announcement-card" onclick="openNote(${note.id})">
-                  <div class="card-header">
-                    <div class="card-info">
-                      <div class="card-author">${note.title}</div>
-                      <div class="card-date">Updated ${InnovateAPI.formatDate(note.updated_at)} by ${note.updated_by_username || note.created_by_username}</div>
-                    </div>
-                  </div>
-                </div>
-              `).join('')}
+            <div id="notes-list" style="display: flex; flex-direction: column; gap: 12px;">
+              ${activeNotes.map(note => renderNoteCard(note)).join('')}
             </div>
           `}
         `;
@@ -4378,20 +4433,195 @@
         console.error('Error loading notes:', error);
       }
     }
+    
+    function toggleArchivedNotes() {
+      state.showArchivedNotes = !state.showArchivedNotes;
+      loadNotesView(state.currentGroupId);
+    }
 
-    async function createNote() {
-      const title = prompt('Note title:');
+    function renderNoteCard(note) {
+      const isPinned = note.is_pinned === 1 || note.is_pinned === true;
+      const isLocked = note.is_locked === 1 || note.is_locked === true;
+      const isArchived = note.is_archived === 1 || note.is_archived === true;
+      
+      return `
+        <div class="announcement-card note-card" data-note-id="${note.id}" data-note-title="${note.title.toLowerCase()}" style="position: relative; ${isPinned ? 'border-left: 4px solid #FFD700;' : ''} ${isArchived ? 'opacity: 0.6;' : ''}">
+          ${isPinned ? '<div style="position: absolute; top: 12px; right: 12px; color: #FFD700; font-size: 18px;">📌</div>' : ''}
+          ${isLocked ? '<div style="position: absolute; top: 12px; right: ' + (isPinned ? '40px' : '12px') + '; color: #ff6b6b; font-size: 18px;">🔒</div>' : ''}
+          <div class="card-header" onclick="openNote(${note.id})">
+            <div class="card-info">
+              <div class="card-author" style="display: flex; align-items: center; gap: 8px;">
+                ${note.title}
+                ${isArchived ? '<span style="font-size: 12px; background: var(--ig-secondary-text); padding: 2px 8px; border-radius: 4px; color: var(--ig-primary-background);">ARCHIVED</span>' : ''}
+              </div>
+              <div class="card-date">${InnovateAPI.formatDate(note.updated_at)} by ${note.updated_by_username || note.created_by_username}</div>
+            </div>
+          </div>
+          <div style="padding: 12px; border-top: 1px solid var(--ig-border); display: flex; gap: 8px; flex-wrap: wrap;">
+            ${!isLocked ? `<button onclick="event.stopPropagation(); openNote(${note.id})" class="btn-icon" title="Edit">✏️</button>` : ''}
+            <button onclick="event.stopPropagation(); togglePinNote(${note.id}, ${!isPinned})" class="btn-icon" title="${isPinned ? 'Unpin' : 'Pin'}">${isPinned ? '📌' : '📍'}</button>
+            <button onclick="event.stopPropagation(); toggleLockNote(${note.id}, ${!isLocked})" class="btn-icon" title="${isLocked ? 'Unlock' : 'Lock'}">${isLocked ? '🔓' : '🔒'}</button>
+            <button onclick="event.stopPropagation(); duplicateNote(${note.id})" class="btn-icon" title="Duplicate">📋</button>
+            <button onclick="event.stopPropagation(); shareNote(${note.id})" class="btn-icon" title="Share">🔗</button>
+            <button onclick="event.stopPropagation(); toggleArchiveNote(${note.id}, ${!isArchived})" class="btn-icon" title="${isArchived ? 'Unarchive' : 'Archive'}">${isArchived ? '📤' : '📥'}</button>
+            <button onclick="event.stopPropagation(); deleteNote(${note.id})" class="btn-icon" title="Delete" style="color: #ff6b6b;">🗑️</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function filterNotes() {
+      const searchInput = document.getElementById('note-search-input');
+      if (!searchInput) return;
+      
+      const searchTerm = searchInput.value.toLowerCase();
+      const noteCards = document.querySelectorAll('.note-card');
+      
+      noteCards.forEach(card => {
+        const title = card.getAttribute('data-note-title') || '';
+        if (title.includes(searchTerm)) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    async function togglePinNote(noteId, isPinned) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/pin`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_pinned: isPinned })
+        });
+        InnovateAPI.showAlert(isPinned ? 'Note pinned!' : 'Note unpinned!', 'success');
+        await loadNotesView(state.currentGroupId);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to pin note', 'error');
+      }
+    }
+
+    async function toggleLockNote(noteId, isLocked) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/lock`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_locked: isLocked })
+        });
+        InnovateAPI.showAlert(isLocked ? 'Note locked!' : 'Note unlocked!', 'success');
+        await loadNotesView(state.currentGroupId);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to lock note', 'error');
+      }
+    }
+
+    async function toggleArchiveNote(noteId, isArchived) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/archive`, {
+          method: 'PUT',
+          body: JSON.stringify({ is_archived: isArchived })
+        });
+        InnovateAPI.showAlert(isArchived ? 'Note archived!' : 'Note unarchived!', 'success');
+        await loadNotesView(state.currentGroupId);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to archive note', 'error');
+      }
+    }
+
+    async function duplicateNote(noteId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/duplicate`, {
+          method: 'POST'
+        });
+        InnovateAPI.showAlert('Note duplicated!', 'success');
+        await loadNotesView(state.currentGroupId);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to duplicate note', 'error');
+      }
+    }
+
+    async function shareNote(noteId) {
+      const noteUrl = `${window.location.origin}/note-editor.html?id=${noteId}`;
+      try {
+        await navigator.clipboard.writeText(noteUrl);
+        InnovateAPI.showAlert('Note link copied to clipboard!', 'success');
+      } catch (error) {
+        prompt('Copy this link:', noteUrl);
+      }
+    }
+
+    async function deleteNote(noteId) {
+      if (!confirm('Are you sure you want to delete this note? This cannot be undone.')) return;
+      
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}`, {
+          method: 'DELETE'
+        });
+        InnovateAPI.showAlert('Note deleted!', 'success');
+        await loadNotesView(state.currentGroupId);
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to delete note', 'error');
+      }
+    }
+
+    function showCreateNoteModal() {
+      showModal(`
+        <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+              📝
+            </div>
+            <div>
+              <div class="modal-title" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Create New Note</div>
+              <div style="font-size: 13px; opacity: 0.9;">Add a collaborative note for your group</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+        </div>
+        <form onsubmit="createNote(event)" style="padding: 24px;">
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <span>📌</span>
+              <span>Note Title *</span>
+            </label>
+            <input 
+              type="text" 
+              id="note-title-input" 
+              placeholder="e.g., Meeting Notes, Project Ideas, Resources" 
+              required 
+              autofocus
+              style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 15px; transition: all 0.2s; outline: none;" 
+              onfocus="this.style.borderColor='#667eea'" 
+              onblur="this.style.borderColor='var(--ig-border)'"
+            />
+          </div>
+          
+          <div style="display: flex; gap: 12px; padding-top: 20px; border-top: 1px solid var(--ig-border);">
+            <button type="submit" style="flex: 1; padding: 14px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+              <i class="fas fa-check-circle"></i> Create Note
+            </button>
+            <button type="button" onclick="closeModal()" style="padding: 14px 24px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 2px solid var(--ig-border); border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.2s;">
+              Cancel
+            </button>
+          </div>
+        </form>
+      `);
+    }
+    
+    async function createNote(e) {
+      e.preventDefault();
+      const title = document.getElementById('note-title-input').value.trim();
       if (!title) return;
 
       try {
         const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/notes`, {
           method: 'POST',
-          body: JSON.stringify({ title, content_md: '# Start writing...' })
+          body: JSON.stringify({ title, content_md: '' })
         });
         console.log('Note created successfully');
+        closeModal();
         openNote(res.note.id);
       } catch (error) {
         console.error('Error creating note:', error);
+        InnovateAPI.showAlert('Failed to create note', 'error');
       }
     }
 
@@ -5358,14 +5588,19 @@
     }
     
     // Convert URLs in text to clickable links
-    function linkify(text) {
+    function linkify(text, isOwnMessage = false) {
       if (!text) return '';
       
       // URL regex pattern
       const urlRegex = /(https?:\/\/[^\s<]+)/g;
       
+      // Use white for own messages, bright cyan for received messages
+      const linkColor = isOwnMessage ? '#ffffff' : '#00d4ff';
+      const fontWeight = isOwnMessage ? '700' : '600';
+      const textShadow = isOwnMessage ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.3);' : '';
+      
       return text.replace(urlRegex, (url) => {
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #0095f6; text-decoration: underline; word-break: break-all;">${url}</a>`;
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: ${linkColor}; text-decoration: underline; word-break: break-all; font-weight: ${fontWeight}; ${textShadow}">${url}</a>`;
       });
     }
     
@@ -5466,7 +5701,7 @@
         return `
           <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px;">
             <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText)}</div>` : ''}
+              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText, true)}</div>` : ''}
               ${attachmentsHTML}
               <div style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
             </div>
@@ -5607,6 +5842,22 @@
       input.click();
     }
     function editTask(id) { }
+
+    // Listen for note updates from child window (note-editor.html)
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'note-updated') {
+        console.log('Note updated message received, refreshing list...');
+        console.log('Current view:', state.currentView);
+        console.log('Current group:', state.currentGroupId);
+        // Refresh notes view if currently viewing notes
+        if (state.currentView === 'notes' && state.currentGroupId) {
+          // Add small delay to ensure backend has saved
+          setTimeout(() => {
+            loadNotesView(state.currentGroupId);
+          }, 500);
+        }
+      }
+    });
   </script>
 </body>
 </html>

@@ -843,14 +843,14 @@ router.get('/community-groups/:groupId/notes', authMiddleware, async (req, res) 
     if (!member) return res.status(403).json({ error: 'You must be a member to view notes' });
 
     db.all(
-      `SELECT n.id, n.group_id, n.title, n.created_at, n.updated_at,
+      `SELECT n.*,
               cu.username as created_by_username,
               uu.username as updated_by_username
        FROM community_group_notes n
        JOIN users cu ON n.created_by = cu.id
        LEFT JOIN users uu ON n.updated_by = uu.id
        WHERE n.group_id = ?
-       ORDER BY n.updated_at DESC`,
+       ORDER BY n.is_pinned DESC, n.updated_at DESC`,
       [groupId],
       (err, rows) => {
         if (err) return res.status(500).json({ error: 'Error fetching notes' });
@@ -875,8 +875,8 @@ router.post('/community-groups/:groupId/notes', authMiddleware, async (req, res)
     if (!member) return res.status(403).json({ error: 'You must be a member to create notes' });
 
     db.run(
-      `INSERT INTO community_group_notes (group_id, title, content_md, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO community_group_notes (group_id, title, content_md, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now', '+5 hours', '+30 minutes'), datetime('now', '+5 hours', '+30 minutes'))`,
       [groupId, title, content_md, userId, userId],
       function(err) {
         if (err) return res.status(500).json({ error: 'Error creating note' });
@@ -885,6 +885,36 @@ router.post('/community-groups/:groupId/notes', authMiddleware, async (req, res)
     );
   } catch (e) {
     res.status(500).json({ error: 'Error creating note' });
+  }
+});
+
+// Upload image for notes
+router.post('/community-groups/upload-image', authMiddleware, upload.single('images'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    const imageUrl = `/uploads/${req.file.path.replace(/\\/g, '/').split('uploads/')[1]}`;
+    res.json({ success: true, url: imageUrl, imageUrl });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
+// Upload file for notes
+router.post('/community-groups/upload-file', authMiddleware, upload.single('files'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const fileUrl = `/uploads/${req.file.path.replace(/\\/g, '/').split('uploads/')[1]}`;
+    res.json({ success: true, url: fileUrl, fileUrl, filename: req.file.originalname });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({ error: 'Failed to upload file' });
   }
 });
 
@@ -925,6 +955,11 @@ router.put('/community-groups/notes/:noteId', authMiddleware, (req, res) => {
       const member = await requireGroupMember(db, existing.group_id, userId);
       if (!member) return res.status(403).json({ error: 'You must be a member to update notes' });
 
+      // Check if note is locked
+      if (existing.is_locked) {
+        return res.status(403).json({ error: 'This note is locked and cannot be edited' });
+      }
+
       // Save version before update
       db.run(
         `INSERT INTO community_group_note_versions (note_id, content_md, created_by)
@@ -937,7 +972,7 @@ router.put('/community-groups/notes/:noteId', authMiddleware, (req, res) => {
 
       db.run(
         `UPDATE community_group_notes
-         SET title = ?, content_md = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+         SET title = ?, content_md = ?, updated_by = ?, updated_at = datetime('now', '+5 hours', '+30 minutes')
          WHERE id = ?`,
         [nextTitle, nextContent, userId, noteId],
         (uErr) => {
@@ -949,6 +984,170 @@ router.put('/community-groups/notes/:noteId', authMiddleware, (req, res) => {
       res.status(500).json({ error: 'Error updating note' });
     }
   });
+});
+
+// Pin/Unpin note
+router.put('/community-groups/notes/:noteId/pin', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const noteId = req.params.noteId;
+  const { is_pinned } = req.body;
+
+  try {
+    const note = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM community_group_notes WHERE id = ?', [noteId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const member = await requireGroupMember(db, note.group_id, userId);
+    if (!member) return res.status(403).json({ error: 'Permission denied' });
+
+    db.run(
+      'UPDATE community_group_notes SET is_pinned = ? WHERE id = ?',
+      [is_pinned ? 1 : 0, noteId],
+      (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to update note' });
+        res.json({ success: true });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Lock/Unlock note
+router.put('/community-groups/notes/:noteId/lock', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const noteId = req.params.noteId;
+  const { is_locked } = req.body;
+
+  try {
+    const note = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM community_group_notes WHERE id = ?', [noteId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const member = await requireGroupMember(db, note.group_id, userId);
+    if (!member) return res.status(403).json({ error: 'Permission denied' });
+
+    db.run(
+      'UPDATE community_group_notes SET is_locked = ? WHERE id = ?',
+      [is_locked ? 1 : 0, noteId],
+      (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to update note' });
+        res.json({ success: true });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Archive/Unarchive note
+router.put('/community-groups/notes/:noteId/archive', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const noteId = req.params.noteId;
+  const { is_archived } = req.body;
+
+  try {
+    const note = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM community_group_notes WHERE id = ?', [noteId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const member = await requireGroupMember(db, note.group_id, userId);
+    if (!member) return res.status(403).json({ error: 'Permission denied' });
+
+    db.run(
+      'UPDATE community_group_notes SET is_archived = ? WHERE id = ?',
+      [is_archived ? 1 : 0, noteId],
+      (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to update note' });
+        res.json({ success: true });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Duplicate note
+router.post('/community-groups/notes/:noteId/duplicate', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const noteId = req.params.noteId;
+
+  try {
+    const note = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM community_group_notes WHERE id = ?', [noteId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const member = await requireGroupMember(db, note.group_id, userId);
+    if (!member) return res.status(403).json({ error: 'Permission denied' });
+
+    db.run(
+      `INSERT INTO community_group_notes (group_id, title, content_md, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now', '+5 hours', '+30 minutes'), datetime('now', '+5 hours', '+30 minutes'))`,
+      [note.group_id, note.title + ' (Copy)', note.content_md, userId, userId],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to duplicate note' });
+        res.json({ success: true, noteId: this.lastID });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete note
+router.delete('/community-groups/notes/:noteId', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const noteId = req.params.noteId;
+
+  try {
+    const note = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM community_group_notes WHERE id = ?', [noteId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+
+    const member = await requireGroupMember(db, note.group_id, userId);
+    if (!member) return res.status(403).json({ error: 'Permission denied' });
+
+    // Delete note versions first
+    db.run('DELETE FROM community_group_note_versions WHERE note_id = ?', [noteId]);
+    
+    // Delete the note
+    db.run('DELETE FROM community_group_notes WHERE id = ?', [noteId], (err) => {
+      if (err) return res.status(500).json({ error: 'Failed to delete note' });
+      res.json({ success: true });
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 router.get('/community-groups/notes/:noteId/versions', authMiddleware, (req, res) => {

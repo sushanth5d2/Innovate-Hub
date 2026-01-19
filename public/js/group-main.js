@@ -196,7 +196,7 @@ function setupTabs() {
 
         // Load content for specific tabs
         if (tabId === 'todo-tab') {
-          await todoBoard.loadTasks();
+          await todoBoard.loadTasks(true); // true = show board view by default
         } else if (tabId === 'notes-tab') {
           await notesEditor.loadNotes();
         } else if (tabId === 'links-tab') {
@@ -255,6 +255,16 @@ async function loadGroupChat() {
   }
 }
 
+// Linkify URLs in text
+function linkifyText(text, isOwnMessage = false) {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const linkColor = isOwnMessage ? '#ffffff' : '#00d4ff'; // Pure white for sent messages, cyan for received
+  return text.replace(urlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: ${linkColor}; text-decoration: underline; font-weight: 700; word-break: break-all; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">${url}</a>`;
+  });
+}
+
 // Render a chat message
 function renderChatMessage(msg) {
   const currentUser = InnovateAPI.getCurrentUser();
@@ -280,7 +290,7 @@ function renderChatMessage(msg) {
   return `
     <div class="ig-message ig-message-${alignClass}" style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''}">
       ${!isOwn ? `<div style="font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ig-secondary-text);">${msg.username}</div>` : ''}
-      ${msg.content ? `<div>${msg.content}</div>` : ''}
+      ${msg.content ? `<div style="word-wrap: break-word;">${linkifyText(msg.content, isOwn)}</div>` : ''}
       ${attachmentsHTML}
       <div class="ig-message-time" style="font-size: 11px; margin-top: 4px; opacity: 0.7;">
         ${InnovateAPI.formatDate(msg.created_at)}
