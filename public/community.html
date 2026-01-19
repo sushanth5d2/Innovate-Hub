@@ -1928,27 +1928,18 @@
       await loadGroups();
       console.log('Groups loaded, count:', state.groups.length);
       
-      // If groupId in URL or last selected group, auto-select it
+      // Always start with Announcements tab on page load/refresh
+      // Clear any groupId from URL to start fresh
       if (groupIdFromUrl) {
-        console.log('=== AUTO-SELECTING GROUP ===');
-        console.log('Auto-selecting group from URL:', groupIdFromUrl);
-        
-        // Switch to Groups tab FIRST
-        console.log('Step 1: Switching to groups tab');
-        switchLeftTab('groups');
-        
-        // Wait a bit for tab switch to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        console.log('Step 2: Tab switch complete, now selecting group');
-        
-        // Select the group
-        await selectGroup(parseInt(groupIdFromUrl));
-        console.log('Step 3: Group selection complete');
-      } else {
-        console.log('No groupId in URL, showing announcements');
-        // Show announcements by default (Announcements tab is active)
-        await loadAnnouncements();
+        console.log('Clearing groupId from URL to start fresh');
+        const url = new URL(window.location);
+        url.searchParams.delete('groupId');
+        window.history.replaceState({}, '', url);
       }
+      
+      console.log('Starting with Announcements tab (default)');
+      // Show announcements by default (Announcements tab is already active)
+      await loadAnnouncements();
 
       setupSocketListeners();
       setupResponsive();
@@ -2874,6 +2865,9 @@
           </button>
         `;
         centerFooter.style.display = 'block';
+        
+        // Clear current group selection when switching to Groups tab
+        state.currentGroupId = null;
         
         // Load groups
         renderGroupsList();
