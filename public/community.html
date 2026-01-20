@@ -1521,9 +1521,14 @@
         grid-template-columns: 1fr;
       }
       .community-left {
+        display: flex !important;
+        position: relative;
+        z-index: 1;
+      }
+      .community-center {
         display: none;
       }
-      .community-left.mobile-active {
+      .community-center.mobile-active {
         display: flex;
         position: fixed;
         top: 0;
@@ -1531,6 +1536,28 @@
         right: 0;
         bottom: 0;
         z-index: 1000;
+      }
+      .community-right {
+        display: none;
+      }
+      .community-right.mobile-active {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        background: var(--ig-primary-background);
+      }
+      .community-right.mobile-active .mobile-close-btn {
+        display: block !important;
+      }
+      .mobile-back-btn {
+        display: none !important;
+      }
+      .community-center.mobile-active .mobile-back-btn {
+        display: flex !important;
       }
     }
 
@@ -1942,8 +1969,8 @@
             <button onclick="window.location.href='/communities'" style="width: 40px; height: 40px; border-radius: 10px; background: var(--ig-blue); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; font-size: 18px; box-shadow: 0 2px 4px rgba(0, 149, 246, 0.3);" onmouseover="this.style.background='#0081d5'" onmouseout="this.style.background='var(--ig-blue)'" title="Back to Communities">
               <i class="fas fa-arrow-left"></i>
             </button>
-            <img id="leftHeaderAvatar" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border); flex-shrink: 0; display: none;">
-            <div style="flex: 1; min-width: 0;">
+            <img id="leftHeaderAvatar" src="" onclick="toggleRightSidebar()" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border); flex-shrink: 0; display: none; cursor: pointer;">
+            <div style="flex: 1; min-width: 0; cursor: pointer;" onclick="toggleRightSidebar()">
               <div class="community-title">
                 <span id="communityName">Loading...</span>
               </div>
@@ -1975,11 +2002,11 @@
     </div>
 
     <!-- CENTER PANEL -->
-    <div class="community-center">
+    <div class="community-center" id="communityCenter">
       <div class="center-header">
         <div class="header-left">
-          <button class="ws-icon-btn" onclick="toggleLeftSidebar()" style="margin-right: 8px; display: none;" id="menuBtn">
-            <i class="fas fa-bars"></i>
+          <button class="ws-icon-btn mobile-back-btn" onclick="toggleLeftSidebar()" style="margin-right: 8px; display: none;" id="menuBtn">
+            <i class="fas fa-arrow-left"></i>
           </button>
           <img id="centerHeaderAvatar" src="" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border); margin-right: 8px; display: none;">
           <div>
@@ -2009,6 +2036,11 @@
 
     <!-- RIGHT SIDEBAR -->
     <div class="community-right" id="communityRight">
+      <!-- Mobile Close Button -->
+      <button onclick="toggleRightSidebar()" style="display: none; position: fixed; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); color: var(--ig-primary-text); font-size: 20px; cursor: pointer; z-index: 10;" class="mobile-close-btn">
+        <i class="fas fa-times"></i>
+      </button>
+      
       <div class="right-header">
         <div class="right-avatar" id="rightAvatar">
           <i class="fas fa-users"></i>
@@ -3016,13 +3048,22 @@
         </div>
       `).join('');
       
-      // Show first announcement by default
+      // Show first announcement by default (but NOT on mobile to keep list view)
       if (announcements.length > 0 && !state.currentAnnouncementId) {
-        viewAnnouncement(announcements[0].id);
+        // Only auto-show first announcement on desktop (width > 768px)
+        if (window.innerWidth > 768) {
+          viewAnnouncement(announcements[0].id);
+        }
       }
     }
     
     function viewAnnouncement(announcementId) {
+      // Show center panel on mobile when announcement is selected
+      const centerPanel = document.getElementById('communityCenter');
+      if (window.innerWidth <= 768 && centerPanel) {
+        centerPanel.classList.add('mobile-active');
+      }
+      
       state.currentAnnouncementId = announcementId;
       const centerContent = document.getElementById('centerContent');
       
@@ -3232,7 +3273,6 @@
       document.querySelectorAll('.left-tab').forEach(t => t.classList.remove('active'));
       
       // Add active class to the clicked tab
-      // When called programmatically (no event), find the tab by matching the onclick attribute
       const clickedTab = event?.target || document.querySelector(`.left-tab[onclick*="'${tab}'"]`);
       console.log('clickedTab element:', clickedTab);
       
@@ -3343,6 +3383,12 @@
     // ==================== GROUP SELECTION ====================
     async function selectGroup(groupId) {
       console.log('selectGroup called with groupId:', groupId);
+      
+      // Show center panel on mobile when group is selected
+      const centerPanel = document.getElementById('communityCenter');
+      if (window.innerWidth <= 768 && centerPanel) {
+        centerPanel.classList.add('mobile-active');
+      }
       
       // Leave previous room if switching groups
       if (state.currentGroupId && state.currentGroupId != groupId && state.socket) {
@@ -6885,7 +6931,17 @@
     }
 
     function toggleLeftSidebar() {
-      document.getElementById('communityLeft').classList.toggle('mobile-active');
+      const centerPanel = document.getElementById('communityCenter');
+      if (window.innerWidth <= 768 && centerPanel) {
+        centerPanel.classList.toggle('mobile-active');
+      }
+    }
+
+    function toggleRightSidebar() {
+      const rightSidebar = document.getElementById('communityRight');
+      if (rightSidebar) {
+        rightSidebar.classList.toggle('mobile-active');
+      }
     }
 
     // Theme toggle function
