@@ -46,7 +46,7 @@ router.post('/register', upload.single('profile_picture'), async (req, res) => {
       // Handle profile picture
       let profilePicture = null;
       if (req.file) {
-        profilePicture = `/uploads/images/${req.file.filename}`;
+        profilePicture = `/uploads/profiles/${req.file.filename}`;
       }
 
       // Create user with all fields

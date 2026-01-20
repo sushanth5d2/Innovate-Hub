@@ -15,15 +15,32 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = './uploads/files';
     
-    // Check path-specific routes first (before generic image check)
-    if (req.path.includes('profile')) {
+    // Log for debugging
+    console.log('Upload middleware - req.path:', req.path);
+    console.log('Upload middleware - req.originalUrl:', req.originalUrl);
+    console.log('Upload middleware - fieldname:', file.fieldname);
+    
+    // Check by field name first (most reliable)
+    if (file.fieldname === 'profile_picture') {
       uploadPath = './uploads/profiles';
-    } else if (req.path.includes('communit')) { // matches both 'community' and 'communities'
+      console.log('Using profiles folder (from fieldname)');
+    } else if (file.fieldname === 'banner') {
       uploadPath = './uploads/community';
+      console.log('Using community folder (from fieldname)');
+    }
+    // Then check path-specific routes
+    else if (req.path.includes('profile') || req.originalUrl.includes('profile')) {
+      uploadPath = './uploads/profiles';
+      console.log('Using profiles folder (from path)');
+    } else if (req.path.includes('communit') || req.originalUrl.includes('communit')) { // matches both 'community' and 'communities'
+      uploadPath = './uploads/community';
+      console.log('Using community folder (from path)');
     } else if (file.mimetype.startsWith('image/')) {
       uploadPath = './uploads/images';
+      console.log('Using images folder (generic)');
     }
     
+    console.log('Final upload path:', uploadPath);
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {

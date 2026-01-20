@@ -2055,8 +2055,13 @@
           if (res.community.banner_image && res.community.banner_image.trim() !== '') {
             // Only try to load if it's a valid path
             const imgSrc = res.community.banner_image.startsWith('/') ? res.community.banner_image : `/uploads/community/${res.community.banner_image}`;
-            rightAvatar.innerHTML = `<img src="${imgSrc}" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-users\\'></i>'" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+            console.log('Loading community banner from:', imgSrc);
+            rightAvatar.innerHTML = `<img src="${imgSrc}" 
+              onerror="console.error('Failed to load banner:', this.src); this.parentElement.innerHTML='<i class=\\'fas fa-users\\'></i>'" 
+              onload="console.log('Banner loaded successfully:', this.src)"
+              style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
           } else {
+            console.log('No banner image, using default icon');
             rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
           }
           
@@ -5690,6 +5695,7 @@
         
         if (communityBannerBlob) {
           formData.append('banner', communityBannerBlob, 'banner.jpg');
+          console.log('Uploading banner with form data');
         }
 
         const res = await fetch(`${InnovateAPI.API_URL}/communities/${state.communityId}`, {
@@ -5701,13 +5707,23 @@
         });
 
         const data = await res.json();
+        console.log('Update response:', data);
+        
         if (data.success) {
+          // If banner was updated, update state immediately
+          if (data.banner_image) {
+            console.log('New banner path:', data.banner_image);
+            state.community.banner_image = data.banner_image;
+          }
+          
           InnovateAPI.showAlert('Community profile updated!', 'success');
           document.querySelector('.ig-modal-overlay').remove();
           communityBannerBlob = null;
+          
+          // Reload community data to reflect changes
           await loadCommunityData();
         } else {
-          throw new Error(data.error);
+          throw new Error(data.error || 'Failed to update');
         }
       } catch (error) {
         InnovateAPI.showAlert(error.message || 'Failed to update community', 'error');

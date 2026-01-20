@@ -8,6 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <title>Sign up • Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body {
       background-color: var(--ig-primary-background);
@@ -174,26 +176,118 @@
 
   <script src="/js/app.js?v=20251209001"></script>
   <script src="/js/instagram-theme.js?v=20251209001"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
   <script>
     // Clear any old cached code
-    console.log('Register page loaded - Version 20251209001');
+    console.log('Register page loaded - Version 20260120');
     
-    let selectedPhoto = null;
+    let selectedPhotoBlob = null;
+    let photoCropper = null;
 
-    // Profile photo preview
+    // Profile photo selection with cropper
     document.getElementById('profilePhoto').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
-        selectedPhoto = file;
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Image size should be less than 5MB');
+          return;
+        }
+        showPhotoCropper(file);
+      }
+    });
+    
+    function showPhotoCropper(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const modal = document.createElement('div');
+        modal.id = 'photo-cropper-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 10001; display: flex; flex-direction: column;';
+        
+        modal.innerHTML = `
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: space-between;">
+            <button onclick="closePhotoCropper()" style="background: none; border: none; color: var(--ig-primary-text); font-size: 16px; cursor: pointer; font-weight: 600;">Cancel</button>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Adjust Profile Photo</h3>
+            <button onclick="uploadCroppedPhoto()" style="background: none; border: none; color: var(--ig-blue); font-size: 16px; cursor: pointer; font-weight: 600;">Done</button>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+            <div style="max-width: 100%; max-height: 100%;">
+              <img id="photo-crop-image" src="${e.target.result}" style="max-width: 100%; max-height: calc(100vh - 150px); display: block;">
+            </div>
+          </div>
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="photoCropper.rotate(-90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="photoCropper.rotate(90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="photoCropper.scaleX(-photoCropper.getData().scaleX || -1)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-arrows-alt-h"></i> Flip
+            </button>
+            <button onclick="photoCropper.reset()" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-sync"></i> Reset
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const image = document.getElementById('photo-crop-image');
+        photoCropper = new Cropper(image, {
+          aspectRatio: 1,
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: false,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function closePhotoCropper() {
+      const modal = document.getElementById('photo-cropper-modal');
+      if (modal) {
+        if (photoCropper) {
+          photoCropper.destroy();
+          photoCropper = null;
+        }
+        modal.remove();
+      }
+    }
+    window.closePhotoCropper = closePhotoCropper;
+    
+    function uploadCroppedPhoto() {
+      if (!photoCropper) return;
+      
+      const canvas = photoCropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+      
+      canvas.toBlob((blob) => {
+        selectedPhotoBlob = blob;
+        closePhotoCropper();
+        
+        // Show preview
         const reader = new FileReader();
         reader.onload = (e) => {
           document.getElementById('profilePhotoPreview').innerHTML = `
             <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
           `;
         };
-        reader.readAsDataURL(file);
-      }
-    });
+        reader.readAsDataURL(blob);
+        
+        alert('Photo ready! Complete the form to sign up.');
+      }, 'image/jpeg', 0.9);
+    }
+    window.uploadCroppedPhoto = uploadCroppedPhoto;
 
     // Set max date for date of birth (must be at least 13 years old)
     const today = new Date();
@@ -216,8 +310,8 @@
       formData.append('date_of_birth', dateOfBirth);
       formData.append('password', password);
       
-      if (selectedPhoto) {
-        formData.append('profile_picture', selectedPhoto);
+      if (selectedPhotoBlob) {
+        formData.append('profile_picture', selectedPhotoBlob, 'profile.jpg');
       }
       
       try {
