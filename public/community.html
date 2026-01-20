@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="/css/workspace.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <!-- E2E Encryption Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <style>
     /* WhatsApp Community Complete Styles */
@@ -2050,8 +2052,10 @@
           
           // Update community avatar/banner
           const rightAvatar = document.getElementById('rightAvatar');
-          if (res.community.banner_image) {
-            rightAvatar.innerHTML = `<img src="${res.community.banner_image}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+          if (res.community.banner_image && res.community.banner_image.trim() !== '') {
+            // Only try to load if it's a valid path
+            const imgSrc = res.community.banner_image.startsWith('/') ? res.community.banner_image : `/uploads/community/${res.community.banner_image}`;
+            rightAvatar.innerHTML = `<img src="${imgSrc}" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-users\\'></i>'" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
           } else {
             rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
           }
@@ -5511,6 +5515,11 @@
     
     // Edit Community Profile
     function editCommunityProfile() {
+      const currentBanner = state.community.banner_image || '';
+      const bannerSrc = currentBanner && currentBanner.trim() !== '' 
+        ? (currentBanner.startsWith('/') ? currentBanner : `/uploads/community/${currentBanner}`)
+        : '';
+      
       const modal = document.createElement('div');
       modal.className = 'ig-modal-overlay';
       modal.innerHTML = `
@@ -5532,10 +5541,14 @@
             </div>
             
             <div style="margin-bottom: 20px;">
-              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Community Banner</label>
-              <input type="file" id="editCommunityBanner" accept="image/*"
-                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
-              <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Recommended: 1500x500px</div>
+              <label style="display: block; font-weight: 600; margin-bottom: 12px;">Community Profile Picture</label>
+              ${bannerSrc ? `<div style="position: relative; margin-bottom: 12px; display: flex; justify-content: center;">
+                <img src="${bannerSrc}" onerror="this.style.display='none'" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid var(--ig-border);">
+              </div>` : ''}
+              <button type="button" onclick="selectCommunityBanner()" style="width: 100%; padding: 14px; border: 2px dashed var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-blue); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600;">
+                <i class="fas fa-camera"></i> ${bannerSrc ? 'Change Profile Picture' : 'Upload Profile Picture'}
+              </button>
+              <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Circular profile image. You can adjust the position after uploading.</div>
             </div>
             
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -5554,10 +5567,116 @@
       document.body.appendChild(modal);
     }
 
+    let communityBannerBlob = null;
+    
+    function selectCommunityBanner() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            InnovateAPI.showAlert('Image size should be less than 5MB', 'error');
+            return;
+          }
+          showCommunityBannerCropper(file);
+        }
+      };
+      input.click();
+    }
+    window.selectCommunityBanner = selectCommunityBanner;
+
+    let bannerCropper = null;
+
+    function showCommunityBannerCropper(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const cropperModal = document.createElement('div');
+        cropperModal.id = 'banner-cropper-modal';
+        cropperModal.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 10001; display: flex; flex-direction: column;`;
+        
+        cropperModal.innerHTML = `
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: space-between;">
+            <button onclick="closeBannerCropper()" style="background: none; border: none; color: var(--ig-primary-text); font-size: 16px; cursor: pointer; font-weight: 600;">Cancel</button>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Adjust Profile Photo</h3>
+            <button onclick="uploadCroppedBanner()" style="background: none; border: none; color: var(--ig-blue); font-size: 16px; cursor: pointer; font-weight: 600;">Done</button>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+            <div style="max-width: 100%; max-height: 100%;">
+              <img id="banner-crop-image" src="${e.target.result}" style="max-width: 100%; max-height: calc(100vh - 150px); display: block;">
+            </div>
+          </div>
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="bannerCropper.rotate(-90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="bannerCropper.rotate(90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="bannerCropper.scaleX(-bannerCropper.getData().scaleX || -1)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-arrows-alt-h"></i> Flip
+            </button>
+            <button onclick="bannerCropper.reset()" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-sync"></i> Reset
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(cropperModal);
+        
+        const image = document.getElementById('banner-crop-image');
+        bannerCropper = new Cropper(image, {
+          aspectRatio: 1,
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: false,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function closeBannerCropper() {
+      const modal = document.getElementById('banner-cropper-modal');
+      if (modal) {
+        if (bannerCropper) {
+          bannerCropper.destroy();
+          bannerCropper = null;
+        }
+        modal.remove();
+      }
+    }
+    window.closeBannerCropper = closeBannerCropper;
+    window.closeBannerCropper = closeBannerCropper;
+
+    function uploadCroppedBanner() {
+      if (!bannerCropper) return;
+      
+      const canvas = bannerCropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+      
+      canvas.toBlob((blob) => {
+        communityBannerBlob = blob;
+        closeBannerCropper();
+        InnovateAPI.showAlert('Profile photo ready! Click "Save Changes" to update.', 'success');
+      }, 'image/jpeg', 0.9);
+    }
+    window.uploadCroppedBanner = uploadCroppedBanner;
+    window.uploadCroppedBanner = uploadCroppedBanner;
+
     async function saveCommunityProfile() {
       const name = document.getElementById('editCommunityName').value.trim();
       const description = document.getElementById('editCommunityDesc').value.trim();
-      const bannerInput = document.getElementById('editCommunityBanner');
       
       if (!name) {
         InnovateAPI.showAlert('Community name is required', 'error');
@@ -5569,8 +5688,8 @@
         formData.append('name', name);
         formData.append('description', description);
         
-        if (bannerInput.files[0]) {
-          formData.append('banner', bannerInput.files[0]);
+        if (communityBannerBlob) {
+          formData.append('banner', communityBannerBlob, 'banner.jpg');
         }
 
         const res = await fetch(`${InnovateAPI.API_URL}/communities/${state.communityId}`, {
@@ -5585,6 +5704,7 @@
         if (data.success) {
           InnovateAPI.showAlert('Community profile updated!', 'success');
           document.querySelector('.ig-modal-overlay').remove();
+          communityBannerBlob = null;
           await loadCommunityData();
         } else {
           throw new Error(data.error);
@@ -5593,6 +5713,7 @@
         InnovateAPI.showAlert(error.message || 'Failed to update community', 'error');
       }
     }
+    window.saveCommunityProfile = saveCommunityProfile;
 
     // Add Members
     function addMembers() {

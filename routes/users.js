@@ -148,6 +148,29 @@ router.get('/:userId/following', authMiddleware, (req, res) => {
   });
 });
 
+// Update profile picture only
+router.post('/profile-picture', authMiddleware, upload.single('profile_picture'), (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const profile_picture = `/uploads/profiles/${req.file.filename}`;
+
+  db.run(
+    'UPDATE users SET profile_picture = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [profile_picture, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error updating profile picture' });
+      }
+      res.json({ success: true, profile_picture });
+    }
+  );
+});
+
 // Update profile
 router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => {
   const db = getDb();

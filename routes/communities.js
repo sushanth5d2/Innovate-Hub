@@ -785,7 +785,7 @@ router.put('/:id', authMiddleware, upload.single('banner'), async (req, res) => 
       }
       if (req.file) {
         updateQuery += ', banner_image = ?';
-        params.push(`/uploads/${req.file.filename}`);
+        params.push(`/uploads/community/${req.file.filename}`);
       }
 
       updateQuery += ' WHERE id = ?';
@@ -795,7 +795,13 @@ router.put('/:id', authMiddleware, upload.single('banner'), async (req, res) => 
         if (err) {
           return res.status(500).json({ error: 'Error updating community' });
         }
-        res.json({ success: true });
+        
+        // Return the updated banner_image path if file was uploaded
+        const response = { success: true };
+        if (req.file) {
+          response.banner_image = `/uploads/community/${req.file.filename}`;
+        }
+        res.json(response);
       });
     }
   );

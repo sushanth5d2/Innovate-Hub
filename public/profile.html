@@ -6,6 +6,7 @@
   <title>Profile - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <style>
     /* Instagram Profile Specific Styles */
     body {
@@ -483,8 +484,15 @@
       </div>
       <div style="padding: 20px;">
         <div style="text-align: center; margin-bottom: 24px;">
-          <img id="edit-avatar" src="" alt="Avatar" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 12px;">
-          <div style="color: var(--ig-blue); font-size: 14px; font-weight: 600; cursor: pointer;" onclick="changePhoto()">Change Photo</div>
+          <div style="position: relative; display: inline-block; margin-bottom: 12px;">
+            <img id="edit-avatar" src="" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--ig-border);">
+            <button onclick="changePhoto()" style="position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--ig-blue); border: 3px solid var(--ig-primary-background); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+              <i class="fas fa-camera" style="font-size: 14px;"></i>
+            </button>
+          </div>
+          <div style="color: var(--ig-blue); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="changePhoto()">
+            <i class="fas fa-image"></i> Change Profile Photo
+          </div>
         </div>
         
         <div style="margin-bottom: 16px;">
@@ -878,12 +886,185 @@
     }
 
     function changePhoto() {
-      alert('Photo upload functionality would open here');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          // Check file size (max 5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            alert('Image size should be less than 5MB');
+            return;
+          }
+          showImageCropper(file);
+        }
+      };
+      input.click();
+    }
+
+    let cropper = null;
+
+    function showImageCropper(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'cropper-modal';
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.9);
+          z-index: 10000;
+          display: flex;
+          flex-direction: column;
+        `;
+        
+        modal.innerHTML = `
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: space-between;">
+            <button onclick="closeCropper()" style="background: none; border: none; color: var(--ig-primary-text); font-size: 16px; cursor: pointer; font-weight: 600;">Cancel</button>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Adjust Profile Photo</h3>
+            <button onclick="uploadCroppedImage()" style="background: none; border: none; color: var(--ig-blue); font-size: 16px; cursor: pointer; font-weight: 600;">Done</button>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+            <div style="max-width: 100%; max-height: 100%; position: relative;">
+              <img id="crop-image" src="${e.target.result}" style="max-width: 100%; max-height: calc(100vh - 150px); display: block;">
+            </div>
+          </div>
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <button onclick="rotateCropper(-90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="rotateCropper(90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="flipCropper('horizontal')" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-arrows-alt-h"></i> Flip
+            </button>
+            <button onclick="resetCropper()" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-sync"></i> Reset
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Initialize Cropper.js
+        const image = document.getElementById('crop-image');
+        cropper = new Cropper(image, {
+          aspectRatio: 1,
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: false,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+          toggleDragModeOnDblclick: false,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function closeCropper() {
+      const modal = document.getElementById('cropper-modal');
+      if (modal) {
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        modal.remove();
+      }
+    }
+
+    function rotateCropper(degree) {
+      if (cropper) {
+        cropper.rotate(degree);
+      }
+    }
+
+    function flipCropper(direction) {
+      if (cropper) {
+        if (direction === 'horizontal') {
+          cropper.scaleX(-cropper.getData().scaleX || -1);
+        } else {
+          cropper.scaleY(-cropper.getData().scaleY || -1);
+        }
+      }
+    }
+
+    function resetCropper() {
+      if (cropper) {
+        cropper.reset();
+      }
+    }
+
+    async function uploadCroppedImage() {
+      if (!cropper) return;
+      
+      // Show loading
+      const doneBtn = event.target;
+      doneBtn.disabled = true;
+      doneBtn.textContent = 'Uploading...';
+      
+      try {
+        // Get cropped canvas
+        const canvas = cropper.getCroppedCanvas({
+          width: 400,
+          height: 400,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high',
+        });
+        
+        // Convert to blob
+        canvas.toBlob(async (blob) => {
+          const formData = new FormData();
+          formData.append('profile_picture', blob, 'profile.jpg');
+          
+          const response = await fetch('/api/users/profile-picture', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to upload photo');
+          }
+          
+          const data = await response.json();
+          
+          // Update UI
+          document.getElementById('profile-picture').src = data.profile_picture;
+          document.getElementById('edit-avatar').src = data.profile_picture;
+          
+          // Update stored user data
+          const user = JSON.parse(localStorage.getItem('user'));
+          user.profile_picture = data.profile_picture;
+          localStorage.setItem('user', JSON.stringify(user));
+          
+          closeCropper();
+          alert('Profile photo updated successfully!');
+        }, 'image/jpeg', 0.9);
+        
+      } catch (error) {
+        console.error('Error uploading photo:', error);
+        alert('Failed to upload photo. Please try again.');
+        doneBtn.disabled = false;
+        doneBtn.textContent = 'Done';
+      }
     }
 
     // Initialize
     loadProfile();
     loadPosts();
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </body>
 </html>
