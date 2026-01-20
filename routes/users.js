@@ -319,4 +319,22 @@ router.get('/blocked/list', authMiddleware, (req, res) => {
   });
 });
 
+// Toggle online status
+router.put('/online-status', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { is_online } = req.body;
+
+  db.run(
+    'UPDATE users SET is_online = ? WHERE id = ?',
+    [is_online ? 1 : 0, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error updating online status' });
+      }
+      res.json({ success: true, is_online: is_online ? 1 : 0 });
+    }
+  );
+});
+
 module.exports = router;

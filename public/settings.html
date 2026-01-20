@@ -234,7 +234,7 @@
     }
 
     // Load settings
-    function loadSettings() {
+    async function loadSettings() {
       // Theme
       const currentTheme = igTheme.getTheme();
       const themeToggle = document.getElementById('themeToggle');
@@ -248,10 +248,19 @@
         document.getElementById('crosspathToggle').classList.add('active');
       }
 
-      // Online status
-      const onlineStatus = localStorage.getItem('show_online_status') !== 'false';
-      if (onlineStatus) {
-        document.getElementById('onlineStatusToggle').classList.add('active');
+      // Online status - fetch from server
+      try {
+        const userData = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        if (userData.user.is_online) {
+          document.getElementById('onlineStatusToggle').classList.add('active');
+        }
+      } catch (error) {
+        console.error('Error loading online status:', error);
+        // Fallback to localStorage
+        const onlineStatus = localStorage.getItem('show_online_status') !== 'false';
+        if (onlineStatus) {
+          document.getElementById('onlineStatusToggle').classList.add('active');
+        }
       }
 
       // Notifications
@@ -297,10 +306,10 @@
       const isEnabled = toggle.classList.contains('active');
       
       try {
-        await InnovateAPI.apiRequest('/users/settings', {
+        await InnovateAPI.apiRequest('/users/online-status', {
           method: 'PUT',
           body: JSON.stringify({
-            show_online_status: !isEnabled
+            is_online: !isEnabled
           })
         });
         
@@ -308,7 +317,8 @@
         localStorage.setItem('show_online_status', !isEnabled);
         InnovateAPI.showAlert(`Online status ${!isEnabled ? 'visible' : 'hidden'}`, 'success');
       } catch (error) {
-        InnovateAPI.showAlert(error.message, 'error');
+        console.error('Error toggling online status:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to update online status', 'error');
       }
     }
 

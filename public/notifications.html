@@ -255,11 +255,19 @@
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined the same event as you!`;
       } else if (notification.type === 'community_join') {
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined your community.`;
+      } else if (notification.type === 'community_invite') {
+        notificationText = `You've been invited to join <span class="ig-notification-username">${notification.content.replace("You've been invited to join ", "")}</span>`;
+        actionButton = `
+          <div class="ig-notification-action" style="display: flex; gap: 8px;">
+            <button class="ig-follow-btn" onclick="acceptCommunityInvite(${notification.related_id}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px;">Accept</button>
+            <button class="ig-following-btn" onclick="rejectCommunityInvite(${notification.id}, event)" style="padding: 7px 14px; font-size: 13px;">Reject</button>
+          </div>
+        `;
       }
       
       div.innerHTML = `
-        <img src="${avatar}" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href='/profile/${notification.sender_id}'">
-        <div class="ig-notification-content" onclick="handleNotificationClick(${notification.id}, '${notification.type}', ${notification.reference_id || 'null'})">
+        <img src="${avatar}" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href='/profile/${notification.sender_id || user.id}'">
+        <div class="ig-notification-content" onclick="handleNotificationClick(${notification.id}, '${notification.type}', ${notification.related_id || 'null'})">
           <div class="ig-notification-text">${notificationText}</div>
           <div class="ig-notification-time">${timeAgo}</div>
         </div>
@@ -296,6 +304,8 @@
         
         if (type === 'message') {
           window.location.href = '/messages';
+        } else if (type === 'community_invite' && referenceId) {
+          window.location.href = `/community/${referenceId}`;
         } else if (type === 'event_invite' && referenceId) {
           window.location.href = `/events/${referenceId}`;
         } else if (type === 'crosspath' && referenceId) {
@@ -353,6 +363,63 @@
         InnovateAPI.showAlert('All notifications marked as read', 'success');
       } catch (error) {
         console.error('Error marking all as read:', error);
+      }
+    }
+
+    // Accept community invitation
+    async function acceptCommunityInvite(communityId, notificationId, event) {
+      event.stopPropagation();
+      const actionDiv = event.target.closest('.ig-notification-action');
+      try {
+        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/accept-invite`, {
+          method: 'POST'
+        });
+        
+        if (response.success) {
+          // Replace buttons with success message
+          actionDiv.innerHTML = `
+            <div style="color: var(--ig-blue); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-check-circle"></i>
+              Accepted
+            </div>
+          `;
+          InnovateAPI.showAlert('You joined the community!', 'success');
+          // Mark notification as read
+          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
+            method: 'PUT'
+          });
+        }
+      } catch (error) {
+        console.error('Error accepting invite:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to accept invitation', 'error');
+      }
+    }
+
+    // Reject community invitation
+    async function rejectCommunityInvite(notificationId, event) {
+      event.stopPropagation();
+      const actionDiv = event.target.closest('.ig-notification-action');
+      try {
+        // Replace buttons with declined message
+        actionDiv.innerHTML = `
+          <div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-times-circle"></i>
+            Declined
+          </div>
+        `;
+        
+        // Just mark the notification as read (delete it) after a short delay
+        setTimeout(async () => {
+          await InnovateAPI.apiRequest(`/notifications/${notificationId}`, {
+            method: 'DELETE'
+          });
+          loadNotifications();
+        }, 1500);
+        
+        InnovateAPI.showAlert('Invitation declined', 'success');
+      } catch (error) {
+        console.error('Error rejecting invite:', error);
+        InnovateAPI.showAlert('Failed to decline invitation', 'error');
       }
     }
 

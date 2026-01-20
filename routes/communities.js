@@ -1077,6 +1077,53 @@ router.delete('/:id/announcements/clear', authMiddleware, (req, res) => {
   );
 });
 
+// Accept community invitation
+router.post('/:id/accept-invite', authMiddleware, (req, res) => {
+  const db = getDb();
+  const communityId = req.params.id;
+  const userId = req.user.userId;
+
+  // Check if community exists
+  db.get('SELECT * FROM communities WHERE id = ?', [communityId], (err, community) => {
+    if (err || !community) {
+      return res.status(404).json({ error: 'Community not found' });
+    }
+
+    // Check if user is already a member
+    db.get(
+      'SELECT * FROM community_members WHERE community_id = ? AND user_id = ?',
+      [communityId, userId],
+      (err, member) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+        if (member) {
+          return res.status(400).json({ error: 'Already a member of this community' });
+        }
+
+        // Add user to community
+        db.run(
+          'INSERT INTO community_members (community_id, user_id, role) VALUES (?, ?, ?)',
+          [communityId, userId, 'member'],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error joining community' });
+            }
+
+            // Notify the admin that user accepted
+            db.run(
+              'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+              [community.admin_id, 'community_join', 'accepted your invitation and joined', communityId]
+            );
+
+            res.json({ success: true, message: 'Successfully joined the community' });
+          }
+        );
+      }
+    );
+  });
+});
+
 // Invite user to community
 router.post('/:id/invite', authMiddleware, (req, res) => {
   const db = getDb();
@@ -1122,6 +1169,152 @@ router.post('/:id/invite', authMiddleware, (req, res) => {
             }
 
             res.json({ success: true });
+          }
+        );
+      });
+    }
+  );
+});
+
+// Update member role (promote/demote admin)
+router.put('/:communityId/members/:userId/role', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, userId } = req.params;
+  const targetUserId = parseInt(userId);
+  const { role } = req.body; // 'admin' or 'member'
+  const currentUserId = req.user.userId;
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can change member roles' });
+      }
+
+      // Prevent changing own role
+      if (parseInt(targetUserId) === currentUserId) {
+        return res.status(400).json({ error: 'You cannot change your own role' });
+      }
+
+      // Update role
+      db.run(
+        'UPDATE community_members SET role = ? WHERE community_id = ? AND user_id = ?',
+        [role, communityId, targetUserId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error updating role' });
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).json({ error: 'Member not found' });
+          }
+
+          // Get username for notification
+          db.get('SELECT username FROM users WHERE id = ?', [targetUserId], (err, user) => {
+            if (!err && user) {
+              // Create notification
+              const message = role === 'admin' 
+                ? 'You have been promoted to admin' 
+                : 'Your admin role has been removed';
+              
+              db.run(
+                'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+                [targetUserId, 'community_role_change', message, communityId],
+                function(notifErr) {
+                  if (notifErr) {
+                    console.error('Error creating notification:', notifErr);
+                  }
+                }
+              );
+
+              // Emit socket notification
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`user_${targetUserId}`).emit('notification:receive', {
+                  type: 'community_role_change',
+                  content: message,
+                  communityId: communityId
+                });
+              }
+            }
+
+            res.json({ success: true, message: `Member ${role === 'admin' ? 'promoted to admin' : 'role updated'}` });
+          });
+        }
+      );
+    }
+  );
+});
+
+// Remove member from community
+router.delete('/:communityId/members/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, userId } = req.params;
+  const targetUserId = parseInt(userId);
+  const currentUserId = req.user.userId;
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can remove members' });
+      }
+
+      // Prevent removing yourself
+      if (parseInt(targetUserId) === currentUserId) {
+        return res.status(400).json({ error: 'Use "Leave Community" to remove yourself' });
+      }
+
+      // Get community admin info to check if we're removing the last admin
+      db.get('SELECT admin_id FROM communities WHERE id = ?', [communityId], (err, community) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error checking community' });
+        }
+
+        // Check if target is the original creator
+        if (community && parseInt(targetUserId) === community.admin_id) {
+          return res.status(400).json({ error: 'Cannot remove the community creator' });
+        }
+
+        // Remove member
+        db.run(
+          'DELETE FROM community_members WHERE community_id = ? AND user_id = ?',
+          [communityId, targetUserId],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error removing member' });
+            }
+
+            if (this.changes === 0) {
+              return res.status(404).json({ error: 'Member not found' });
+            }
+
+            // Create notification
+            db.run(
+              'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+              [targetUserId, 'community_removed', 'You have been removed from the community', communityId],
+              function(notifErr) {
+                if (notifErr) {
+                  console.error('Error creating notification:', notifErr);
+                }
+              }
+            );
+
+            // Emit socket notification
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`user_${targetUserId}`).emit('notification:receive', {
+                type: 'community_removed',
+                content: 'You have been removed from the community',
+                communityId: communityId
+              });
+            }
+
+            res.json({ success: true, message: 'Member removed successfully' });
           }
         );
       });
