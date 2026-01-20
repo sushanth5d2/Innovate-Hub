@@ -65,13 +65,14 @@ router.get('/my-communities', authMiddleware, (req, res) => {
 });
 
 // Create community
-router.post('/', authMiddleware, upload.single('banner_image'), (req, res) => {
+router.post('/', authMiddleware, upload.single('banner'), (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { name, description, team_name, is_public } = req.body;
   
   let banner_image = null;
   if (req.file) {
+    // The upload middleware will place it in uploads/community/ folder
     banner_image = `/uploads/community/${req.file.filename}`;
   }
 

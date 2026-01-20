@@ -15,16 +15,13 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = './uploads/files';
     
-    if (file.mimetype.startsWith('image/')) {
-      uploadPath = './uploads/images';
-    }
-    
+    // Check path-specific routes first (before generic image check)
     if (req.path.includes('profile')) {
       uploadPath = './uploads/profiles';
-    }
-    
-    if (req.path.includes('community')) {
+    } else if (req.path.includes('communit')) { // matches both 'community' and 'communities'
       uploadPath = './uploads/community';
+    } else if (file.mimetype.startsWith('image/')) {
+      uploadPath = './uploads/images';
     }
     
     cb(null, uploadPath);
