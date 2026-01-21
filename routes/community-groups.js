@@ -1299,4 +1299,506 @@ router.post('/community-groups/notes/:noteId/restore/:versionId', authMiddleware
   });
 });
 
+// ==================== GROUP MESSAGE EDIT ====================
+// Edit group message
+router.patch('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), (req, res) => {
+  const db = getDb();
+  const { groupId, postId } = req.params;
+  const { content } = req.body;
+  const userId = req.user.userId;
+  const attachmentFiles = req.files?.attachments || [];
+
+  // Check if user is member
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      // Check if user is the author
+      db.get('SELECT * FROM community_group_posts WHERE id = ? AND group_id = ?',
+        [postId, groupId],
+        (err, post) => {
+          if (err || !post) return res.status(404).json({ error: 'Message not found' });
+          if (post.user_id !== userId) {
+            return res.status(403).json({ error: 'You can only edit your own messages' });
+          }
+
+          // If attachments are being replaced
+          if (attachmentFiles.length > 0) {
+            const attachmentPaths = attachmentFiles.map(f => f.path.replace(/\\/g, '/'));
+            const attachmentsJSON = JSON.stringify(attachmentPaths);
+
+            // Delete old attachments from filesystem
+            if (post.attachments) {
+              try {
+                const oldAttachments = JSON.parse(post.attachments);
+                const fs = require('fs');
+                oldAttachments.forEach(oldPath => {
+                  try {
+                    if (fs.existsSync(oldPath)) {
+                      fs.unlinkSync(oldPath);
+                    }
+                  } catch (e) {
+                    console.error('Error deleting old attachment:', e);
+                  }
+                });
+              } catch (e) {
+                console.error('Error parsing old attachments:', e);
+              }
+            }
+
+            db.run(
+              'UPDATE community_group_posts SET attachments = ?, is_edited = 1, edited_at = CURRENT_TIMESTAMP WHERE id = ?',
+              [attachmentsJSON, postId],
+              function(err) {
+                if (err) return res.status(500).json({ error: 'Error updating message' });
+
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`community_group_${groupId}`).emit('message:edited', {
+                    groupId,
+                    postId,
+                    attachments: attachmentPaths,
+                    editedAt: new Date().toISOString()
+                  });
+                }
+
+                res.json({ success: true });
+              }
+            );
+          }
+          // If only text content is being updated
+          else if (content && content.trim()) {
+            db.run(
+              'UPDATE community_group_posts SET content = ?, is_edited = 1, edited_at = CURRENT_TIMESTAMP WHERE id = ?',
+              [content.trim(), postId],
+              function(err) {
+                if (err) return res.status(500).json({ error: 'Error updating message' });
+
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`community_group_${groupId}`).emit('message:edited', {
+                    groupId,
+                    postId,
+                    content: content.trim(),
+                    editedAt: new Date().toISOString()
+                  });
+                }
+
+                res.json({ success: true });
+              }
+            );
+          } else {
+            return res.status(400).json({ error: 'Content or attachments required' });
+          }
+        }
+      );
+    }
+  );
+});
+
+// ==================== GROUP MESSAGE DELETE ====================
+// Delete group message (soft delete)
+router.delete('/community-groups/:groupId/posts/:postId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, postId } = req.params;
+  const userId = req.user.userId;
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.get('SELECT * FROM community_group_posts WHERE id = ? AND group_id = ?',
+        [postId, groupId],
+        (err, post) => {
+          if (err || !post) return res.status(404).json({ error: 'Message not found' });
+
+          const isAuthor = post.user_id === userId;
+          const isAdmin = member.role === 'admin';
+
+          if (!isAuthor && !isAdmin) {
+            return res.status(403).json({ error: 'You can only delete your own messages or be admin' });
+          }
+
+          // Soft delete
+          db.run(
+            'UPDATE community_group_posts SET is_deleted = 1, content = ? WHERE id = ?',
+            ['[Message deleted]', postId],
+            function(err) {
+              if (err) return res.status(500).json({ error: 'Error deleting message' });
+
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`community_group_${groupId}`).emit('message:deleted', {
+                  groupId,
+                  postId
+                });
+              }
+
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// ==================== GROUP MESSAGE REACTIONS ====================
+// Add reaction to group message
+router.post('/community-groups/:groupId/posts/:postId/reactions', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, postId } = req.params;
+  const { reaction_type } = req.body;
+  const userId = req.user.userId;
+
+  const validReactions = ['like', 'love', 'care', 'haha', 'wow', 'sad', 'angry'];
+  if (!validReactions.includes(reaction_type)) {
+    return res.status(400).json({ error: 'Invalid reaction type' });
+  }
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.run(
+        'INSERT OR REPLACE INTO group_message_reactions (message_id, user_id, reaction_type) VALUES (?, ?, ?)',
+        [postId, userId, reaction_type],
+        function(err) {
+          if (err) return res.status(500).json({ error: 'Error adding reaction' });
+
+          db.all(
+            'SELECT reaction_type, COUNT(*) as count FROM group_message_reactions WHERE message_id = ? GROUP BY reaction_type',
+            [postId],
+            (err, reactions) => {
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`community_group_${groupId}`).emit('message:reaction', {
+                  groupId,
+                  postId,
+                  reactions: reactions || []
+                });
+              }
+              res.json({ success: true, reactions: reactions || [] });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Remove reaction from group message
+router.delete('/community-groups/:groupId/posts/:postId/reactions/:reactionType', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { postId, reactionType } = req.params;
+  const userId = req.user.userId;
+
+  db.run(
+    'DELETE FROM group_message_reactions WHERE message_id = ? AND user_id = ? AND reaction_type = ?',
+    [postId, userId, reactionType],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Error removing reaction' });
+      res.json({ success: true });
+    }
+  );
+});
+
+// Get message reactions
+router.get('/community-groups/:groupId/posts/:postId/reactions', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { postId } = req.params;
+  const userId = req.user.userId;
+
+  db.all(
+    `SELECT gmr.reaction_type, gmr.user_id, u.username, u.profile_picture,
+            (SELECT reaction_type FROM group_message_reactions WHERE message_id = ? AND user_id = ?) as user_reaction
+     FROM group_message_reactions gmr
+     JOIN users u ON gmr.user_id = u.id
+     WHERE gmr.message_id = ?
+     ORDER BY gmr.created_at DESC`,
+    [postId, userId, postId],
+    (err, reactions) => {
+      if (err) return res.status(500).json({ error: 'Error fetching reactions' });
+
+      const grouped = {};
+      reactions.forEach(r => {
+        if (!grouped[r.reaction_type]) {
+          grouped[r.reaction_type] = { count: 0, users: [] };
+        }
+        grouped[r.reaction_type].count++;
+        grouped[r.reaction_type].users.push({
+          id: r.user_id,
+          username: r.username,
+          profile_picture: r.profile_picture
+        });
+      });
+
+      const userReaction = reactions.length > 0 ? reactions[0].user_reaction : null;
+      res.json({ success: true, reactions: grouped, userReaction });
+    }
+  );
+});
+
+// ==================== GROUP POLLS ====================
+// Create poll in group
+router.post('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId } = req.params;
+  const { question, options, expiresIn } = req.body;
+  const userId = req.user.userId;
+
+  if (!question || !options || !Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ error: 'Question and at least 2 options are required' });
+  }
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      let expiresAt = null;
+      if (expiresIn) {
+        expiresAt = new Date(Date.now() + expiresIn * 60000).toISOString();
+      }
+
+      db.run(
+        'INSERT INTO group_polls (group_id, user_id, question, options, expires_at) VALUES (?, ?, ?, ?, ?)',
+        [groupId, userId, question, JSON.stringify(options), expiresAt],
+        function(err) {
+          if (err) return res.status(500).json({ error: 'Error creating poll' });
+
+          const pollId = this.lastID;
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`community_group_${groupId}`).emit('poll:created', {
+              groupId,
+              poll: {
+                id: pollId,
+                question,
+                options,
+                expiresAt
+              }
+            });
+          }
+
+          res.json({
+            success: true,
+            poll: {
+              id: pollId,
+              question,
+              options,
+              expiresAt
+            }
+          });
+        }
+      );
+    }
+  );
+});
+
+// Vote on group poll
+router.post('/community-groups/:groupId/polls/:pollId/vote', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const { optionIndex } = req.body;
+  const userId = req.user.userId;
+
+  if (typeof optionIndex !== 'number' || optionIndex < 0) {
+    return res.status(400).json({ error: 'Invalid option index' });
+  }
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?',
+        [pollId, groupId],
+        (err, poll) => {
+          if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
+
+          // Check if poll expired
+          if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
+            return res.status(400).json({ error: 'Poll has expired' });
+          }
+
+          const options = JSON.parse(poll.options);
+          if (optionIndex >= options.length) {
+            return res.status(400).json({ error: 'Invalid option index' });
+          }
+
+          db.run(
+            'INSERT OR REPLACE INTO group_poll_votes (poll_id, user_id, option_index) VALUES (?, ?, ?)',
+            [pollId, userId, optionIndex],
+            function(err) {
+              if (err) return res.status(500).json({ error: 'Error recording vote' });
+
+              // Get vote counts
+              db.all(
+                'SELECT option_index, COUNT(*) as count FROM group_poll_votes WHERE poll_id = ? GROUP BY option_index',
+                [pollId],
+                (err, votes) => {
+                  const voteCounts = new Array(options.length).fill(0);
+                  let totalVotes = 0;
+
+                  votes.forEach(v => {
+                    if (v.option_index >= 0 && v.option_index < voteCounts.length) {
+                      voteCounts[v.option_index] = v.count;
+                      totalVotes += v.count;
+                    }
+                  });
+
+                  const results = {
+                    question: poll.question,
+                    options,
+                    voteCounts,
+                    totalVotes,
+                    userVote: optionIndex,
+                    percentages: voteCounts.map(count => totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0)
+                  };
+
+                  const io = req.app.get('io');
+                  if (io) {
+                    io.to(`community_group_${groupId}`).emit('poll:voted', {
+                      groupId,
+                      pollId,
+                      results
+                    });
+                  }
+
+                  res.json({ success: true, results });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get poll results
+router.get('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const userId = req.user.userId;
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?',
+        [pollId, groupId],
+        (err, poll) => {
+          if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
+
+          const options = JSON.parse(poll.options);
+
+          // Get user's vote
+          db.get(
+            'SELECT option_index FROM group_poll_votes WHERE poll_id = ? AND user_id = ?',
+            [pollId, userId],
+            (err, userVote) => {
+              // Get all votes
+              db.all(
+                'SELECT option_index, COUNT(*) as count FROM group_poll_votes WHERE poll_id = ? GROUP BY option_index',
+                [pollId],
+                (err, votes) => {
+                  const voteCounts = new Array(options.length).fill(0);
+                  let totalVotes = 0;
+
+                  votes.forEach(v => {
+                    if (v.option_index >= 0 && v.option_index < voteCounts.length) {
+                      voteCounts[v.option_index] = v.count;
+                      totalVotes += v.count;
+                    }
+                  });
+
+                  const results = {
+                    id: poll.id,
+                    question: poll.question,
+                    options,
+                    voteCounts,
+                    totalVotes,
+                    userVote: userVote ? userVote.option_index : null,
+                    percentages: voteCounts.map(count => totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0),
+                    expiresAt: poll.expires_at,
+                    isExpired: poll.expires_at && new Date(poll.expires_at) < new Date()
+                  };
+
+                  res.json({ success: true, poll: results });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get all group polls
+router.get('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId } = req.params;
+  const userId = req.user.userId;
+
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.all(
+        `SELECT gp.*, u.username, u.profile_picture
+         FROM group_polls gp
+         JOIN users u ON gp.user_id = u.id
+         WHERE gp.group_id = ?
+         ORDER BY gp.created_at DESC`,
+        [groupId],
+        (err, polls) => {
+          if (err) return res.status(500).json({ error: 'Error fetching polls' });
+
+          // Get vote counts for each poll
+          const pollPromises = polls.map(poll => {
+            return new Promise((resolve) => {
+              db.all(
+                'SELECT option_index, COUNT(*) as count FROM group_poll_votes WHERE poll_id = ? GROUP BY option_index',
+                [poll.id],
+                (err, votes) => {
+                  const options = JSON.parse(poll.options);
+                  const voteCounts = new Array(options.length).fill(0);
+                  let totalVotes = 0;
+
+                  votes.forEach(v => {
+                    if (v.option_index >= 0 && v.option_index < voteCounts.length) {
+                      voteCounts[v.option_index] = v.count;
+                      totalVotes += v.count;
+                    }
+                  });
+
+                  resolve({
+                    ...poll,
+                    options,
+                    voteCounts,
+                    totalVotes,
+                    isExpired: poll.expires_at && new Date(poll.expires_at) < new Date()
+                  });
+                }
+              );
+            });
+          });
+
+          Promise.all(pollPromises).then(enrichedPolls => {
+            res.json({ success: true, polls: enrichedPolls });
+          });
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;

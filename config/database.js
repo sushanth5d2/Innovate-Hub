@@ -677,6 +677,33 @@ const createTables = () => {
         }
       });
 
+      // Add edited columns to community_group_posts for message editing
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN edited_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: edited_at column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN is_edited BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: is_edited column migration - ', err.message);
+        }
+      });
+
+      // Add reply_to column for message threading
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN reply_to INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: reply_to column migration - ', err.message);
+        }
+      });
+
+      // Add is_deleted column for soft delete
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN is_deleted BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: is_deleted column migration - ', err.message);
+        }
+      });
+
       // Add action buttons columns to posts
       db.run(`ALTER TABLE posts ADD COLUMN enable_contact BOOLEAN DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column')) {
@@ -762,6 +789,76 @@ const createTables = () => {
           option_index INTEGER NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(poll_id, user_id)
+        )
+      `);
+
+      // Announcement reactions table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS announcement_reactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          announcement_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          reaction_type TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (announcement_id) REFERENCES community_announcements(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(announcement_id, user_id, reaction_type)
+        )
+      `);
+
+      // Announcement comments table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS announcement_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          announcement_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          content TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (announcement_id) REFERENCES community_announcements(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Group message reactions table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS group_message_reactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          message_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          reaction_type TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (message_id) REFERENCES community_group_posts(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(message_id, user_id, reaction_type)
+        )
+      `);
+
+      // Group polls table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS group_polls (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          question TEXT NOT NULL,
+          options TEXT NOT NULL,
+          expires_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+
+      // Group poll votes table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS group_poll_votes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          poll_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          option_index INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (poll_id) REFERENCES group_polls(id) ON DELETE CASCADE,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
           UNIQUE(poll_id, user_id)
         )

@@ -91,14 +91,18 @@
     if (!dateString) return 'Unknown';
     
     // Handle SQLite datetime format: "2026-01-19 11:40:38"
-    // Parse as local time (don't add 'Z' to avoid UTC conversion)
+    // SQLite stores in UTC, so we need to explicitly handle it
     let dateStr = dateString;
-    if (dateStr.includes(' ') && !dateStr.includes('T')) {
-      dateStr = dateStr.replace(' ', 'T'); // Convert to ISO format WITHOUT timezone
+    if (dateStr.includes(' ') && !dateStr.includes('T') && !dateStr.includes('Z')) {
+      dateStr = dateStr.replace(' ', 'T') + 'Z'; // Add 'Z' to indicate UTC
     }
     
     const date = new Date(dateStr);
+    
+    // Get current time in IST (UTC+5:30)
     const now = new Date();
+    
+    // Calculate difference
     const diff = now - date;
 
     const minutes = Math.floor(diff / 60000);
@@ -110,12 +114,27 @@
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
 
-    return date.toLocaleDateString();
+    // Format date in IST timezone
+    return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
   }
 
   function formatTimestamp(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+    if (!dateString) return '';
+    
+    // Handle SQLite datetime format
+    let dateStr = dateString;
+    if (dateStr.includes(' ') && !dateStr.includes('T') && !dateStr.includes('Z')) {
+      dateStr = dateStr.replace(' ', 'T') + 'Z'; // Add 'Z' to indicate UTC
+    }
+    
+    const date = new Date(dateStr);
+    
+    // Format in IST (Asia/Kolkata timezone)
+    return date.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
   }
 
   function previewFiles(input, previewContainer) {

@@ -516,17 +516,20 @@ router.post('/:communityId/announcements', authMiddleware, upload.array('files',
 
       // Add uploaded files to attachments
       if (req.files && req.files.length > 0) {
-        // Store relative paths - frontend will construct full URL
-        // Determine correct folder based on file type (matching multer logic)
+        // Files are saved to ./uploads/community/ by multer for community/announcement routes
+        // Extract the actual path from multer's file.path
         attachmentsData.files = req.files.map(file => {
-          let folder = 'files';
-          if (file.mimetype.startsWith('image/')) {
-            folder = 'images';
+          // Use the actual path from multer, convert to URL path
+          let urlPath = file.path.replace(/\\/g, '/'); // normalize backslashes
+          if (urlPath.startsWith('uploads/')) {
+            urlPath = '/' + urlPath; // add leading slash
+          } else if (!urlPath.startsWith('/uploads/')) {
+            urlPath = '/uploads/community/' + file.filename; // fallback to community folder
           }
           
           return {
             name: file.originalname,
-            url: `/uploads/${folder}/${file.filename}`,
+            url: urlPath,
             size: `${(file.size / 1024).toFixed(1)} KB`,
             type: file.mimetype
           };
@@ -741,6 +744,203 @@ router.post('/:communityId/announcements/:announcementId/vote', authMiddleware, 
           );
         }
       );
+    }
+  );
+});
+
+// ==================== ANNOUNCEMENT REACTIONS ====================
+// Add reaction to announcement
+router.post('/:communityId/announcements/:announcementId/reactions', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, announcementId } = req.params;
+  const { reaction_type } = req.body;
+  const userId = req.user.userId;
+
+  const validReactions = ['like', 'love', 'care', 'haha', 'wow', 'sad', 'angry'];
+  if (!validReactions.includes(reaction_type)) {
+    return res.status(400).json({ error: 'Invalid reaction type' });
+  }
+
+  db.get('SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.run(
+        'INSERT OR REPLACE INTO announcement_reactions (announcement_id, user_id, reaction_type) VALUES (?, ?, ?)',
+        [announcementId, userId, reaction_type],
+        function(err) {
+          if (err) return res.status(500).json({ error: 'Error adding reaction' });
+          
+          // Get updated reaction counts
+          db.all(
+            'SELECT reaction_type, COUNT(*) as count FROM announcement_reactions WHERE announcement_id = ? GROUP BY reaction_type',
+            [announcementId],
+            (err, reactions) => {
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`community_${communityId}`).emit('announcement:reaction', {
+                  announcementId,
+                  reactions: reactions || []
+                });
+              }
+              res.json({ success: true, reactions: reactions || [] });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Remove reaction from announcement
+router.delete('/:communityId/announcements/:announcementId/reactions/:reactionType', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { announcementId, reactionType } = req.params;
+  const userId = req.user.userId;
+
+  db.run(
+    'DELETE FROM announcement_reactions WHERE announcement_id = ? AND user_id = ? AND reaction_type = ?',
+    [announcementId, userId, reactionType],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Error removing reaction' });
+      res.json({ success: true });
+    }
+  );
+});
+
+// Get announcement reactions
+router.get('/:communityId/announcements/:announcementId/reactions', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { announcementId } = req.params;
+  const userId = req.user.userId;
+
+  db.all(
+    `SELECT ar.reaction_type, ar.user_id, u.username, u.profile_picture,
+            (SELECT reaction_type FROM announcement_reactions WHERE announcement_id = ? AND user_id = ?) as user_reaction
+     FROM announcement_reactions ar
+     JOIN users u ON ar.user_id = u.id
+     WHERE ar.announcement_id = ?
+     ORDER BY ar.created_at DESC`,
+    [announcementId, userId, announcementId],
+    (err, reactions) => {
+      if (err) return res.status(500).json({ error: 'Error fetching reactions' });
+      
+      // Group by reaction type with counts
+      const grouped = {};
+      reactions.forEach(r => {
+        if (!grouped[r.reaction_type]) {
+          grouped[r.reaction_type] = { count: 0, users: [] };
+        }
+        grouped[r.reaction_type].count++;
+        grouped[r.reaction_type].users.push({
+          id: r.user_id,
+          username: r.username,
+          profile_picture: r.profile_picture
+        });
+      });
+
+      const userReaction = reactions.length > 0 ? reactions[0].user_reaction : null;
+
+      res.json({ success: true, reactions: grouped, userReaction });
+    }
+  );
+});
+
+// ==================== ANNOUNCEMENT COMMENTS ====================
+// Add comment to announcement
+router.post('/:communityId/announcements/:announcementId/comments', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, announcementId } = req.params;
+  const { content } = req.body;
+  const userId = req.user.userId;
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Comment content is required' });
+  }
+
+  db.get('SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.run(
+        'INSERT INTO announcement_comments (announcement_id, user_id, content) VALUES (?, ?, ?)',
+        [announcementId, userId, content.trim()],
+        function(err) {
+          if (err) return res.status(500).json({ error: 'Error adding comment' });
+
+          db.get(
+            `SELECT ac.*, u.username, u.profile_picture
+             FROM announcement_comments ac
+             JOIN users u ON ac.user_id = u.id
+             WHERE ac.id = ?`,
+            [this.lastID],
+            (err, comment) => {
+              if (err) return res.status(500).json({ error: 'Error fetching comment' });
+
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`community_${communityId}`).emit('announcement:comment', {
+                  announcementId,
+                  comment
+                });
+              }
+
+              res.json({ success: true, comment });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get announcement comments
+router.get('/:communityId/announcements/:announcementId/comments', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { announcementId } = req.params;
+
+  db.all(
+    `SELECT ac.*, u.username, u.profile_picture
+     FROM announcement_comments ac
+     JOIN users u ON ac.user_id = u.id
+     WHERE ac.announcement_id = ?
+     ORDER BY ac.created_at ASC`,
+    [announcementId],
+    (err, comments) => {
+      if (err) return res.status(500).json({ error: 'Error fetching comments' });
+      res.json({ success: true, comments: comments || [] });
+    }
+  );
+});
+
+// Delete announcement comment
+router.delete('/:communityId/announcements/:announcementId/comments/:commentId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, commentId } = req.params;
+  const userId = req.user.userId;
+
+  db.get('SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      db.get('SELECT * FROM announcement_comments WHERE id = ?', [commentId], (err, comment) => {
+        if (err || !comment) return res.status(404).json({ error: 'Comment not found' });
+
+        const isAuthor = comment.user_id === userId;
+        const isAdminOrMod = ['admin', 'moderator'].includes(member.role);
+
+        if (!isAuthor && !isAdminOrMod) {
+          return res.status(403).json({ error: 'Only author or admins/moderators can delete' });
+        }
+
+        db.run('DELETE FROM announcement_comments WHERE id = ?', [commentId], function(err) {
+          if (err) return res.status(500).json({ error: 'Error deleting comment' });
+          res.json({ success: true });
+        });
+      });
     }
   );
 });

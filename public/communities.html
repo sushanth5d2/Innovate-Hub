@@ -494,12 +494,15 @@
       // Reset privacy toggle
       document.getElementById('is-public').checked = true;
       updatePrivacyDisplay(true);
+      // Reset cropped banner
+      croppedBannerBlob = null;
     }
 
     // Remove banner image
     function removeBannerImage(event) {
       event.stopPropagation();
       document.getElementById('banner-image').value = '';
+      croppedBannerBlob = null;
       document.getElementById('banner-preview').style.display = 'none';
       document.getElementById('file-label').textContent = 'Click to upload or drag & drop';
     }
@@ -534,12 +537,146 @@
       }
     }
 
-    // Banner image preview
+    // Banner image cropper
+    let bannerCropper = null;
+    let croppedBannerBlob = null;
+
+    function showBannerCropper(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'banner-cropper-modal';
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.95);
+          z-index: 10000;
+          display: flex;
+          flex-direction: column;
+        `;
+        
+        modal.innerHTML = `
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: space-between;">
+            <button onclick="closeBannerCropper()" style="background: none; border: none; color: var(--ig-primary-text); font-size: 16px; cursor: pointer; font-weight: 600;">Cancel</button>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Adjust Banner Image</h3>
+            <button onclick="applyBannerCrop()" style="background: none; border: none; color: var(--ig-blue); font-size: 16px; cursor: pointer; font-weight: 600;">Done</button>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden;">
+            <div style="max-width: 100%; max-height: 100%; position: relative;">
+              <img id="banner-crop-image" src="${e.target.result}" style="max-width: 100%; max-height: calc(100vh - 200px); display: block;">
+            </div>
+          </div>
+          <div style="padding: 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <button onclick="rotateBannerCropper(-90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="rotateBannerCropper(90)" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="flipBannerCropper('horizontal')" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-arrows-alt-h"></i> Flip H
+            </button>
+            <button onclick="flipBannerCropper('vertical')" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-arrows-alt-v"></i> Flip V
+            </button>
+            <button onclick="resetBannerCropper()" style="padding: 10px 16px; background: var(--ig-hover); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-sync"></i> Reset
+            </button>
+          </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Initialize Cropper.js with 16:9 aspect ratio for banner
+        const image = document.getElementById('banner-crop-image');
+        bannerCropper = new Cropper(image, {
+          aspectRatio: 16 / 9,
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: false,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+          toggleDragModeOnDblclick: false,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function closeBannerCropper() {
+      const modal = document.getElementById('banner-cropper-modal');
+      if (modal) {
+        if (bannerCropper) {
+          bannerCropper.destroy();
+          bannerCropper = null;
+        }
+        modal.remove();
+      }
+      // Clear the file input
+      document.getElementById('banner-image').value = '';
+      croppedBannerBlob = null;
+    }
+
+    function rotateBannerCropper(degree) {
+      if (bannerCropper) {
+        bannerCropper.rotate(degree);
+      }
+    }
+
+    function flipBannerCropper(direction) {
+      if (bannerCropper) {
+        if (direction === 'horizontal') {
+          bannerCropper.scaleX(-bannerCropper.getData().scaleX || -1);
+        } else {
+          bannerCropper.scaleY(-bannerCropper.getData().scaleY || -1);
+        }
+      }
+    }
+
+    function resetBannerCropper() {
+      if (bannerCropper) {
+        bannerCropper.reset();
+      }
+    }
+
+    function applyBannerCrop() {
+      if (!bannerCropper) return;
+      
+      // Get cropped canvas
+      const canvas = bannerCropper.getCroppedCanvas({
+        width: 1600,
+        height: 900,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+      
+      // Convert to blob and store it
+      canvas.toBlob((blob) => {
+        croppedBannerBlob = blob;
+        
+        // Show preview
+        const bannerPreview = document.getElementById('banner-preview');
+        const bannerPreviewImg = document.getElementById('banner-preview-img');
+        const fileLabel = document.getElementById('file-label');
+        
+        bannerPreviewImg.src = canvas.toDataURL('image/jpeg', 0.9);
+        bannerPreview.style.display = 'block';
+        fileLabel.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 6px;"></i>Banner adjusted`;
+        
+        closeBannerCropper();
+      }, 'image/jpeg', 0.9);
+    }
+
+    // Banner image preview with cropper
     document.addEventListener('DOMContentLoaded', () => {
       const bannerInput = document.getElementById('banner-image');
-      const bannerPreview = document.getElementById('banner-preview');
-      const bannerPreviewImg = document.getElementById('banner-preview-img');
-      const fileLabel = document.getElementById('file-label');
       
       bannerInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -551,16 +688,15 @@
             return;
           }
           
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            bannerPreviewImg.src = e.target.result;
-            bannerPreview.style.display = 'block';
-            fileLabel.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 6px;"></i>${file.name}`;
-          };
-          reader.readAsDataURL(file);
-        } else {
-          bannerPreview.style.display = 'none';
-          fileLabel.textContent = 'Click to upload or drag & drop';
+          // Check if it's an image
+          if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            e.target.value = '';
+            return;
+          }
+          
+          // Show cropper
+          showBannerCropper(file);
         }
       });
 
@@ -575,7 +711,6 @@
       const teamName = document.getElementById('team-name').value;
       const description = document.getElementById('community-description').value;
       const isPublic = document.getElementById('is-public').checked;
-      const bannerFile = document.getElementById('banner-image').files[0];
 
       try {
         const formData = new FormData();
@@ -583,7 +718,14 @@
         if (teamName) formData.append('team_name', teamName);
         if (description) formData.append('description', description);
         formData.append('is_public', isPublic);
-        if (bannerFile) formData.append('banner', bannerFile);
+        
+        // Use cropped banner blob if available, otherwise use original file
+        if (croppedBannerBlob) {
+          formData.append('banner', croppedBannerBlob, 'banner.jpg');
+        } else {
+          const bannerFile = document.getElementById('banner-image').files[0];
+          if (bannerFile) formData.append('banner', bannerFile);
+        }
 
         const response = await fetch('/api/communities', {
           method: 'POST',
@@ -601,6 +743,8 @@
         
         const data = await response.json();
         closeCreateModal();
+        // Reset cropped blob
+        croppedBannerBlob = null;
         loadCommunities();
         alert('Community created successfully!');
       } catch (error) {
@@ -612,5 +756,6 @@
     // Initialize
     loadCommunities();
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </body>
 </html>

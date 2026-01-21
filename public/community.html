@@ -2191,6 +2191,9 @@
       githubIntegration: null
     };
 
+    // Expose state to window for external scripts (community-enhancements.js)
+    window.state = state;
+
     // ==================== E2E ENCRYPTION MODULE ====================
     const E2EEncryption = {
       // Encryption key management
@@ -3105,11 +3108,14 @@
                   </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
+                  <button onclick="editAnnouncement(${ann.id})" style="padding: 10px 16px; background: linear-gradient(135deg, #00a8ff 0%, #0081cc 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0, 168, 255, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0, 168, 255, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 168, 255, 0.3)'">
+                    <i class="fas fa-edit"></i> Edit
+                  </button>
                   <button onclick="pinAnnouncement(${ann.id}, ${!ann.is_pinned})" style="padding: 10px 16px; background: ${ann.is_pinned ? 'var(--ig-secondary-background)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: ${ann.is_pinned ? 'var(--ig-primary-text)' : 'white'}; border: ${ann.is_pinned ? '2px solid var(--ig-border)' : 'none'}; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     <i class="fas fa-thumbtack"></i> ${ann.is_pinned ? 'Unpin' : 'Pin'}
                   </button>
                   <button onclick="deleteAnnouncement(${ann.id})" style="padding: 10px 16px; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(220, 53, 69, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(220, 53, 69, 0.3)'">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash"></i> Delete
                   </button>
                 </div>
               </div>
@@ -3254,11 +3260,40 @@
                   ${renderPollResults(ann.id, poll)}
                 </div>
               ` : ''}
+              
+              <!-- Reactions Section -->
+              <div style="padding: 16px 0; border-top: 1px solid var(--ig-border); border-bottom: 1px solid var(--ig-border); margin-bottom: 16px;">
+                <div id="reactions-announcement-${ann.id}" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; min-height: 36px;"></div>
+                <div style="display: flex; gap: 12px;">
+                  <button onclick="showReactionPicker(${ann.id}, 'announcement', event)" 
+                    style="flex: 1; padding: 10px 16px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; cursor: pointer; color: var(--ig-primary-text); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+                    onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+                    <i class="far fa-smile"></i> React
+                  </button>
+                  <button onclick="showCommentSection(${ann.id})" 
+                    style="flex: 1; padding: 10px 16px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; cursor: pointer; color: var(--ig-primary-text); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;"
+                    onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+                    onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+                    <i class="far fa-comment"></i> Comment
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Comments Section -->
+              <div id="comments-${ann.id}"></div>
             </div>
           `;
           
           // Update active state
           renderAnnouncements(res.announcements);
+          
+          // Load reactions and comments after rendering
+          setTimeout(() => {
+            if (typeof loadAnnouncementReactions === 'function') {
+              loadAnnouncementReactions(ann.id);
+            }
+          }, 100);
         })
         .catch(err => {
           console.error('Error loading announcement:', err);
@@ -3489,8 +3524,11 @@
       footer.style.display = 'flex';
       footer.innerHTML = `
         <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx">
-        <button class="ws-icon-btn" onclick="document.getElementById('fileInput').click()">
+        <button class="ws-icon-btn" onclick="document.getElementById('fileInput').click()" title="Attach files">
           <i class="fas fa-paperclip"></i>
+        </button>
+        <button class="ws-icon-btn" onclick="showPollCreator()" title="Create a poll" style="color: var(--ig-blue);">
+          <i class="fas fa-poll"></i>
         </button>
         <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;" onkeypress="if(event.key==='Enter')sendMessage()">
         <button class="btn btn-primary" onclick="sendMessage()">
@@ -3543,6 +3581,13 @@
             const list = document.getElementById('messagesList');
             if (list) list.scrollTop = list.scrollHeight;
           }, 100);
+          
+          // Load reactions for all messages
+          sortedPosts.forEach(msg => {
+            if (msg.id) {
+              loadMessageReactions(msg.id);
+            }
+          });
         } else {
           content.innerHTML = `
             <div id="messagesList" style="padding: 20px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 12px;">
@@ -3581,6 +3626,7 @@
       console.log('Message text:', message);
       console.log('GroupId:', state.currentGroupId);
       console.log('Accumulated files:', accumulatedFiles.length);
+      console.log('Replying to:', window.replyingTo);
       
       if ((!message && accumulatedFiles.length === 0) || !state.currentGroupId) {
         console.log('Aborting: no message/files or no groupId');
@@ -3620,6 +3666,12 @@
           console.log('🔐 Added ENCRYPTED content to FormData');
         }
         
+        // Add reply_to if replying
+        if (window.replyingTo) {
+          formData.append('reply_to', window.replyingTo);
+          console.log('📩 Added reply_to:', window.replyingTo);
+        }
+        
         // Add accumulated files (CUMULATIVE)
         if (accumulatedFiles.length > 0) {
           for (let i = 0; i < accumulatedFiles.length; i++) {
@@ -3649,6 +3701,10 @@
           if (fileInput) {
             fileInput.value = '';
             input.placeholder = 'Type a message...';
+          }
+          // Clear reply
+          if (window.replyingTo && typeof cancelReply === 'function') {
+            cancelReply();
           }
           // Clear accumulated files after successful send
           accumulatedFiles = [];
@@ -5739,6 +5795,99 @@
       }
     }
 
+    async function editAnnouncement(announcementId) {
+      try {
+        // Get current announcement data
+        const response = await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements`);
+        const ann = response.announcements.find(a => a.id == announcementId);
+        
+        if (!ann) {
+          alert('Announcement not found');
+          return;
+        }
+
+        // Show edit modal
+        showModal(`
+          <div class="modal-header" style="background: linear-gradient(135deg, #00a8ff 0%, #0081cc 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                <i class="fas fa-edit"></i>
+              </div>
+              <div>
+                <div class="modal-title" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Edit Announcement</div>
+                <div style="font-size: 13px; opacity: 0.9;">Update announcement content</div>
+              </div>
+            </div>
+            <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+          </div>
+          <div style="padding: 24px;">
+            <form id="editAnnouncementForm" onsubmit="event.preventDefault(); saveEditedAnnouncement(${announcementId})">
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--ig-primary-text);">
+                  <i class="fas fa-heading"></i> Title
+                </label>
+                <input 
+                  type="text" 
+                  id="editTitle" 
+                  value="${ann.title.replace(/"/g, '&quot;')}" 
+                  required
+                  style="width: 100%; padding: 12px; border: 2px solid var(--ig-border); border-radius: 10px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 15px;"
+                />
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--ig-primary-text);">
+                  <i class="fas fa-align-left"></i> Content
+                </label>
+                <textarea 
+                  id="editBody" 
+                  rows="6" 
+                  style="width: 100%; padding: 12px; border: 2px solid var(--ig-border); border-radius: 10px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 15px; resize: vertical; font-family: inherit;"
+                >${ann.body || ''}</textarea>
+              </div>
+              
+              <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" onclick="closeModal()" style="padding: 12px 24px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 10px; color: var(--ig-primary-text); font-weight: 600; cursor: pointer;">
+                  Cancel
+                </button>
+                <button type="submit" style="padding: 12px 24px; background: linear-gradient(135deg, #00a8ff 0%, #0081cc 100%); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-save"></i> Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        `);
+      } catch (error) {
+        console.error('Error loading announcement for edit:', error);
+        alert('Failed to load announcement');
+      }
+    }
+
+    async function saveEditedAnnouncement(announcementId) {
+      const title = document.getElementById('editTitle').value.trim();
+      const body = document.getElementById('editBody').value.trim();
+
+      if (!title) {
+        alert('Title is required');
+        return;
+      }
+
+      try {
+        await InnovateAPI.apiRequest(`/communities/${state.communityId}/announcements/${announcementId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ title, body })
+        });
+
+        console.log('Announcement updated successfully');
+        closeModal();
+        await loadAnnouncements();
+        viewAnnouncement(announcementId);
+      } catch (error) {
+        console.error('Error updating announcement:', error);
+        alert('Failed to update announcement');
+      }
+    }
+
     function showModal(content) {
       const container = document.getElementById('modalsContainer');
       container.innerHTML = `
@@ -7052,6 +7201,7 @@
       const senderName = msg.sender_username || msg.username || 'User';
       const profilePic = msg.profile_picture || msg.sender_profile_picture || '/images/default-avatar.svg';
       const isOwn = senderId == state.user?.id; // Use == for loose comparison
+      const isAdmin = state.userRole === 'admin';
       
       console.log('=== renderMessage called ===');
       console.log('Message ID:', msg.id);
@@ -7085,13 +7235,13 @@
           let filepath, filename, type;
           
           if (typeof att === 'string') {
-            // Old format: just URL string
-            filepath = att;
-            filename = att.split('/').pop();
-            type = getFileTypeFromUrl(att);
+            // Old format: just URL string - clean up any duplicate extensions
+            filepath = att.replace(/\.(jpg|jpeg|png|gif|webp)\.[0-9]+$/i, '.$1');
+            filename = filepath.split('/').pop();
+            type = getFileTypeFromUrl(filepath);
           } else {
             // New format: object with properties
-            filepath = att.filepath || att.url || att.path;
+            filepath = (att.filepath || att.url || att.path || '').replace(/\.(jpg|jpeg|png|gif|webp)\.[0-9]+$/i, '.$1');
             filename = att.filename || att.name || 'file';
             type = att.type || att.file_type || getFileTypeFromUrl(filepath);
           }
@@ -7137,22 +7287,36 @@
       }
       
       const hasContent = contentText && contentText.trim() !== '';
+      const editedBadge = msg.is_edited ? '<span style="font-style: italic; opacity: 0.6; margin-left: 4px;">(edited)</span>' : '';
       
       if (isOwn) {
         // Own message - on the right with gradient
         return `
-          <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px;">
-            <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText, true)}</div>` : ''}
-              ${attachmentsHTML}
-              <div style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
+          <div data-post-id="${msg.id}" style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+            <div style="max-width: 70%;">
+              <div style="padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText, true) : ''}</div>
+                ${attachmentsHTML}
+                <div class="message-time" style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">
+                  ${formatTimestampIST(msg.created_at)}${editedBadge}
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px;">
+                <button onclick="showReactionPicker(${msg.id}, 'message', event)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 16px; padding: 4px 8px;" title="React">
+                  <i class="far fa-smile"></i>
+                </button>
+                <button onclick="showMessageMenu(${msg.id}, true, ${isAdmin}, event)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 16px; padding: 4px 8px;" title="Options">
+                  ⋯
+                </button>
+              </div>
+              <div id="reactions-message-${msg.id}" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; justify-content: flex-end;"></div>
             </div>
           </div>
         `;
       } else {
         // Other user's message - on the left with DP
         return `
-          <div style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px;">
+          <div data-post-id="${msg.id}" class="message-item" style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
             <img 
               src="${profilePic}" 
               alt="${senderName}"
@@ -7160,17 +7324,30 @@
               style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer; flex-shrink: 0;"
               title="View ${senderName}'s profile"
             />
-            <div style="max-width: 70%; padding: 12px 16px; border-radius: 18px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
-              <div 
-                style="font-weight: 600; font-size: 13px; margin-bottom: 6px; opacity: 0.9; cursor: pointer; color: var(--ig-blue);"
-                onclick="viewUserProfile(${senderId})"
-                title="View profile"
-              >
-                ${senderName}
+            <div style="max-width: 70%;">
+              <div style="padding: 12px 16px; border-radius: 18px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+                <div class="message-author"
+                  style="font-weight: 600; font-size: 13px; margin-bottom: 6px; opacity: 0.9; cursor: pointer; color: var(--ig-blue);"
+                  onclick="viewUserProfile(${senderId})"
+                  title="View profile"
+                >
+                  ${senderName}
+                </div>
+                <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText) : ''}</div>
+                ${attachmentsHTML}
+                <div class="message-time" style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">
+                  ${formatTimestampIST(msg.created_at)}${editedBadge}
+                </div>
               </div>
-              ${hasContent ? `<div style="word-wrap: break-word; margin-bottom: 4px;">${linkify(contentText)}</div>` : ''}
-              ${attachmentsHTML}
-              <div style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">${formatTimestampIST(msg.created_at)}</div>
+              <div style="display: flex; gap: 8px; justify-content: flex-start; margin-top: 6px;">
+                <button onclick="showReactionPicker(${msg.id}, 'message', event)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 16px; padding: 4px 8px;" title="React">
+                  <i class="far fa-smile"></i>
+                </button>
+                <button onclick="showMessageMenu(${msg.id}, false, ${isAdmin}, event)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 16px; padding: 4px 8px;" title="Options">
+                  ⋯
+                </button>
+              </div>
+              <div id="reactions-message-${msg.id}" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;"></div>
             </div>
           </div>
         `;
@@ -7301,5 +7478,28 @@
       }
     });
   </script>
+  
+  <!-- Community Enhancements: Reactions, Comments, Message Actions, Polls -->
+  <script src="/js/community-enhancements.js"></script>
+  <script>
+    // Initialize enhanced features when socket connects
+    if (typeof socket !== 'undefined' && socket) {
+      setupEnhancedSocketListeners(socket);
+    }
+  </script>
+  
+  <!-- Animation CSS for enhanced features -->
+  <style>
+    @keyframes slideUpFade {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
 </body>
 </html>
