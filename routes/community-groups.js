@@ -312,7 +312,7 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
   const db = getDb();
   const userId = req.user.userId;
   const groupId = req.params.groupId;
-  const { content, location } = req.body;
+  const { content, location, reply_to } = req.body;
 
   // Check if user is a member
   db.get(
@@ -402,11 +402,12 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
           console.log('=== SAVING TO DATABASE ===');
           console.log('Attachments array before stringify:', attachments);
           console.log('Attachments JSON:', JSON.stringify(attachments));
+          console.log('Reply to:', reply_to);
           
           db.run(
-            `INSERT INTO community_group_posts (group_id, user_id, content, attachments)
-             VALUES (?, ?, ?, ?)`,
-            [groupId, userId, postContent, JSON.stringify(attachments)],
+            `INSERT INTO community_group_posts (group_id, user_id, content, attachments, reply_to)
+             VALUES (?, ?, ?, ?, ?)`,
+            [groupId, userId, postContent, JSON.stringify(attachments), reply_to || null],
             function(err) {
               if (err) {
                 console.error('Database error:', err);
@@ -482,10 +483,14 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
         SELECT 
           cgp.*,
           u.username,
-          u.profile_picture
+          u.profile_picture,
+          reply_user.username as reply_to_username,
+          reply_post.content as reply_to_content
         FROM community_group_posts cgp
         JOIN users u ON cgp.user_id = u.id
-        WHERE cgp.group_id = ?
+        LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id
+        LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
+        WHERE cgp.group_id = ? AND (cgp.is_deleted IS NULL OR cgp.is_deleted = 0)
         ORDER BY cgp.created_at DESC
       `;
 
@@ -1300,8 +1305,8 @@ router.post('/community-groups/notes/:noteId/restore/:versionId', authMiddleware
 });
 
 // ==================== GROUP MESSAGE EDIT ====================
-// Edit group message
-router.patch('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), (req, res) => {
+// Edit group message (both PATCH and PUT supported)
+const editMessageHandler = (req, res) => {
   const db = getDb();
   const { groupId, postId } = req.params;
   const { content } = req.body;
@@ -1395,7 +1400,10 @@ router.patch('/community-groups/:groupId/posts/:postId', authMiddleware, upload.
       );
     }
   );
-});
+};
+
+router.patch('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), editMessageHandler);
+router.put('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), editMessageHandler);
 
 // ==================== GROUP MESSAGE DELETE ====================
 // Delete group message (soft delete)

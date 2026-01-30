@@ -15,9 +15,9 @@ let currentCommunityId = null;
 document.addEventListener('DOMContentLoaded', async () => {
   if (!InnovateAPI.requireAuth()) return;
 
-  // Get group ID from URL
+  // Get group ID from URL or window global
   const urlParams = new URLSearchParams(window.location.search);
-  currentGroupId = urlParams.get('id');
+  currentGroupId = window.currentGroupId || urlParams.get('id');
   currentCommunityId = urlParams.get('communityId');
 
   if (!currentGroupId) {
@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/communities';
     return;
   }
+  
+  // Update window global for inline scripts
+  window.currentGroupId = currentGroupId;
 
   // Initialize Socket.IO
   socket = InnovateAPI.getSocket();
@@ -219,8 +222,17 @@ function setupTabs() {
 
 // Load group chat messages
 async function loadGroupChat() {
+  console.log('🔵 GROUP-MAIN.JS loadGroupChat() called');
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/posts`);
+    // Use window.currentGroupId if currentGroupId is not set yet
+    const groupId = currentGroupId || window.currentGroupId;
+    
+    if (!groupId) {
+      console.error('Group ID not available');
+      return;
+    }
+    
+    const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
     const messages = response.posts || [];
 
     const chatContainer = document.getElementById('group-chat-messages');
@@ -239,20 +251,77 @@ async function loadGroupChat() {
     chatContainer.innerHTML = messages.map(msg => renderChatMessage(msg)).join('');
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
+    // Add event listeners to messages
+    setupMessageEventListeners(chatContainer);
+
+    // Initialize socket if not already done
+    if (!socket) {
+      socket = InnovateAPI.getSocket();
+    }
+
     // Join group chat room
     if (socket) {
-      socket.emit('group:join', currentGroupId);
+      socket.emit('group:join', groupId);
       
       // Listen for new messages
       socket.on('group:message:receive', (message) => {
         const newMsg = renderChatMessage(message);
         chatContainer.insertAdjacentHTML('beforeend', newMsg);
         chatContainer.scrollTop = chatContainer.scrollHeight;
+        // Add event listeners to new message
+        setupMessageEventListeners(chatContainer);
       });
     }
   } catch (error) {
     console.error('Error loading chat:', error);
   }
+}
+
+// Setup event listeners for message interactions
+function setupMessageEventListeners(container) {
+  const messages = container.querySelectorAll('.ig-message');
+  
+  console.log(`Setting up listeners for ${messages.length} messages`);
+  
+  messages.forEach(messageEl => {
+    // Remove existing listeners to prevent duplicates
+    const newMessageEl = messageEl.cloneNode(true);
+    messageEl.parentNode.replaceChild(newMessageEl, messageEl);
+    
+    const messageId = parseInt(newMessageEl.dataset.messageId);
+    const userId = parseInt(newMessageEl.dataset.userId);
+    const username = newMessageEl.dataset.username;
+    const content = newMessageEl.dataset.content || '';
+    const isOwn = newMessageEl.dataset.isOwn === 'true';
+    
+    console.log('Setting up message:', { messageId, username, isOwn });
+    
+    // Right-click context menu (desktop)
+    newMessageEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Context menu triggered for message:', messageId);
+      showMessageMenu(e, messageId, username, content, userId, isOwn);
+    });
+    
+    // Double-tap for mobile
+    let lastTap = 0;
+    newMessageEl.addEventListener('click', (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Double-tap triggered for message:', messageId);
+        showMessageMenu(e, messageId, username, content, userId, isOwn);
+      }
+      
+      lastTap = currentTime;
+    });
+  });
+  
+  console.log('Message listeners setup complete');
 }
 
 // Linkify URLs in text
@@ -287,9 +356,29 @@ function renderChatMessage(msg) {
     } catch (e) {}
   }
 
+  // Reply preview HTML
+  let replyHTML = '';
+  if (msg.reply_to) {
+    const replyBgColor = isOwn ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+    const replyTextColor = isOwn ? 'rgba(255, 255, 255, 0.8)' : 'var(--ig-secondary-text)';
+    replyHTML = `
+      <div style="border-left: 3px solid var(--ig-blue); padding-left: 8px; margin-bottom: 8px; background: ${replyBgColor}; border-radius: 4px; padding: 6px 8px;">
+        <div style="font-size: 11px; color: var(--ig-blue); font-weight: 600; margin-bottom: 2px;">Replying to ${msg.reply_to_username || 'a message'}</div>
+        <div style="font-size: 12px; color: ${replyTextColor}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${msg.reply_to_content || '...'}</div>
+      </div>
+    `;
+  }
+
   return `
-    <div class="ig-message ig-message-${alignClass}" style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''}">
+    <div class="ig-message ig-message-${alignClass}" 
+         data-message-id="${msg.id}" 
+         data-user-id="${msg.user_id}" 
+         data-username="${msg.username}" 
+         data-content="${(msg.content || '').replace(/"/g, '&quot;')}" 
+         data-is-own="${isOwn}"
+         style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''} cursor: pointer; position: relative;">
       ${!isOwn ? `<div style="font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ig-secondary-text);">${msg.username}</div>` : ''}
+      ${replyHTML}
       ${msg.content ? `<div style="word-wrap: break-word;">${linkifyText(msg.content, isOwn)}</div>` : ''}
       ${attachmentsHTML}
       <div class="ig-message-time" style="font-size: 11px; margin-top: 4px; opacity: 0.7;">
@@ -569,3 +658,248 @@ async function loadGroupMembers() {
     console.error('Error loading members:', error);
   }
 }
+
+// Global variables for reply functionality (accessible from group.html)
+window.replyingToMessageId = null;
+window.replyingToUsername = null;
+window.replyingToContent = null;
+
+// Show message context menu (desktop)
+function showMessageMenu(event, messageId, username, content, userId, isOwn) {
+  console.log('showMessageMenu called:', { messageId, username, content, userId, isOwn });
+  
+  event.preventDefault();
+  event.stopPropagation();
+  
+  // Remove existing menu
+  const existingMenu = document.getElementById('message-context-menu');
+  if (existingMenu) existingMenu.remove();
+  
+  // Create menu
+  const menu = document.createElement('div');
+  menu.id = 'message-context-menu';
+  menu.style.cssText = `
+    position: fixed;
+    background: var(--ig-primary-background);
+    border: 1px solid var(--ig-border);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    min-width: 200px;
+    overflow: hidden;
+  `;
+  
+  const currentUser = InnovateAPI.getCurrentUser();
+  
+  let menuHTML = `
+    <button data-action="reply" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; transition: background 0.2s;">
+      <span style="font-size: 18px;">💬</span> Reply
+    </button>
+    <button data-action="forward" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
+      <span style="font-size: 18px;">➡️</span> Forward
+    </button>
+  `;
+  
+  // Add edit/delete only for own messages
+  if (isOwn) {
+    menuHTML += `
+      <button data-action="edit" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
+        <span style="font-size: 18px;">✏️</span> Edit Message
+      </button>
+      <button data-action="delete" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-error); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
+        <span style="font-size: 18px;">🗑️</span> Delete Message
+      </button>
+    `;
+  }
+  
+  menu.innerHTML = menuHTML;
+  
+  // Add click handlers to menu buttons
+  menu.querySelectorAll('button').forEach(btn => {
+    const action = btn.dataset.action;
+    
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('Menu action clicked:', action);
+      
+      if (action === 'reply') {
+        replyToMessage(messageId, username, content);
+      } else if (action === 'forward') {
+        forwardMessage(messageId);
+      } else if (action === 'edit') {
+        editMessage(messageId, content);
+      } else if (action === 'delete') {
+        deleteMessage(messageId);
+      }
+      
+      menu.remove();
+    });
+    
+    // Add hover effects
+    btn.addEventListener('mouseenter', () => {
+      btn.style.background = 'var(--ig-hover)';
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.style.background = 'none';
+    });
+  });
+  
+  // Position menu
+  menu.style.left = event.pageX + 'px';
+  menu.style.top = event.pageY + 'px';
+  
+  document.body.appendChild(menu);
+  
+  console.log('Context menu created and positioned');
+  
+  // Close menu when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeMenu() {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+    });
+  }, 100);
+}
+
+// Reply to message
+function replyToMessage(messageId, username, content) {
+  console.log('=== REPLY TO MESSAGE ===');
+  console.log('Message ID:', messageId);
+  console.log('Username:', username);
+  console.log('Content:', content);
+  
+  window.replyingToMessageId = messageId;
+  window.replyingToUsername = username;
+  window.replyingToContent = content;
+  
+  // Find the reply preview container
+  const replyContainer = document.getElementById('reply-preview-container');
+  console.log('Reply container found:', !!replyContainer);
+  
+  if (!replyContainer) {
+    console.error('Reply preview container not found in DOM!');
+    alert('Reply container missing! Check HTML structure.');
+    return;
+  }
+  
+  // Create reply preview
+  const replyPreview = document.createElement('div');
+  replyPreview.id = 'reply-preview';
+  replyPreview.style.cssText = `
+    display: block !important;
+    visibility: visible !important;
+    padding: 12px;
+    background: var(--ig-secondary-background);
+    border-left: 3px solid var(--ig-blue);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    opacity: 1 !important;
+  `;
+  
+  console.log('Reply preview element created, styles:', replyPreview.style.cssText);
+  
+  // Safely escape HTML in content
+  const safeContent = (content || 'Message').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safeUsername = username.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  replyPreview.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12px; color: var(--ig-blue); font-weight: 600; margin-bottom: 4px;">Replying to ${safeUsername}</div>
+        <div style="font-size: 13px; color: var(--ig-secondary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${safeContent}</div>
+      </div>
+      <button id="cancel-reply-btn" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 20px; padding: 4px; flex-shrink: 0;">✕</button>
+    </div>
+  `;
+  
+  console.log('Reply preview innerHTML set');
+  
+  // Clear previous preview and add new one
+  replyContainer.innerHTML = '';
+  replyContainer.appendChild(replyPreview);
+  console.log('Reply preview HTML set');
+  console.log('Container display:', window.getComputedStyle(replyContainer).display);
+  console.log('Container visibility:', window.getComputedStyle(replyContainer).visibility);
+  
+  // Add click handler to cancel button
+  const cancelBtn = document.getElementById('cancel-reply-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', cancelReply);
+    console.log('Cancel button listener added');
+  }
+  
+  // Focus the input
+  const chatInput = document.getElementById('chat-message-input');
+  if (chatInput) {
+    chatInput.focus();
+    console.log('Input focused');
+  }
+  
+  console.log('=== REPLY SETUP COMPLETE ===');
+  InnovateAPI.showAlert('Replying to message', 'success');
+}
+
+// Cancel reply
+function cancelReply() {
+  console.log('Cancel reply called');
+  
+  window.replyingToMessageId = null;
+  window.replyingToUsername = null;
+  window.replyingToContent = null;
+  
+  const replyContainer = document.getElementById('reply-preview-container');
+  if (replyContainer) {
+    replyContainer.innerHTML = '';
+  }
+  
+  console.log('Reply cancelled');
+}
+
+// Forward message
+function forwardMessage(messageId) {
+  InnovateAPI.showAlert('Forward functionality coming soon!', 'info');
+  // TODO: Implement forward to other groups/users
+}
+
+// Edit message
+function editMessage(messageId, currentContent) {
+  const newContent = prompt('Edit message:', currentContent);
+  if (!newContent || newContent === currentContent) return;
+  
+  InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/posts/${messageId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ content: newContent })
+  })
+  .then(() => {
+    InnovateAPI.showAlert('Message updated!', 'success');
+    loadGroupChat();
+  })
+  .catch(error => {
+    InnovateAPI.showAlert(error.message, 'error');
+  });
+}
+
+// Delete message
+function deleteMessage(messageId) {
+  if (!confirm('Are you sure you want to delete this message?')) return;
+  
+  InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/posts/${messageId}`, {
+    method: 'DELETE'
+  })
+  .then(() => {
+    InnovateAPI.showAlert('Message deleted!', 'success');
+    loadGroupChat();
+  })
+  .catch(error => {
+    InnovateAPI.showAlert(error.message, 'error');
+  });
+}
+
+// Make functions global
+window.loadGroupChat = loadGroupChat;
+window.showMessageMenu = showMessageMenu;
+window.replyToMessage = replyToMessage;
+window.cancelReply = cancelReply;
+window.forwardMessage = forwardMessage;
+window.editMessage = editMessage;
+window.deleteMessage = deleteMessage;

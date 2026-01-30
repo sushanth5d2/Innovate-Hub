@@ -76,6 +76,9 @@
         
         <!-- Chat Input Container -->
         <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Reply Preview Container (Hidden by default) -->
+          <div id="reply-preview-container" style="display: block; min-height: 30px; border: 2px dashed red; background: rgba(255,0,0,0.1);"></div>
+          
           <!-- Message Input -->
           <textarea id="chat-message-input" placeholder="Type a message..." style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; min-height: 60px; max-height: 120px; resize: vertical; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-family: inherit;"></textarea>
           
@@ -236,10 +239,18 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
+  <script src="/js/group-call.js"></script>
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <script src="/js/todo-board.js"></script>
+  <script src="/js/notes-editor.js"></script>
+  <script src="/js/group-main.js"></script>
   <script>
     InnovateAPI.requireAuth();
 
     const groupId = new URLSearchParams(window.location.search).get('id');
+    // Set global for group-main.js to use
+    window.currentGroupId = groupId;
+    
     let currentTab = 'feed';
     let isMember = false;
     let communityId = null;
@@ -273,7 +284,8 @@
         }
 
         // Load initial content
-        loadGroupChat();
+        // NOTE: loadGroupChat() is handled by group-main.js DOMContentLoaded
+        // Only load feed here to avoid double initialization
         loadFeed();
       } catch (error) {
         InnovateAPI.showAlert(error.message, 'error');
@@ -568,71 +580,8 @@
     // Chat functionality
     let chatAttachments = [];
 
-    async function loadGroupChat() {
-      if (!isMember) return;
-      
-      try {
-        const data = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
-        const container = document.getElementById('group-chat-messages');
-        
-        if (!container) return;
-        
-        container.innerHTML = '';
-
-        if (!data.posts || data.posts.length === 0) {
-          container.innerHTML = '<div style="text-align: center; color: var(--ig-secondary-text); padding: 20px;">No messages yet. Start the conversation!</div>';
-          return;
-        }
-
-        // Display messages in chat style (reverse chronological - newest at bottom)
-        data.posts.forEach(post => {
-          const messageEl = document.createElement('div');
-          messageEl.style.cssText = 'margin-bottom: 16px;';
-          
-          const currentUser = InnovateAPI.getCurrentUser();
-          const isOwnMessage = post.user_id === currentUser.id;
-          
-          messageEl.innerHTML = `
-            <div style="display: flex; gap: 12px; ${isOwnMessage ? 'flex-direction: row-reverse;' : ''}">
-              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
-              <div style="flex: 1; max-width: 70%;">
-                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px; ${isOwnMessage ? 'flex-direction: row-reverse;' : ''}">
-                  <span style="font-weight: 600; font-size: 13px;">${post.username}</span>
-                  <span style="font-size: 11px; color: var(--ig-secondary-text);">${InnovateAPI.formatDate(post.created_at)}</span>
-                </div>
-                <div style="background: ${isOwnMessage ? '#0095f6' : 'var(--ig-secondary-background)'}; color: ${isOwnMessage ? '#fff' : 'var(--ig-primary-text)'}; padding: 12px; border-radius: 16px; word-wrap: break-word;">
-                  ${post.content || ''}
-                </div>
-                ${post.attachments && post.attachments.length > 0 ? `
-                  <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;">
-                    ${post.attachments.map(att => {
-                      if (att.includes('/images/')) {
-                        return `<img src="${att}" style="max-width: 200px; border-radius: 12px; cursor: pointer;" onclick="window.open('${att}', '_blank')">`;
-                      } else if (att.includes('/videos/')) {
-                        return `<video src="${att}" controls style="max-width: 200px; border-radius: 12px;"></video>`;
-                      } else {
-                        const filename = att.split('/').pop();
-                        return `<a href="${att}" download style="padding: 8px 12px; background: var(--ig-hover); border-radius: 8px; text-decoration: none; color: var(--ig-primary-text); font-size: 12px;">📎 ${filename}</a>`;
-                      }
-                    }).join('')}
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          `;
-          container.appendChild(messageEl);
-        });
-
-        // Scroll to bottom to show latest messages
-        container.scrollTop = container.scrollHeight;
-      } catch (error) {
-        console.error('Error loading chat:', error);
-        const container = document.getElementById('group-chat-messages');
-        if (container) {
-          container.innerHTML = '<div style="text-align: center; color: var(--ig-error); padding: 20px;">Error loading messages</div>';
-        }
-      }
-    }
+    // NOTE: loadGroupChat is now handled by group-main.js with full reply support
+    // The inline version has been removed to avoid conflicts
 
     // Handle chat attachments
     function handleChatAttachment(input, type) {
@@ -734,6 +683,11 @@
         
         formData.append('is_chat', 'true'); // Flag to indicate it's a chat message
         
+        // Add reply_to if replying
+        if (window.replyingToMessageId) {
+          formData.append('reply_to', window.replyingToMessageId);
+        }
+        
         chatAttachments.forEach((attachment) => {
           if (attachment.file) {
             formData.append('attachments', attachment.file);
@@ -752,6 +706,12 @@
         input.value = '';
         chatAttachments = [];
         displayChatAttachments();
+        
+        // Clear reply state
+        if (typeof window.cancelReply === 'function') {
+          window.cancelReply();
+        }
+        
         InnovateAPI.showAlert('Message sent!', 'success');
         loadGroupChat();
         loadFeed(); // Refresh feed to show new message
@@ -966,14 +926,5 @@
     }
   </style>
 
-  <!-- Scripts -->
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/app.js"></script>
-  <script src="/js/instagram-theme.js"></script>
-  <script src="/js/group-call.js"></script>
-  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-  <script src="/js/todo-board.js"></script>
-  <script src="/js/notes-editor.js"></script>
-  <script src="/js/group-main.js"></script>
 </body>
 </html>
