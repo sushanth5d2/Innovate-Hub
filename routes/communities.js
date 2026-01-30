@@ -65,31 +65,65 @@ router.get('/my-communities', authMiddleware, (req, res) => {
 });
 
 // Create community
-router.post('/', authMiddleware, upload.single('banner'), (req, res) => {
+router.post('/', authMiddleware, (req, res, next) => {
+  // Wrap upload middleware with error handling
+  upload.single('banner')(req, res, (err) => {
+    if (err) {
+      console.error('Upload middleware error:', err);
+      return res.status(400).json({ 
+        error: 'File upload failed', 
+        details: err.message 
+      });
+    }
+    next();
+  });
+}, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { name, description, team_name, is_public } = req.body;
+  
+  console.log('=== CREATE COMMUNITY REQUEST ===');
+  console.log('User ID:', userId);
+  console.log('Body:', { name, description, team_name, is_public });
+  console.log('File uploaded:', req.file ? 'YES' : 'NO');
+  if (req.file) {
+    console.log('File details:', {
+      filename: req.file.filename,
+      path: req.file.path,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+  }
   
   let banner_image = null;
   if (req.file) {
     // The upload middleware will place it in uploads/community/ folder
     banner_image = `/uploads/community/${req.file.filename}`;
+    console.log('Banner image path:', banner_image);
   }
+  
+  // Parse is_public - could be boolean, string '1'/'0', or string 'true'/'false'
+  const isPublicValue = (is_public === '1' || is_public === 1 || is_public === true || is_public === 'true') ? 1 : 0;
+  console.log('Parsed is_public value:', isPublicValue);
 
   const query = `
     INSERT INTO communities (name, description, team_name, banner_image, is_public, admin_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [name, description, team_name, banner_image, is_public ? 1 : 0, userId], function(err) {
+  console.log('Executing query with values:', [name, description, team_name, banner_image, isPublicValue, userId]);
+
+  db.run(query, [name, description, team_name, banner_image, isPublicValue, userId], function(err) {
     if (err) {
+      console.error('Database error:', err);
       if (err.message.includes('UNIQUE')) {
         return res.status(400).json({ error: 'Community name already exists' });
       }
-      return res.status(500).json({ error: 'Error creating community' });
+      return res.status(500).json({ error: 'Error creating community', details: err.message });
     }
 
     const communityId = this.lastID;
+    console.log('Community created with ID:', communityId);
 
     // Add creator as admin member
     db.run(
@@ -97,10 +131,11 @@ router.post('/', authMiddleware, upload.single('banner'), (req, res) => {
       [communityId, userId, 'admin'],
       (err) => {
         if (err) {
+          console.error('Error adding admin member:', err);
           return res.status(500).json({ error: 'Error adding admin to community' });
         }
 
-        res.json({
+        const response = {
           success: true,
           community: {
             id: communityId,
@@ -108,9 +143,12 @@ router.post('/', authMiddleware, upload.single('banner'), (req, res) => {
             description,
             team_name,
             banner_image,
+            is_public: isPublicValue,
             admin_id: userId
           }
-        });
+        };
+        console.log('Sending response:', response);
+        res.json(response);
       }
     );
   });

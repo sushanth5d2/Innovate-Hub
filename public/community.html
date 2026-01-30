@@ -2510,8 +2510,9 @@
       console.log('renderGroupsList called');
       console.log('Current groups count:', state.groups.length);
       
-      // Only render if groups tab is active
-      const groupsTab = document.querySelector('.left-tab[onclick*="groups"]');
+      // Only render if groups tab is active - use Array.from to avoid quote escaping issues
+      const tabs = document.querySelectorAll('.left-tab');
+      const groupsTab = Array.from(tabs).find(tab => tab.textContent.trim() === 'Groups');
       console.log('Groups tab element:', groupsTab);
       console.log('Groups tab active?:', groupsTab?.classList.contains('active'));
       
@@ -6988,20 +6989,20 @@
             </h3>
           </div>
           <div style="padding: 24px;">
-            <div style="background: #fee; border: 1px solid var(--ig-error); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-              <div style="font-weight: 600; margin-bottom: 8px;">This is permanent and cannot be undone!</div>
-              <div style="font-size: 13px;">Type <strong>${communityName}</strong> to confirm</div>
+            <div style="background: #fee2e2; border: 1px solid var(--ig-error); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+              <div style="font-weight: 600; margin-bottom: 8px; color: #991b1b;">This is permanent and cannot be undone!</div>
+              <div style="font-size: 13px; color: #7f1d1d;">Type <strong style="color: #7f1d1d;">${communityName}</strong> to confirm</div>
             </div>
             
             <input type="text" id="confirmCommunityName" placeholder="Type community name here" 
-              style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); margin-bottom: 20px;">
+              style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: #fef3c7; color: #000000; margin-bottom: 20px; font-weight: 500;">
             
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
               <button onclick="this.closest('.ig-modal-overlay').remove()" 
                 style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
                 Cancel
               </button>
-              <button onclick="confirmDeleteCommunity('${communityName}')" 
+              <button onclick="confirmDeleteCommunity(decodeURIComponent('${encodeURIComponent(communityName)}'))" 
                 style="padding: 12px 24px; border: none; border-radius: 8px; background: var(--ig-error); color: white; cursor: pointer; font-weight: 600;">
                 <i class="fas fa-trash"></i> Delete Forever
               </button>
