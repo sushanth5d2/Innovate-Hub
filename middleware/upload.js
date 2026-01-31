@@ -32,7 +32,7 @@ const storage = multer.diskStorage({
     else if (req.path.includes('profile') || req.originalUrl.includes('profile')) {
       uploadPath = './uploads/profiles';
       console.log('Using profiles folder (from path)');
-    } else if (req.path.includes('communit') || req.originalUrl.includes('communit')) { // matches both 'community' and 'communities'
+    } else if (req.path.includes('communit') || req.originalUrl.includes('communit') || req.path.includes('groups')) { // matches communities, community-groups, and groups
       uploadPath = './uploads/community';
       console.log('Using community folder (from path)');
     } else if (file.mimetype.startsWith('image/')) {

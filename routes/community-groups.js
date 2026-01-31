@@ -6,6 +6,7 @@ const { getDb } = require('../config/database');
 const fs = require('fs');
 const path = require('path');
 const mlClient = require('../services/ml-client');
+const crypto = require('crypto');
 
 // Create folder structure for a group
 function createGroupFolders(communityId, groupId) {
@@ -49,11 +50,11 @@ function getFileType(filename) {
 }
 
 // Create group in a community
-router.post('/communities/:communityId/groups', authMiddleware, (req, res) => {
+router.post('/communities/:communityId/groups', authMiddleware, upload.single('profile_picture'), (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const communityId = req.params.communityId;
-  const { name, description } = req.body;
+  const { name, description, is_public } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'Group name is required' });
@@ -68,13 +69,26 @@ router.post('/communities/:communityId/groups', authMiddleware, (req, res) => {
         return res.status(403).json({ error: 'You must be a community member to create a group' });
       }
 
-      // Create group
+      // Generate encryption key for E2E encryption
+      const encryptionKey = crypto.randomBytes(32).toString('hex');
+      
+      // Handle profile picture upload
+      let profilePicturePath = null;
+      if (req.file) {
+        const fileName = req.file.filename;
+        const fileFolder = req.file.destination.replace('./uploads/', '');
+        profilePicturePath = `/uploads/${fileFolder}/${fileName}`;
+        console.log('Group profile picture uploaded:', profilePicturePath);
+      }
+
+      // Create group with profile picture and privacy setting
       db.run(
-        `INSERT INTO community_groups (community_id, name, description, creator_id) 
-         VALUES (?, ?, ?, ?)`,
-        [communityId, name, description, userId],
+        `INSERT INTO community_groups (community_id, name, description, creator_id, encryption_key, profile_picture, is_public) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [communityId, name, description, userId, encryptionKey, profilePicturePath, parseInt(is_public) || 1],
         function(err) {
           if (err) {
+            console.error('Error creating group:', err);
             return res.status(500).json({ error: 'Error creating group' });
           }
 
@@ -103,7 +117,9 @@ router.post('/communities/:communityId/groups', authMiddleware, (req, res) => {
                   id: groupId,
                   community_id: communityId,
                   name,
-                  description
+                  description,
+                  profile_picture: profilePicturePath,
+                  is_public: parseInt(is_public) || 1
                 }
               });
             }
@@ -171,25 +187,156 @@ router.post('/community-groups/:groupId/join', authMiddleware, (req, res) => {
   const userId = req.user.userId;
   const groupId = req.params.groupId;
 
-  // Check if user is already a member
+  // Check if user is blocked
+  db.get(
+    'SELECT * FROM community_group_blocked WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, blocked) => {
+      if (blocked) {
+        return res.status(403).json({ error: 'You are blocked from this group' });
+      }
+
+      // Check if user is already a member
+      db.get(
+        'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, userId],
+        (err, member) => {
+          if (member) {
+            return res.status(400).json({ error: 'Already a member' });
+          }
+
+          // Check if group is private
+          db.get(
+            'SELECT is_public FROM community_groups WHERE id = ?',
+            [groupId],
+            (err, group) => {
+              if (err || !group) {
+                return res.status(404).json({ error: 'Group not found' });
+              }
+
+              if (group.is_public === 0) {
+                return res.status(403).json({ error: 'This is a private group. Please request to join.' });
+              }
+
+              // Join the group
+              db.run(
+                'INSERT INTO community_group_members (group_id, user_id, role) VALUES (?, ?, ?)',
+                [groupId, userId, 'member'],
+                (err) => {
+                  if (err) {
+                    return res.status(500).json({ error: 'Error joining group' });
+                  }
+                  res.json({ success: true, message: 'Joined group successfully' });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get encryption key for group (only for members)
+router.get('/community-groups/:groupId/encryption-key', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const groupId = req.params.groupId;
+
+  // Check if user is a member
   db.get(
     'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
     [groupId, userId],
     (err, member) => {
-      if (member) {
-        return res.status(400).json({ error: 'Already a member' });
+      if (err || !member) {
+        return res.status(403).json({ error: 'You must be a member to access encryption key' });
       }
 
-      db.run(
-        'INSERT INTO community_group_members (group_id, user_id, role) VALUES (?, ?, ?)',
-        [groupId, userId, 'member'],
-        (err) => {
-          if (err) {
-            return res.status(500).json({ error: 'Error joining group' });
+      // Get encryption key
+      db.get(
+        'SELECT encryption_key FROM community_groups WHERE id = ?',
+        [groupId],
+        (err, group) => {
+          if (err || !group) {
+            return res.status(404).json({ error: 'Group not found' });
           }
-          res.json({ success: true, message: 'Joined group successfully' });
+          res.json({ 
+            success: true, 
+            encryption_key: group.encryption_key 
+          });
         }
       );
+    }
+  );
+});
+
+// Update group settings (admin only)
+router.put('/community-groups/:groupId', authMiddleware, upload.single('profile_picture'), (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const groupId = req.params.groupId;
+  const { name, description, is_public } = req.body;
+
+  // Check if user is admin
+  db.get(
+    'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ? AND role = ?',
+    [groupId, userId, 'admin'],
+    (err, member) => {
+      if (err || !member) {
+        return res.status(403).json({ error: 'Only admins can update group settings' });
+      }
+
+      let updateFields = [];
+      let updateValues = [];
+
+      if (name) {
+        updateFields.push('name = ?');
+        updateValues.push(name);
+      }
+
+      if (description !== undefined) {
+        updateFields.push('description = ?');
+        updateValues.push(description);
+      }
+
+      if (is_public !== undefined) {
+        updateFields.push('is_public = ?');
+        updateValues.push(parseInt(is_public));
+      }
+
+      // Handle profile picture upload
+      if (req.file) {
+        // Get the correct subdirectory path from the file destination
+        const fileName = req.file.filename;
+        const fileFolder = req.file.destination.replace('./uploads/', '');
+        const profilePicturePath = `/uploads/${fileFolder}/${fileName}`;
+        updateFields.push('profile_picture = ?');
+        updateValues.push(profilePicturePath);
+        console.log('Group profile picture uploaded:', profilePicturePath);
+      }
+
+      updateFields.push('updated_at = CURRENT_TIMESTAMP');
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ error: 'No fields to update' });
+      }
+
+      const query = `UPDATE community_groups SET ${updateFields.join(', ')} WHERE id = ?`;
+      updateValues.push(groupId);
+
+      db.run(query, updateValues, function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error updating group' });
+        }
+
+        // Get updated group
+        db.get('SELECT * FROM community_groups WHERE id = ?', [groupId], (err, group) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error fetching updated group' });
+          }
+          res.json({ success: true, group });
+        });
+      });
     }
   );
 });
@@ -208,47 +355,6 @@ router.post('/community-groups/:groupId/leave', authMiddleware, (req, res) => {
         return res.status(500).json({ error: 'Error leaving group' });
       }
       res.json({ success: true, message: 'Left group successfully' });
-    }
-  );
-});
-
-// Update group
-router.put('/community-groups/:groupId', authMiddleware, (req, res) => {
-  const db = getDb();
-  const userId = req.user.userId;
-  const groupId = req.params.groupId;
-  const { name, description } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Group name is required' });
-  }
-
-  // Check if user is admin or creator
-  db.get(
-    `SELECT cg.*, cgm.role 
-     FROM community_groups cg
-     LEFT JOIN community_group_members cgm ON cg.id = cgm.group_id AND cgm.user_id = ?
-     WHERE cg.id = ?`,
-    [userId, groupId],
-    (err, group) => {
-      if (err || !group) {
-        return res.status(404).json({ error: 'Group not found' });
-      }
-      
-      if (group.creator_id !== userId && group.role !== 'admin') {
-        return res.status(403).json({ error: 'Only admins can update the group' });
-      }
-
-      db.run(
-        'UPDATE community_groups SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [name, description, groupId],
-        function(err) {
-          if (err) {
-            return res.status(500).json({ error: 'Error updating group' });
-          }
-          res.json({ success: true });
-        }
-      );
     }
   );
 });
@@ -1809,4 +1915,493 @@ router.get('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
   );
 });
 
+// ==================== MEMBER MANAGEMENT ROUTES ====================
+
+// Get group members with roles
+router.get('/community-groups/:groupId/members', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if user is a member or admin
+  db.get(
+    'SELECT role FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, membership) => {
+      if (err || !membership) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+
+      // Get all members with user details
+      db.all(
+        `SELECT gm.*, u.username, u.profile_picture, u.email, g.creator_id,
+         CASE WHEN g.creator_id = gm.user_id THEN 'creator'
+              ELSE gm.role
+         END as role
+         FROM community_group_members gm
+         JOIN users u ON gm.user_id = u.id
+         JOIN community_groups g ON gm.group_id = g.id
+         WHERE gm.group_id = ?
+         ORDER BY 
+           CASE WHEN g.creator_id = gm.user_id THEN 1
+                WHEN gm.role = 'admin' THEN 2
+                ELSE 3
+           END,
+           gm.joined_at ASC`,
+        [groupId],
+        (err, members) => {
+          if (err) {
+            console.error('Error fetching members:', err);
+            return res.status(500).json({ error: 'Error fetching members' });
+          }
+
+          res.json({
+            success: true,
+            members,
+            userRole: membership.role
+          });
+        }
+      );
+    }
+  );
+});
+
+// Promote member to admin
+router.post('/community-groups/:groupId/members/:userId/promote', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is creator
+  db.get(
+    'SELECT creator_id FROM community_groups WHERE id = ?',
+    [groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      if (group.creator_id !== adminId) {
+        return res.status(403).json({ error: 'Only the group creator can promote members' });
+      }
+
+      // Promote member
+      db.run(
+        'UPDATE community_group_members SET role = ? WHERE group_id = ? AND user_id = ?',
+        ['admin', groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error promoting member:', err);
+            return res.status(500).json({ error: 'Error promoting member' });
+          }
+
+          res.json({ success: true, message: 'Member promoted to admin' });
+        }
+      );
+    }
+  );
+});
+
+// Remove member from group
+router.delete('/community-groups/:groupId/members/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can remove members' });
+      }
+
+      // Can't remove creator
+      if (targetUserId == group.creator_id) {
+        return res.status(403).json({ error: 'Cannot remove group creator' });
+      }
+
+      // Remove member
+      db.run(
+        'DELETE FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error removing member:', err);
+            return res.status(500).json({ error: 'Error removing member' });
+          }
+
+          res.json({ success: true, message: 'Member removed' });
+        }
+      );
+    }
+  );
+});
+
+// Block member from group
+router.post('/community-groups/:groupId/members/:userId/block', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can block members' });
+      }
+
+      // Can't block creator
+      if (targetUserId == group.creator_id) {
+        return res.status(403).json({ error: 'Cannot block group creator' });
+      }
+
+      // Remove from members first
+      db.run(
+        'DELETE FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error removing member:', err);
+            return res.status(500).json({ error: 'Error removing member' });
+          }
+
+          // Add to blocked list
+          db.run(
+            'INSERT OR IGNORE INTO community_group_blocked (group_id, user_id, blocked_by) VALUES (?, ?, ?)',
+            [groupId, targetUserId, adminId],
+            (err) => {
+              if (err) {
+                console.error('Error blocking member:', err);
+                return res.status(500).json({ error: 'Error blocking member' });
+              }
+
+              res.json({ success: true, message: 'Member blocked' });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get blocked members
+router.get('/community-groups/:groupId/blocked', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if user is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [userId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === userId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can view blocked members' });
+      }
+
+      // Get blocked members
+      db.all(
+        `SELECT gb.*, u.username, u.profile_picture
+         FROM community_group_blocked gb
+         JOIN users u ON gb.user_id = u.id
+         WHERE gb.group_id = ?
+         ORDER BY gb.blocked_at DESC`,
+        [groupId],
+        (err, blocked) => {
+          if (err) {
+            console.error('Error fetching blocked members:', err);
+            return res.status(500).json({ error: 'Error fetching blocked members' });
+          }
+
+          res.json({ success: true, blocked: blocked || [] });
+        }
+      );
+    }
+  );
+});
+
+// Unblock member
+router.post('/community-groups/:groupId/members/:userId/unblock', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can unblock members' });
+      }
+
+      // Remove from blocked list
+      db.run(
+        'DELETE FROM community_group_blocked WHERE group_id = ? AND user_id = ?',
+        [groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error unblocking member:', err);
+            return res.status(500).json({ error: 'Error unblocking member' });
+          }
+
+          res.json({ success: true, message: 'Member unblocked' });
+        }
+      );
+    }
+  );
+});
+
+// ==================== JOIN REQUEST ROUTES ====================
+
+// Request to join private group
+router.post('/community-groups/:groupId/request-join', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if group is private
+  db.get(
+    'SELECT * FROM community_groups WHERE id = ?',
+    [groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      if (group.is_public !== 0) {
+        return res.status(400).json({ error: 'This group is public, you can join directly' });
+      }
+
+      // Check if already a member
+      db.get(
+        'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, userId],
+        (err, member) => {
+          if (member) {
+            return res.status(400).json({ error: 'Already a member' });
+          }
+
+          // Check if already blocked
+          db.get(
+            'SELECT * FROM community_group_blocked WHERE group_id = ? AND user_id = ?',
+            [groupId, userId],
+            (err, blocked) => {
+              if (blocked) {
+                return res.status(403).json({ error: 'You are blocked from this group' });
+              }
+
+              // Create join request
+              db.run(
+                'INSERT OR REPLACE INTO community_group_join_requests (group_id, user_id, status) VALUES (?, ?, ?)',
+                [groupId, userId, 'pending'],
+                (err) => {
+                  if (err) {
+                    console.error('Error creating join request:', err);
+                    return res.status(500).json({ error: 'Error creating join request' });
+                  }
+
+                  res.json({ success: true, message: 'Join request sent' });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Get join requests for a group
+router.get('/community-groups/:groupId/join-requests', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if user is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [userId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === userId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can view join requests' });
+      }
+
+      // Get pending requests
+      db.all(
+        `SELECT jr.*, u.username, u.profile_picture
+         FROM community_group_join_requests jr
+         JOIN users u ON jr.user_id = u.id
+         WHERE jr.group_id = ? AND jr.status = 'pending'
+         ORDER BY jr.created_at DESC`,
+        [groupId],
+        (err, requests) => {
+          if (err) {
+            console.error('Error fetching join requests:', err);
+            return res.status(500).json({ error: 'Error fetching join requests' });
+          }
+
+          res.json({ success: true, requests: requests || [] });
+        }
+      );
+    }
+  );
+});
+
+// Approve join request
+router.post('/community-groups/:groupId/join-requests/:userId/approve', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can approve join requests' });
+      }
+
+      // Add member
+      db.run(
+        'INSERT INTO community_group_members (group_id, user_id, role) VALUES (?, ?, ?)',
+        [groupId, targetUserId, 'member'],
+        (err) => {
+          if (err) {
+            console.error('Error adding member:', err);
+            return res.status(500).json({ error: 'Error adding member' });
+          }
+
+          // Delete join request
+          db.run(
+            'DELETE FROM community_group_join_requests WHERE group_id = ? AND user_id = ?',
+            [groupId, targetUserId],
+            (err) => {
+              if (err) {
+                console.error('Error deleting join request:', err);
+              }
+
+              res.json({ success: true, message: 'Join request approved' });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Reject join request
+router.post('/community-groups/:groupId/join-requests/:userId/reject', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can reject join requests' });
+      }
+
+      // Delete join request
+      db.run(
+        'DELETE FROM community_group_join_requests WHERE group_id = ? AND user_id = ?',
+        [groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error rejecting join request:', err);
+            return res.status(500).json({ error: 'Error rejecting join request' });
+          }
+
+          res.json({ success: true, message: 'Join request rejected' });
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;
+

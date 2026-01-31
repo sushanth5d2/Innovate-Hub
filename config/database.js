@@ -863,6 +863,36 @@ const createTables = () => {
           UNIQUE(poll_id, user_id)
         )
       `);
+
+      // Community group blocked members table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS community_group_blocked (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          blocked_by INTEGER NOT NULL,
+          blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (blocked_by) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(group_id, user_id)
+        )
+      `);
+
+      // Community group join requests table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS community_group_join_requests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          status TEXT DEFAULT 'pending',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(group_id, user_id)
+        )
+      `);
     });
 
     console.log('SQLite tables created successfully');

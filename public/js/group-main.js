@@ -15,25 +15,29 @@ let currentCommunityId = null;
 const E2EManager = {
   keys: {},
   
-  // Initialize E2E for a group
-  init(groupId) {
-    const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
-    if (storedKey) {
-      this.keys[groupId] = storedKey;
-      console.log(`🔐 E2E: Loaded key for group ${groupId}`);
-    } else {
-      // Generate new key for this group
-      const newKey = this.generateKey();
-      this.keys[groupId] = newKey;
-      localStorage.setItem(`e2e_key_${groupId}`, newKey);
-      console.log(`🔐 E2E: Generated new key for group ${groupId}`);
+  // Initialize E2E for a group - fetch shared key from server
+  async init(groupId) {
+    try {
+      // Check if we already have the key cached
+      if (this.keys[groupId]) {
+        console.log(`🔐 E2E: Using cached key for group ${groupId}`);
+        return this.keys[groupId];
+      }
+
+      // Fetch the encryption key from server
+      const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/encryption-key`);
+      if (response.success && response.encryption_key) {
+        this.keys[groupId] = response.encryption_key;
+        console.log(`🔐 E2E: Fetched encryption key for group ${groupId}`);
+        return this.keys[groupId];
+      } else {
+        console.warn('E2E: No encryption key found for group', groupId);
+        return null;
+      }
+    } catch (error) {
+      console.error('E2E: Failed to fetch encryption key:', error);
+      return null;
     }
-    return this.keys[groupId];
-  },
-  
-  // Generate a random encryption key
-  generateKey() {
-    return CryptoJS.lib.WordArray.random(256 / 8).toString();
   },
   
   // Encrypt message
@@ -66,16 +70,11 @@ const E2EManager = {
       
       const key = this.keys[groupId];
       if (!key) {
-        const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
-        if (storedKey) {
-          this.keys[groupId] = storedKey;
-        } else {
-          console.warn('E2E: No key found for group', groupId);
-          return encryptedText;
-        }
+        console.warn('E2E: No key found for group', groupId);
+        return encryptedText;
       }
       
-      const decrypted = CryptoJS.AES.decrypt(encryptedText, this.keys[groupId]).toString(CryptoJS.enc.Utf8);
+      const decrypted = CryptoJS.AES.decrypt(encryptedText, key).toString(CryptoJS.enc.Utf8);
       console.log('🔐 E2E: Decrypted message');
       return decrypted || encryptedText;
     } catch (error) {
@@ -93,14 +92,6 @@ const E2EManager = {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   if (!InnovateAPI.requireAuth()) return;
-
-  // Clear any E2E encryption keys from localStorage (encryption disabled for groups)
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('e2e_key_')) {
-      localStorage.removeItem(key);
-      console.log('🗑️ Removed encryption key:', key);
-    }
-  });
 
   // Get group ID from URL or window global
   const urlParams = new URLSearchParams(window.location.search);
@@ -143,11 +134,60 @@ async function loadGroupData() {
   try {
     const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}`);
     const group = response.group;
+    const currentUser = InnovateAPI.getCurrentUser();
 
+    // Update main header
     document.getElementById('group-name').textContent = group.name;
-    document.getElementById('group-description').textContent = group.description || 'No description';
-    document.getElementById('member-count').textContent = group.member_count || 0;
-    document.getElementById('creator-name').textContent = group.creator_username || 'Unknown';
+
+    // Update right sidebar
+    const sidebarPicture = document.getElementById('sidebar-group-picture');
+    if (sidebarPicture) {
+      sidebarPicture.src = group.profile_picture || '/images/default-avatar.svg';
+    }
+
+    const sidebarName = document.getElementById('sidebar-group-name');
+    if (sidebarName) {
+      sidebarName.textContent = group.name;
+    }
+
+    const sidebarDescription = document.getElementById('sidebar-group-description');
+    if (sidebarDescription) {
+      sidebarDescription.textContent = group.description || 'No description';
+    }
+
+    const sidebarMemberCount = document.getElementById('sidebar-member-count');
+    if (sidebarMemberCount) {
+      sidebarMemberCount.textContent = `(${group.member_count || 0})`;
+    }
+
+    // Update group type with privacy badge
+    const sidebarType = document.getElementById('sidebar-group-type');
+    if (sidebarType) {
+      if (group.is_public === 0) {
+        sidebarType.textContent = '🔒 Private Group';
+      } else {
+        sidebarType.textContent = '🌐 Public Group';
+      }
+    }
+
+    // Show settings/edit button if user is admin
+    const isAdmin = group.creator_id === currentUser.id;
+    
+    const settingsBtn = document.getElementById('group-settings-btn');
+    if (settingsBtn && isAdmin) {
+      settingsBtn.style.display = 'block';
+      settingsBtn.onclick = () => showGroupSettings(group);
+    }
+
+    const sidebarSettingsBtn = document.getElementById('sidebar-settings-btn');
+    if (sidebarSettingsBtn && isAdmin) {
+      sidebarSettingsBtn.style.display = 'flex';
+    }
+
+    const sidebarEditBtn = document.getElementById('sidebar-edit-profile-btn');
+    if (sidebarEditBtn && isAdmin) {
+      sidebarEditBtn.style.display = 'inline-block';
+    }
 
     // Setup back button
     const backBtn = document.getElementById('back-to-community');
@@ -319,6 +359,9 @@ async function loadGroupChat() {
       return;
     }
     
+    // Initialize E2E encryption for this group (fetch shared key)
+    await E2EManager.init(groupId);
+    
     const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
     const messages = response.posts || [];
 
@@ -334,6 +377,16 @@ async function loadGroupChat() {
       `;
       return;
     }
+
+    // Decrypt messages before rendering
+    messages.forEach(msg => {
+      if (msg.content) {
+        msg.content = E2EManager.decrypt(msg.content, groupId);
+      }
+      if (msg.reply_to_content) {
+        msg.reply_to_content = E2EManager.decrypt(msg.reply_to_content, groupId);
+      }
+    });
 
     chatContainer.innerHTML = messages.map(msg => renderChatMessage(msg)).join('');
     chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -352,6 +405,14 @@ async function loadGroupChat() {
       
       // Listen for new messages
       socket.on('group:message:receive', (message) => {
+        // Decrypt the message content before rendering
+        if (message.content) {
+          message.content = E2EManager.decrypt(message.content, groupId);
+        }
+        if (message.reply_to_content) {
+          message.reply_to_content = E2EManager.decrypt(message.reply_to_content, groupId);
+        }
+        
         const newMsg = renderChatMessage(message);
         chatContainer.insertAdjacentHTML('beforeend', newMsg);
         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -491,10 +552,11 @@ async function sendChatMessage() {
   if (!content && attachments.length === 0) return;
 
   try {
-    // Note: E2E encryption disabled for group messages
-    // (requires shared key exchange among all members)
+    // Encrypt message content before sending
+    const encryptedContent = content ? E2EManager.encrypt(content, currentGroupId) : '';
+    
     const formData = new FormData();
-    formData.append('content', content);
+    formData.append('content', encryptedContent);
     if (attachments.length > 0) {
       formData.append('attachments', JSON.stringify(attachments));
     }
@@ -984,6 +1046,189 @@ function deleteMessage(messageId) {
   });
 }
 
+// Show Group Settings Modal
+async function showGroupSettings(group) {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="min-width: 500px; max-width: 90%;">
+      <div class="ig-settings-section">
+        <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
+          <h3 style="margin: 0;">Group Settings</h3>
+        </div>
+        
+        <!-- Profile Picture -->
+        <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border); text-align: left;">
+          <div style="margin-bottom: 12px; font-weight: 600;">Profile Picture</div>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <img id="group-settings-avatar" src="${group.profile_picture || '/images/default-avatar.svg'}" 
+                 style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+            <div>
+              <input type="file" id="group-profile-picture-input" accept="image/*" style="display: none;">
+              <button onclick="document.getElementById('group-profile-picture-input').click()" 
+                      style="padding: 8px 16px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                Change Picture
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group Name -->
+        <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border); text-align: left;">
+          <div style="margin-bottom: 8px; font-weight: 600;">Group Name</div>
+          <input type="text" id="group-settings-name" value="${group.name || ''}" 
+                 style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px;">
+        </div>
+
+        <!-- Group Description -->
+        <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border); text-align: left;">
+          <div style="margin-bottom: 8px; font-weight: 600;">Description</div>
+          <textarea id="group-settings-description" 
+                    style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; min-height: 80px; resize: vertical;">${group.description || ''}</textarea>
+        </div>
+
+        <!-- Privacy Settings -->
+        <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="text-align: left;">
+              <div style="font-weight: 600; margin-bottom: 4px;">Public Group</div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text);">Allow anyone in the community to see this group</div>
+            </div>
+            <div class="ig-toggle-switch ${group.is_public !== 0 ? 'active' : ''}" id="group-public-toggle">
+              <div class="ig-toggle-slider"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="ig-modal-item" style="padding: 20px; display: flex; gap: 12px; justify-content: flex-end; border-bottom: none;">
+          <button onclick="document.querySelector('.ig-modal-overlay').remove()" 
+                  style="padding: 10px 24px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+            Cancel
+          </button>
+          <button id="save-group-settings-btn"
+                  style="padding: 10px 24px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Handle profile picture preview
+  document.getElementById('group-profile-picture-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('group-settings-avatar').src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Handle privacy toggle
+  document.getElementById('group-public-toggle').addEventListener('click', (e) => {
+    e.currentTarget.classList.toggle('active');
+  });
+
+  // Handle save
+  document.getElementById('save-group-settings-btn').addEventListener('click', () => saveGroupSettings(group.id));
+
+  // Close on overlay click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+}
+
+// Save Group Settings
+async function saveGroupSettings(groupId) {
+  try {
+    const formData = new FormData();
+    
+    const name = document.getElementById('group-settings-name').value.trim();
+    const description = document.getElementById('group-settings-description').value.trim();
+    const isPublic = document.getElementById('group-public-toggle').classList.contains('active') ? 1 : 0;
+    const profilePicture = document.getElementById('group-profile-picture-input').files[0];
+
+    if (!name) {
+      InnovateAPI.showAlert('Group name is required', 'error');
+      return;
+    }
+
+    formData.append('name', name);
+    formData.append('description', description);
+    formData.append('is_public', isPublic);
+    
+    if (profilePicture) {
+      formData.append('profile_picture', profilePicture);
+    }
+
+    const response = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${InnovateAPI.getToken()}`
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update group settings');
+    }
+
+    InnovateAPI.showAlert('Group settings updated successfully!', 'success');
+    document.querySelector('.ig-modal-overlay').remove();
+    
+    // Reload group data
+    loadGroupData();
+    
+  } catch (error) {
+    console.error('Error saving group settings:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
+}
+
+// Show group members
+function showGroupMembers() {
+  document.getElementById('members-tab').click();
+}
+
+// Show add members interface
+function showAddMembers() {
+  InnovateAPI.showAlert('Add members feature coming soon!', 'info');
+}
+
+// Leave group
+async function leaveGroup() {
+  if (!confirm('Are you sure you want to leave this group?')) {
+    return;
+  }
+
+  try {
+    await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/leave`, {
+      method: 'POST'
+    });
+
+    InnovateAPI.showAlert('Left group successfully', 'success');
+    
+    // Redirect back to community
+    if (currentCommunityId) {
+      window.location.href = `/community.html?id=${currentCommunityId}`;
+    } else {
+      window.location.href = '/communities';
+    }
+  } catch (error) {
+    console.error('Error leaving group:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
+}
+
 // Make functions global
 window.loadGroupChat = loadGroupChat;
 window.showMessageMenu = showMessageMenu;
@@ -992,3 +1237,8 @@ window.cancelReply = cancelReply;
 window.forwardMessage = forwardMessage;
 window.editMessage = editMessage;
 window.deleteMessage = deleteMessage;
+window.showGroupSettings = showGroupSettings;
+window.saveGroupSettings = saveGroupSettings;
+window.showGroupMembers = showGroupMembers;
+window.showAddMembers = showAddMembers;
+window.leaveGroup = leaveGroup;

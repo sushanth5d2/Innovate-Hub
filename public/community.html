@@ -11,7 +11,9 @@
   <!-- E2E Encryption Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/instagram-theme.js"></script>
+  <script src="/js/group-management.js"></script>
   <style>
     /* WhatsApp Community Complete Styles */
     body { margin: 0; padding: 0; overflow: hidden; }
@@ -2199,25 +2201,27 @@
       // Encryption key management
       keys: {},
       
-      // Initialize encryption for a group/community
+      // Initialize encryption for a group - fetch shared key from server
       async initForGroup(groupId) {
         try {
-          // Check if we already have a key for this group
-          const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
-          if (storedKey) {
-            this.keys[groupId] = storedKey;
-            console.log(`🔐 E2E: Loaded existing key for group ${groupId}`);
+          // Check if we already have the key cached
+          if (this.keys[groupId]) {
+            console.log(`🔐 E2E: Using cached key for group ${groupId}`);
             return true;
           }
           
-          // Generate new encryption key for this group
-          const key = CryptoJS.lib.WordArray.random(32).toString();
-          this.keys[groupId] = key;
-          localStorage.setItem(`e2e_key_${groupId}`, key);
-          console.log(`🔐 E2E: Generated new key for group ${groupId}`);
-          return true;
+          // Fetch the encryption key from server
+          const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/encryption-key`);
+          if (response.success && response.encryption_key) {
+            this.keys[groupId] = response.encryption_key;
+            console.log(`🔐 E2E: Fetched encryption key for group ${groupId}`);
+            return true;
+          } else {
+            console.warn('E2E: No encryption key found for group', groupId);
+            return false;
+          }
         } catch (error) {
-          console.error('E2E: Key initialization failed:', error);
+          console.error('E2E: Failed to fetch encryption key:', error);
           return false;
         }
       },
@@ -2247,16 +2251,13 @@
         try {
           if (!encryptedText || !groupId) return encryptedText;
           
-          // Try cached key first, then fall back to localStorage
-          let key = this.keys[groupId];
-          if (!key) {
-            const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
-            if (storedKey) {
-              this.keys[groupId] = storedKey;
-              key = storedKey;
-              console.log(`🔐 E2E: Loaded key from storage for group ${groupId}`);
-            }
+          // Check if text looks like encrypted data
+          if (!encryptedText.includes('U2FsdGVk')) {
+            return encryptedText; // Not encrypted
           }
+          
+          // Use cached key
+          const key = this.keys[groupId];
           if (!key) {
             console.warn('E2E: No key found for group', groupId);
             return encryptedText;
@@ -2335,6 +2336,9 @@
         url.searchParams.delete('groupId');
         window.history.replaceState({}, '', url);
       }
+      
+      // Initialize right sidebar with community view
+      updateRightSidebarForCommunity();
       
       console.log('Starting with Announcements tab (default)');
       // Show announcements by default (Announcements tab is already active)
@@ -3341,6 +3345,9 @@
           leftFooterBtn.onclick = showCreateAnnouncementModal;
         }
         
+        // Reset right sidebar to community view
+        updateRightSidebarForCommunity();
+        
         // Load announcements (will also set centerFooter)
         loadAnnouncements();
       } else if (tab === 'groups') {
@@ -3368,6 +3375,9 @@
         // Clear current group selection when switching to Groups tab
         state.currentGroupId = null;
         
+        // Reset right sidebar to community view when on Groups tab but no group selected
+        updateRightSidebarForCommunity();
+        
         // Load groups
         renderGroupsList();
       } else if (tab === 'folders') {
@@ -3392,12 +3402,18 @@
           centerFooter.style.display = 'block';
         }
         
+        // Reset right sidebar to community view
+        updateRightSidebarForCommunity();
+        
         // Load folders
         renderFoldersList();
       } else if (tab === 'github') {
         // GitHub Integration tab
         if (centerTitle) centerTitle.textContent = 'GitHub Integration';
         if (centerSubtitle) centerSubtitle.textContent = 'Connect your repositories';
+        
+        // Reset right sidebar to community view
+        updateRightSidebarForCommunity();
         
         // Hide both footers (GitHub has its own connect button in content)
         leftFooter.style.display = 'none';
@@ -3442,14 +3458,38 @@
       url.searchParams.set('groupId', groupId);
       window.history.pushState({}, '', url);
 
-      // Auto-join group if not already a member
+      // Check if user is a member, if not and group is private, show join request
       try {
-        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, {
-          method: 'POST'
-        });
-        console.log('Joined group successfully');
+        const groupDetails = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
+        
+        // If user is not a member (is_member is 0 or undefined)
+        if (!groupDetails.group.is_member || groupDetails.group.is_member === 0) {
+          // Not a member
+          if (groupDetails.group.is_public === 0) {
+            // Private group - show join request button instead of auto-joining
+            showPrivateGroupJoinRequest(groupId, groupDetails.group);
+            return;
+          } else {
+            // Public group - try to auto join
+            try {
+              await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, {
+                method: 'POST'
+              });
+              console.log('Joined group successfully');
+            } catch (joinError) {
+              // If join fails (already member, blocked, etc), continue anyway
+              console.log('Join attempt:', joinError.message);
+              // If blocked, show error and return
+              if (joinError.message.includes('blocked')) {
+                InnovateAPI.showAlert('You are blocked from this group', 'error');
+                return;
+              }
+            }
+          }
+        }
       } catch (error) {
-        console.log('Already a member or error joining:', error.message);
+        console.log('Error checking group membership:', error.message);
+        // Continue anyway - user might already be a member
       }
 
       // Update header
@@ -3485,9 +3525,396 @@
 
       state.currentView = 'chat';
       console.log('About to call loadGroupView with groupId:', groupId);
+      
+      // Update right sidebar with group information
+      await updateRightSidebarForGroup(groupId, group);
+      
       await loadGroupView(groupId);
       console.log('loadGroupView completed');
       renderGroupsList(); // Update active state
+    }
+
+    // ==================== UPDATE RIGHT SIDEBAR FOR GROUP ====================
+    async function updateRightSidebarForGroup(groupId, group) {
+      try {
+        // Fetch full group details
+        const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
+        const groupData = response.group;
+        const currentUser = InnovateAPI.getCurrentUser();
+        
+        // Update avatar with cache busting
+        const rightAvatar = document.getElementById('rightAvatar');
+        if (groupData.profile_picture) {
+          const cacheBuster = `?t=${Date.now()}`;
+          rightAvatar.innerHTML = `<img src="${groupData.profile_picture}${cacheBuster}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-users\\'></i>'">`;
+        } else {
+          rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
+        }
+        
+        // Update name and meta
+        document.getElementById('rightName').textContent = groupData.name;
+        const privacyLabel = groupData.is_public === 0 ? '🔒 Private Group' : '🌐 Public Group';
+        document.getElementById('rightMeta').textContent = privacyLabel;
+        
+        // Update description
+        document.getElementById('rightDescription').textContent = groupData.description || 'No description';
+        
+        // Update action buttons for group context
+        const rightActions = document.querySelector('.right-actions');
+        const isAdmin = groupData.creator_id === currentUser.id;
+        
+        rightActions.innerHTML = `
+          <div class="right-action" onclick="showInviteLinkModal(${groupId})">
+            <div class="action-circle">
+              <i class="fas fa-link"></i>
+            </div>
+            <div class="action-label">Invite Link</div>
+          </div>
+
+          <div class="right-action" onclick="addGroupMembers()">
+            <div class="action-circle">
+              <i class="fas fa-user-plus"></i>
+            </div>
+            <div class="action-label">Add members</div>
+          </div>
+
+          ${isAdmin ? `
+          <div class="right-action" onclick="showGroupSettings()">
+            <div class="action-circle">
+              <i class="fas fa-cog"></i>
+            </div>
+            <div class="action-label">Settings</div>
+          </div>
+          ` : ''}
+        `;
+        
+        // Update Edit Profile button
+        const editBtn = document.querySelector('.right-section button.btn-text');
+        if (isAdmin) {
+          editBtn.style.display = 'block';
+          editBtn.onclick = () => showGroupSettings();
+          editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Group';
+        } else {
+          editBtn.style.display = 'none';
+        }
+        
+        // Update member count
+        document.getElementById('memberCountBadge').textContent = `(${groupData.member_count || 0})`;
+        
+        // Hide community-specific options, show group-specific options
+        const menuItems = document.querySelectorAll('.community-right .menu-item');
+        menuItems.forEach(item => {
+          const text = item.textContent.toLowerCase();
+          if (text.includes('leave community') || text.includes('manage groups') || 
+              text.includes('view groups') || text.includes('community settings') || 
+              text.includes('github integration')) {
+            item.style.display = 'none';
+          } else if (text.includes('view members')) {
+            item.onclick = () => viewGroupMembers(groupId);
+            item.style.display = 'flex';
+          } else if (text.includes('add members')) {
+            item.onclick = () => addGroupMembers();
+            item.style.display = 'flex';
+          }
+        });
+        
+        // Add Leave Group option
+        const leaveGroupItem = document.createElement('div');
+        leaveGroupItem.className = 'menu-item';
+        leaveGroupItem.style.color = 'var(--ig-error)';
+        leaveGroupItem.onclick = () => leaveGroup(groupId);
+        leaveGroupItem.innerHTML = `
+          <div class="menu-left">
+            <div class="menu-icon"><i class="fas fa-sign-out-alt"></i></div>
+            <div>Leave group</div>
+          </div>
+          <i class="fas fa-chevron-right"></i>
+        `;
+        
+        // Remove existing leave group item if any
+        const existingLeaveGroup = Array.from(menuItems).find(item => item.textContent.toLowerCase().includes('leave group'));
+        if (existingLeaveGroup) existingLeaveGroup.remove();
+        
+        // Add after the last visible menu item
+        const lastVisibleItem = Array.from(menuItems).filter(item => item.style.display !== 'none').pop();
+        if (lastVisibleItem) {
+          lastVisibleItem.after(leaveGroupItem);
+        }
+        
+        // Hide admin features section for now
+        const adminFeatures = document.getElementById('adminOnlyFeatures');
+        if (adminFeatures) {
+          adminFeatures.style.display = 'none';
+        }
+        
+      } catch (error) {
+        console.error('Error updating right sidebar for group:', error);
+      }
+    }
+
+    // Helper functions for group actions
+    function startGroupVideoCall() {
+      switchCenterTab('calls');
+    }
+
+    function addGroupMembers() {
+      InnovateAPI.showAlert('Add members feature coming soon!', 'info');
+    }
+
+    function viewGroupMembers(groupId) {
+      switchCenterTab('members');
+    }
+
+    async function leaveGroup(groupId) {
+      if (!confirm('Are you sure you want to leave this group?')) {
+        return;
+      }
+
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/leave`, {
+          method: 'POST'
+        });
+
+        InnovateAPI.showAlert('Left group successfully', 'success');
+        
+        // Reload groups and switch back to community view
+        await loadGroups();
+        resetToCommunityView();
+      } catch (error) {
+        console.error('Error leaving group:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function showGroupSettings() {
+      if (!state.currentGroupId) return;
+      
+      try {
+        const response = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}`);
+        const group = response.group;
+        const currentUser = InnovateAPI.getCurrentUser();
+        const isAdmin = group.creator_id === currentUser.id || group.role === 'admin' || group.role === 'creator';
+        
+        if (!isAdmin) {
+          InnovateAPI.showAlert('Only admins can access group settings', 'error');
+          return;
+        }
+        
+        showGroupSettingsModal(group);
+      } catch (error) {
+        console.error('Error loading group settings:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function showGroupSettingsModal(group) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="min-width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0; position: sticky; top: 0; z-index: 10; position: relative;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <i class="fas fa-cog" style="font-size: 24px;"></i>
+              <div>
+                <div style="font-size: 20px; font-weight: 700;">Group Settings</div>
+                <div style="font-size: 13px; opacity: 0.9;">Manage ${group.name}</div>
+              </div>
+            </div>
+            <button onclick="this.closest('.ig-modal-overlay').remove()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 28px; cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center; font-weight: 300;">×</button>
+          </div>
+          
+          <div style="padding: 24px;">
+            <!-- Tabs -->
+            <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--ig-border); margin-bottom: 24px; overflow-x: auto;">
+              <button class="group-settings-tab active" data-tab="general" onclick="switchGroupSettingsTab('general')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                <i class="fas fa-info-circle"></i> General
+              </button>
+              <button class="group-settings-tab" data-tab="members" onclick="switchGroupSettingsTab('members')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                <i class="fas fa-users"></i> Members
+              </button>
+              <button class="group-settings-tab" data-tab="requests" onclick="switchGroupSettingsTab('requests')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                <i class="fas fa-user-clock"></i> Requests <span id="requestsBadge" style="display: none; background: var(--ig-error); color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 4px;">0</span>
+              </button>
+              <button class="group-settings-tab" data-tab="blocked" onclick="switchGroupSettingsTab('blocked')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                <i class="fas fa-ban"></i> Blocked
+              </button>
+            </div>
+            
+            <!-- General Tab -->
+            <div id="generalTab" class="group-settings-content">
+              <form id="groupSettingsForm" onsubmit="saveGroupSettings(event, ${group.id})">
+                <!-- Profile Picture -->
+                <div style="margin-bottom: 20px; text-align: center;">
+                  <div style="position: relative; width: 120px; height: 120px; margin: 0 auto 16px;">
+                    <img id="settingsGroupPicture" src="${group.profile_picture || '/images/default-avatar.svg'}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--ig-border);">
+                    <button type="button" onclick="document.getElementById('settingsProfilePicture').click()" style="position: absolute; bottom: 0; right: 0; width: 36px; height: 36px; background: var(--ig-blue); color: white; border: 2px solid var(--ig-primary-background); border-radius: 50%; cursor: pointer; font-size: 16px;">
+                      <i class="fas fa-camera"></i>
+                    </button>
+                  </div>
+                  <input type="file" id="settingsProfilePicture" accept="image/*" style="display: none;" onchange="previewSettingsGroupPictureWithCrop(event)">
+                  <div style="font-size: 13px; color: var(--ig-secondary-text); margin-top: 8px;">Click camera to upload and adjust</div>
+                </div>
+                
+                <!-- Group Name -->
+                <div style="margin-bottom: 16px;">
+                  <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;"><i class="fas fa-tag"></i> Group Name *</label>
+                  <input type="text" id="settingsGroupName" value="${group.name}" required style="width: 100%; padding: 12px; border: 2px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px;">
+                </div>
+                
+                <!-- Description -->
+                <div style="margin-bottom: 16px;">
+                  <label style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px;"><i class="fas fa-align-left"></i> Description</label>
+                  <textarea id="settingsGroupDescription" rows="4" style="width: 100%; padding: 12px; border: 2px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; resize: vertical; font-family: inherit;">${group.description || ''}</textarea>
+                </div>
+                
+                <!-- Privacy -->
+                <div style="background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <div style="font-weight: 600; margin-bottom: 4px;"><i class="fas fa-lock"></i> Public Group</div>
+                      <div style="font-size: 13px; color: var(--ig-secondary-text);">Anyone in the community can see and join</div>
+                    </div>
+                    <div class="ig-toggle-switch ${group.is_public !== 0 ? 'active' : ''}" id="settingsPrivacyToggle" onclick="this.classList.toggle('active')">
+                      <div class="ig-toggle-slider"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Save Button -->
+                <button type="submit" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px;">
+                  <i class="fas fa-save"></i> Save Changes
+                </button>
+              </form>
+            </div>
+            
+            <!-- Members Tab -->
+            <div id="membersTab" class="group-settings-content" style="display: none;">
+              <div id="membersList"></div>
+            </div>
+            
+            <!-- Requests Tab -->
+            <div id="requestsTab" class="group-settings-content" style="display: none;">
+              <div id="requestsList"></div>
+            </div>
+            
+            <!-- Blocked Tab -->
+            <div id="blockedTab" class="group-settings-content" style="display: none;">
+              <div id="blockedList"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Load initial data
+      loadGroupMembers(group.id);
+      loadJoinRequests(group.id);
+      loadBlockedMembers(group.id);
+      
+      // Add CSS for active tab
+      const style = document.createElement('style');
+      style.textContent = `
+        .group-settings-tab.active {
+          color: var(--ig-primary-text) !important;
+          border-bottom-color: #11998e !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    function resetToCommunityView() {
+      state.currentGroupId = null;
+      
+      // Update URL
+      const url = new URL(window.location);
+      url.searchParams.delete('groupId');
+      window.history.pushState({}, '', url);
+      
+      // Reset center panel
+      document.getElementById('centerTitle').textContent = state.community?.name || 'Community';
+      document.getElementById('centerSubtitle').textContent = 'Select a group to start';
+      document.getElementById('centerTabs').style.display = 'none';
+      document.getElementById('centerContent').innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);"><i class="fas fa-users" style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;"></i><h3>No Group Selected</h3><p>Choose a group from the sidebar to get started</p></div>';
+      
+      // Reset right sidebar to community view
+      updateRightSidebarForCommunity();
+    }
+
+    function updateRightSidebarForCommunity() {
+      if (!state.community) return;
+      
+      const rightAvatar = document.getElementById('rightAvatar');
+      if (state.community.banner_image) {
+        rightAvatar.innerHTML = `<img src="${state.community.banner_image}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+      } else {
+        rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
+      }
+      
+      document.getElementById('rightName').textContent = state.community.name;
+      document.getElementById('rightMeta').textContent = `Community · ${state.groups?.length || 0} groups`;
+      document.getElementById('rightDescription').textContent = state.community.description || 'No description';
+      
+      // Reset action buttons
+      const rightActions = document.querySelector('.right-actions');
+      rightActions.innerHTML = `
+        <div class="right-action" onclick="inviteMembers()">
+          <div class="action-circle">
+            <i class="fas fa-link"></i>
+          </div>
+          <div class="action-label">Invite</div>
+        </div>
+
+        <div class="right-action" onclick="addMembers()">
+          <div class="action-circle">
+            <i class="fas fa-user-plus"></i>
+          </div>
+          <div class="action-label">Add members</div>
+        </div>
+
+        <div class="right-action" onclick="showCreateGroupModal()">
+          <div class="action-circle">
+            <i class="fas fa-users-cog"></i>
+          </div>
+          <div class="action-label">Add groups</div>
+        </div>
+      `;
+      
+      // Show all community menu items
+      const menuItems = document.querySelectorAll('.community-right .menu-item');
+      menuItems.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        if (text.includes('leave group')) {
+          item.remove();
+        } else {
+          item.style.display = 'flex';
+          
+          // Reset onclick handlers
+          if (text.includes('view members')) {
+            item.onclick = () => viewMembers();
+          } else if (text.includes('add members')) {
+            item.onclick = () => addMembers();
+          } else if (text.includes('leave community')) {
+            item.onclick = () => leaveCommunity();
+          } else if (text.includes('manage groups')) {
+            item.onclick = () => manageGroups();
+          } else if (text.includes('view groups')) {
+            item.onclick = () => viewAllGroups();
+          } else if (text.includes('community settings')) {
+            item.onclick = () => showCommunitySettings();
+          } else if (text.includes('github')) {
+            item.onclick = () => showGitHubIntegration();
+          }
+        }
+      });
+      
+      // Reset Edit Profile button
+      const editBtn = document.querySelector('.right-section button.btn-text');
+      if (editBtn) {
+        editBtn.style.display = 'block';
+        editBtn.onclick = () => editCommunityProfile();
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
+      }
     }
 
     // ==================== VIEW LOADING ====================
@@ -3540,6 +3967,11 @@
       // Load messages
       try {
         console.log('Fetching posts from:', `/community-groups/${groupId}/posts`);
+        
+        // Initialize E2E encryption for this group BEFORE fetching messages
+        await E2EEncryption.initForGroup(groupId);
+        console.log('🔐 E2E initialized for group', groupId);
+        
         const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
         console.log('Posts response:', res);
         console.log('Posts array:', res.posts);
@@ -3637,8 +4069,11 @@
       try {
         console.log('Sending POST to:', `/community-groups/${state.currentGroupId}/posts`);
         
-        // Note: E2E encryption disabled for group messages (requires shared key)
-        // const encryptedMessage = E2EEncryption.encrypt(message, state.currentGroupId);
+        // Initialize E2E encryption for this group
+        await E2EEncryption.initForGroup(state.currentGroupId);
+        
+        // Encrypt message content
+        const encryptedMessage = E2EEncryption.encrypt(message, state.currentGroupId);
         
         // Extract URLs from message for links folder
         const urlRegex = /(https?:\/\/[^\s<]+)/g;
@@ -3660,8 +4095,8 @@
         
         const formData = new FormData();
         if (message) {
-          formData.append('content', message);
-          console.log('Added content to FormData');
+          formData.append('content', encryptedMessage);
+          console.log('🔐 Added ENCRYPTED content to FormData');
         }
         
         // Add reply_to if replying
@@ -5164,6 +5599,28 @@
           <button class="modal-close" onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
         </div>
         <form onsubmit="createGroup(event)" style="padding: 24px;">
+          <!-- Group Profile Picture -->
+          <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-image" style="color: #11998e;"></i>
+              <span>Group Picture</span>
+              <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 16px; align-items: center;">
+              <div style="position: relative; width: 120px; height: 120px;">
+                <img id="groupPicturePreview" src="/images/default-avatar.svg" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--ig-border);">
+                <button type="button" onclick="document.getElementById('groupPicture').click()" style="position: absolute; bottom: 0; right: 0; width: 36px; height: 36px; background: var(--ig-blue); color: white; border: 2px solid var(--ig-primary-background); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                  <i class="fas fa-camera"></i>
+                </button>
+              </div>
+              <input type="file" id="groupPicture" accept="image/*" style="display: none;" onchange="previewGroupPictureWithCrop(event)">
+              <div style="text-align: center;">
+                <div style="font-size: 13px; color: var(--ig-secondary-text); margin-bottom: 4px;">Click camera to upload and adjust</div>
+                <div style="font-size: 12px; color: var(--ig-tertiary-text);">You can crop and rotate your image</div>
+              </div>
+            </div>
+          </div>
+          
           <!-- Group Name Input -->
           <div style="margin-bottom: 20px;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
@@ -5174,13 +5631,36 @@
           </div>
           
           <!-- Description Textarea -->
-          <div style="margin-bottom: 24px;">
+          <div style="margin-bottom: 20px;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
               <i class="fas fa-align-left" style="color: #11998e;"></i>
               <span>Description</span>
               <span style="font-size: 12px; font-weight: 400; color: var(--ig-secondary-text);">(optional)</span>
             </label>
             <textarea id="groupDescription" rows="4" placeholder="What is this group about? Who should join?" style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical; font-size: 15px; line-height: 1.6; transition: all 0.2s; outline: none; font-family: inherit;" onfocus="this.style.borderColor='#11998e'" onblur="this.style.borderColor='var(--ig-border)'"></textarea>
+          </div>
+          
+          <!-- Privacy Setting -->
+          <div style="margin-bottom: 24px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
+              <i class="fas fa-lock" style="color: #11998e;"></i>
+              <span>Privacy</span>
+            </label>
+            <div style="background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; color: var(--ig-primary-text);">Public Group</div>
+                  <div style="font-size: 13px; color: var(--ig-secondary-text);">Anyone in the community can see and join this group</div>
+                </div>
+                <div class="ig-toggle-switch active" id="groupPrivacyToggle" onclick="toggleGroupPrivacy()" style="cursor: pointer;">
+                  <div class="ig-toggle-slider"></div>
+                </div>
+              </div>
+              <div id="privacyHelpText" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ig-border); font-size: 13px; color: var(--ig-secondary-text); display: flex; align-items: start; gap: 8px;">
+                <i class="fas fa-globe" style="color: #11998e; margin-top: 2px;"></i>
+                <span>This group will be visible in the community groups list</span>
+              </div>
+            </div>
           </div>
           
           <!-- Action Buttons -->
@@ -5196,18 +5676,778 @@
       `);
     }
 
+    function previewGroupPicture(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('groupPicturePreview').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Create group with crop functionality
+    let createGroupCropper = null;
+    let croppedCreateGroupImageBlob = null;
+
+    function previewGroupPictureWithCrop(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        showCreateGroupImageCropModal(e.target.result, (croppedBlob) => {
+          // Update preview with cropped image
+          const previewUrl = URL.createObjectURL(croppedBlob);
+          document.getElementById('groupPicturePreview').src = previewUrl;
+          croppedCreateGroupImageBlob = croppedBlob;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function showCreateGroupImageCropModal(imageSrc, onCropComplete) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.style.zIndex = '10001';
+      modal.innerHTML = `
+        <div class="ig-modal" style="min-width: 600px; max-width: 90%; max-height: 90vh; overflow: hidden;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+            <div style="font-size: 18px; font-weight: 700; text-align: center;">
+              <i class="fas fa-crop"></i> Adjust Group Picture
+            </div>
+          </div>
+          
+          <div style="padding: 20px; background: #000;">
+            <div style="max-height: 400px; overflow: hidden;">
+              <img id="createGroupCropperImage" src="${imageSrc}" style="max-width: 100%; display: block;">
+            </div>
+          </div>
+          
+          <div style="padding: 16px; display: flex; gap: 12px; justify-content: center; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border);">
+            <button onclick="rotateCreateGroupCropperLeft()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="rotateCreateGroupCropperRight()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="zoomCreateGroupCropperIn()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-search-plus"></i> Zoom In
+            </button>
+            <button onclick="zoomCreateGroupCropperOut()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-search-minus"></i> Zoom Out
+            </button>
+          </div>
+          
+          <div style="padding: 20px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--ig-border);">
+            <button onclick="closeCreateGroupCropModal()" style="padding: 12px 24px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              Cancel
+            </button>
+            <button onclick="applyCreateGroupCrop()" style="padding: 12px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700;">
+              <i class="fas fa-check"></i> Apply
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Initialize cropper
+      const image = document.getElementById('createGroupCropperImage');
+      createGroupCropper = new Cropper(image, {
+        aspectRatio: 1,
+        viewMode: 2,
+        dragMode: 'move',
+        autoCropArea: 1,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+      
+      // Store callback
+      modal.onCropComplete = onCropComplete;
+    }
+
+    function rotateCreateGroupCropperLeft() {
+      if (createGroupCropper) {
+        createGroupCropper.rotate(-90);
+      }
+    }
+
+    function rotateCreateGroupCropperRight() {
+      if (createGroupCropper) {
+        createGroupCropper.rotate(90);
+      }
+    }
+
+    function zoomCreateGroupCropperIn() {
+      if (createGroupCropper) {
+        createGroupCropper.zoom(0.1);
+      }
+    }
+
+    function zoomCreateGroupCropperOut() {
+      if (createGroupCropper) {
+        createGroupCropper.zoom(-0.1);
+      }
+    }
+
+    function closeCreateGroupCropModal() {
+      const modal = document.querySelector('.ig-modal-overlay[style*="10001"]');
+      if (modal) {
+        if (createGroupCropper) {
+          createGroupCropper.destroy();
+          createGroupCropper = null;
+        }
+        modal.remove();
+      }
+      // Clear file input
+      const fileInput = document.getElementById('groupPicture');
+      if (fileInput) fileInput.value = '';
+    }
+
+    function applyCreateGroupCrop() {
+      if (!createGroupCropper) return;
+      
+      const modal = document.querySelector('.ig-modal-overlay[style*="10001"]');
+      
+      createGroupCropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingQuality: 'high'
+      }).toBlob((blob) => {
+        if (modal && modal.onCropComplete) {
+          modal.onCropComplete(blob);
+        }
+        
+        if (createGroupCropper) {
+          createGroupCropper.destroy();
+          createGroupCropper = null;
+        }
+        
+        if (modal) {
+          modal.remove();
+        }
+      }, 'image/jpeg', 0.9);
+    }
+
+    // Image crop functionality for group settings
+    let groupPictureCropper = null;
+    let croppedGroupImageBlob = null;
+
+    function previewSettingsGroupPictureWithCrop(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        showImageCropModal(e.target.result, (croppedBlob) => {
+          // Update preview with cropped image
+          const previewUrl = URL.createObjectURL(croppedBlob);
+          document.getElementById('settingsGroupPicture').src = previewUrl;
+          croppedGroupImageBlob = croppedBlob;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function showImageCropModal(imageSrc, onCropComplete) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.style.zIndex = '10000';
+      modal.innerHTML = `
+        <div class="ig-modal" style="min-width: 600px; max-width: 90%; max-height: 90vh; overflow: hidden;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+            <div style="font-size: 18px; font-weight: 700; text-align: center;">
+              <i class="fas fa-crop"></i> Adjust Image
+            </div>
+          </div>
+          
+          <div style="padding: 20px; background: #000;">
+            <div style="max-height: 400px; overflow: hidden;">
+              <img id="cropperImage" src="${imageSrc}" style="max-width: 100%; display: block;">
+            </div>
+          </div>
+          
+          <div style="padding: 16px; display: flex; gap: 12px; justify-content: center; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border);">
+            <button onclick="rotateCropperLeft()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-undo"></i> Rotate Left
+            </button>
+            <button onclick="rotateCropperRight()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-redo"></i> Rotate Right
+            </button>
+            <button onclick="zoomCropperIn()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-search-plus"></i> Zoom In
+            </button>
+            <button onclick="zoomCropperOut()" style="padding: 10px 16px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              <i class="fas fa-search-minus"></i> Zoom Out
+            </button>
+          </div>
+          
+          <div style="padding: 20px; display: flex; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--ig-border);">
+            <button onclick="closeCropModal()" style="padding: 12px 24px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); border-radius: 8px; cursor: pointer; font-weight: 600;">
+              Cancel
+            </button>
+            <button onclick="applyCrop()" style="padding: 12px 24px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700;">
+              <i class="fas fa-check"></i> Apply
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Initialize cropper
+      const image = document.getElementById('cropperImage');
+      groupPictureCropper = new Cropper(image, {
+        aspectRatio: 1,
+        viewMode: 2,
+        dragMode: 'move',
+        autoCropArea: 1,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+      
+      // Store callback
+      modal.onCropComplete = onCropComplete;
+    }
+
+    function rotateCropperLeft() {
+      if (groupPictureCropper) {
+        groupPictureCropper.rotate(-90);
+      }
+    }
+
+    function rotateCropperRight() {
+      if (groupPictureCropper) {
+        groupPictureCropper.rotate(90);
+      }
+    }
+
+    function zoomCropperIn() {
+      if (groupPictureCropper) {
+        groupPictureCropper.zoom(0.1);
+      }
+    }
+
+    function zoomCropperOut() {
+      if (groupPictureCropper) {
+        groupPictureCropper.zoom(-0.1);
+      }
+    }
+
+    function closeCropModal() {
+      const modal = document.querySelector('.ig-modal-overlay[style*="10000"]');
+      if (modal) {
+        if (groupPictureCropper) {
+          groupPictureCropper.destroy();
+          groupPictureCropper = null;
+        }
+        modal.remove();
+      }
+      // Clear file input
+      const fileInput = document.getElementById('settingsProfilePicture');
+      if (fileInput) fileInput.value = '';
+    }
+
+    function applyCrop() {
+      if (!groupPictureCropper) return;
+      
+      const modal = document.querySelector('.ig-modal-overlay[style*="10000"]');
+      
+      groupPictureCropper.getCroppedCanvas({
+        width: 400,
+        height: 400,
+        imageSmoothingQuality: 'high'
+      }).toBlob((blob) => {
+        if (modal && modal.onCropComplete) {
+          modal.onCropComplete(blob);
+        }
+        
+        if (groupPictureCropper) {
+          groupPictureCropper.destroy();
+          groupPictureCropper = null;
+        }
+        
+        if (modal) {
+          modal.remove();
+        }
+      }, 'image/jpeg', 0.9);
+    }
+
+    // Save group settings function
+    async function saveGroupSettings(event, groupId) {
+      event.preventDefault();
+      
+      try {
+        const name = document.getElementById('settingsGroupName').value;
+        const description = document.getElementById('settingsGroupDescription').value;
+        const isPublic = document.getElementById('settingsPrivacyToggle').classList.contains('active') ? 1 : 0;
+        
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('is_public', isPublic);
+        
+        // Add cropped image if available
+        if (croppedGroupImageBlob) {
+          formData.append('profile_picture', croppedGroupImageBlob, 'profile_picture.jpg');
+        }
+        
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to update group settings');
+        }
+        
+        InnovateAPI.showAlert('Group settings updated successfully!', 'success');
+        
+        // Close modal
+        const modal = document.querySelector('.ig-modal-overlay');
+        if (modal) modal.remove();
+        
+        // Reset cropped image
+        croppedGroupImageBlob = null;
+        
+        // Reload groups and refresh view
+        await loadGroups();
+        if (state.currentGroupId === groupId) {
+          await selectGroup(groupId);
+        }
+        
+        // Notify via socket
+        if (state.socket) {
+          state.socket.emit('group:updated', { groupId, communityId: state.communityId });
+        }
+      } catch (error) {
+        console.error('Error saving group settings:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Switch tabs in group settings
+    function switchGroupSettingsTab(tabName) {
+      // Update tab buttons
+      document.querySelectorAll('.group-settings-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.tab === tabName) {
+          tab.classList.add('active');
+        }
+      });
+      
+      // Show/hide content
+      document.querySelectorAll('.group-settings-content').forEach(content => {
+        content.style.display = 'none';
+      });
+      document.getElementById(`${tabName}Tab`).style.display = 'block';
+    }
+
+    // Load group members for settings
+    async function loadGroupMembers(groupId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        const membersList = document.getElementById('membersList');
+        if (data.members && data.members.length > 0) {
+          membersList.innerHTML = data.members.map(member => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
+              <img src="${member.profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${member.username}</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">${member.role}</div>
+              </div>
+              ${member.role !== 'admin' ? `
+                <button onclick="removeMember(${groupId}, ${member.user_id})" style="padding: 8px 16px; background: var(--ig-error); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                  <i class="fas fa-times"></i> Remove
+                </button>
+              ` : '<span style="color: var(--ig-secondary-text); font-size: 12px;">Admin</span>'}
+            </div>
+          `).join('');
+        } else {
+          membersList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No members yet</div>';
+        }
+      } catch (error) {
+        console.error('Error loading members:', error);
+      }
+    }
+
+    // Load join requests for settings
+    async function loadJoinRequests(groupId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        const requestsList = document.getElementById('requestsList');
+        const badge = document.getElementById('requestsBadge');
+        
+        if (data.requests && data.requests.length > 0) {
+          badge.textContent = data.requests.length;
+          badge.style.display = 'inline';
+          
+          requestsList.innerHTML = data.requests.map(request => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
+              <img src="${request.profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${request.username}</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">Requested ${InnovateAPI.formatDate(request.created_at)}</div>
+              </div>
+              <button onclick="approveJoinRequest(${groupId}, ${request.user_id})" style="padding: 8px 16px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-right: 8px;">
+                <i class="fas fa-check"></i> Approve
+              </button>
+              <button onclick="rejectJoinRequest(${groupId}, ${request.user_id})" style="padding: 8px 16px; background: var(--ig-error); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-times"></i> Reject
+              </button>
+            </div>
+          `).join('');
+        } else {
+          badge.style.display = 'none';
+          requestsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No pending requests</div>';
+        }
+      } catch (error) {
+        console.error('Error loading join requests:', error);
+      }
+    }
+
+    // Load blocked members for settings
+    async function loadBlockedMembers(groupId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/blocked`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        const blockedList = document.getElementById('blockedList');
+        if (data.blocked && data.blocked.length > 0) {
+          blockedList.innerHTML = data.blocked.map(user => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
+              <img src="${user.profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${user.username}</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">Blocked ${InnovateAPI.formatDate(user.blocked_at)}</div>
+              </div>
+              <button onclick="unblockMember(${groupId}, ${user.user_id})" style="padding: 8px 16px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-unlock"></i> Unblock
+              </button>
+            </div>
+          `).join('');
+        } else {
+          blockedList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No blocked users</div>';
+        }
+      } catch (error) {
+        console.error('Error loading blocked members:', error);
+      }
+    }
+
+    // Remove member from group
+    async function removeMember(groupId, userId) {
+      if (!confirm('Are you sure you want to remove this member?')) return;
+      
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Member removed successfully', 'success');
+        await loadGroupMembers(groupId);
+      } catch (error) {
+        console.error('Error removing member:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Approve join request
+    async function approveJoinRequest(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests/${userId}/approve`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Join request approved', 'success');
+        await loadJoinRequests(groupId);
+        await loadGroupMembers(groupId);
+      } catch (error) {
+        console.error('Error approving request:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Reject join request
+    async function rejectJoinRequest(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests/${userId}/reject`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Join request rejected', 'success');
+        await loadJoinRequests(groupId);
+      } catch (error) {
+        console.error('Error rejecting request:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Unblock member
+    async function unblockMember(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/blocked/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Member unblocked successfully', 'success');
+        await loadBlockedMembers(groupId);
+      } catch (error) {
+        console.error('Error unblocking member:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Invite Link Modal
+    function showInviteLinkModal(groupId) {
+      const group = state.groups.find(g => g.id === groupId);
+      if (!group) return;
+      
+      const inviteLink = `${window.location.origin}/community/${state.communityId}?groupId=${groupId}`;
+      
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="min-width: 500px; max-width: 90%; overflow: hidden;">
+          <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
+            <div style="text-align: center;">
+              <i class="fas fa-link" style="font-size: 32px; margin-bottom: 8px;"></i>
+              <div style="font-size: 20px; font-weight: 700;">Invite to ${group.name}</div>
+              <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Share this link to invite members</div>
+            </div>
+            <button onclick="this.closest('.ig-modal-overlay').remove()" style="position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 24px; cursor: pointer;">×</button>
+          </div>
+          
+          <div style="padding: 24px;">
+            <!-- Invite Link -->
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 12px; font-size: 14px; color: var(--ig-primary-text);">
+                <i class="fas fa-link"></i> Group Invite Link
+              </label>
+              <div style="display: flex; gap: 12px;">
+                <input type="text" id="inviteLinkInput" value="${inviteLink}" readonly style="flex: 1; padding: 12px; border: 2px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; font-family: monospace;">
+                <button onclick="copyInviteLink()" style="padding: 12px 20px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+                  <i class="fas fa-copy"></i> Copy
+                </button>
+              </div>
+            </div>
+            
+            <!-- Share via Apps -->
+            <div>
+              <label style="display: block; font-weight: 600; margin-bottom: 12px; font-size: 14px; color: var(--ig-primary-text);">
+                <i class="fas fa-share-alt"></i> Share via
+              </label>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <!-- WhatsApp -->
+                <div onclick="shareViaWhatsApp('${inviteLink}', '${group.name}')" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 2px solid var(--ig-border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--ig-secondary-background);" onmouseover="this.style.borderColor='#25D366'; this.style.transform='scale(1.05)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.transform='scale(1)'">
+                  <div style="width: 48px; height: 48px; background: #25D366; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                    <i class="fab fa-whatsapp"></i>
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">WhatsApp</div>
+                </div>
+                
+                <!-- Telegram -->
+                <div onclick="shareViaTelegram('${inviteLink}', '${group.name}')" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 2px solid var(--ig-border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--ig-secondary-background);" onmouseover="this.style.borderColor='#0088cc'; this.style.transform='scale(1.05)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.transform='scale(1)'">
+                  <div style="width: 48px; height: 48px; background: #0088cc; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                    <i class="fab fa-telegram-plane"></i>
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Telegram</div>
+                </div>
+                
+                <!-- Email -->
+                <div onclick="shareViaEmail('${inviteLink}', '${group.name}')" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 2px solid var(--ig-border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--ig-secondary-background);" onmouseover="this.style.borderColor='#ea4335'; this.style.transform='scale(1.05)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.transform='scale(1)'">
+                  <div style="width: 48px; height: 48px; background: #ea4335; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                    <i class="fas fa-envelope"></i>
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Email</div>
+                </div>
+                
+                <!-- Twitter/X -->
+                <div onclick="shareViaTwitter('${inviteLink}', '${group.name}')" style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; border: 2px solid var(--ig-border); border-radius: 12px; cursor: pointer; transition: all 0.2s; background: var(--ig-secondary-background);" onmouseover="this.style.borderColor='#1DA1F2'; this.style.transform='scale(1.05)'" onmouseout="this.style.borderColor='var(--ig-border)'; this.style.transform='scale(1)'">
+                  <div style="width: 48px; height: 48px; background: #1DA1F2; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+                    <i class="fab fa-twitter"></i>
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Twitter</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- QR Code Section -->
+            <div style="margin-top: 24px; padding: 20px; background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; text-align: center;">
+              <div style="font-weight: 600; margin-bottom: 12px; color: var(--ig-primary-text);">
+                <i class="fas fa-qrcode"></i> Or scan QR Code
+              </div>
+              <div id="qrcode" style="display: flex; justify-content: center; margin: 16px 0;"></div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                Scan this code to join the group
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Generate QR Code
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(document.getElementById('qrcode'), {
+          text: inviteLink,
+          width: 160,
+          height: 160,
+          colorDark: getComputedStyle(document.documentElement).getPropertyValue('--ig-primary-text').trim(),
+          colorLight: getComputedStyle(document.documentElement).getPropertyValue('--ig-secondary-background').trim(),
+        });
+      }
+    }
+
+    function copyInviteLink() {
+      const input = document.getElementById('inviteLinkInput');
+      input.select();
+      document.execCommand('copy');
+      InnovateAPI.showAlert('Invite link copied to clipboard!', 'success');
+    }
+
+    function shareViaWhatsApp(link, groupName) {
+      const text = `Join "${groupName}" group on Innovate Hub: ${link}`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+
+    function shareViaTelegram(link, groupName) {
+      const text = `Join "${groupName}" group on Innovate Hub`;
+      const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+      window.open(telegramUrl, '_blank');
+    }
+
+    function shareViaEmail(link, groupName) {
+      const subject = `Join "${groupName}" on Innovate Hub`;
+      const body = `I'd like to invite you to join the "${groupName}" group on Innovate Hub.\n\nClick here to join: ${link}`;
+      const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailtoUrl;
+    }
+
+    function shareViaTwitter(link, groupName) {
+      const text = `Join "${groupName}" group on Innovate Hub`;
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
+      window.open(twitterUrl, '_blank');
+    }
+
+    function toggleGroupPrivacy() {
+      const toggle = document.getElementById('groupPrivacyToggle');
+      const helpText = document.getElementById('privacyHelpText');
+      toggle.classList.toggle('active');
+      
+      if (toggle.classList.contains('active')) {
+        helpText.innerHTML = '<i class="fas fa-globe" style="color: #11998e; margin-top: 2px;"></i><span>This group will be visible in the community groups list</span>';
+      } else {
+        helpText.innerHTML = '<i class="fas fa-lock" style="color: #f5576c; margin-top: 2px;"></i><span>Only members can see this group. Invite-only access.</span>';
+      }
+    }
+
     async function createGroup(e) {
       e.preventDefault();
       const name = document.getElementById('groupName').value;
       const description = document.getElementById('groupDescription').value;
+      const isPublic = document.getElementById('groupPrivacyToggle').classList.contains('active') ? 1 : 0;
 
       try {
-        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`, {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('is_public', isPublic);
+        
+        // Use cropped image if available, otherwise use file input
+        if (croppedCreateGroupImageBlob) {
+          formData.append('profile_picture', croppedCreateGroupImageBlob, 'profile_picture.jpg');
+        } else {
+          const profilePicture = document.getElementById('groupPicture').files[0];
+          if (profilePicture) {
+            formData.append('profile_picture', profilePicture);
+          }
+        }
+
+        const res = await fetch(`${InnovateAPI.API_URL}/communities/${state.communityId}/groups`, {
           method: 'POST',
-          body: JSON.stringify({ name, description })
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          },
+          body: formData
         });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to create group');
+        }
         
         console.log('Group created successfully');
+        InnovateAPI.showAlert('Group created successfully!', 'success');
+        
+        // Reset cropped image blob
+        croppedCreateGroupImageBlob = null;
+        
         closeModal();
         await loadGroups();
         
@@ -5216,6 +6456,7 @@
         }
       } catch (error) {
         console.error('Error creating group:', error);
+        InnovateAPI.showAlert(error.message, 'error');
       }
     }
     
@@ -7279,10 +8520,14 @@
       // Get the actual content text, treating null/undefined as empty string
       let contentText = msg.content || '';
       
-      // Note: E2E decryption disabled for group messages
-      // if (contentText && state.currentGroupId) {
-      //   contentText = E2EEncryption.decrypt(contentText, state.currentGroupId);
-      // }
+      // Decrypt message content if E2E is enabled
+      if (contentText && state.currentGroupId) {
+        const originalText = contentText;
+        contentText = E2EEncryption.decrypt(contentText, state.currentGroupId);
+        if (originalText !== contentText) {
+          console.log('🔓 Decrypted message:', originalText.substring(0, 20) + '... → ' + contentText);
+        }
+      }
       
       const hasContent = contentText && contentText.trim() !== '';
       const editedBadge = msg.is_edited ? '<span style="font-style: italic; opacity: 0.6; margin-left: 4px;">(edited)</span>' : '';
