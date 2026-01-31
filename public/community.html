@@ -3637,11 +3637,8 @@
       try {
         console.log('Sending POST to:', `/community-groups/${state.currentGroupId}/posts`);
         
-        // Initialize E2E encryption for this group if not already done
-        await E2EEncryption.initForGroup(state.currentGroupId);
-        
-        // Encrypt message content
-        const encryptedMessage = E2EEncryption.encrypt(message, state.currentGroupId);
+        // Note: E2E encryption disabled for group messages (requires shared key)
+        // const encryptedMessage = E2EEncryption.encrypt(message, state.currentGroupId);
         
         // Extract URLs from message for links folder
         const urlRegex = /(https?:\/\/[^\s<]+)/g;
@@ -3663,8 +3660,8 @@
         
         const formData = new FormData();
         if (message) {
-          formData.append('content', encryptedMessage);
-          console.log('🔐 Added ENCRYPTED content to FormData');
+          formData.append('content', message);
+          console.log('Added content to FormData');
         }
         
         // Add reply_to if replying
@@ -7282,10 +7279,10 @@
       // Get the actual content text, treating null/undefined as empty string
       let contentText = msg.content || '';
       
-      // Decrypt message content if E2E is enabled
-      if (contentText && state.currentGroupId) {
-        contentText = E2EEncryption.decrypt(contentText, state.currentGroupId);
-      }
+      // Note: E2E decryption disabled for group messages
+      // if (contentText && state.currentGroupId) {
+      //   contentText = E2EEncryption.decrypt(contentText, state.currentGroupId);
+      // }
       
       const hasContent = contentText && contentText.trim() !== '';
       const editedBadge = msg.is_edited ? '<span style="font-style: italic; opacity: 0.6; margin-left: 4px;">(edited)</span>' : '';

@@ -11,9 +11,96 @@ let socket = null;
 let currentGroupId = null;
 let currentCommunityId = null;
 
+// E2E Encryption Manager
+const E2EManager = {
+  keys: {},
+  
+  // Initialize E2E for a group
+  init(groupId) {
+    const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
+    if (storedKey) {
+      this.keys[groupId] = storedKey;
+      console.log(`🔐 E2E: Loaded key for group ${groupId}`);
+    } else {
+      // Generate new key for this group
+      const newKey = this.generateKey();
+      this.keys[groupId] = newKey;
+      localStorage.setItem(`e2e_key_${groupId}`, newKey);
+      console.log(`🔐 E2E: Generated new key for group ${groupId}`);
+    }
+    return this.keys[groupId];
+  },
+  
+  // Generate a random encryption key
+  generateKey() {
+    return CryptoJS.lib.WordArray.random(256 / 8).toString();
+  },
+  
+  // Encrypt message
+  encrypt(text, groupId) {
+    try {
+      if (!text) return text;
+      const key = this.keys[groupId];
+      if (!key) {
+        console.warn('E2E: No key found for group', groupId);
+        return text;
+      }
+      const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+      console.log('🔐 E2E: Encrypted message');
+      return encrypted;
+    } catch (error) {
+      console.error('E2E: Encryption failed:', error);
+      return text;
+    }
+  },
+  
+  // Decrypt message
+  decrypt(encryptedText, groupId) {
+    try {
+      if (!encryptedText) return encryptedText;
+      
+      // Check if text looks like encrypted data (Base64 format)
+      if (!encryptedText.includes('U2FsdGVk')) {
+        return encryptedText; // Not encrypted
+      }
+      
+      const key = this.keys[groupId];
+      if (!key) {
+        const storedKey = localStorage.getItem(`e2e_key_${groupId}`);
+        if (storedKey) {
+          this.keys[groupId] = storedKey;
+        } else {
+          console.warn('E2E: No key found for group', groupId);
+          return encryptedText;
+        }
+      }
+      
+      const decrypted = CryptoJS.AES.decrypt(encryptedText, this.keys[groupId]).toString(CryptoJS.enc.Utf8);
+      console.log('🔐 E2E: Decrypted message');
+      return decrypted || encryptedText;
+    } catch (error) {
+      console.error('E2E: Decryption failed:', error);
+      return encryptedText;
+    }
+  },
+  
+  // Check if E2E is enabled for this group
+  isEnabled(groupId) {
+    return !!this.keys[groupId];
+  }
+};
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   if (!InnovateAPI.requireAuth()) return;
+
+  // Clear any E2E encryption keys from localStorage (encryption disabled for groups)
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('e2e_key_')) {
+      localStorage.removeItem(key);
+      console.log('🗑️ Removed encryption key:', key);
+    }
+  });
 
   // Get group ID from URL or window global
   const urlParams = new URLSearchParams(window.location.search);
@@ -404,6 +491,8 @@ async function sendChatMessage() {
   if (!content && attachments.length === 0) return;
 
   try {
+    // Note: E2E encryption disabled for group messages
+    // (requires shared key exchange among all members)
     const formData = new FormData();
     formData.append('content', content);
     if (attachments.length > 0) {
