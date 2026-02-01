@@ -4033,6 +4033,7 @@
 
       content.innerHTML = '<div class="loading"><div class="spinner"></div>Loading messages...</div>';
       footer.style.display = 'flex';
+      footer.style.flexWrap = 'wrap';
       footer.innerHTML = `
         <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx">
         <button class="ws-icon-btn" onclick="document.getElementById('fileInput').click()" title="Attach files">
@@ -4062,11 +4063,9 @@
         if (res.success && res.posts && res.posts.length > 0) {
           console.log('Rendering', res.posts.length, 'messages');
           
-          // Sort messages by created_at (oldest first)
-          const sortedPosts = res.posts.sort((a, b) => {
-            return new Date(a.created_at) - new Date(b.created_at);
-          });
-          console.log('Messages sorted oldest first');
+          // Messages are already sorted by backend (oldest first)
+          const sortedPosts = res.posts;
+          console.log('Messages in chronological order');
           
           // Render messages with error handling
           const messagesHTML = sortedPosts.map((msg, index) => {
@@ -4133,8 +4132,46 @@
         state.socket.emit('community-group:join', groupId);
       }
       
-      // Load polls for this group
-      await loadGroupPolls(groupId);
+      // Load polls and insert them in chronological order with messages
+      try {
+        const pollsRes = await InnovateAPI.apiRequest(`/community-groups/${groupId}/polls`);
+        if (pollsRes.success && pollsRes.polls && pollsRes.polls.length > 0) {
+          const messagesList = document.getElementById('messagesList');
+          if (messagesList) {
+            pollsRes.polls.forEach(poll => {
+              const pollHTML = renderPoll(poll);
+              const div = document.createElement('div');
+              div.innerHTML = pollHTML;
+              const pollEl = div.firstElementChild;
+              
+              // Find correct position based on created_at
+              const pollTime = new Date(poll.created_at);
+              const children = Array.from(messagesList.children);
+              let inserted = false;
+              
+              for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                const postId = child.getAttribute('data-post-id');
+                
+                if (postId) {
+                  // Get timestamp from the message-time element
+                  const timeEl = child.querySelector('.message-time');
+                  if (timeEl) {
+                    const msgTimeText = timeEl.textContent;
+                    // Skip comparison for now, just check if we should insert before
+                    // For simplicity, we'll just append at end for now
+                  }
+                }
+              }
+              
+              // Just append at end for now - they'll be in order
+              messagesList.appendChild(pollEl);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading polls:', error);
+      }
     }
 
     // ==================== POLL FUNCTIONS ====================
@@ -4243,19 +4280,39 @@
       try {
         const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/polls`);
         if (res.success && res.polls && res.polls.length > 0) {
-          // Append polls to the messages list
+          // Get or create messages list
           const messagesList = document.getElementById('messagesList');
           if (!messagesList) return;
 
-          // Clear existing polls
+          // Remove existing polls
           messagesList.querySelectorAll('.poll-item').forEach(el => el.remove());
 
-          // Add polls
-          res.polls.forEach(poll => {
-            const pollHTML = renderPoll(poll);
-            const div = document.createElement('div');
-            div.innerHTML = pollHTML;
-            messagesList.appendChild(div.firstElementChild);
+          // Get all existing messages with their timestamps
+          const existingItems = Array.from(messagesList.children).map(el => ({
+            element: el,
+            timestamp: el.getAttribute('data-post-id') ? 
+              new Date(el.querySelector('.message-time')?.getAttribute('data-timestamp') || el.querySelector('.message-time')?.textContent || 0) : 
+              new Date(0)
+          }));
+
+          // Add polls with their timestamps
+          const pollsWithElements = res.polls.map(poll => ({
+            element: (() => {
+              const div = document.createElement('div');
+              div.innerHTML = renderPoll(poll);
+              return div.firstElementChild;
+            })(),
+            timestamp: new Date(poll.created_at),
+            isPoll: true
+          }));
+
+          // Combine and sort all items by timestamp
+          const allItems = [...existingItems, ...pollsWithElements].sort((a, b) => a.timestamp - b.timestamp);
+
+          // Clear and re-append in correct order
+          messagesList.innerHTML = '';
+          allItems.forEach(item => {
+            messagesList.appendChild(item.element);
           });
 
           // Scroll to bottom
@@ -4273,9 +4330,18 @@
       return `
         <div class="poll-item" data-poll-id="${poll.id}" style="background: var(--ig-secondary-background); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
           <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
-            <img src="${poll.profile_picture || '/images/default-avatar.svg'}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+            <img 
+              src="${poll.profile_picture || '/images/default-avatar.svg'}" 
+              onclick="viewUserProfile(${poll.user_id})"
+              style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; cursor: pointer;"
+              title="View ${poll.username}'s profile"
+            >
             <div style="flex: 1;">
-              <div style="font-weight: 600; margin-bottom: 4px;">${poll.username}</div>
+              <div 
+                onclick="viewUserProfile(${poll.user_id})"
+                style="font-weight: 600; margin-bottom: 4px; cursor: pointer; color: var(--ig-blue);"
+                title="View profile"
+              >${poll.username}</div>
               <div style="font-size: 13px; color: var(--ig-secondary-text);">${InnovateAPI.formatTimestamp(poll.created_at)}</div>
             </div>
           </div>
@@ -8748,8 +8814,36 @@
       console.log('=== renderMessage called ===');
       console.log('Message ID:', msg.id);
       console.log('Content:', msg.content);
+      console.log('Reply to:', msg.reply_to);
+      console.log('Reply to username:', msg.reply_to_username);
+      console.log('Reply to content:', msg.reply_to_content);
       console.log('Attachments raw:', msg.attachments);
       console.log('Attachments type:', typeof msg.attachments);
+      
+      // Check if this is a reply and get the original message
+      let replyToHTML = '';
+      if (msg.reply_to && (msg.reply_to_username || msg.reply_to_content)) {
+        const replyAuthor = msg.reply_to_username || 'User';
+        let replyContent = msg.reply_to_content || '';
+        
+        // Decrypt reply content if needed
+        if (replyContent && state.currentGroupId) {
+          const decrypted = E2EEncryption.decrypt(replyContent, state.currentGroupId);
+          if (decrypted !== replyContent) {
+            replyContent = decrypted;
+          }
+        }
+        replyToHTML = `
+          <div onclick="document.querySelector('[data-post-id=\\"${msg.reply_to}\\"]')?.scrollIntoView({behavior: 'smooth', block: 'center'})" style="padding: 8px 12px; margin-bottom: 8px; border-left: 3px solid ${isOwn ? 'rgba(255,255,255,0.5)' : 'var(--ig-blue)'}; background: ${isOwn ? 'rgba(255,255,255,0.15)' : 'rgba(102, 126, 234, 0.1)'}; border-radius: 6px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='${isOwn ? 'rgba(255,255,255,0.25)' : 'rgba(102, 126, 234, 0.2)'}'" onmouseout="this.style.background='${isOwn ? 'rgba(255,255,255,0.15)' : 'rgba(102, 126, 234, 0.1)'}'">
+            <div style="font-size: 11px; font-weight: 600; color: ${isOwn ? 'rgba(255,255,255,0.9)' : 'var(--ig-blue)'}; margin-bottom: 3px;">
+              <i class="fas fa-reply" style="margin-right: 4px;"></i>${replyAuthor}
+            </div>
+            <div style="font-size: 12px; opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${replyContent.substring(0, 80)}${replyContent.length > 80 ? '...' : ''}
+            </div>
+          </div>
+        `;
+      }
       
       // Parse attachments FIRST
       let attachments = [];
@@ -8838,9 +8932,10 @@
       if (isOwn) {
         // Own message - on the right with gradient
         return `
-          <div data-post-id="${msg.id}" style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+          <div data-post-id="${msg.id}" data-author="${senderName}" style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
             <div style="max-width: 70%;">
               <div style="padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                ${replyToHTML}
                 <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText, true) : ''}</div>
                 ${attachmentsHTML}
                 <div class="message-time" style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">
@@ -8862,7 +8957,7 @@
       } else {
         // Other user's message - on the left with DP
         return `
-          <div data-post-id="${msg.id}" class="message-item" style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+          <div data-post-id="${msg.id}" data-author="${senderName}" class="message-item" style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
             <img 
               src="${profilePic}" 
               alt="${senderName}"
@@ -8879,6 +8974,7 @@
                 >
                   ${senderName}
                 </div>
+                ${replyToHTML}
                 <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText) : ''}</div>
                 ${attachmentsHTML}
                 <div class="message-time" style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">

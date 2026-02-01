@@ -667,17 +667,27 @@ function replyToMessage(postId) {
   const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
   if (!messageEl) return;
   
-  const content = messageEl.querySelector('.message-content')?.textContent || '';
-  const author = messageEl.querySelector('.message-author')?.textContent || 'Unknown';
+  let content = messageEl.querySelector('.message-content')?.textContent || '';
+  const author = messageEl.getAttribute('data-author') || messageEl.querySelector('.message-author')?.textContent || 'Unknown';
+  
+  // Decrypt content if it looks encrypted
+  const state = window.state || {};
+  if (content && state.currentGroupId && typeof E2EEncryption !== 'undefined') {
+    const decrypted = E2EEncryption.decrypt(content, state.currentGroupId);
+    if (decrypted !== content) {
+      content = decrypted;
+    }
+  }
   
   // Show reply preview
-  const composer = document.getElementById('messageComposer');
-  if (composer) {
+  const footer = document.getElementById('centerFooter');
+  if (footer) {
     let replyPreview = document.getElementById('replyPreview');
     if (!replyPreview) {
       replyPreview = document.createElement('div');
       replyPreview.id = 'replyPreview';
-      composer.insertBefore(replyPreview, composer.firstChild);
+      replyPreview.style.cssText = 'width: 100%; order: -1;'; // Place before other elements
+      footer.insertBefore(replyPreview, footer.firstChild);
     }
     
     replyPreview.innerHTML = `
@@ -698,7 +708,7 @@ function replyToMessage(postId) {
     `;
     
     // Focus input
-    const input = composer.querySelector('textarea');
+    const input = footer.querySelector('#chatInput');
     if (input) input.focus();
   }
 }

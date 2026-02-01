@@ -525,9 +525,16 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
 
               // Hydrate with username/created_at for client rendering and realtime broadcast.
               db.get(
-                `SELECT cgp.*, u.username, u.profile_picture
+                `SELECT 
+                  cgp.*, 
+                  u.username, 
+                  u.profile_picture,
+                  reply_user.username as reply_to_username,
+                  reply_post.content as reply_to_content
                  FROM community_group_posts cgp
                  JOIN users u ON cgp.user_id = u.id
+                 LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id
+                 LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
                  WHERE cgp.id = ?`,
                 [postId],
                 (err2, postRow) => {
@@ -597,7 +604,7 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
         LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id
         LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
         WHERE cgp.group_id = ? AND (cgp.is_deleted IS NULL OR cgp.is_deleted = 0)
-        ORDER BY cgp.created_at DESC
+        ORDER BY cgp.created_at ASC
       `;
 
       db.all(query, [groupId], (err, posts) => {
@@ -1871,7 +1878,7 @@ router.get('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
          FROM group_polls gp
          JOIN users u ON gp.user_id = u.id
          WHERE gp.group_id = ?
-         ORDER BY gp.created_at DESC`,
+         ORDER BY gp.created_at ASC`,
         [groupId],
         (err, polls) => {
           if (err) return res.status(500).json({ error: 'Error fetching polls' });
