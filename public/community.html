@@ -2389,6 +2389,14 @@
           }
         }
       });
+      
+      // Listen for new polls in groups
+      state.socket.on('poll:created', (data) => {
+        console.log('New poll created:', data);
+        if (data.groupId == state.currentGroupId) {
+          loadGroupPolls(state.currentGroupId);
+        }
+      });
 
       state.socket.on('call:offer', handleCallOffer);
       state.socket.on('call:answer', handleCallAnswer);
@@ -2571,9 +2579,14 @@
           displayDesc = `<a href="${displayDesc}" target="_blank" onclick="event.stopPropagation()" style="color: var(--ig-blue); text-decoration: none; font-weight: 500;">🔗 ${displayDesc}</a>`;
         }
         
+        // Use profile picture if available, otherwise show initial
+        const avatarContent = group.profile_picture 
+          ? `<img src="${group.profile_picture}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.parentElement.innerHTML='${group.name.charAt(0).toUpperCase()}'">`
+          : group.name.charAt(0).toUpperCase();
+        
         return `
           <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
-            <div class="group-avatar">${group.name.charAt(0).toUpperCase()}</div>
+            <div class="group-avatar">${avatarContent}</div>
             <div class="group-info">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <div class="group-name">${group.name}</div>
@@ -3087,15 +3100,21 @@
           let location = null;
           let poll = null;
           
+          console.log('Announcement attachments raw:', ann.attachments);
+          
           try {
             if (ann.attachments) {
               const parsed = JSON.parse(ann.attachments);
+              console.log('Parsed attachments:', parsed);
               attachments = parsed.files || [];
               links = parsed.links || [];
               location = parsed.location || null;
               poll = parsed.poll || null;
+              console.log('Extracted poll:', poll);
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error('Error parsing attachments:', e);
+          }
           
           centerContent.innerHTML = `
             <div style="padding: 24px; max-width: 800px; margin: 0 auto;">
@@ -3338,6 +3357,22 @@
         if (centerTitle) centerTitle.textContent = 'Announcements';
         if (centerSubtitle) centerSubtitle.textContent = 'Community updates and news';
         
+        // Reset center header avatar to community banner
+        const centerHeaderAvatar = document.getElementById('centerHeaderAvatar');
+        if (state.community && state.community.banner_image) {
+          centerHeaderAvatar.src = state.community.banner_image;
+          centerHeaderAvatar.style.display = 'block';
+          centerHeaderAvatar.onerror = () => {
+            centerHeaderAvatar.style.display = 'none';
+          };
+        } else {
+          centerHeaderAvatar.style.display = 'none';
+        }
+        
+        // Clear current group/announcement selection
+        state.currentGroupId = null;
+        state.currentAnnouncementId = null;
+        
         // Show Create Announcement button in left footer
         if (leftFooter) leftFooter.style.display = 'block';
         if (leftFooterBtn) {
@@ -3348,12 +3383,24 @@
         // Reset right sidebar to community view
         updateRightSidebarForCommunity();
         
-        // Load announcements (will also set centerFooter)
+        // Load announcements (will also set centerFooter and center content)
         loadAnnouncements();
       } else if (tab === 'groups') {
         // Groups tab
         if (centerTitle) centerTitle.textContent = 'Select a group';
         if (centerSubtitle) centerSubtitle.textContent = 'Choose from the left sidebar';
+        
+        // Reset center header avatar to community banner
+        const centerHeaderAvatar = document.getElementById('centerHeaderAvatar');
+        if (state.community && state.community.banner_image) {
+          centerHeaderAvatar.src = state.community.banner_image;
+          centerHeaderAvatar.style.display = 'block';
+          centerHeaderAvatar.onerror = () => {
+            centerHeaderAvatar.style.display = 'none';
+          };
+        } else {
+          centerHeaderAvatar.style.display = 'none';
+        }
         
         // Show Create Group button in left footer
         if (leftFooter) leftFooter.style.display = 'block';
@@ -3385,6 +3432,18 @@
         if (centerTitle) centerTitle.textContent = 'Folders';
         if (centerSubtitle) centerSubtitle.textContent = 'Organized by groups';
         
+        // Reset center header avatar to community banner
+        const centerHeaderAvatar = document.getElementById('centerHeaderAvatar');
+        if (state.community && state.community.banner_image) {
+          centerHeaderAvatar.src = state.community.banner_image;
+          centerHeaderAvatar.style.display = 'block';
+          centerHeaderAvatar.onerror = () => {
+            centerHeaderAvatar.style.display = 'none';
+          };
+        } else {
+          centerHeaderAvatar.style.display = 'none';
+        }
+        
         // Show Create Group button in left footer (folders are created with groups)
         if (leftFooter) leftFooter.style.display = 'block';
         if (leftFooterBtn) {
@@ -3411,6 +3470,18 @@
         // GitHub Integration tab
         if (centerTitle) centerTitle.textContent = 'GitHub Integration';
         if (centerSubtitle) centerSubtitle.textContent = 'Connect your repositories';
+        
+        // Reset center header avatar to community banner
+        const centerHeaderAvatar = document.getElementById('centerHeaderAvatar');
+        if (state.community && state.community.banner_image) {
+          centerHeaderAvatar.src = state.community.banner_image;
+          centerHeaderAvatar.style.display = 'block';
+          centerHeaderAvatar.onerror = () => {
+            centerHeaderAvatar.style.display = 'none';
+          };
+        } else {
+          centerHeaderAvatar.style.display = 'none';
+        }
         
         // Reset right sidebar to community view
         updateRightSidebarForCommunity();
@@ -3495,6 +3566,18 @@
       // Update header
       document.getElementById('centerTitle').textContent = group.name;
       document.getElementById('centerSubtitle').textContent = group.description || 'Group workspace';
+      
+      // Update center header avatar with group profile picture
+      const centerHeaderAvatar = document.getElementById('centerHeaderAvatar');
+      if (group.profile_picture) {
+        centerHeaderAvatar.src = group.profile_picture;
+        centerHeaderAvatar.style.display = 'block';
+        centerHeaderAvatar.onerror = () => {
+          centerHeaderAvatar.style.display = 'none';
+        };
+      } else {
+        centerHeaderAvatar.style.display = 'none';
+      }
       
       // Show tabs
       document.getElementById('centerTabs').style.display = 'flex';
@@ -4048,6 +4131,208 @@
       // Join room
       if (state.socket) {
         state.socket.emit('community-group:join', groupId);
+      }
+      
+      // Load polls for this group
+      await loadGroupPolls(groupId);
+    }
+
+    // ==================== POLL FUNCTIONS ====================
+    function showPollCreator() {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.id = 'pollCreatorModal';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px; padding: 0; border-radius: 12px; background: var(--ig-secondary-background);">
+          <div style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">Create a Poll</h3>
+          </div>
+          <div style="padding: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Question</label>
+            <input type="text" id="pollQuestion" placeholder="Ask a question..." 
+              style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 16px;">
+            
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Options</label>
+            <div id="pollOptions">
+              <input type="text" class="poll-option" placeholder="Option 1" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 8px;">
+              <input type="text" class="poll-option" placeholder="Option 2" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 8px;">
+            </div>
+            <button onclick="addPollOption()" style="width: 100%; padding: 10px; background: var(--ig-secondary-background); border: 1px dashed var(--ig-border); border-radius: 8px; color: var(--ig-secondary-text); cursor: pointer; margin-bottom: 16px;">
+              <i class="fas fa-plus"></i> Add Option
+            </button>
+            
+            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Duration (optional)</label>
+            <select id="pollDuration" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 16px;">
+              <option value="">No expiration</option>
+              <option value="60">1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440">1 day</option>
+              <option value="10080">1 week</option>
+            </select>
+          </div>
+          <div style="padding: 16px 20px; border-top: 1px solid var(--ig-border); display: flex; gap: 12px; justify-content: flex-end;">
+            <button onclick="closePollCreator()" class="btn btn-secondary" style="padding: 10px 20px; background: var(--ig-secondary-background); border: none; border-radius: 8px; color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">
+              Cancel
+            </button>
+            <button onclick="createPoll()" class="btn btn-primary" style="padding: 10px 20px; background: var(--ig-blue); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: 600;">
+              Create Poll
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closePollCreator();
+      });
+    }
+
+    function addPollOption() {
+      const container = document.getElementById('pollOptions');
+      const optionCount = container.querySelectorAll('.poll-option').length + 1;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'poll-option';
+      input.placeholder = `Option ${optionCount}`;
+      input.style.cssText = 'width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 8px;';
+      container.appendChild(input);
+    }
+
+    function closePollCreator() {
+      document.getElementById('pollCreatorModal')?.remove();
+    }
+
+    async function createPoll() {
+      const question = document.getElementById('pollQuestion').value.trim();
+      const optionInputs = document.querySelectorAll('.poll-option');
+      const options = Array.from(optionInputs)
+        .map(input => input.value.trim())
+        .filter(opt => opt !== '');
+      const expiresIn = parseInt(document.getElementById('pollDuration').value) || null;
+
+      if (!question) {
+        InnovateAPI.showAlert('Please enter a question', 'error');
+        return;
+      }
+
+      if (options.length < 2) {
+        InnovateAPI.showAlert('Please provide at least 2 options', 'error');
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/polls`, {
+          method: 'POST',
+          body: JSON.stringify({ question, options, expiresIn })
+        });
+
+        if (res.success) {
+          InnovateAPI.showAlert('Poll created', 'success');
+          closePollCreator();
+          // Reload polls
+          await loadGroupPolls(state.currentGroupId);
+        }
+      } catch (error) {
+        console.error('Error creating poll:', error);
+        InnovateAPI.showAlert('Failed to create poll', 'error');
+      }
+    }
+
+    async function loadGroupPolls(groupId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/polls`);
+        if (res.success && res.polls && res.polls.length > 0) {
+          // Append polls to the messages list
+          const messagesList = document.getElementById('messagesList');
+          if (!messagesList) return;
+
+          // Clear existing polls
+          messagesList.querySelectorAll('.poll-item').forEach(el => el.remove());
+
+          // Add polls
+          res.polls.forEach(poll => {
+            const pollHTML = renderPoll(poll);
+            const div = document.createElement('div');
+            div.innerHTML = pollHTML;
+            messagesList.appendChild(div.firstElementChild);
+          });
+
+          // Scroll to bottom
+          messagesList.scrollTop = messagesList.scrollHeight;
+        }
+      } catch (error) {
+        console.error('Error loading polls:', error);
+      }
+    }
+
+    function renderPoll(poll) {
+      const isExpired = poll.isExpired;
+      const hasVoted = poll.userVote !== undefined;
+
+      return `
+        <div class="poll-item" data-poll-id="${poll.id}" style="background: var(--ig-secondary-background); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+            <img src="${poll.profile_picture || '/images/default-avatar.svg'}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+            <div style="flex: 1;">
+              <div style="font-weight: 600; margin-bottom: 4px;">${poll.username}</div>
+              <div style="font-size: 13px; color: var(--ig-secondary-text);">${InnovateAPI.formatTimestamp(poll.created_at)}</div>
+            </div>
+          </div>
+          
+          <div style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--ig-primary-text);">
+            📊 ${poll.question}
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+            ${poll.options.map((option, index) => {
+              const votes = poll.voteCounts[index] || 0;
+              const percentage = poll.totalVotes > 0 ? Math.round((votes / poll.totalVotes) * 100) : 0;
+              
+              return `
+                <button 
+                  onclick="voteOnPoll(${poll.id}, ${index})" 
+                  ${isExpired ? 'disabled' : ''}
+                  style="position: relative; padding: 12px 16px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); text-align: left; cursor: ${isExpired ? 'not-allowed' : 'pointer'}; overflow: hidden; transition: all 0.2s;">
+                  <div style="position: absolute; top: 0; left: 0; height: 100%; width: ${percentage}%; background: var(--ig-blue); opacity: 0.2; transition: width 0.3s;"></div>
+                  <div style="position: relative; display: flex; justify-content: space-between; align-items: center;">
+                    <span>${option}</span>
+                    <span style="font-weight: 600; color: var(--ig-blue);">${percentage}% (${votes})</span>
+                  </div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+          
+          <div style="font-size: 12px; color: var(--ig-secondary-text); text-align: center;">
+            ${poll.totalVotes} vote${poll.totalVotes !== 1 ? 's' : ''}
+            ${isExpired ? ' • Poll ended' : (poll.expires_at ? ` • Expires ${InnovateAPI.formatTimestamp(poll.expires_at)}` : '')}
+          </div>
+        </div>
+      `;
+    }
+
+    async function voteOnPoll(pollId, optionIndex) {
+      try {
+        console.log('Voting on poll:', pollId, 'option:', optionIndex, 'type:', typeof optionIndex);
+        console.log('Request body:', JSON.stringify({ optionIndex }));
+        
+        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/polls/${pollId}/vote`, {
+          method: 'POST',
+          body: JSON.stringify({ optionIndex: Number(optionIndex) })
+        });
+
+        console.log('Vote response:', res);
+
+        if (res.success) {
+          InnovateAPI.showAlert('Vote recorded!', 'success');
+          // Reload polls to show updated results
+          await loadGroupPolls(state.currentGroupId);
+        }
+      } catch (error) {
+        console.error('Error voting:', error);
+        console.error('Error details:', error.message);
+        InnovateAPI.showAlert(error.message || 'Failed to vote', 'error');
       }
     }
 
@@ -6680,7 +6965,7 @@
         <div style="width: 28px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ig-secondary-text);">
           ${container.children.length + 1}
         </div>
-        <input type="text" class="poll-option-text" placeholder="Option ${container.children.length + 1}" style="flex: 1; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none; font-size: 14px;">
+        <input type="text" class="poll-option" placeholder="Option ${container.children.length + 1}" style="flex: 1; padding: 10px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-primary-background); color: var(--ig-primary-text); outline: none; font-size: 14px;">
         ${container.children.length >= 2 ? `
           <button type="button" onclick="document.getElementById('${optionId}').remove(); updatePollOptionNumbers()" style="width: 40px; height: 40px; background: var(--ig-error); color: white; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fas fa-times"></i>
@@ -6933,19 +7218,36 @@
       
       // Collect poll
       let poll = null;
-      if (document.getElementById('announcementAddPoll').checked) {
-        const question = document.getElementById('pollQuestion').value;
+      const pollCheckbox = document.getElementById('announcementAddPoll');
+      console.log('📊 Poll checkbox checked?', pollCheckbox ? pollCheckbox.checked : 'CHECKBOX NOT FOUND');
+      
+      if (pollCheckbox && pollCheckbox.checked) {
+        const questionInput = document.getElementById('pollQuestion');
+        const question = questionInput ? questionInput.value : '';
+        console.log('📊 Poll question:', question);
+        
         const options = [];
-        document.querySelectorAll('.poll-option-text').forEach(input => {
+        const optionInputs = document.querySelectorAll('.poll-option');
+        console.log('📊 Found', optionInputs.length, 'option inputs');
+        
+        optionInputs.forEach((input, index) => {
+          console.log(`📊 Option ${index + 1}:`, input.value);
           if (input.value.trim()) {
             options.push(input.value.trim());
           }
         });
         
+        console.log('📊 Collected options:', options);
+        
         if (question && options.length >= 2) {
           poll = { question, options };
+          console.log('✅ Poll object created:', poll);
+        } else {
+          console.log('❌ Poll validation failed - question:', question, 'options.length:', options.length);
         }
       }
+      
+      console.log('📊 Final poll data:', poll);
       
       try {
         const formData = new FormData();
@@ -6961,6 +7263,7 @@
         
         // Add structured data
         const attachmentsData = { links, location, poll, files: [] };
+        console.log('📎 Attachments data being sent:', attachmentsData);
         formData.append('attachments', JSON.stringify(attachmentsData));
         
         const res = await fetch(`/api/communities/${state.communityId}/announcements`, {

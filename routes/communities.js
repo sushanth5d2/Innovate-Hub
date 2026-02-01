@@ -529,7 +529,19 @@ router.post('/:communityId/announcements', authMiddleware, upload.array('files',
   const db = getDb();
   const { communityId } = req.params;
   const userId = req.user.userId;
+  
+  console.log('📥 Raw req.body:', JSON.stringify(req.body, null, 2));
+  console.log('📥 req.body.attachments type:', typeof req.body.attachments);
+  console.log('📥 req.body.attachments value:', req.body.attachments);
+  
   const { title, body = '', is_pinned = 0, attachments: attachmentsJson } = req.body || {};
+
+  console.log('📥 Parsed values:', {
+    title,
+    body: body ? body.substring(0, 50) + '...' : '(empty)',
+    attachmentsJson,
+    filesCount: req.files ? req.files.length : 0
+  });
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 

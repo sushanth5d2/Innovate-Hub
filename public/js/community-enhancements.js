@@ -922,20 +922,31 @@ async function voteOnPoll(pollId, optionIndex) {
       return;
     }
     
+    console.log('Voting on poll:', pollId, 'option:', optionIndex, 'type:', typeof optionIndex);
+    
     const response = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/polls/${pollId}/vote`, {
       method: 'POST',
-      body: JSON.stringify({ optionIndex })
+      body: JSON.stringify({ optionIndex: Number(optionIndex) })
     });
+    
+    console.log('Vote response:', response);
     
     if (!response || !response.success) {
       throw new Error(response?.error || 'Failed to vote on poll');
     }
     
-    // Update poll display with results
-    displayPollResults(pollId, res.results);
+    InnovateAPI.showAlert('Vote recorded!', 'success');
+    
+    // Reload polls to show updated results
+    if (typeof loadGroupPolls === 'function') {
+      await loadGroupPolls(state.currentGroupId);
+    } else {
+      // Alternative: reload the page section
+      location.reload();
+    }
   } catch (error) {
     console.error('Error voting on poll:', error);
-    InnovateAPI.showAlert('Failed to vote', 'error');
+    InnovateAPI.showAlert(error.message || 'Failed to vote', 'error');
   }
 }
 

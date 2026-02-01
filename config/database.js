@@ -269,6 +269,9 @@ const createTables = () => {
         name TEXT NOT NULL,
         description TEXT,
         creator_id INTEGER NOT NULL,
+        encryption_key TEXT,
+        profile_picture TEXT,
+        is_public BOOLEAN DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
@@ -962,6 +965,33 @@ const migrateDatabase = () => {
     `, (err) => {
       if (err && !err.message.includes('duplicate column name')) {
         console.error('Error adding attachments column:', err);
+      }
+    });
+
+    // Add encryption_key column to community_groups if not exists
+    db.run(`
+      ALTER TABLE community_groups ADD COLUMN encryption_key TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding encryption_key column:', err);
+      }
+    });
+
+    // Add profile_picture column to community_groups if not exists
+    db.run(`
+      ALTER TABLE community_groups ADD COLUMN profile_picture TEXT
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding profile_picture column:', err);
+      }
+    });
+
+    // Add is_public column to community_groups if not exists
+    db.run(`
+      ALTER TABLE community_groups ADD COLUMN is_public BOOLEAN DEFAULT 1
+    `, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding is_public column:', err);
       }
     });
 
