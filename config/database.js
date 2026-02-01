@@ -707,6 +707,20 @@ const createTables = () => {
         }
       });
 
+      // Add pinned_at column for pinned messages
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN pinned_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: pinned_at column migration - ', err.message);
+        }
+      });
+
+      // Add pinned_by column for who pinned the message
+      db.run(`ALTER TABLE community_group_posts ADD COLUMN pinned_by INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: pinned_by column migration - ', err.message);
+        }
+      });
+
       // Add action buttons columns to posts
       db.run(`ALTER TABLE posts ADD COLUMN enable_contact BOOLEAN DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column')) {

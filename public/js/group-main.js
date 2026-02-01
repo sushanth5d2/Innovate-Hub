@@ -419,6 +419,17 @@ async function loadGroupChat() {
         // Add event listeners to new message
         setupMessageEventListeners(chatContainer);
       });
+      
+      // Listen for message pin events
+      socket.on('message:pinned', (data) => {
+        console.log('Message pinned:', data);
+        loadGroupChat(); // Reload to show pinned message at top
+      });
+      
+      socket.on('message:unpinned', (data) => {
+        console.log('Message unpinned:', data);
+        loadGroupChat(); // Reload to update display
+      });
     }
   } catch (error) {
     console.error('Error loading chat:', error);
@@ -487,6 +498,7 @@ function renderChatMessage(msg) {
   const currentUser = InnovateAPI.getCurrentUser();
   const isOwn = msg.user_id === currentUser.id;
   const alignClass = isOwn ? 'sent' : 'received';
+  const isPinned = msg.pinned_at !== null;
   
   let attachmentsHTML = '';
   if (msg.attachments) {
@@ -517,6 +529,20 @@ function renderChatMessage(msg) {
     `;
   }
 
+  // Pin indicator HTML
+  let pinHTML = '';
+  if (isPinned) {
+    pinHTML = `
+      <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ig-blue); font-weight: 600; margin-bottom: 6px; padding: 4px 8px; background: rgba(0, 149, 246, 0.1); border-radius: 4px; border-left: 3px solid var(--ig-blue);">
+        <span style="font-size: 14px;">📌</span>
+        <span>Pinned${msg.pinned_by_username ? ' by ' + msg.pinned_by_username : ''}</span>
+      </div>
+    `;
+  }
+
+  // Additional styling for pinned messages
+  const pinnedStyle = isPinned ? 'border: 2px solid var(--ig-blue); box-shadow: 0 2px 8px rgba(0, 149, 246, 0.2);' : '';
+
   return `
     <div class="ig-message ig-message-${alignClass}" 
          data-message-id="${msg.id}" 
@@ -524,7 +550,9 @@ function renderChatMessage(msg) {
          data-username="${msg.username}" 
          data-content="${(msg.content || '').replace(/"/g, '&quot;')}" 
          data-is-own="${isOwn}"
-         style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''} cursor: pointer; position: relative;">
+         data-is-pinned="${isPinned}"
+         style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''} cursor: pointer; position: relative; ${pinnedStyle}">
+      ${pinHTML}
       ${!isOwn ? `<div style="font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ig-secondary-text);">${msg.username}</div>` : ''}
       ${replyHTML}
       ${msg.content ? `<div style="word-wrap: break-word;">${linkifyText(msg.content, isOwn)}</div>` : ''}
@@ -826,6 +854,10 @@ function showMessageMenu(event, messageId, username, content, userId, isOwn) {
   const existingMenu = document.getElementById('message-context-menu');
   if (existingMenu) existingMenu.remove();
   
+  // Get pinned status from message element
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+  const isPinned = messageEl?.dataset.isPinned === 'true';
+  
   // Create menu
   const menu = document.createElement('div');
   menu.id = 'message-context-menu';
@@ -842,6 +874,8 @@ function showMessageMenu(event, messageId, username, content, userId, isOwn) {
   
   const currentUser = InnovateAPI.getCurrentUser();
   
+  console.log('🔍 DEBUG: Creating menu - isPinned:', isPinned, 'messageId:', messageId);
+  
   let menuHTML = `
     <button data-action="reply" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; transition: background 0.2s;">
       <span style="font-size: 18px;">💬</span> Reply
@@ -849,7 +883,13 @@ function showMessageMenu(event, messageId, username, content, userId, isOwn) {
     <button data-action="forward" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
       <span style="font-size: 18px;">➡️</span> Forward
     </button>
+    <button data-action="pin" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
+      <span style="font-size: 18px;">📌</span> ${isPinned ? 'Unpin Message' : 'Pin Message'}
+    </button>
   `;
+  
+  console.log('📌 PIN OPTION ADDED TO MENU');
+  
   
   // Add edit/delete only for own messages
   if (isOwn) {
@@ -877,6 +917,8 @@ function showMessageMenu(event, messageId, username, content, userId, isOwn) {
         replyToMessage(messageId, username, content);
       } else if (action === 'forward') {
         forwardMessage(messageId);
+      } else if (action === 'pin') {
+        pinMessage(messageId);
       } else if (action === 'edit') {
         editMessage(messageId, content);
       } else if (action === 'delete') {
@@ -1010,6 +1052,25 @@ function cancelReply() {
 function forwardMessage(messageId) {
   InnovateAPI.showAlert('Forward functionality coming soon!', 'info');
   // TODO: Implement forward to other groups/users
+}
+
+// Pin/Unpin message
+async function pinMessage(messageId) {
+  try {
+    const response = await InnovateAPI.apiRequest(
+      `/community-groups/${currentGroupId}/posts/${messageId}/pin`,
+      { method: 'POST' }
+    );
+
+    if (response.success) {
+      InnovateAPI.showAlert(response.message, 'success');
+      // Reload chat to show updated pin status
+      await loadGroupChat();
+    }
+  } catch (error) {
+    console.error('Error pinning message:', error);
+    InnovateAPI.showAlert('Failed to pin/unpin message', 'error');
+  }
 }
 
 // Edit message

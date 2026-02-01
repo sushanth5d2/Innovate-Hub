@@ -598,13 +598,18 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
           u.username,
           u.profile_picture,
           reply_user.username as reply_to_username,
-          reply_post.content as reply_to_content
+          reply_post.content as reply_to_content,
+          pin_user.username as pinned_by_username
         FROM community_group_posts cgp
         JOIN users u ON cgp.user_id = u.id
         LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id
         LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
+        LEFT JOIN users pin_user ON cgp.pinned_by = pin_user.id
         WHERE cgp.group_id = ? AND (cgp.is_deleted IS NULL OR cgp.is_deleted = 0)
-        ORDER BY cgp.created_at ASC
+        ORDER BY 
+          CASE WHEN cgp.pinned_at IS NOT NULL THEN 0 ELSE 1 END,
+          cgp.pinned_at DESC,
+          cgp.created_at ASC
       `;
 
       db.all(query, [groupId], (err, posts) => {
@@ -1517,6 +1522,78 @@ const editMessageHandler = (req, res) => {
 
 router.patch('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), editMessageHandler);
 router.put('/community-groups/:groupId/posts/:postId', authMiddleware, upload.fields([{ name: 'attachments', maxCount: 10 }]), editMessageHandler);
+
+// ==================== GROUP MESSAGE PIN/UNPIN ====================
+// Pin/Unpin group message
+router.post('/community-groups/:groupId/posts/:postId/pin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { groupId, postId } = req.params;
+
+  // Check if user is a member (optionally check for admin/moderator role)
+  db.get(
+    'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) {
+        return res.status(403).json({ error: 'You must be a group member' });
+      }
+
+      // Check if message exists
+      db.get('SELECT * FROM community_group_posts WHERE id = ? AND group_id = ?',
+        [postId, groupId],
+        (err, message) => {
+          if (err || !message) {
+            return res.status(404).json({ error: 'Message not found' });
+          }
+
+          // Toggle pin status
+          const isPinned = message.pinned_at !== null;
+          
+          if (isPinned) {
+            // Unpin message
+            db.run(
+              'UPDATE community_group_posts SET pinned_at = NULL, pinned_by = NULL WHERE id = ?',
+              [postId],
+              (err) => {
+                if (err) {
+                  return res.status(500).json({ error: 'Failed to unpin message' });
+                }
+
+                // Notify via socket
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`community_group_${groupId}`).emit('message:unpinned', { messageId: postId });
+                }
+
+                res.json({ success: true, pinned: false, message: 'Message unpinned' });
+              }
+            );
+          } else {
+            // Pin message
+            db.run(
+              'UPDATE community_group_posts SET pinned_at = CURRENT_TIMESTAMP, pinned_by = ? WHERE id = ?',
+              [userId, postId],
+              (err) => {
+                if (err) {
+                  return res.status(500).json({ error: 'Failed to pin message' });
+                }
+
+                // Notify via socket
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`community_group_${groupId}`).emit('message:pinned', { messageId: postId });
+                }
+
+                res.json({ success: true, pinned: true, message: 'Message pinned' });
+              }
+            );
+          }
+        }
+      );
+    }
+  );
+});
 
 // ==================== GROUP MESSAGE DELETE ====================
 // Delete group message (soft delete)
