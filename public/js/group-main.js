@@ -171,7 +171,19 @@ async function loadGroupData() {
     }
 
     // Show settings/edit button if user is admin
-    const isAdmin = group.creator_id === currentUser.id;
+    // Use loose equality (==) to handle potential type mismatches between string and number IDs
+    const isCreator = group.creator_id == currentUser.id;
+    const isAdminRole = group.user_role === 'admin';
+    const isAdmin = isCreator || isAdminRole;
+    
+    console.log('===== ADMIN STATUS DEBUG =====');
+    console.log('Group creator_id:', group.creator_id, '(type:', typeof group.creator_id + ')');
+    console.log('Current user ID:', currentUser.id, '(type:', typeof currentUser.id + ')');
+    console.log('User role from API:', group.user_role);
+    console.log('Is creator match (==):', isCreator);
+    console.log('Is admin role:', isAdminRole);
+    console.log('Final isAdmin:', isAdmin);
+    console.log('==============================');
     
     const settingsBtn = document.getElementById('group-settings-btn');
     if (settingsBtn && isAdmin) {
@@ -189,20 +201,30 @@ async function loadGroupData() {
       sidebarEditBtn.style.display = 'inline-block';
     }
 
-    // Show admin-only sidebar buttons
+    // Admin buttons are visible by default - hide them if user is NOT admin
     const requestApprovalsBtn = document.getElementById('request-approvals-btn');
-    if (requestApprovalsBtn && isAdmin) {
-      requestApprovalsBtn.style.display = 'block';
-    }
-
     const blockedMembersBtn = document.getElementById('blocked-members-btn');
-    if (blockedMembersBtn && isAdmin) {
-      blockedMembersBtn.style.display = 'block';
-    }
-
     const deleteGroupBtn = document.getElementById('delete-group-btn');
-    if (deleteGroupBtn && isAdmin) {
-      deleteGroupBtn.style.display = 'flex';
+    
+    console.log('Admin buttons found:', {
+      requestApprovalsBtn: !!requestApprovalsBtn,
+      blockedMembersBtn: !!blockedMembersBtn,
+      deleteGroupBtn: !!deleteGroupBtn,
+      isAdmin: isAdmin
+    });
+    
+    // Hide admin buttons if user is NOT admin
+    if (!isAdmin) {
+      if (requestApprovalsBtn) requestApprovalsBtn.style.display = 'none';
+      if (blockedMembersBtn) blockedMembersBtn.style.display = 'none';
+      if (deleteGroupBtn) deleteGroupBtn.style.display = 'none';
+      console.log('⚠️ User is NOT admin - admin buttons hidden');
+    } else {
+      // Ensure they're visible for admins
+      if (requestApprovalsBtn) requestApprovalsBtn.style.display = 'block';
+      if (blockedMembersBtn) blockedMembersBtn.style.display = 'block';
+      if (deleteGroupBtn) deleteGroupBtn.style.display = 'flex';
+      console.log('✅ User IS admin - all admin buttons visible');
     }
 
     // Load pending requests count for admins

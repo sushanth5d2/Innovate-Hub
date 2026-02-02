@@ -167,13 +167,14 @@ router.get('/community-groups/:groupId', authMiddleware, (req, res) => {
       cg.*,
       u.username as creator_username,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id) as member_count,
-      (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member
+      (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member,
+      (SELECT role FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as user_role
     FROM community_groups cg
     JOIN users u ON cg.creator_id = u.id
     WHERE cg.id = ?
   `;
 
-  db.get(query, [userId, groupId], (err, group) => {
+  db.get(query, [userId, userId, groupId], (err, group) => {
     if (err || !group) {
       return res.status(404).json({ error: 'Group not found' });
     }
