@@ -189,6 +189,28 @@ async function loadGroupData() {
       sidebarEditBtn.style.display = 'inline-block';
     }
 
+    // Show admin-only sidebar buttons
+    const requestApprovalsBtn = document.getElementById('request-approvals-btn');
+    if (requestApprovalsBtn && isAdmin) {
+      requestApprovalsBtn.style.display = 'block';
+    }
+
+    const blockedMembersBtn = document.getElementById('blocked-members-btn');
+    if (blockedMembersBtn && isAdmin) {
+      blockedMembersBtn.style.display = 'block';
+    }
+
+    const deleteGroupBtn = document.getElementById('delete-group-btn');
+    if (deleteGroupBtn && isAdmin) {
+      deleteGroupBtn.style.display = 'flex';
+    }
+
+    // Load pending requests count for admins
+    if (isAdmin) {
+      loadPendingRequestsCount();
+      loadBlockedMembersCount();
+    }
+
     // Setup back button
     const backBtn = document.getElementById('back-to-community');
     if (backBtn && currentCommunityId) {
@@ -197,6 +219,46 @@ async function loadGroupData() {
   } catch (error) {
     console.error('Error loading group:', error);
     InnovateAPI.showAlert('Failed to load group data', 'error');
+  }
+}
+
+// Load pending requests count
+async function loadPendingRequestsCount() {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/requests`);
+    const count = response.requests ? response.requests.length : 0;
+    
+    const badge = document.getElementById('pending-requests-count');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading requests count:', error);
+  }
+}
+
+// Load blocked members count
+async function loadBlockedMembersCount() {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/blocked`);
+    const count = response.blocked ? response.blocked.length : 0;
+    
+    const badge = document.getElementById('blocked-count');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading blocked count:', error);
   }
 }
 
@@ -388,7 +450,44 @@ async function loadGroupChat() {
       }
     });
 
-    chatContainer.innerHTML = messages.map(msg => renderChatMessage(msg)).join('');
+    // Separate pinned messages from regular messages
+    const pinnedMessages = messages.filter(msg => msg.pinned_at !== null);
+    const regularMessages = messages.filter(msg => msg.pinned_at === null);
+    
+    // Build HTML with pinned banner (WhatsApp style)
+    let chatHTML = '';
+    
+    // Add pinned message banner at the top (if any)
+    if (pinnedMessages.length > 0) {
+      const pinnedMsg = pinnedMessages[0]; // Show most recent pinned message
+      const pinnedContent = pinnedMsg.content || 'Message';
+      const truncatedContent = pinnedContent.length > 60 ? pinnedContent.substring(0, 60) + '...' : pinnedContent;
+      
+      chatHTML += `
+        <div style="background: rgba(0, 149, 246, 0.1); border-left: 4px solid var(--ig-blue); padding: 12px 16px; margin-bottom: 16px; border-radius: 8px; cursor: pointer;" 
+             onclick="document.querySelector('[data-message-id=\\"${pinnedMsg.id}\\"]')?.scrollIntoView({behavior: 'smooth', block: 'center'})">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ig-blue); font-weight: 600; margin-bottom: 4px;">
+                <span style="font-size: 16px;">📌</span>
+                <span>Pinned by ${pinnedMsg.pinned_by_username || 'someone'}</span>
+              </div>
+              <div style="font-size: 14px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <strong>${pinnedMsg.username}:</strong> ${truncatedContent}
+              </div>
+            </div>
+            <button onclick="event.stopPropagation(); pinMessage(${pinnedMsg.id})" 
+                    style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px 8px; font-size: 20px; flex-shrink: 0;"
+                    title="Unpin message">✕</button>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Add all messages (pinned messages will appear first due to ORDER BY in SQL)
+    chatHTML += messages.map(msg => renderChatMessage(msg)).join('');
+    
+    chatContainer.innerHTML = chatHTML;
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     // Add event listeners to messages
@@ -529,19 +628,19 @@ function renderChatMessage(msg) {
     `;
   }
 
-  // Pin indicator HTML
+  // Pin indicator HTML (WhatsApp style - subtle badge)
   let pinHTML = '';
   if (isPinned) {
     pinHTML = `
-      <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ig-blue); font-weight: 600; margin-bottom: 6px; padding: 4px 8px; background: rgba(0, 149, 246, 0.1); border-radius: 4px; border-left: 3px solid var(--ig-blue);">
-        <span style="font-size: 14px;">📌</span>
-        <span>Pinned${msg.pinned_by_username ? ' by ' + msg.pinned_by_username : ''}</span>
+      <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ig-blue); font-weight: 600; margin-bottom: 4px; padding: 2px 8px; background: rgba(0, 149, 246, 0.15); border-radius: 12px; align-self: flex-start;">
+        <span style="font-size: 12px;">📌</span>
+        <span>Pinned</span>
       </div>
     `;
   }
 
-  // Additional styling for pinned messages
-  const pinnedStyle = isPinned ? 'border: 2px solid var(--ig-blue); box-shadow: 0 2px 8px rgba(0, 149, 246, 0.2);' : '';
+  // Additional styling for pinned messages (subtle highlight)
+  const pinnedStyle = isPinned ? 'background: rgba(0, 149, 246, 0.05); border-left: 3px solid var(--ig-blue);' : '';
 
   return `
     <div class="ig-message ig-message-${alignClass}" 
@@ -551,9 +650,9 @@ function renderChatMessage(msg) {
          data-content="${(msg.content || '').replace(/"/g, '&quot;')}" 
          data-is-own="${isOwn}"
          data-is-pinned="${isPinned}"
-         style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''} cursor: pointer; position: relative; ${pinnedStyle}">
+         style="max-width: 70%; margin-bottom: 12px; ${isOwn ? 'margin-left: auto;' : ''} cursor: pointer; position: relative; ${pinnedStyle} padding: ${isPinned ? '12px' : '8px 12px'}; border-radius: 12px;">
       ${pinHTML}
-      ${!isOwn ? `<div style="font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--ig-secondary-text);">${msg.username}</div>` : ''}
+      ${!isOwn ? `<div style="font-size: 12px; font-weight: 600; margin-bottom: 4px; color: ${isPinned ? 'var(--ig-blue)' : 'var(--ig-secondary-text)'};">${msg.username}</div>` : ''}
       ${replyHTML}
       ${msg.content ? `<div style="word-wrap: break-word;">${linkifyText(msg.content, isOwn)}</div>` : ''}
       ${attachmentsHTML}
@@ -880,15 +979,15 @@ function showMessageMenu(event, messageId, username, content, userId, isOwn) {
     <button data-action="reply" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; transition: background 0.2s;">
       <span style="font-size: 18px;">💬</span> Reply
     </button>
-    <button data-action="forward" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
-      <span style="font-size: 18px;">➡️</span> Forward
-    </button>
     <button data-action="pin" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
       <span style="font-size: 18px;">📌</span> ${isPinned ? 'Unpin Message' : 'Pin Message'}
     </button>
+    <button data-action="forward" style="width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--ig-primary-text); font-size: 14px; border-top: 1px solid var(--ig-border); transition: background 0.2s;">
+      <span style="font-size: 18px;">➡️</span> Forward
+    </button>
   `;
   
-  console.log('📌 PIN OPTION ADDED TO MENU');
+  console.log('📌 PIN OPTION ADDED TO MENU - isPinned:', isPinned);
   
   
   // Add edit/delete only for own messages
@@ -1054,18 +1153,38 @@ function forwardMessage(messageId) {
   // TODO: Implement forward to other groups/users
 }
 
-// Pin/Unpin message
+// Pin/Unpin message (WhatsApp style)
 async function pinMessage(messageId) {
+  console.log('📌 Pinning/Unpinning message:', messageId);
+  
   try {
+    // Get current pin status
+    const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+    const currentlyPinned = messageEl?.dataset.isPinned === 'true';
+    
+    console.log('Current pin status:', currentlyPinned);
+    
     const response = await InnovateAPI.apiRequest(
       `/community-groups/${currentGroupId}/posts/${messageId}/pin`,
       { method: 'POST' }
     );
 
+    console.log('Pin response:', response);
+
     if (response.success) {
-      InnovateAPI.showAlert(response.message, 'success');
-      // Reload chat to show updated pin status
+      const action = response.pinned ? 'pinned' : 'unpinned';
+      InnovateAPI.showAlert(`Message ${action}!`, 'success');
+      
+      // Reload chat to show updated pin status and reorder messages
       await loadGroupChat();
+      
+      // Scroll to show the pinned message banner
+      if (response.pinned) {
+        const chatContainer = document.getElementById('group-chat-messages');
+        if (chatContainer) {
+          chatContainer.scrollTop = 0; // Scroll to top to show pinned message
+        }
+      }
     }
   } catch (error) {
     console.error('Error pinning message:', error);
@@ -1112,10 +1231,16 @@ async function showGroupSettings(group) {
   const modal = document.createElement('div');
   modal.className = 'ig-modal-overlay';
   modal.innerHTML = `
-    <div class="ig-modal" style="min-width: 500px; max-width: 90%;">
+    <div class="ig-modal" style="min-width: 500px; max-width: 90%; position: relative;">
+      <!-- Close Button - Positioned clearly in top-right corner -->
+      <button onclick="document.querySelector('.ig-modal-overlay').remove()" 
+              style="position: absolute; top: -10px; right: -10px; z-index: 10001; background: var(--ig-primary-background); border: 2px solid var(--ig-border); color: var(--ig-primary-text); cursor: pointer; font-size: 24px; font-weight: 300; line-height: 1; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);"
+              onmouseover="this.style.background='var(--ig-error)'; this.style.borderColor='var(--ig-error)'; this.style.color='white'"
+              onmouseout="this.style.background='var(--ig-primary-background)'; this.style.borderColor='var(--ig-border)'; this.style.color='var(--ig-primary-text)'">✕</button>
+      
       <div class="ig-settings-section">
         <div class="ig-modal-item" style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
-          <h3 style="margin: 0;">Group Settings</h3>
+          <h3 style="margin: 0; padding-right: 40px;">Group Settings</h3>
         </div>
         
         <!-- Profile Picture -->
@@ -1257,12 +1382,296 @@ async function saveGroupSettings(groupId) {
 
 // Show group members
 function showGroupMembers() {
-  document.getElementById('members-tab').click();
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 20px; border-bottom: 1px solid var(--ig-border); position: relative;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="position: absolute; top: -10px; right: -10px; background: var(--ig-primary-background); border: 2px solid var(--ig-border); border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--ig-primary-text); display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s;"
+                onmouseover="this.style.background='#ed4956'; this.style.color='white'; this.style.borderColor='#ed4956';"
+                onmouseout="this.style.background='var(--ig-primary-background)'; this.style.color='var(--ig-primary-text)'; this.style.borderColor='var(--ig-border)';">×</button>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; text-align: center;">Group Members</h2>
+      </div>
+      <div id="members-list" style="flex: 1; overflow-y: auto; padding: 16px;">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  loadMembersForModal();
+}
+
+async function loadMembersForModal() {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/members`);
+    const membersList = document.getElementById('members-list');
+    
+    if (!response.members || response.members.length === 0) {
+      membersList.innerHTML = '<p style="text-align: center; color: var(--ig-secondary-text);">No members found</p>';
+      return;
+    }
+    
+    membersList.innerHTML = response.members.map(member => `
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+        <img src="${member.profile_picture || '/images/default-avatar.svg'}" 
+             alt="${member.username}"
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 14px;">${member.username}</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text);">${member.role}</div>
+        </div>
+        ${member.role === 'admin' ? '<span style="background: var(--ig-blue); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">Admin</span>' : ''}
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading members:', error);
+    document.getElementById('members-list').innerHTML = '<p style="text-align: center; color: var(--ig-error);">Failed to load members</p>';
+  }
 }
 
 // Show add members interface
 function showAddMembers() {
-  InnovateAPI.showAlert('Add members feature coming soon!', 'info');
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 20px; border-bottom: 1px solid var(--ig-border); position: relative;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="position: absolute; top: -10px; right: -10px; background: var(--ig-primary-background); border: 2px solid var(--ig-border); border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--ig-primary-text); display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s;"
+                onmouseover="this.style.background='#ed4956'; this.style.color='white'; this.style.borderColor='#ed4956';"
+                onmouseout="this.style.background='var(--ig-primary-background)'; this.style.color='var(--ig-primary-text)'; this.style.borderColor='var(--ig-border)';">×</button>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; text-align: center;">Add Members</h2>
+      </div>
+      <div style="padding: 16px;">
+        <input type="text" id="search-users" placeholder="Search users..." 
+               style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); margin-bottom: 16px;"
+               oninput="window.searchUsersToAdd(this.value)">
+      </div>
+      <div id="users-to-add-list" style="flex: 1; overflow-y: auto; padding: 0 16px 16px;">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  loadUsersToAdd();
+}
+
+async function loadUsersToAdd(search = '') {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/available-users?search=${search}`);
+    const usersList = document.getElementById('users-to-add-list');
+    
+    if (!response.users || response.users.length === 0) {
+      usersList.innerHTML = '<p style="text-align: center; color: var(--ig-secondary-text);">No users available to add</p>';
+      return;
+    }
+    
+    usersList.innerHTML = response.users.map(user => `
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+        <img src="${user.profile_picture || '/images/default-avatar.svg'}" 
+             alt="${user.username}"
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 14px;">${user.username}</div>
+        </div>
+        <button onclick="window.addMemberToGroup(${user.id}, '${user.username}')"
+                style="background: var(--ig-blue); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+          Add
+        </button>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading users:', error);
+    document.getElementById('users-to-add-list').innerHTML = '<p style="text-align: center; color: var(--ig-error);">Failed to load users</p>';
+  }
+}
+
+async function searchUsersToAdd(query) {
+  await loadUsersToAdd(query);
+}
+
+async function addMemberToGroup(userId, username) {
+  try {
+    await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userId })
+    });
+    
+    InnovateAPI.showAlert(`${username} added successfully!`, 'success');
+    loadUsersToAdd();
+  } catch (error) {
+    console.error('Error adding member:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
+}
+
+// Show request approvals
+function showRequestApprovals() {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 20px; border-bottom: 1px solid var(--ig-border); position: relative;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="position: absolute; top: -10px; right: -10px; background: var(--ig-primary-background); border: 2px solid var(--ig-border); border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--ig-primary-text); display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s;"
+                onmouseover="this.style.background='#ed4956'; this.style.color='white'; this.style.borderColor='#ed4956';"
+                onmouseout="this.style.background='var(--ig-primary-background)'; this.style.color='var(--ig-primary-text)'; this.style.borderColor='var(--ig-border)';">×</button>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; text-align: center;">Join Requests</h2>
+      </div>
+      <div id="requests-list" style="flex: 1; overflow-y: auto; padding: 16px;">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  loadJoinRequests();
+}
+
+async function loadJoinRequests() {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/requests`);
+    const requestsList = document.getElementById('requests-list');
+    
+    if (!response.requests || response.requests.length === 0) {
+      requestsList.innerHTML = '<p style="text-align: center; color: var(--ig-secondary-text);">No pending requests</p>';
+      return;
+    }
+    
+    requestsList.innerHTML = response.requests.map(request => `
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+        <img src="${request.profile_picture || '/images/default-avatar.svg'}" 
+             alt="${request.username}"
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 14px;">${request.username}</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text);">${InnovateAPI.formatDate(request.created_at)}</div>
+        </div>
+        <button onclick="window.handleJoinRequest(${request.user_id}, 'approved')"
+                style="background: var(--ig-blue); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-right: 8px;">
+          Approve
+        </button>
+        <button onclick="window.handleJoinRequest(${request.user_id}, 'rejected')"
+                style="background: var(--ig-error); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+          Reject
+        </button>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading requests:', error);
+    document.getElementById('requests-list').innerHTML = '<p style="text-align: center; color: var(--ig-error);">Failed to load requests</p>';
+  }
+}
+
+async function handleJoinRequest(userId, status) {
+  try {
+    await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/requests/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+    
+    InnovateAPI.showAlert(`Request ${status} successfully!`, 'success');
+    loadJoinRequests();
+  } catch (error) {
+    console.error('Error handling request:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
+}
+
+// Show blocked members
+function showBlockedMembers() {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 500px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="padding: 20px; border-bottom: 1px solid var(--ig-border); position: relative;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="position: absolute; top: -10px; right: -10px; background: var(--ig-primary-background); border: 2px solid var(--ig-border); border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--ig-primary-text); display: flex; align-items: center; justify-content: center; z-index: 10; transition: all 0.2s;"
+                onmouseover="this.style.background='#ed4956'; this.style.color='white'; this.style.borderColor='#ed4956';"
+                onmouseout="this.style.background='var(--ig-primary-background)'; this.style.color='var(--ig-primary-text)'; this.style.borderColor='var(--ig-border)';">×</button>
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; text-align: center;">Blocked Members</h2>
+      </div>
+      <div id="blocked-list" style="flex: 1; overflow-y: auto; padding: 16px;">
+        <div class="ig-spinner"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  loadBlockedMembers();
+}
+
+async function loadBlockedMembers() {
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/blocked`);
+    const blockedList = document.getElementById('blocked-list');
+    
+    if (!response.blocked || response.blocked.length === 0) {
+      blockedList.innerHTML = '<p style="text-align: center; color: var(--ig-secondary-text);">No blocked members</p>';
+      return;
+    }
+    
+    blockedList.innerHTML = response.blocked.map(blocked => `
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+        <img src="${blocked.profile_picture || '/images/default-avatar.svg'}" 
+             alt="${blocked.username}"
+             style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 14px;">${blocked.username}</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text);">Blocked ${InnovateAPI.formatDate(blocked.blocked_at)}</div>
+        </div>
+        <button onclick="window.unblockMember(${blocked.user_id}, '${blocked.username}')"
+                style="background: var(--ig-blue); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+          Unblock
+        </button>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading blocked members:', error);
+    document.getElementById('blocked-list').innerHTML = '<p style="text-align: center; color: var(--ig-error);">Failed to load blocked members</p>';
+  }
+}
+
+async function unblockMember(userId, username) {
+  try {
+    await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}/blocked/${userId}`, {
+      method: 'DELETE'
+    });
+    
+    InnovateAPI.showAlert(`${username} unblocked successfully!`, 'success');
+    loadBlockedMembers();
+  } catch (error) {
+    console.error('Error unblocking member:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
+}
+
+// Delete group
+async function deleteGroup() {
+  if (!confirm('⚠️ Are you sure you want to delete this group? This action cannot be undone!')) {
+    return;
+  }
+  
+  if (!confirm('This will permanently delete all messages, files, and data. Are you absolutely sure?')) {
+    return;
+  }
+
+  try {
+    await InnovateAPI.apiRequest(`/community-groups/${currentGroupId}`, {
+      method: 'DELETE'
+    });
+
+    InnovateAPI.showAlert('Group deleted successfully', 'success');
+    
+    // Redirect back to community
+    if (currentCommunityId) {
+      window.location.href = `/community.html?id=${currentCommunityId}`;
+    } else {
+      window.location.href = '/communities';
+    }
+  } catch (error) {
+    console.error('Error deleting group:', error);
+    InnovateAPI.showAlert(error.message, 'error');
+  }
 }
 
 // Leave group
@@ -1296,10 +1705,19 @@ window.showMessageMenu = showMessageMenu;
 window.replyToMessage = replyToMessage;
 window.cancelReply = cancelReply;
 window.forwardMessage = forwardMessage;
+window.pinMessage = pinMessage;
 window.editMessage = editMessage;
 window.deleteMessage = deleteMessage;
 window.showGroupSettings = showGroupSettings;
 window.saveGroupSettings = saveGroupSettings;
 window.showGroupMembers = showGroupMembers;
 window.showAddMembers = showAddMembers;
+window.searchUsersToAdd = searchUsersToAdd;
+window.addMemberToGroup = addMemberToGroup;
+window.showRequestApprovals = showRequestApprovals;
+window.handleJoinRequest = handleJoinRequest;
+window.showBlockedMembers = showBlockedMembers;
+window.unblockMember = unblockMember;
+window.deleteGroup = deleteGroup;
+window.leaveGroup = leaveGroup;
 window.leaveGroup = leaveGroup;

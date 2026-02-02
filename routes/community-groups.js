@@ -2487,5 +2487,228 @@ router.post('/community-groups/:groupId/join-requests/:userId/reject', authMiddl
   );
 });
 
+// Get join requests for a group (admin only)
+router.get('/community-groups/:groupId/requests', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can view join requests' });
+      }
+
+      // Get pending requests
+      db.all(
+        `SELECT jr.*, u.username, u.profile_picture
+         FROM community_group_join_requests jr
+         JOIN users u ON u.id = jr.user_id
+         WHERE jr.group_id = ? AND jr.status = 'pending'
+         ORDER BY jr.created_at DESC`,
+        [groupId],
+        (err, requests) => {
+          if (err) {
+            console.error('Error fetching join requests:', err);
+            return res.status(500).json({ error: 'Error fetching join requests' });
+          }
+
+          res.json({ requests });
+        }
+      );
+    }
+  );
+});
+
+// Handle join request (approve/reject)
+router.put('/community-groups/:groupId/requests/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = parseInt(req.params.userId);
+  const adminId = req.user.userId;
+  const { status } = req.body; // 'approved' or 'rejected'
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can handle join requests' });
+      }
+
+      // Update request status
+      db.run(
+        'UPDATE community_group_join_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id = ? AND user_id = ?',
+        [status, groupId, userId],
+        (err) => {
+          if (err) {
+            console.error('Error updating join request:', err);
+            return res.status(500).json({ error: 'Error updating join request' });
+          }
+
+          // If approved, add to group
+          if (status === 'approved') {
+            db.run(
+              'INSERT OR IGNORE INTO community_group_members (group_id, user_id, role) VALUES (?, ?, ?)',
+              [groupId, userId, 'member'],
+              (err) => {
+                if (err) {
+                  console.error('Error adding member:', err);
+                  return res.status(500).json({ error: 'Error adding member' });
+                }
+
+                res.json({ success: true, message: 'Request approved and member added' });
+              }
+            );
+          } else {
+            res.json({ success: true, message: 'Request rejected' });
+          }
+        }
+      );
+    }
+  );
+});
+
+// Get available users to add to group
+router.get('/community-groups/:groupId/available-users', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const search = req.query.search || '';
+
+  // Get users not already in the group
+  db.all(
+    `SELECT u.id, u.username, u.profile_picture
+     FROM users u
+     WHERE u.id NOT IN (
+       SELECT user_id FROM community_group_members WHERE group_id = ?
+     )
+     AND u.id NOT IN (
+       SELECT user_id FROM community_group_blocked WHERE group_id = ?
+     )
+     ${search ? 'AND u.username LIKE ?' : ''}
+     ORDER BY u.username
+     LIMIT 50`,
+    search ? [groupId, groupId, `%${search}%`] : [groupId, groupId],
+    (err, users) => {
+      if (err) {
+        console.error('Error fetching available users:', err);
+        return res.status(500).json({ error: 'Error fetching users' });
+      }
+
+      res.json({ users });
+    }
+  );
+});
+
+// Add member to group (admin only)
+router.post('/community-groups/:groupId/members', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const adminId = req.user.userId;
+  const { userId } = req.body;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can add members' });
+      }
+
+      // Add member
+      db.run(
+        'INSERT OR IGNORE INTO community_group_members (group_id, user_id, role) VALUES (?, ?, ?)',
+        [groupId, userId, 'member'],
+        (err) => {
+          if (err) {
+            console.error('Error adding member:', err);
+            return res.status(500).json({ error: 'Error adding member' });
+          }
+
+          res.json({ success: true, message: 'Member added successfully' });
+        }
+      );
+    }
+  );
+});
+
+// Delete blocked member (using DELETE method)
+router.delete('/community-groups/:groupId/blocked/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const targetUserId = req.params.userId;
+  const adminId = req.user.userId;
+
+  // Check if requester is admin or creator
+  db.get(
+    `SELECT g.creator_id, gm.role 
+     FROM community_groups g
+     LEFT JOIN community_group_members gm ON gm.group_id = g.id AND gm.user_id = ?
+     WHERE g.id = ?`,
+    [adminId, groupId],
+    (err, group) => {
+      if (err || !group) {
+        return res.status(404).json({ error: 'Group not found' });
+      }
+
+      const isCreator = group.creator_id === adminId;
+      const isAdmin = group.role === 'admin';
+
+      if (!isCreator && !isAdmin) {
+        return res.status(403).json({ error: 'Only admins can unblock members' });
+      }
+
+      // Remove from blocked list
+      db.run(
+        'DELETE FROM community_group_blocked WHERE group_id = ? AND user_id = ?',
+        [groupId, targetUserId],
+        (err) => {
+          if (err) {
+            console.error('Error unblocking member:', err);
+            return res.status(500).json({ error: 'Error unblocking member' });
+          }
+
+          res.json({ success: true, message: 'Member unblocked' });
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;
 
