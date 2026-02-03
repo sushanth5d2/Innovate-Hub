@@ -476,11 +476,82 @@ const createTables = () => {
         title TEXT NOT NULL,
         description TEXT,
         event_date DATETIME NOT NULL,
+        is_public BOOLEAN DEFAULT 1,
+        city TEXT,
+        category TEXT,
         location TEXT,
+        cover_image TEXT,
+        organizer_name TEXT,
+        important_note TEXT,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Event ticket types (passes)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_ticket_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        payment_mode TEXT DEFAULT 'free',
+        contact_text TEXT,
+        price_cents INTEGER DEFAULT 0,
+        currency TEXT DEFAULT 'INR',
+        quantity_total INTEGER,
+        quantity_sold INTEGER DEFAULT 0,
+        sales_start DATETIME,
+        sales_end DATETIME,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Event orders (simple checkout records)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        ticket_type_id INTEGER,
+        quantity INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'pending',
+        total_cents INTEGER DEFAULT 0,
+        currency TEXT DEFAULT 'INR',
+        payment_provider TEXT,
+        payment_ref TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (ticket_type_id) REFERENCES event_ticket_types(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Issued tickets (each ticket is a unique pass code)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        ticket_type_id INTEGER,
+        owner_id INTEGER NOT NULL,
+        code TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'issued',
+        checked_in_at DATETIME,
+        checked_in_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (ticket_type_id) REFERENCES event_ticket_types(id) ON DELETE SET NULL,
+        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (checked_in_by) REFERENCES users(id) ON DELETE SET NULL
       )
     `);
 
@@ -919,6 +990,130 @@ const createTables = () => {
 // Migrate database schema
 const migrateDatabase = () => {
   db.serialize(() => {
+    // Events discover fields (safe for existing DBs)
+    db.run(`ALTER TABLE events ADD COLUMN is_public BOOLEAN DEFAULT 1`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding is_public column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN city TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding city column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN category TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding category column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN cover_image TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding cover_image column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN organizer_name TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding organizer_name column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN important_note TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding important_note column to events:', err);
+      }
+    });
+
+    // Ticketing tables/columns (safe for existing DBs)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_ticket_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        payment_mode TEXT DEFAULT 'free',
+        contact_text TEXT,
+        price_cents INTEGER DEFAULT 0,
+        currency TEXT DEFAULT 'INR',
+        quantity_total INTEGER,
+        quantity_sold INTEGER DEFAULT 0,
+        sales_start DATETIME,
+        sales_end DATETIME,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`ALTER TABLE event_ticket_types ADD COLUMN payment_mode TEXT DEFAULT 'free'`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding payment_mode column to event_ticket_types:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE event_ticket_types ADD COLUMN contact_text TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding contact_text column to event_ticket_types:', err);
+      }
+    });
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        ticket_type_id INTEGER,
+        quantity INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'pending',
+        total_cents INTEGER DEFAULT 0,
+        currency TEXT DEFAULT 'INR',
+        payment_provider TEXT,
+        payment_ref TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (ticket_type_id) REFERENCES event_ticket_types(id) ON DELETE SET NULL
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        ticket_type_id INTEGER,
+        owner_id INTEGER NOT NULL,
+        code TEXT UNIQUE NOT NULL,
+        status TEXT DEFAULT 'issued',
+        checked_in_at DATETIME,
+        checked_in_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES event_orders(id) ON DELETE CASCADE,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (ticket_type_id) REFERENCES event_ticket_types(id) ON DELETE SET NULL,
+        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (checked_in_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    db.run(`ALTER TABLE event_orders ADD COLUMN ticket_type_id INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding ticket_type_id column to event_orders:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE event_orders ADD COLUMN quantity INTEGER DEFAULT 1`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding quantity column to event_orders:', err);
+      }
+    });
+
     // Add type column to messages if not exists
     db.run(`
       ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'

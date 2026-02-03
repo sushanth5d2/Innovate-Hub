@@ -50,229 +50,367 @@
     <!-- Tabs -->
     <div style="background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); display: flex; gap: 24px; padding: 0 20px; margin-bottom: 24px;">
       <button class="event-tab active" onclick="switchTab('events')" style="padding: 12px 0; background: none; border: none; border-bottom: 2px solid var(--ig-primary-text); color: var(--ig-primary-text); font-weight: 600; cursor: pointer;">Events</button>
+      <button class="event-tab" onclick="switchTab('passes')" style="padding: 12px 0; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer;">Passes</button>
       <button class="event-tab" onclick="switchTab('crosspath')" style="padding: 12px 0; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer;">Crosspath</button>
       <button class="event-tab" onclick="switchTab('reminders')" style="padding: 12px 0; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer;">Reminders</button>
-    </div>
+    <!DOCTYPE html>
+    <html lang="en" data-theme="dark">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Experiences - Innovate</title>
+      <link rel="stylesheet" href="/css/instagram.css" />
+      <link rel="stylesheet" href="/css/experiences.css" />
+    </head>
+    <body>
+      <header class="exp-topbar">
+        <div class="exp-topbar-inner">
+          <a class="exp-brand" href="/home">Innovate</a>
 
-    <!-- Events Tab -->
-    <div id="events-tab" class="tab-content">
-      <div id="events-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
-        <!-- Events will be loaded here -->
-      </div>
-    </div>
+          <button class="exp-pill" id="cityBtn" type="button" title="Change city">
+            <span id="cityLabel">Hyderabad</span>
+            <span style="opacity:0.7;">▾</span>
+          </button>
 
-    <!-- Crosspath Tab -->
-    <div id="crosspath-tab" class="tab-content" style="display: none;">
-      <div id="crosspath-list" style="max-width: 600px; margin: 0 auto;">
-        <!-- Crosspath requests will be loaded here -->
-      </div>
-    </div>
-
-    <!-- Reminders Tab -->
-    <div id="reminders-tab" class="tab-content" style="display: none;">
-      <div id="reminders-list" style="max-width: 600px; margin: 0 auto;">
-        <!-- Reminders will be loaded here -->
-      </div>
-    </div>
-  </main>
-
-  <!-- Create Event Modal -->
-  <div id="create-event-modal" class="ig-modal-overlay" style="display: none;">
-    <div class="ig-modal">
-      <div class="ig-modal-item" style="padding: 20px; text-align: left;">
-        <h3 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">Create Event</h3>
-        
-        <form id="create-event-form" onsubmit="createEvent(); return false;">
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600;">Event Title</label>
-            <input type="text" id="event-title" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 4px; background: var(--ig-secondary-background); color: var(--ig-primary-text);" required>
+          <div class="exp-search" title="Search">
+            <span style="opacity:0.7;">🔎</span>
+            <input id="searchInput" type="text" placeholder="Search experiences..." />
           </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600;">Date & Time</label>
-            <input type="datetime-local" id="event-date" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 4px; background: var(--ig-secondary-background); color: var(--ig-primary-text);" required>
+
+          <div class="exp-actions">
+            <button class="exp-pill" id="filtersBtn" type="button">Filters</button>
+            <button class="exp-icon-btn" id="openCreateEvent" type="button" title="Create event">＋</button>
+            <a class="exp-icon-btn" href="/notifications" title="Notifications" style="text-decoration:none;">🔔</a>
           </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600;">Location</label>
-            <input type="text" id="event-location" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 4px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+        </div>
+      </header>
+
+      <main class="exp-main exp-page">
+        <div>
+          <div class="exp-title" id="expHeaderTitle">All Experiences</div>
+          <div class="exp-subtitle" id="expHeaderSubtitle">Parties, concerts & trips in one place</div>
+          <div class="exp-tabs" role="tablist">
+            <button class="exp-tab active" data-exp-tab="discover" type="button">All Events</button>
+            <button class="exp-tab" data-exp-tab="mine" type="button">My Events</button>
+            <button class="exp-tab" data-exp-tab="passes" type="button">Passes</button>
+            <button class="exp-tab" data-exp-tab="crosspath" type="button">Crosspath</button>
+            <button class="exp-tab" data-exp-tab="reminders" type="button">Reminders</button>
           </div>
-          
-          <div style="margin-bottom: 20px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600;">Description</label>
-            <textarea id="event-description" rows="3" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 4px; background: var(--ig-secondary-background); color: var(--ig-primary-text);"></textarea>
+        </div>
+
+        <section data-exp-panel="discover">
+          <div id="expDiscoverGrid" class="exp-grid"></div>
+        </section>
+
+        <section data-exp-panel="mine" style="display:none;">
+          <div id="expMyGrid" class="exp-grid"></div>
+        </section>
+
+        <section data-exp-panel="passes" style="display:none;">
+          <div id="passesList" style="max-width: 900px; margin: 0 auto; display:flex; flex-direction:column; gap: 12px;"></div>
+        </section>
+
+        <section data-exp-panel="crosspath" style="display:none;">
+          <div id="crosspathList" style="max-width: 760px; margin: 0 auto;"></div>
+        </section>
+
+        <section data-exp-panel="reminders" style="display:none;">
+          <div id="remindersList" style="max-width: 760px; margin: 0 auto;"></div>
+        </section>
+      </main>
+
+      <!-- Event detail overlay -->
+      <div class="exp-overlay" id="eventOverlay">
+        <div class="exp-detail" role="dialog" aria-modal="true">
+          <div class="exp-detail-media">
+            <img id="eventDetailImg" alt="Event" />
+            <button class="exp-close" id="closeEventOverlay" type="button">✕</button>
           </div>
-          
-          <div style="display: flex; gap: 10px;">
-            <button type="button" onclick="closeCreateEventModal()" style="flex: 1; padding: 12px; border: 1px solid var(--ig-border); border-radius: 4px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">Cancel</button>
-            <button type="submit" style="flex: 1; padding: 12px; border: none; border-radius: 4px; background: var(--ig-blue); color: white; font-weight: 600; cursor: pointer;">Create</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation -->
-  <nav class="ig-bottom-nav">
-    <a href="/home" class="ig-bottom-nav-item">
-      <svg aria-label="Home" viewBox="0 0 24 24" width="24">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Home</span>
-    </a>
-    <a href="/communities" class="ig-bottom-nav-item">
-      <svg aria-label="Communities" viewBox="0 0 24 24" width="24">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Communities</span>
-    </a>
-    <a href="/events" class="ig-bottom-nav-item active">
-      <svg aria-label="Events" viewBox="0 0 24 24" width="24">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Events</span>
-    </a>
-    <button class="ig-bottom-nav-item" onclick="openCreateEventModal()" style="background: none; border: none; cursor: pointer;">
-      <svg aria-label="Create" viewBox="0 0 24 24" width="24">
-        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Create</span>
-    </button>
-    <a href="/social-service" class="ig-bottom-nav-item">
-      <svg aria-label="Social Service" viewBox="0 0 24 24" width="24">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Service</span>
-    </a>
-    <a href="/search" class="ig-bottom-nav-item">
-      <svg aria-label="Search" viewBox="0 0 24 24" width="24">
-        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Search</span>
-    </a>
-    <a href="#" class="ig-bottom-nav-item" id="profileNavLink" onclick="navigateToProfile(event)">
-      <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
-        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-        <path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Profile</span>
-    </a>
-  </nav>
-
-  <script>
-    function navigateToProfile(e) {
-      e.preventDefault();
-      const user = InnovateAPI.getCurrentUser();
-      if (user && user.id) {
-        window.location.href = `/profile/${user.id}`;
-      }
-    }
-  </script>
-      </svg>
-    </a>
-  </nav>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/instagram-theme.js"></script>
-  <script>
-    const socket = io();
-
-    if (!localStorage.getItem('token')) {
-      window.location.href = '/login';
-    }
-
-    let currentTab = 'events';
-
-    function switchTab(tab) {
-      currentTab = tab;
-      
-      // Update tab buttons
-      document.querySelectorAll('.event-tab').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.borderBottomColor = 'transparent';
-        btn.style.color = 'var(--ig-secondary-text)';
-      });
-      event.target.classList.add('active');
-      event.target.style.borderBottomColor = 'var(--ig-primary-text)';
-      event.target.style.color = 'var(--ig-primary-text)';
-
-      // Update tab content
-      document.querySelectorAll('.tab-content').forEach(content => {
-        content.style.display = 'none';
-      });
-      document.getElementById(`${tab}-tab`).style.display = 'block';
-
-      // Load data for tab
-      if (tab === 'events') loadEvents();
-      else if (tab === 'crosspath') loadCrosspathRequests();
-      else if (tab === 'reminders') loadReminders();
-    }
-
-    async function loadEvents() {
-      try {
-        const response = await fetch('/api/events', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (!response.ok) throw new Error('Failed to load events');
-        
-        const data = await response.json();
-        displayEvents(data.events || []);
-      } catch (error) {
-        console.error('Error loading events:', error);
-      }
-    }
-
-    function displayEvents(events) {
-      const grid = document.getElementById('events-grid');
-      grid.innerHTML = '';
-
-      if (events.length === 0) {
-        grid.innerHTML = `
-          <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px;">
-            <div style="font-size: 48px; margin-bottom: 16px;">📅</div>
-            <p style="color: var(--ig-secondary-text); margin-bottom: 24px;">No events yet</p>
-            <button class="ig-action-btn" onclick="openCreateEventModal()" style="padding: 10px 24px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Create First Event</button>
-          </div>
-        `;
-        return;
-      }
-
-      events.forEach(event => {
-        const card = document.createElement('div');
-        card.className = 'ig-post';
-        card.innerHTML = `
-          <div style="padding: 20px;">
-            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
-              <div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--ig-blue), #833AB4); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; flex-shrink: 0;">
-                <div style="font-size: 20px; font-weight: 700;">${new Date(event.event_date).getDate()}</div>
-                <div style="font-size: 11px; text-transform: uppercase;">${new Date(event.event_date).toLocaleString('default', { month: 'short' })}</div>
+          <div class="exp-detail-panel">
+            <div style="display:flex; justify-content:space-between; gap: 10px; align-items:flex-start;">
+              <div style="min-width:0;">
+                <div id="eventDetailTitle" style="font-weight: 900; font-size: 20px; letter-spacing: -0.4px;">Event</div>
+                <div id="eventDetailPlace" style="color: var(--ig-secondary-text); margin-top: 4px;"></div>
               </div>
-              <div style="flex: 1; min-width: 0;">
-                <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600;">${event.title}</h3>
-                <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 4px;">
-                  <i class="fas fa-clock"></i> ${new Date(event.event_date).toLocaleString()}
+              <div id="eventDetailPrice" style="font-weight: 900;"></div>
+            </div>
+
+            <div class="exp-kpis">
+              <div class="exp-kpi"><div class="exp-kpi-val" id="kpiInterested">0</div><div class="exp-kpi-lbl">Interested</div></div>
+              <div class="exp-kpi"><div class="exp-kpi-val" id="kpiCountdown">—</div><div class="exp-kpi-lbl">Starts in</div></div>
+              <div class="exp-kpi"><div class="exp-kpi-val" id="kpiPopularity">—</div><div class="exp-kpi-lbl">Popularity</div></div>
+            </div>
+
+            <div class="exp-section">
+              <div style="font-weight: 900; margin-bottom: 6px;">Quick look</div>
+              <div class="exp-row"><strong style="width: 120px;">Event timings</strong> <span id="qlTime"></span></div>
+              <div class="exp-row"><strong style="width: 120px;">Category</strong> <span id="qlCategory"></span></div>
+              <div class="exp-row"><strong style="width: 120px;">Organized by</strong> <span id="qlOrganizer"></span></div>
+              <div class="exp-row"><strong style="width: 120px;">Important note</strong> <span id="qlNote"></span></div>
+            </div>
+
+            <div class="exp-section" id="eventDetailDescWrap" style="display:block;">
+              <div style="font-weight: 900; margin-bottom: 6px;">About</div>
+              <div id="eventDetailDesc" style="color: var(--ig-secondary-text); white-space: pre-wrap;"></div>
+            </div>
+
+            <div class="exp-cta">
+              <button class="exp-btn primary" id="btnSelectTickets" type="button">Select Tickets</button>
+              <button class="exp-btn" id="btnManagePasses" type="button" style="display:none;">Manage Pass Types</button>
+              <button class="exp-btn" id="btnOrders" type="button" style="display:none;">Orders</button>
+              <button class="exp-btn" id="btnCheckin" type="button" style="display:none;">Check-in</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters overlay + drawer -->
+      <div class="exp-overlay" id="filtersOverlay"></div>
+      <div class="exp-drawer" id="filtersDrawer" aria-label="Filters">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+          <div style="font-weight: 900; font-size: 16px;">Filters</div>
+          <button class="exp-icon-btn" id="closeFilters" type="button">✕</button>
+        </div>
+        <div class="exp-field">
+          <label>City</label>
+          <select id="filterCity">
+            <option>Hyderabad</option>
+            <option>Bengaluru</option>
+            <option>Mumbai</option>
+            <option>Delhi</option>
+            <option>Chennai</option>
+            <option>Pune</option>
+            <option>Kolkata</option>
+          </select>
+        </div>
+        <div class="exp-hint">Tip: Press Enter in search to apply.</div>
+        <div style="display:flex; gap: 10px; margin-top: 16px;">
+          <button class="exp-btn" type="button" id="applyFilters">Apply</button>
+        </div>
+      </div>
+
+      <!-- Tickets modal -->
+      <div id="ticketsModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 620px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div>
+                <div id="ticketsTitle" style="font-weight: 900; font-size: 18px;">Select Tickets</div>
+                <div id="ticketsSubtitle" style="color: var(--ig-secondary-text); margin-top: 4px; font-size: 13px;"></div>
+              </div>
+              <button id="closeTickets" type="button" class="exp-icon-btn">✕</button>
+            </div>
+
+            <div id="ticketTypes" style="display:flex; flex-direction:column; gap: 10px; margin-top: 14px;"></div>
+
+            <div style="display:flex; gap: 10px; align-items:center; margin-top: 14px;">
+              <div style="font-weight: 900;">Qty</div>
+              <input id="ticketQty" type="number" min="1" max="10" value="1" style="width: 100px; height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: var(--ig-primary-text); padding: 0 12px;" />
+              <div id="ticketTotal" style="margin-left:auto; color: var(--ig-secondary-text);"></div>
+            </div>
+
+            <div style="display:flex; gap: 10px; margin-top: 14px;">
+              <button class="exp-btn" type="button" id="btnCheckout">Confirm</button>
+            </div>
+
+            <div id="ticketsResult" style="margin-top: 12px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orders modal -->
+      <div id="ordersModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 720px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div>
+                <div id="ordersTitle" style="font-weight: 900; font-size: 18px;">Manage Orders</div>
+                <div id="ordersSubtitle" style="color: var(--ig-secondary-text); margin-top: 4px; font-size: 13px;"></div>
+              </div>
+              <button id="closeOrders" type="button" class="exp-icon-btn">✕</button>
+            </div>
+            <div id="ordersList" style="display:flex; flex-direction:column; gap: 10px; margin-top: 14px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage passes modal -->
+      <div id="managePassesModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 820px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div>
+                <div id="managePassesTitle" style="font-weight: 900; font-size: 18px;">Manage Pass Types</div>
+                <div id="managePassesSubtitle" style="color: var(--ig-secondary-text); margin-top: 4px; font-size: 13px;"></div>
+              </div>
+              <button id="closeManagePasses" type="button" class="exp-icon-btn">✕</button>
+            </div>
+
+            <div id="managePassesList" style="display:flex; flex-direction:column; gap: 10px; margin-top: 14px;"></div>
+
+            <div class="exp-section" style="margin-top: 14px;">
+              <div style="font-weight: 900; margin-bottom: 8px;">Create pass type</div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="exp-field"><label>Name</label><input id="newName" placeholder="VIP / General" /></div>
+                <div class="exp-field"><label>Mode</label>
+                  <select id="newMode">
+                    <option value="free">Free</option>
+                    <option value="venue">Pay at venue</option>
+                    <option value="contact">Contact organizer</option>
+                    <option value="dm">DM organizer</option>
+                    <option value="online">Online (future)</option>
+                  </select>
                 </div>
-                ${event.location ? `<div style="font-size: 14px; color: var(--ig-secondary-text);"><i class="fas fa-map-marker-alt"></i> ${event.location}</div>` : ''}
+                <div class="exp-field"><label>Price (INR)</label><input id="newPrice" type="number" min="0" step="0.01" placeholder="0" /></div>
+                <div class="exp-field"><label>Capacity (optional)</label><input id="newQty" type="number" min="1" step="1" placeholder="" /></div>
               </div>
+              <div class="exp-field"><label>Description</label><textarea id="newDesc" placeholder="What's included?"></textarea></div>
+              <div class="exp-field"><label>Contact text (optional)</label><input id="newContact" placeholder="WhatsApp/Phone/Instructions" /></div>
+              <button class="exp-btn primary" id="btnCreatePassType" type="button">Create</button>
             </div>
-            ${event.description ? `<p style="color: var(--ig-secondary-text); font-size: 14px; margin: 0 0 16px 0;">${event.description}</p>` : ''}
-            <div style="display: flex; gap: 16px; font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 16px;">
-              <span><i class="fas fa-users"></i> ${event.attendee_count || 0} attending</span>
-              <span><i class="fas fa-user"></i> ${event.creator_username}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit pass modal -->
+      <div id="editPassModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 720px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div style="font-weight: 900; font-size: 18px;">Edit pass type</div>
+              <button id="closeEditPass" type="button" class="exp-icon-btn">✕</button>
             </div>
-            <button class="ig-action-btn ${event.user_status === 'attending' ? 'attending' : ''}" onclick="toggleAttendance(${event.id}, this)" style="width: 100%; padding: 10px; background: ${event.user_status === 'attending' ? 'transparent' : 'var(--ig-blue)'}; color: ${event.user_status === 'attending' ? 'var(--ig-primary-text)' : 'white'}; border: ${event.user_status === 'attending' ? '1px solid var(--ig-border)' : 'none'}; border-radius: 8px; font-weight: 600; cursor: pointer;">
-              ${event.user_status === 'attending' ? 'Attending' : 'RSVP'}
-            </button>
+            <input id="editTypeId" type="hidden" />
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+              <div class="exp-field"><label>Name</label><input id="editName" /></div>
+              <div class="exp-field"><label>Mode</label>
+                <select id="editMode">
+                  <option value="free">Free</option>
+                  <option value="venue">Pay at venue</option>
+                  <option value="contact">Contact organizer</option>
+                  <option value="dm">DM organizer</option>
+                  <option value="online">Online (future)</option>
+                </select>
+              </div>
+              <div class="exp-field"><label>Price (INR)</label><input id="editPrice" type="number" min="0" step="0.01" /></div>
+              <div class="exp-field"><label>Capacity (optional)</label><input id="editQty" type="number" min="1" step="1" /></div>
+            </div>
+            <div class="exp-field"><label>Description</label><textarea id="editDesc"></textarea></div>
+            <div class="exp-field"><label>Contact text</label><input id="editContact" /></div>
+            <label style="display:flex; gap: 10px; align-items:center; margin-top: 10px; color: var(--ig-secondary-text);">
+              <input id="editActive" type="checkbox" /> Active
+            </label>
+            <div style="display:flex; gap: 10px; margin-top: 12px;">
+              <button class="exp-btn primary" id="saveEditPass" type="button">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create event modal -->
+      <div id="createEventModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 760px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div style="font-weight: 900; font-size: 18px;">Create event</div>
+              <button id="closeCreateEvent" type="button" class="exp-icon-btn">✕</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+              <div class="exp-field"><label>Title</label><input id="ceTitle" placeholder="Event title" /></div>
+              <div class="exp-field"><label>Date & time</label><input id="ceDate" type="datetime-local" /></div>
+              <div class="exp-field"><label>City</label><input id="ceCity" placeholder="Hyderabad" /></div>
+              <div class="exp-field"><label>Category</label><input id="ceCategory" placeholder="Concert / Party / Trip" /></div>
+              <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="ceLocation" placeholder="Venue name, area" /></div>
+              <div class="exp-field" style="grid-column: 1 / -1;"><label>Cover image URL (optional)</label><input id="ceCover" placeholder="https://..." /></div>
+              <div class="exp-field"><label>Organizer name (optional)</label><input id="ceOrganizer" placeholder="Brand / Organizer" /></div>
+              <div class="exp-field"><label>Important note (optional)</label><input id="ceNote" placeholder="Entry rules, ID required..." /></div>
+            </div>
+            <div class="exp-field"><label>Description</label><textarea id="ceDesc" placeholder="Describe the event..."></textarea></div>
+            <label style="display:flex; gap: 10px; align-items:center; margin-top: 10px; color: var(--ig-secondary-text);">
+              <input id="cePublic" type="checkbox" checked /> Public listing (discover)
+            </label>
+
+            <div style="display:flex; gap: 10px; margin-top: 12px;">
+              <button class="exp-btn primary" id="createEventSubmit" type="button">Create</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Check-in modal -->
+      <div id="checkinModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 520px;">
+          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+              <div style="font-weight: 900; font-size: 18px;">Check-in pass</div>
+              <button id="closeCheckin" type="button" class="exp-icon-btn">✕</button>
+            </div>
+            <div class="exp-field"><label>Pass code</label><input id="checkinCode" placeholder="Paste/enter code" /></div>
+            <button class="exp-btn primary" id="btnCheckinGo" type="button">Check-in</button>
+            <div id="checkinResult" class="exp-hint" style="margin-top: 10px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Navigation -->
+      <nav class="ig-bottom-nav">
+        <a href="/home" class="ig-bottom-nav-item">
+          <svg aria-label="Home" viewBox="0 0 24 24" width="24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ig-bottom-nav-label">Home</span>
+        </a>
+        <a href="/communities" class="ig-bottom-nav-item">
+          <svg aria-label="Communities" viewBox="0 0 24 24" width="24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="ig-bottom-nav-label">Communities</span>
+        </a>
+        <a href="/events" class="ig-bottom-nav-item active">
+          <svg aria-label="Events" viewBox="0 0 24 24" width="24">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span class="ig-bottom-nav-label">Events</span>
+        </a>
+        <a href="#" class="ig-bottom-nav-item" onclick="(function(e){e.preventDefault(); var u=localStorage.getItem('user'); if(u){ try{u=JSON.parse(u); if(u.id) location.href='/profile/'+u.id; }catch{}}})(event)">
+          <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+          <span class="ig-bottom-nav-label">Profile</span>
+        </a>
+      </nav>
+
+      <script src="/socket.io/socket.io.js"></script>
+      <script src="/js/app.js"></script>
+      <script src="/js/instagram-theme.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+      <script src="/js/events-experiences.js"></script>
+    </body>
+    </html>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="ig-action-btn ${event.user_status === 'attending' ? 'attending' : ''}" onclick="toggleAttendance(${event.id}, this)" style="flex: 1; padding: 10px; background: ${event.user_status === 'attending' ? 'transparent' : 'var(--ig-blue)'}; color: ${event.user_status === 'attending' ? 'var(--ig-primary-text)' : 'white'}; border: ${event.user_status === 'attending' ? '1px solid var(--ig-border)' : 'none'}; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                ${event.user_status === 'attending' ? 'Attending' : 'RSVP'}
+              </button>
+              ${Number(event.ticket_type_count || 0) > 0 ? `
+                <button class="ig-action-btn" onclick="openTicketsModal(${event.id})" style="flex: 1; padding: 10px; background: transparent; color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; font-weight: 600; cursor: pointer;">
+                  Get Pass
+                </button>
+              ` : ''}
+              ${(currentUserId && Number(event.creator_id) === Number(currentUserId)) ? `
+                <button class="ig-action-btn" onclick="openOrdersModal(${event.id})" style="flex: 1; padding: 10px; background: transparent; color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; font-weight: 600; cursor: pointer;">
+                  Orders
+                </button>
+              ` : ''}
+            </div>
           </div>
         `;
         grid.appendChild(card);
@@ -375,7 +513,7 @@
 
     async function loadReminders() {
       try {
-        const response = await fetch('/api/posts/reminders', {
+        const response = await fetch('/api/events/reminders', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -432,7 +570,7 @@
 
     async function deleteReminder(reminderId) {
       try {
-        const response = await fetch(`/api/posts/reminders/${reminderId}`, {
+        const response = await fetch(`/api/events/reminders/${reminderId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -496,6 +634,321 @@
 
     // Initialize
     loadEvents();
+
+    // =========================
+    // Passes / Tickets UI
+    // =========================
+
+    let activeTicketsEventId = null;
+    let activeTicketTypes = [];
+
+    function formatMoney(cents, currency) {
+      const amount = (Number(cents) || 0) / 100;
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency || 'INR' }).format(amount);
+    }
+
+    function formatPaymentMode(mode) {
+      const m = String(mode || '').toLowerCase();
+      if (m === 'free') return 'Free';
+      if (m === 'venue') return 'Pay at venue';
+      if (m === 'contact' || m === 'dm') return 'Contact organizer';
+      if (m === 'online') return 'Online payment';
+      return 'Offline payment';
+    }
+
+    async function loadMyPasses() {
+      const list = document.getElementById('passes-list');
+      list.innerHTML = '<div class="ig-spinner"></div>';
+      try {
+        const response = await fetch('/api/events/tickets/mine', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (!response.ok) throw new Error('Failed to load passes');
+        const data = await response.json();
+        displayMyPasses(data.tickets || []);
+      } catch (e) {
+        list.innerHTML = `<div class="ig-post"><div style="padding: 20px; color: var(--ig-secondary-text);">Failed to load passes</div></div>`;
+      }
+    }
+
+    function displayMyPasses(tickets) {
+      const list = document.getElementById('passes-list');
+      list.innerHTML = '';
+      if (!tickets.length) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🎫</div>
+            <p style="color: var(--ig-secondary-text);">No passes yet</p>
+          </div>
+        `;
+        return;
+      }
+
+      tickets.forEach((t, idx) => {
+        const card = document.createElement('div');
+        card.className = 'ig-post';
+        const qrId = `qr-${idx}-${t.id}`;
+        card.innerHTML = `
+          <div style="padding: 20px; display: flex; gap: 16px; align-items: flex-start;">
+            <div style="width: 120px; height: 120px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden;" id="${qrId}"></div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; margin-bottom: 4px;">${t.event_title || 'Event'}</div>
+              <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 6px;">${t.ticket_type_name || 'Pass'} • ${new Date(t.event_date).toLocaleString()}</div>
+              ${t.event_location ? `<div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 10px;"><i class="fas fa-map-marker-alt"></i> ${t.event_location}</div>` : ''}
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 12px; padding: 8px 10px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-secondary-background);">${t.code}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">Status: <span style="color: var(--ig-primary-text); font-weight: 600;">${t.status}</span></div>
+              </div>
+            </div>
+          </div>
+        `;
+        list.appendChild(card);
+
+        try {
+          new QRCode(document.getElementById(qrId), {
+            text: String(t.code),
+            width: 112,
+            height: 112,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch {
+          // ignore QR failures
+        }
+      });
+    }
+
+    async function openTicketsModal(eventId) {
+      activeTicketsEventId = eventId;
+      activeTicketTypes = [];
+      document.getElementById('tickets-modal-result').innerHTML = '';
+      document.getElementById('ticket-qty').value = 1;
+      document.getElementById('ticket-total').textContent = '';
+      document.getElementById('ticket-types').innerHTML = '<div class="ig-spinner"></div>';
+
+      document.getElementById('tickets-modal').style.display = 'flex';
+
+      try {
+        const [eventRes, typesRes] = await Promise.all([
+          fetch(`/api/events/${eventId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+          fetch(`/api/events/${eventId}/tickets/types`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+        ]);
+
+        const eventData = await eventRes.json();
+        const typesData = await typesRes.json();
+
+        document.getElementById('tickets-modal-title').textContent = `Get Pass`;
+        document.getElementById('tickets-modal-subtitle').textContent = eventData?.event?.title ? eventData.event.title : '';
+
+        activeTicketTypes = (typesData.types || []).map(t => ({
+          ...t,
+          remaining: (t.quantity_total === null || t.quantity_total === undefined) ? null : Math.max(0, Number(t.quantity_total) - Number(t.quantity_sold || 0))
+        }));
+
+        renderTicketTypes();
+        updateTicketTotal();
+      } catch (e) {
+        document.getElementById('ticket-types').innerHTML = `<div style="color: var(--ig-secondary-text);">Failed to load ticket types</div>`;
+      }
+    }
+
+    function closeTicketsModal() {
+      document.getElementById('tickets-modal').style.display = 'none';
+      activeTicketsEventId = null;
+      activeTicketTypes = [];
+    }
+
+    function renderTicketTypes() {
+      const wrap = document.getElementById('ticket-types');
+      wrap.innerHTML = '';
+
+      if (!activeTicketTypes.length) {
+        wrap.innerHTML = `<div style="color: var(--ig-secondary-text);">No passes configured for this event.</div>`;
+        return;
+      }
+
+      activeTicketTypes.forEach((t, i) => {
+        const disabled = (t.remaining !== null && t.remaining <= 0);
+        const row = document.createElement('label');
+        row.style.cssText = `display:flex; gap:12px; align-items:flex-start; padding:12px; border:1px solid var(--ig-border); border-radius:12px; cursor:${disabled ? 'not-allowed' : 'pointer'}; opacity:${disabled ? 0.5 : 1};`;
+        row.innerHTML = `
+          <input type="radio" name="ticketType" value="${t.id}" ${i === 0 && !disabled ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="margin-top: 4px;" onchange="updateTicketTotal()">
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; gap:10px;">
+              <div style="font-weight:700;">${t.name}</div>
+              <div style="font-weight:700;">${t.price_cents ? formatMoney(t.price_cents, t.currency) : 'Free'}</div>
+            </div>
+            ${t.description ? `<div style="color: var(--ig-secondary-text); font-size: 13px; margin-top: 4px;">${t.description}</div>` : ''}
+            <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 6px;">Payment: ${formatPaymentMode(t.payment_mode)}</div>
+            ${(t.contact_text && (String(t.payment_mode).toLowerCase() === 'contact' || String(t.payment_mode).toLowerCase() === 'dm')) ? `<div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px;">${t.contact_text}</div>` : ''}
+            ${t.remaining !== null ? `<div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 6px;">Remaining: ${t.remaining}</div>` : ''}
+          </div>
+        `;
+        wrap.appendChild(row);
+      });
+
+      document.getElementById('ticket-qty').addEventListener('input', updateTicketTotal);
+    }
+
+    function getSelectedTicketType() {
+      const selected = document.querySelector('input[name="ticketType"]:checked');
+      if (!selected) return null;
+      return activeTicketTypes.find(t => String(t.id) === String(selected.value)) || null;
+    }
+
+    function updateTicketTotal() {
+      const t = getSelectedTicketType();
+      const qty = Number(document.getElementById('ticket-qty').value) || 1;
+      if (!t) {
+        document.getElementById('ticket-total').textContent = '';
+        return;
+      }
+      const total = (Number(t.price_cents) || 0) * qty;
+      document.getElementById('ticket-total').textContent = total ? `Total: ${formatMoney(total, t.currency)}` : 'Total: Free';
+    }
+
+    async function checkoutTickets() {
+      const t = getSelectedTicketType();
+      const qty = Number(document.getElementById('ticket-qty').value) || 1;
+      const result = document.getElementById('tickets-modal-result');
+      result.innerHTML = '';
+
+      if (!activeTicketsEventId || !t) {
+        result.innerHTML = `<div style="color: var(--ig-error);">Select a pass type</div>`;
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/events/${activeTicketsEventId}/tickets/checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ ticket_type_id: t.id, quantity: qty })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          result.innerHTML = `<div style="color: var(--ig-error);">${data.error || 'Checkout failed'}</div>`;
+          return;
+        }
+
+        if (data.tickets && data.tickets.length) {
+          result.innerHTML = `
+            <div style="padding: 12px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background);">
+              <div style="font-weight: 700; margin-bottom: 6px;">Pass issued</div>
+              <div style="color: var(--ig-secondary-text); font-size: 13px;">Open Passes tab to view QR.</div>
+            </div>
+          `;
+          loadMyPasses();
+          return;
+        }
+
+        result.innerHTML = `
+          <div style="padding: 12px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background);">
+            <div style="font-weight: 700; margin-bottom: 6px;">Order created</div>
+            <div style="color: var(--ig-secondary-text); font-size: 13px;">${data.message || 'Offline payment: the organizer will contact you via DM, then send your pass QR after confirmation.'}</div>
+          </div>
+        `;
+      } catch (e) {
+        result.innerHTML = `<div style="color: var(--ig-error);">Checkout failed</div>`;
+      }
+    }
+
+    // =========================
+    // Organizer Orders UI
+    // =========================
+    let activeOrdersEventId = null;
+
+    async function openOrdersModal(eventId) {
+      activeOrdersEventId = eventId;
+      document.getElementById('orders-list').innerHTML = '<div class="ig-spinner"></div>';
+      document.getElementById('orders-modal').style.display = 'flex';
+
+      try {
+        const eventRes = await fetch(`/api/events/${eventId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+        const eventData = await eventRes.json();
+        document.getElementById('orders-modal-subtitle').textContent = eventData?.event?.title ? eventData.event.title : '';
+      } catch {
+        document.getElementById('orders-modal-subtitle').textContent = '';
+      }
+
+      await loadOrders();
+    }
+
+    function closeOrdersModal() {
+      document.getElementById('orders-modal').style.display = 'none';
+      activeOrdersEventId = null;
+    }
+
+    async function loadOrders() {
+      if (!activeOrdersEventId) return;
+      const list = document.getElementById('orders-list');
+      list.innerHTML = '<div class="ig-spinner"></div>';
+
+      try {
+        const res = await fetch(`/api/events/${activeOrdersEventId}/orders?status=pending`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        renderOrders(data.orders || []);
+      } catch {
+        list.innerHTML = `<div style="color: var(--ig-secondary-text);">Failed to load orders</div>`;
+      }
+    }
+
+    function renderOrders(orders) {
+      const list = document.getElementById('orders-list');
+      list.innerHTML = '';
+
+      if (!orders.length) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 30px 10px;">
+            <div style="font-size: 40px; margin-bottom: 10px;">🧾</div>
+            <div style="color: var(--ig-secondary-text);">No pending orders</div>
+          </div>
+        `;
+        return;
+      }
+
+      orders.forEach(o => {
+        const card = document.createElement('div');
+        card.style.cssText = 'border: 1px solid var(--ig-border); border-radius: 12px; padding: 14px; background: var(--ig-primary-background);';
+        const total = o.total_cents ? formatMoney(o.total_cents, o.currency) : 'Free';
+        const mode = formatPaymentMode(o.payment_mode);
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+            <div style="min-width:0;">
+              <div style="font-weight:700;">@${o.buyer_username || ('User ' + o.buyer_id)}</div>
+              <div style="color: var(--ig-secondary-text); font-size: 13px; margin-top: 2px;">${o.ticket_type_name || 'Pass'} • Qty ${o.quantity || 1}</div>
+              <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 6px;">Payment: ${mode} • Total: ${total}</div>
+              <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">Order #${o.id}</div>
+            </div>
+            <button onclick="markOrderPaid(${o.id})" style="padding: 10px 12px; background: var(--ig-blue); color: white; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; white-space: nowrap;">Mark paid & send pass</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    async function markOrderPaid(orderId) {
+      if (!activeOrdersEventId) return;
+      try {
+        const res = await fetch(`/api/events/${activeOrdersEventId}/orders/${orderId}/mark-paid`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        alert('Pass sent via DM to buyer');
+        await loadOrders();
+      } catch (e) {
+        alert('Failed to mark paid');
+      }
+    }
   </script>
 </body>
 </html>
