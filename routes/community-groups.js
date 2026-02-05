@@ -141,16 +141,19 @@ router.get('/communities/:communityId/groups', authMiddleware, (req, res) => {
       cg.*,
       u.username as creator_username,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id) as member_count,
-      (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member
+      (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member,
+      (SELECT content FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message,
+      (SELECT created_at FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message_time
     FROM community_groups cg
     JOIN users u ON cg.creator_id = u.id
     WHERE cg.community_id = ?
-    ORDER BY cg.created_at DESC
+    ORDER BY latest_message_time DESC, cg.created_at DESC
   `;
 
   db.all(query, [userId, communityId], (err, groups) => {
     if (err) {
-      return res.status(500).json({ error: 'Error fetching groups' });
+      console.error('Error fetching groups:', err);
+      return res.status(500).json({ error: 'Error fetching groups', details: err.message });
     }
     res.json({ success: true, groups });
   });
@@ -166,18 +169,27 @@ router.get('/community-groups/:groupId', authMiddleware, (req, res) => {
     SELECT 
       cg.*,
       u.username as creator_username,
+      c.admin_id as community_admin_id,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id) as member_count,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member,
-      (SELECT role FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as user_role
+      (SELECT role FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as role,
+      (SELECT role FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as user_role,
+      (SELECT role FROM community_members WHERE community_id = cg.community_id AND user_id = ?) as community_role,
+      (SELECT status FROM community_group_join_requests WHERE group_id = cg.id AND user_id = ?) as join_request_status
     FROM community_groups cg
     JOIN users u ON cg.creator_id = u.id
+    JOIN communities c ON cg.community_id = c.id
     WHERE cg.id = ?
   `;
 
-  db.get(query, [userId, userId, groupId], (err, group) => {
+  db.get(query, [userId, userId, userId, userId, userId, groupId], (err, group) => {
     if (err || !group) {
       return res.status(404).json({ error: 'Group not found' });
     }
+    
+    // Check if user is community admin
+    group.is_community_admin = (group.community_admin_id === userId) || (group.community_role === 'admin');
+    
     res.json({ success: true, group });
   });
 });
@@ -2051,14 +2063,15 @@ router.get('/community-groups/:groupId/members', authMiddleware, (req, res) => {
   );
 });
 
-// Promote member to admin
+// Promote/Demote member
 router.post('/community-groups/:groupId/members/:userId/promote', authMiddleware, (req, res) => {
   const db = getDb();
   const groupId = req.params.groupId;
   const targetUserId = req.params.userId;
   const adminId = req.user.userId;
+  const { promote } = req.body; // true for promote, false for demote
 
-  // Check if requester is creator
+  // Check if requester is admin or creator
   db.get(
     'SELECT creator_id FROM community_groups WHERE id = ?',
     [groupId],
@@ -2067,21 +2080,42 @@ router.post('/community-groups/:groupId/members/:userId/promote', authMiddleware
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      if (group.creator_id !== adminId) {
-        return res.status(403).json({ error: 'Only the group creator can promote members' });
-      }
-
-      // Promote member
-      db.run(
-        'UPDATE community_group_members SET role = ? WHERE group_id = ? AND user_id = ?',
-        ['admin', groupId, targetUserId],
-        (err) => {
-          if (err) {
-            console.error('Error promoting member:', err);
-            return res.status(500).json({ error: 'Error promoting member' });
+      // Check if requester is admin
+      db.get(
+        'SELECT role FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, adminId],
+        (err, adminMember) => {
+          if (err || !adminMember) {
+            return res.status(403).json({ error: 'Not authorized' });
           }
 
-          res.json({ success: true, message: 'Member promoted to admin' });
+          const isCreator = group.creator_id === adminId;
+          const isAdmin = adminMember.role === 'admin' || isCreator;
+
+          if (!isAdmin) {
+            return res.status(403).json({ error: 'Only admins can manage member roles' });
+          }
+
+          // Prevent demoting the creator
+          if (group.creator_id === targetUserId && promote === false) {
+            return res.status(403).json({ error: 'Cannot demote the group creator' });
+          }
+
+          // Update member role
+          const newRole = promote ? 'admin' : 'member';
+          db.run(
+            'UPDATE community_group_members SET role = ? WHERE group_id = ? AND user_id = ?',
+            [newRole, groupId, targetUserId],
+            (err) => {
+              if (err) {
+                console.error('Error updating member role:', err);
+                return res.status(500).json({ error: 'Error updating member role' });
+              }
+
+              const message = promote ? 'Member promoted to admin' : 'Member demoted to member';
+              res.json({ success: true, message });
+            }
+          );
         }
       );
     }

@@ -2160,6 +2160,14 @@
           <i class="fas fa-chevron-right"></i>
         </div>
 
+        <div class="menu-item" onclick="viewBlockedUsers()">
+          <div class="menu-left">
+            <div class="menu-icon"><i class="fas fa-ban"></i></div>
+            <div>Blocked Users</div>
+          </div>
+          <i class="fas fa-chevron-right"></i>
+        </div>
+
         <div class="menu-item" onclick="deleteCommunity()" style="color: var(--ig-error);">
           <div class="menu-left">
             <div class="menu-icon" style="color: var(--ig-error);"><i class="fas fa-exclamation-triangle"></i></div>
@@ -2483,20 +2491,7 @@
         const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`);
         if (res.success) {
           state.groups = res.groups || [];
-          
-          // Fetch latest message for each group
-          for (let group of state.groups) {
-            try {
-              const postsRes = await InnovateAPI.apiRequest(`/community-groups/${group.id}/posts`);
-              if (postsRes.success && postsRes.posts && postsRes.posts.length > 0) {
-                const sortedPosts = postsRes.posts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                group.latest_message = sortedPosts[0].content || 'Attachment';
-                group.unread_count = 0; // TODO: Implement unread tracking
-              }
-            } catch (err) {
-              // No posts for this group
-            }
-          }
+          console.log('Loaded groups:', state.groups);
           
           document.getElementById('groupCountBadge').textContent = `(${state.groups.length})`;
           renderGroupsList();
@@ -2536,6 +2531,18 @@
       console.log('Groups tab is active, proceeding with render');
       
       const content = document.getElementById('leftContent');
+      
+      // Add search bar at the top
+      const searchHtml = `
+        <div style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border);">
+          <div style="position: relative;">
+            <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text); font-size: 14px;"></i>
+            <input type="text" id="groupSearchInput" placeholder="Search groups..." 
+              style="width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px;"
+              oninput="filterGroups(this.value)">
+          </div>
+        </div>
+      `;
       const centerContent = document.getElementById('centerContent');
       
       // Only show default center content if no group is currently selected
@@ -2553,7 +2560,7 @@
       }
       
       if (state.groups.length === 0) {
-        content.innerHTML = `
+        content.innerHTML = searchHtml + `
           <div class="empty-state" style="padding: 60px 20px; text-align: center;">
             <div style="width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 20px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px;">
               <i class="fas fa-users"></i>
@@ -2564,8 +2571,15 @@
         `;
         return;
       }
+      
+      // Sort groups by latest message time (most recent first)
+      const sortedGroups = [...state.groups].sort((a, b) => {
+        const timeA = a.latest_message_time ? new Date(a.latest_message_time).getTime() : 0;
+        const timeB = b.latest_message_time ? new Date(b.latest_message_time).getTime() : 0;
+        return timeB - timeA;
+      });
 
-      content.innerHTML = state.groups.map(group => {
+      content.innerHTML = searchHtml + '<div id="groupsListContainer">' + sortedGroups.map(group => {
         const latestMsg = group.latest_message || '';
         // Attempt decryption for preview if content appears encrypted
         const previewMsg = E2EEncryption.decrypt(latestMsg, group.id);
@@ -2598,7 +2612,27 @@
             </div>
           </div>
         `;
-      }).join('');
+      }).join('') + '</div>';
+    }
+    
+    // Filter groups by search query
+    function filterGroups(query) {
+      const groupsContainer = document.getElementById('groupsListContainer');
+      if (!groupsContainer) return;
+      
+      const groupItems = groupsContainer.querySelectorAll('.group-item');
+      const searchLower = query.toLowerCase().trim();
+      
+      groupItems.forEach(item => {
+        const groupName = item.querySelector('.group-name')?.textContent.toLowerCase() || '';
+        const groupDesc = item.querySelector('.group-desc')?.textContent.toLowerCase() || '';
+        
+        if (groupName.includes(searchLower) || groupDesc.includes(searchLower) || searchLower === '') {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
     }
 
     function renderFoldersList() {
@@ -3537,30 +3571,48 @@
         if (!groupDetails.group.is_member || groupDetails.group.is_member === 0) {
           // Not a member
           if (groupDetails.group.is_public === 0) {
-            // Private group - show join request button instead of auto-joining
-            showPrivateGroupJoinRequest(groupId, groupDetails.group);
-            return;
+            // Private group - check if already has pending request
+            if (groupDetails.group.join_request_status === 'pending') {
+              // Already has pending request
+              showPendingJoinRequestUI(groupId, groupDetails.group);
+              return; // Don't load group content
+            } else {
+              // Show join request button
+              showPrivateGroupJoinRequest(groupId, groupDetails.group);
+              return; // Don't load group content
+            }
           } else {
             // Public group - try to auto join
             try {
               await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, {
                 method: 'POST'
               });
+              InnovateAPI.showAlert('Joined group successfully!', 'success');
               console.log('Joined group successfully');
-            } catch (joinError) {
-              // If join fails (already member, blocked, etc), continue anyway
-              console.log('Join attempt:', joinError.message);
-              // If blocked, show error and return
-              if (joinError.message.includes('blocked')) {
-                InnovateAPI.showAlert('You are blocked from this group', 'error');
-                return;
+              // Reload groups list to update state
+              await loadGroups();
+              // Refresh group details after joining
+              const updatedGroupDetails = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
+              if (!updatedGroupDetails.group.is_member) {
+                InnovateAPI.showAlert('Failed to join group', 'error');
+                return; // Don't continue if join failed
               }
+            } catch (joinError) {
+              // If join fails, show error and return
+              console.log('Join attempt failed:', joinError.message);
+              if (joinError.message && joinError.message.includes('blocked')) {
+                InnovateAPI.showAlert('You are blocked from this group', 'error');
+              } else {
+                InnovateAPI.showAlert('Failed to join group: ' + (joinError.message || 'Unknown error'), 'error');
+              }
+              return; // Don't load group content if join failed
             }
           }
         }
       } catch (error) {
         console.log('Error checking group membership:', error.message);
-        // Continue anyway - user might already be a member
+        InnovateAPI.showAlert('Error loading group: ' + (error.message || 'Unknown error'), 'error');
+        return; // Don't continue if we can't check membership
       }
 
       // Update header
@@ -3644,9 +3696,10 @@
         
         // Update action buttons for group context
         const rightActions = document.querySelector('.right-actions');
-        const isAdmin = groupData.creator_id === currentUser.id;
+        const isAdmin = groupData.creator_id === currentUser.id || groupData.user_role === 'admin' || groupData.user_role === 'creator' || groupData.is_community_admin;
         
         rightActions.innerHTML = `
+          ${isAdmin ? `
           <div class="right-action" onclick="showInviteLinkModal(${groupId})">
             <div class="action-circle">
               <i class="fas fa-link"></i>
@@ -3661,24 +3714,32 @@
             <div class="action-label">Add members</div>
           </div>
 
-          ${isAdmin ? `
           <div class="right-action" onclick="showGroupSettings()">
             <div class="action-circle">
               <i class="fas fa-cog"></i>
             </div>
             <div class="action-label">Settings</div>
           </div>
-          ` : ''}
+          ` : `
+          <div class="right-action" onclick="viewGroupMembersReadOnly(${groupId})">
+            <div class="action-circle">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="action-label">View members</div>
+          </div>
+          `}
         `;
         
         // Update Edit Profile button
         const editBtn = document.querySelector('.right-section button.btn-text');
-        if (isAdmin) {
-          editBtn.style.display = 'block';
-          editBtn.onclick = () => showGroupSettings();
-          editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Group';
-        } else {
-          editBtn.style.display = 'none';
+        if (editBtn) {
+          if (isAdmin) {
+            editBtn.style.display = 'block';
+            editBtn.onclick = () => showGroupSettings();
+            editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Group';
+          } else {
+            editBtn.style.display = 'none';
+          }
         }
         
         // Update member count
@@ -3690,43 +3751,94 @@
           const text = item.textContent.toLowerCase();
           if (text.includes('leave community') || text.includes('manage groups') || 
               text.includes('view groups') || text.includes('community settings') || 
-              text.includes('github integration')) {
+              text.includes('github integration') || text.includes('clear announcements') || 
+              text.includes('delete community')) {
             item.style.display = 'none';
           } else if (text.includes('view members')) {
-            item.onclick = () => viewGroupMembers(groupId);
+            if (isAdmin) {
+              item.onclick = () => viewGroupMembers(groupId);
+            } else {
+              item.onclick = () => viewGroupMembersReadOnly(groupId);
+            }
             item.style.display = 'flex';
           } else if (text.includes('add members')) {
             item.onclick = () => addGroupMembers();
-            item.style.display = 'flex';
+            item.style.display = isAdmin ? 'flex' : 'none';
+          } else if (text.includes('blocked users')) {
+            item.onclick = () => viewGroupBlockedUsers(groupId);
+            item.style.display = isAdmin ? 'flex' : 'none';
+          } else if (text.includes('join requests')) {
+            item.onclick = () => showGroupJoinRequests(groupId);
+            item.style.display = isAdmin && groupData.is_public === 0 ? 'flex' : 'none';
+          } else {
+            item.style.display = 'none';
           }
         });
         
-        // Add Leave Group option
+        // Add Leave Group option (for all members)
+        // Remove existing exit/leave group items first
+        const existingExitItems = document.querySelectorAll('.menu-item[data-action="exit-group"]');
+        existingExitItems.forEach(item => item.remove());
+        
         const leaveGroupItem = document.createElement('div');
         leaveGroupItem.className = 'menu-item';
+        leaveGroupItem.setAttribute('data-action', 'exit-group');
         leaveGroupItem.style.color = 'var(--ig-error)';
         leaveGroupItem.onclick = () => leaveGroup(groupId);
         leaveGroupItem.innerHTML = `
           <div class="menu-left">
             <div class="menu-icon"><i class="fas fa-sign-out-alt"></i></div>
-            <div>Leave group</div>
+            <div>Exit group</div>
           </div>
           <i class="fas fa-chevron-right"></i>
         `;
         
         // Remove existing leave group item if any
+        const existingItems = document.querySelectorAll('.menu-item[data-action="exit-group"]');
+        existingItems.forEach(item => item.remove());
+        
+        // Insert at the bottom of menu
         const existingLeaveGroup = Array.from(menuItems).find(item => item.textContent.toLowerCase().includes('leave group'));
         if (existingLeaveGroup) existingLeaveGroup.remove();
         
-        // Add after the last visible menu item
-        const lastVisibleItem = Array.from(menuItems).filter(item => item.style.display !== 'none').pop();
-        if (lastVisibleItem) {
-          lastVisibleItem.after(leaveGroupItem);
+        // Add after the last visible menu item before admin section
+        const blockedUsersItem = Array.from(menuItems).find(item => item.textContent.toLowerCase().includes('blocked users'));
+        if (blockedUsersItem) {
+          blockedUsersItem.after(leaveGroupItem);
+        } else {
+          const lastVisibleItem = Array.from(menuItems).filter(item => item.style.display !== 'none').pop();
+          if (lastVisibleItem) {
+            lastVisibleItem.after(leaveGroupItem);
+          }
         }
         
-        // Hide admin features section for now
+        // Show admin features section if user is admin
         const adminFeatures = document.getElementById('adminOnlyFeatures');
-        if (adminFeatures) {
+        if (adminFeatures && isAdmin) {
+          adminFeatures.style.display = 'block';
+          
+          // Add Delete Group option for admins
+          const deleteGroupItem = document.createElement('div');
+          deleteGroupItem.className = 'menu-item';
+          deleteGroupItem.style.color = 'var(--ig-error)';
+          deleteGroupItem.onclick = () => deleteGroup(groupId);
+          deleteGroupItem.innerHTML = `
+            <div class="menu-left">
+              <div class="menu-icon" style="color: var(--ig-error);"><i class="fas fa-trash-alt"></i></div>
+              <div>Delete group</div>
+            </div>
+            <i class="fas fa-chevron-right"></i>
+          `;
+          
+          // Remove existing delete group item if any
+          const existingDeleteGroup = Array.from(adminFeatures.querySelectorAll('.menu-item')).find(item => 
+            item.textContent.toLowerCase().includes('delete group')
+          );
+          if (existingDeleteGroup) existingDeleteGroup.remove();
+          
+          // Add delete group as last item in admin section
+          adminFeatures.appendChild(deleteGroupItem);
+        } else if (adminFeatures) {
           adminFeatures.style.display = 'none';
         }
         
@@ -3741,11 +3853,285 @@
     }
 
     function addGroupMembers() {
-      InnovateAPI.showAlert('Add members feature coming soon!', 'info');
+      if (!state.currentGroupId) {
+        InnovateAPI.showAlert('Please select a group first', 'error');
+        return;
+      }
+      showAddGroupMembersModal(state.currentGroupId);
     }
 
     function viewGroupMembers(groupId) {
-      switchCenterTab('members');
+      // Open group settings and switch to members tab
+      showGroupSettings();
+      setTimeout(() => {
+        switchGroupSettingsTab('members');
+      }, 100);
+    }
+
+    // View group members as read-only (for non-admins)
+    function viewGroupMembersReadOnly(groupId) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal members-modal">
+          <div class="members-modal-header">
+            <h3 style="margin: 0; font-size: 22px; color: white; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+              <i class="fas fa-users"></i>
+              Group Members
+            </h3>
+            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">View all members in this group</p>
+          </div>
+          <div class="members-modal-body" id="readOnlyMembersList">
+            <div style="text-align: center; padding: 40px;">
+              <div class="ig-spinner"></div>
+            </div>
+          </div>
+          <div class="members-modal-footer">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-weight: 600;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadReadOnlyGroupMembers(groupId);
+    }
+
+    async function loadReadOnlyGroupMembers(groupId) {
+      const listDiv = document.getElementById('readOnlyMembersList');
+      
+      try {
+        // Get group info
+        const groupRes = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        const groupData = await groupRes.json();
+        const group = groupData.group;
+        
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        if (data.members && data.members.length > 0) {
+          listDiv.innerHTML = `
+            <div class="members-grid">
+              ${data.members.map(member => {
+                const isAdmin = member.role === 'admin' || member.role === 'creator';
+                const isCreator = member.user_id === group.creator_id;
+                const currentUser = InnovateAPI.getCurrentUser();
+                const isSelf = member.user_id === currentUser.id;
+                
+                function formatJoinDate(dateStr) {
+                  const date = new Date(dateStr);
+                  return date.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  });
+                }
+                
+                return `
+                  <div class="member-card ${isAdmin ? 'member-admin' : ''}">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper" onclick="window.location.href='/profile/${member.user_id}'">
+                        <img src="${member.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                        ${member.is_online ? '<div class="member-online-dot"></div>' : ''}
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${member.username}</div>
+                        <div class="member-badges">
+                          ${isSelf ? '<span class="badge badge-you">YOU</span>' : ''}
+                          ${isCreator ? '<span class="badge badge-creator"><i class="fas fa-star"></i> CREATOR</span>' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-meta">
+                      ${isAdmin ? 
+                        '<div class="member-role role-admin"><i class="fas fa-crown"></i> ADMIN</div>' 
+                        : 
+                        '<div class="member-role role-member"><i class="fas fa-user"></i> Member</div>'
+                      }
+                      <div class="member-joined">
+                        <i class="fas fa-calendar-check"></i> ${formatJoinDate(member.joined_at)}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          listDiv.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.5;">👥</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-primary-text);">No members yet</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading members:', error);
+        listDiv.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load members</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
+      }
+    }
+
+    // Show join request UI for private groups
+    function showPrivateGroupJoinRequest(groupId, groupData) {
+      const content = document.getElementById('centerContent');
+      content.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+            ${groupData.profile_picture ? 
+              `<img src="${groupData.profile_picture}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover;">` :
+              '<i class="fas fa-users" style="font-size: 48px; color: white;"></i>'
+            }
+          </div>
+          
+          <h2 style="margin: 0 0 12px 0; font-size: 28px; color: var(--ig-primary-text);">${groupData.name}</h2>
+          <p style="margin: 0 0 8px 0; color: var(--ig-secondary-text); font-size: 16px;">${groupData.description || 'Private Group'}</p>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 32px; padding: 8px 16px; background: var(--ig-secondary-background); border-radius: 20px;">
+            <i class="fas fa-lock" style="color: var(--ig-blue);"></i>
+            <span style="font-size: 14px; font-weight: 600; color: var(--ig-blue);">Private Group</span>
+          </div>
+          
+          <p style="margin: 0 0 24px 0; max-width: 400px; color: var(--ig-secondary-text); line-height: 1.5;">
+            This is a private group. Send a join request to the group admin to become a member.
+          </p>
+          
+          <button onclick="sendGroupJoinRequest(${groupId})" 
+            style="padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
+            <i class="fas fa-paper-plane"></i>
+            Request to Join
+          </button>
+        </div>
+      `;
+      
+      // Update right sidebar with minimal info
+      const rightAvatar = document.getElementById('rightAvatar');
+      if (groupData.profile_picture) {
+        rightAvatar.innerHTML = `<img src="${groupData.profile_picture}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+      } else {
+        rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
+      }
+      
+      document.getElementById('rightName').textContent = groupData.name;
+      document.getElementById('rightMeta').textContent = '🔒 Private Group';
+      document.getElementById('rightDescription').textContent = groupData.description || 'Private group - request to join';
+      
+      // Hide all action buttons and menu items for non-members
+      const rightActions = document.querySelector('.right-actions');
+      rightActions.innerHTML = '';
+      
+      const menuItems = document.querySelectorAll('.community-right .menu-item');
+      menuItems.forEach(item => item.style.display = 'none');
+      
+      const adminFeatures = document.getElementById('adminOnlyFeatures');
+      if (adminFeatures) adminFeatures.style.display = 'none';
+    }
+
+    async function sendGroupJoinRequest(groupId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/request-join`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Join request sent! Wait for admin approval.', 'success');
+        
+        // Update UI to show pending status
+        const content = document.getElementById('centerContent');
+        content.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center;">
+            <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+              <i class="fas fa-clock" style="font-size: 48px; color: white;"></i>
+            </div>
+            
+            <h2 style="margin: 0 0 12px 0; font-size: 28px; color: var(--ig-primary-text);">Request Pending</h2>
+            <p style="margin: 0 0 24px 0; max-width: 400px; color: var(--ig-secondary-text); line-height: 1.5;">
+              Your join request has been sent to the group admin. You'll be notified when it's approved.
+            </p>
+            
+            <button onclick="resetToCommunityView()" 
+              style="padding: 14px 32px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 2px solid var(--ig-border); border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">
+              Go Back
+            </button>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error sending join request:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to send join request', 'error');
+      }
+    }
+
+    function showPendingJoinRequestUI(groupId, groupData) {
+      const content = document.getElementById('centerContent');
+      content.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+            ${groupData.profile_picture ? 
+              `<img src="${groupData.profile_picture}" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover;">` :
+              '<i class="fas fa-clock" style="font-size: 48px; color: white;"></i>'
+            }
+          </div>
+          
+          <h2 style="margin: 0 0 12px 0; font-size: 28px; color: var(--ig-primary-text);">${groupData.name}</h2>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 8px 16px; background: rgba(240, 147, 251, 0.2); border-radius: 20px;">
+            <i class="fas fa-clock" style="color: #f5576c;"></i>
+            <span style="font-size: 14px; font-weight: 600; color: #f5576c;">Join Request Pending</span>
+          </div>
+          
+          <p style="margin: 0 0 24px 0; max-width: 400px; color: var(--ig-secondary-text); line-height: 1.5;">
+            Your join request is awaiting approval from the group admin. You'll be notified when your request is processed.
+          </p>
+          
+          <button onclick="resetToCommunityView()" 
+            style="padding: 14px 32px; background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 2px solid var(--ig-border); border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">
+            <i class="fas fa-arrow-left"></i> Go Back
+          </button>
+        </div>
+      `;
+      
+      // Update right sidebar with minimal info
+      const rightAvatar = document.getElementById('rightAvatar');
+      if (groupData.profile_picture) {
+        rightAvatar.innerHTML = `<img src="${groupData.profile_picture}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+      } else {
+        rightAvatar.innerHTML = '<i class="fas fa-users"></i>';
+      }
+      
+      document.getElementById('rightName').textContent = groupData.name;
+      document.getElementById('rightMeta').textContent = '⏳ Request Pending';
+      document.getElementById('rightDescription').textContent = groupData.description || 'Waiting for admin approval';
+      
+      // Hide all action buttons and menu items for non-members
+      const rightActions = document.querySelector('.right-actions');
+      rightActions.innerHTML = '';
+      
+      const menuItems = document.querySelectorAll('.community-right .menu-item');
+      menuItems.forEach(item => item.style.display = 'none');
+      
+      const adminFeatures = document.getElementById('adminOnlyFeatures');
+      if (adminFeatures) adminFeatures.style.display = 'none';
     }
 
     async function leaveGroup(groupId) {
@@ -3769,20 +4155,311 @@
       }
     }
 
+    async function deleteGroup(groupId) {
+      if (!confirm('⚠️ Are you sure you want to DELETE this group? This action cannot be undone and will remove all messages, files, and settings.')) {
+        return;
+      }
+
+      // Double confirmation for safety
+      if (!confirm('This is your FINAL warning. Type DELETE to confirm you want to permanently delete this group and all its content.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        InnovateAPI.showAlert('Group deleted successfully', 'success');
+        
+        // Reload groups and switch back to community view
+        await loadGroups();
+        resetToCommunityView();
+      } catch (error) {
+        console.error('Error deleting group:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to delete group', 'error');
+      }
+    }
+
+    function viewGroupBlockedUsers(groupId) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal members-modal">
+          <div class="members-modal-header">
+            <h3 style="margin: 0; font-size: 22px; color: white; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+              <i class="fas fa-ban"></i>
+              Blocked Users
+            </h3>
+            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Manage blocked users in this group</p>
+          </div>
+          <div class="members-modal-body" id="groupBlockedList">
+            <div style="text-align: center; padding: 40px;">
+              <div class="ig-spinner"></div>
+            </div>
+          </div>
+          <div class="members-modal-footer">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-weight: 600;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadGroupBlockedList(groupId);
+    }
+
+    async function loadGroupBlockedList(groupId) {
+      const listDiv = document.getElementById('groupBlockedList');
+      
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/blocked`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        if (data.blocked && data.blocked.length > 0) {
+          listDiv.innerHTML = `
+            <div class="members-grid">
+              ${data.blocked.map(user => {
+                const blockedDate = new Date(user.blocked_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                });
+                
+                return `
+                  <div class="member-card" style="border-left: 3px solid var(--ig-error);">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper">
+                        <img src="${user.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${user.username}</div>
+                        <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                          Blocked on ${blockedDate}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-actions">
+                      <button onclick="unblockGroupMemberFromModal(${groupId}, ${user.user_id})" 
+                        class="member-btn btn-promote">
+                        <i class="fas fa-unlock"></i>
+                        Unblock
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          listDiv.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.5;">🚫</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-primary-text);">No blocked users</div>
+              <div style="font-size: 14px; color: var(--ig-secondary-text);">Blocked users will appear here</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading blocked users:', error);
+        listDiv.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load blocked users</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
+      }
+    }
+
+    async function unblockGroupMemberFromModal(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}/unblock`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Member unblocked successfully', 'success');
+        await loadGroupBlockedList(groupId);
+      } catch (error) {
+        console.error('Error unblocking member:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    function showGroupJoinRequests(groupId) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal members-modal">
+          <div class="members-modal-header">
+            <h3 style="margin: 0; font-size: 22px; color: white; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+              <i class="fas fa-user-clock"></i>
+              Join Requests
+            </h3>
+            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Approve or reject join requests for this private group</p>
+          </div>
+          <div class="members-modal-body" id="groupJoinRequestsList">
+            <div style="text-align: center; padding: 40px;">
+              <div class="ig-spinner"></div>
+            </div>
+          </div>
+          <div class="members-modal-footer">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-weight: 600;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadGroupJoinRequestsList(groupId);
+    }
+
+    async function loadGroupJoinRequestsList(groupId) {
+      const listDiv = document.getElementById('groupJoinRequestsList');
+      
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        if (data.requests && data.requests.length > 0) {
+          listDiv.innerHTML = `
+            <div class="members-grid">
+              ${data.requests.map(request => {
+                const requestDate = new Date(request.created_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                });
+                
+                return `
+                  <div class="member-card" style="border-left: 3px solid var(--ig-blue);">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper">
+                        <img src="${request.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${request.username}</div>
+                        <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                          Requested ${requestDate}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-actions">
+                      <button onclick="approveGroupJoinRequest(${groupId}, ${request.user_id})" 
+                        class="member-btn btn-promote">
+                        <i class="fas fa-check"></i>
+                        Approve
+                      </button>
+                      <button onclick="rejectGroupJoinRequest(${groupId}, ${request.user_id})" 
+                        class="member-btn btn-remove">
+                        <i class="fas fa-times"></i>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          listDiv.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.5;">📬</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-primary-text);">No pending requests</div>
+              <div style="font-size: 14px; color: var(--ig-secondary-text);">Join requests will appear here</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading join requests:', error);
+        listDiv.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load requests</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
+      }
+    }
+
+    async function approveGroupJoinRequest(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests/${userId}/approve`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Join request approved', 'success');
+        await loadGroupJoinRequestsList(groupId);
+      } catch (error) {
+        console.error('Error approving request:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    async function rejectGroupJoinRequest(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests/${userId}/reject`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Join request rejected', 'success');
+        await loadGroupJoinRequestsList(groupId);
+      } catch (error) {
+        console.error('Error rejecting request:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
     async function showGroupSettings() {
       if (!state.currentGroupId) return;
       
       try {
         const response = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}`);
         const group = response.group;
-        const currentUser = InnovateAPI.getCurrentUser();
-        const isAdmin = group.creator_id === currentUser.id || group.role === 'admin' || group.role === 'creator';
         
-        if (!isAdmin) {
-          InnovateAPI.showAlert('Only admins can access group settings', 'error');
-          return;
-        }
-        
+        // Allow all members to view - modal handles permissions internally
         showGroupSettingsModal(group);
       } catch (error) {
         console.error('Error loading group settings:', error);
@@ -3791,6 +4468,10 @@
     }
 
     function showGroupSettingsModal(group) {
+      const currentUser = InnovateAPI.getCurrentUser();
+      const isCreator = group.creator_id === currentUser.id;
+      const isAdmin = isCreator || group.user_role === 'admin' || group.user_role === 'creator' || group.is_community_admin;
+      
       const modal = document.createElement('div');
       modal.className = 'ig-modal-overlay';
       modal.innerHTML = `
@@ -3809,21 +4490,26 @@
           <div style="padding: 24px;">
             <!-- Tabs -->
             <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--ig-border); margin-bottom: 24px; overflow-x: auto;">
+              ${isAdmin ? `
               <button class="group-settings-tab active" data-tab="general" onclick="switchGroupSettingsTab('general')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                 <i class="fas fa-info-circle"></i> General
               </button>
-              <button class="group-settings-tab" data-tab="members" onclick="switchGroupSettingsTab('members')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+              ` : ''}
+              <button class="group-settings-tab ${!isAdmin ? 'active' : ''}" data-tab="members" onclick="switchGroupSettingsTab('members')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                 <i class="fas fa-users"></i> Members
               </button>
+              ${isAdmin ? `
               <button class="group-settings-tab" data-tab="requests" onclick="switchGroupSettingsTab('requests')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                 <i class="fas fa-user-clock"></i> Requests <span id="requestsBadge" style="display: none; background: var(--ig-error); color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 4px;">0</span>
               </button>
               <button class="group-settings-tab" data-tab="blocked" onclick="switchGroupSettingsTab('blocked')" style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                 <i class="fas fa-ban"></i> Blocked
               </button>
+              ` : ''}
             </div>
             
             <!-- General Tab -->
+            ${isAdmin ? `
             <div id="generalTab" class="group-settings-content">
               <form id="groupSettingsForm" onsubmit="saveGroupSettings(event, ${group.id})">
                 <!-- Profile Picture -->
@@ -3869,21 +4555,38 @@
                 </button>
               </form>
             </div>
+            ` : ''}
             
             <!-- Members Tab -->
-            <div id="membersTab" class="group-settings-content" style="display: none;">
+            <div id="membersTab" class="group-settings-content" style="display: ${isAdmin ? 'none' : 'block'};">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="font-size: 16px; font-weight: 600; color: var(--ig-primary-text);">
+                  <i class="fas fa-users"></i> Group Members
+                </div>
+                ${isAdmin ? `
+                <button onclick="showAddGroupMembersModal(${group.id})" 
+                  style="padding: 10px 18px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-user-plus"></i>
+                  Add Members
+                </button>
+                ` : ''}
+              </div>
               <div id="membersList"></div>
             </div>
             
             <!-- Requests Tab -->
+            ${isAdmin ? `
             <div id="requestsTab" class="group-settings-content" style="display: none;">
               <div id="requestsList"></div>
             </div>
+            ` : ''}
             
             <!-- Blocked Tab -->
+            ${isAdmin ? `
             <div id="blockedTab" class="group-settings-content" style="display: none;">
               <div id="blockedList"></div>
             </div>
+            ` : ''}
           </div>
         </div>
       `;
@@ -3892,8 +4595,10 @@
       
       // Load initial data
       loadGroupMembers(group.id);
-      loadJoinRequests(group.id);
-      loadBlockedMembers(group.id);
+      if (isAdmin) {
+        loadJoinRequests(group.id);
+        loadBlockedMembers(group.id);
+      }
       
       // Add CSS for active tab
       const style = document.createElement('style');
@@ -3938,7 +4643,8 @@
       document.getElementById('rightMeta').textContent = `Community · ${state.groups?.length || 0} groups`;
       document.getElementById('rightDescription').textContent = state.community.description || 'No description';
       
-      // Reset action buttons
+      // Reset action buttons based on permissions
+      const isCommunityAdmin = state.community && state.community.admin_id === state.user.id;
       const rightActions = document.querySelector('.right-actions');
       rightActions.innerHTML = `
         <div class="right-action" onclick="inviteMembers()">
@@ -3955,22 +4661,30 @@
           <div class="action-label">Add members</div>
         </div>
 
+        ${isCommunityAdmin ? `
         <div class="right-action" onclick="showCreateGroupModal()">
           <div class="action-circle">
             <i class="fas fa-users-cog"></i>
           </div>
           <div class="action-label">Add groups</div>
         </div>
+        ` : ''}
       `;
       
-      // Show all community menu items
+      // Show all community menu items based on permissions
       const menuItems = document.querySelectorAll('.community-right .menu-item');
+      
       menuItems.forEach(item => {
         const text = item.textContent.toLowerCase();
         if (text.includes('leave group')) {
           item.remove();
         } else {
-          item.style.display = 'flex';
+          // Community admin-only features
+          if (text.includes('manage groups') || text.includes('community settings')) {
+            item.style.display = isCommunityAdmin ? 'flex' : 'none';
+          } else {
+            item.style.display = 'flex';
+          }
           
           // Reset onclick handlers
           if (text.includes('view members')) {
@@ -3991,12 +4705,16 @@
         }
       });
       
-      // Reset Edit Profile button
+      // Reset Edit Profile button - only show for community admins
       const editBtn = document.querySelector('.right-section button.btn-text');
       if (editBtn) {
-        editBtn.style.display = 'block';
-        editBtn.onclick = () => editCommunityProfile();
-        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
+        if (isCommunityAdmin) {
+          editBtn.style.display = 'block';
+          editBtn.onclick = () => editCommunityProfile();
+          editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
+        } else {
+          editBtn.style.display = 'none';
+        }
       }
     }
 
@@ -6414,6 +7132,15 @@
     // Load group members for settings
     async function loadGroupMembers(groupId) {
       try {
+        // Get current group info to determine creator
+        const groupRes = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        const groupData = await groupRes.json();
+        const group = groupData.group;
+        
         const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members`, {
           headers: {
             'Authorization': `Bearer ${InnovateAPI.getToken()}`
@@ -6425,25 +7152,96 @@
         
         const membersList = document.getElementById('membersList');
         if (data.members && data.members.length > 0) {
-          membersList.innerHTML = data.members.map(member => `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
-              <img src="${member.profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
-              <div style="flex: 1;">
-                <div style="font-weight: 600;">${member.username}</div>
-                <div style="font-size: 13px; color: var(--ig-secondary-text);">${member.role}</div>
-              </div>
-              ${member.role !== 'admin' ? `
-                <button onclick="removeMember(${groupId}, ${member.user_id})" style="padding: 8px 16px; background: var(--ig-error); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
-                  <i class="fas fa-times"></i> Remove
-                </button>
-              ` : '<span style="color: var(--ig-secondary-text); font-size: 12px;">Admin</span>'}
+          const currentUser = InnovateAPI.getCurrentUser();
+          const currentUserMember = data.members.find(m => m.user_id === currentUser.id);
+          const isCurrentUserCreator = group.creator_id === currentUser.id;
+          const isCurrentUserAdmin = isCurrentUserCreator || (currentUserMember && (currentUserMember.role === 'admin' || currentUserMember.role === 'creator')) || group.is_community_admin;
+          
+          // Helper to format join date properly
+          function formatJoinDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric' 
+            });
+          }
+          
+          membersList.innerHTML = `
+            <div class="members-grid">
+              ${data.members.map(member => {
+                const isAdmin = member.role === 'admin' || member.role === 'creator';
+                const isSelf = member.user_id === currentUser.id;
+                const isCreator = member.user_id === group.creator_id;
+                
+                return `
+                  <div class="member-card ${isAdmin ? 'member-admin' : ''}">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper" onclick="window.location.href='/profile/${member.user_id}'">
+                        <img src="${member.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                        ${member.is_online ? '<div class="member-online-dot"></div>' : ''}
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${member.username}</div>
+                        <div class="member-badges">
+                          ${isSelf ? '<span class="badge badge-you">YOU</span>' : ''}
+                          ${isCreator ? '<span class="badge badge-creator"><i class="fas fa-star"></i> CREATOR</span>' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-meta">
+                      ${isAdmin ? 
+                        '<div class="member-role role-admin"><i class="fas fa-crown"></i> ADMIN</div>' 
+                        : 
+                        '<div class="member-role role-member"><i class="fas fa-user"></i> Member</div>'
+                      }
+                      <div class="member-joined">
+                        <i class="fas fa-calendar-check"></i> ${formatJoinDate(member.joined_at)}
+                      </div>
+                    </div>
+                    
+                    ${isCurrentUserAdmin && !isSelf && !isCreator ? `
+                      <div class="member-actions">
+                        <button onclick="toggleGroupMemberRole(${groupId}, ${member.user_id}, '${member.role}', '${member.username}', event)" 
+                          class="member-btn ${isAdmin ? 'btn-demote' : 'btn-promote'}">
+                          <i class="fas ${isAdmin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                          ${isAdmin ? 'Demote' : 'Make Admin'}
+                        </button>
+                        <button onclick="removeGroupMember(${groupId}, ${member.user_id}, '${member.username}', event)" 
+                          class="member-btn btn-remove">
+                          <i class="fas fa-user-times"></i>
+                          Remove
+                        </button>
+                        <button onclick="blockGroupMember(${groupId}, ${member.user_id}, '${member.username}', event)" 
+                          class="member-btn btn-block">
+                          <i class="fas fa-ban"></i>
+                          Block
+                        </button>
+                      </div>
+                    ` : isCreator && isCurrentUserAdmin ? `
+                      <div class="member-protected">
+                        <i class="fas fa-lock"></i> Creator cannot be modified
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
             </div>
-          `).join('');
+          `;
         } else {
           membersList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No members yet</div>';
         }
       } catch (error) {
         console.error('Error loading members:', error);
+        membersList.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load members</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
       }
     }
 
@@ -6504,29 +7302,68 @@
         
         const blockedList = document.getElementById('blockedList');
         if (data.blocked && data.blocked.length > 0) {
-          blockedList.innerHTML = data.blocked.map(user => `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--ig-border); border-radius: 12px; margin-bottom: 12px;">
-              <img src="${user.profile_picture || '/images/default-avatar.svg'}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
-              <div style="flex: 1;">
-                <div style="font-weight: 600;">${user.username}</div>
-                <div style="font-size: 13px; color: var(--ig-secondary-text);">Blocked ${InnovateAPI.formatDate(user.blocked_at)}</div>
-              </div>
-              <button onclick="unblockMember(${groupId}, ${user.user_id})" style="padding: 8px 16px; background: var(--ig-blue); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
-                <i class="fas fa-unlock"></i> Unblock
-              </button>
+          blockedList.innerHTML = `
+            <div class="members-grid">
+              ${data.blocked.map(user => {
+                const blockedDate = new Date(user.blocked_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                });
+                
+                return `
+                  <div class="member-card" style="border-left: 3px solid var(--ig-error);">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper">
+                        <img src="${user.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${user.username}</div>
+                        <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                          Blocked on ${blockedDate}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-actions">
+                      <button onclick="unblockGroupMember(${groupId}, ${user.user_id})" 
+                        class="member-btn btn-promote">
+                        <i class="fas fa-unlock"></i>
+                        Unblock
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
             </div>
-          `).join('');
+          `;
         } else {
-          blockedList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No blocked users</div>';
+          blockedList.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.5;">🚫</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-primary-text);">No blocked users</div>
+              <div style="font-size: 14px; color: var(--ig-secondary-text);">Blocked users will appear here</div>
+            </div>
+          `;
         }
       } catch (error) {
         console.error('Error loading blocked members:', error);
+        blockedList.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load blocked users</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
       }
     }
 
     // Remove member from group
-    async function removeMember(groupId, userId) {
-      if (!confirm('Are you sure you want to remove this member?')) return;
+    async function removeGroupMember(groupId, userId, username, event) {
+      if (event) event.stopPropagation();
+      
+      if (!confirm(`Are you sure you want to remove ${username} from this group? They will need to rejoin.`)) return;
       
       try {
         const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}`, {
@@ -6539,11 +7376,206 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         
-        InnovateAPI.showAlert('Member removed successfully', 'success');
+        InnovateAPI.showAlert(`${username} removed from group`, 'success');
+        
+        // Reload the members list in the modal
         await loadGroupMembers(groupId);
+        
+        // Also reload the groups list to update member count
+        await loadGroups();
       } catch (error) {
         console.error('Error removing member:', error);
         InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Toggle group member role (promote/demote)
+    async function toggleGroupMemberRole(groupId, userId, currentRole, username, event) {
+      if (event) event.stopPropagation();
+      
+      const newRole = (currentRole === 'admin' || currentRole === 'creator') ? 'member' : 'admin';
+      const action = newRole === 'admin' ? 'promote' : 'demote';
+      
+      if (!confirm(`Are you sure you want to ${action} ${username} ${newRole === 'admin' ? 'to admin' : 'from admin'}?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}/promote`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ promote: newRole === 'admin' })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert(`${username} ${action}d successfully!`, 'success');
+        await loadGroupMembers(groupId);
+      } catch (error) {
+        console.error('Error updating role:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to update role', 'error');
+      }
+    }
+
+    // Block group member
+    async function blockGroupMember(groupId, userId, username, event) {
+      if (event) event.stopPropagation();
+      
+      if (!confirm(`Are you sure you want to block ${username}? They will be removed from the group and cannot rejoin.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}/block`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Member blocked successfully', 'success');
+        await loadGroupMembers(groupId);
+        await loadBlockedMembers(groupId);
+      } catch (error) {
+        console.error('Error blocking member:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to block member', 'error');
+      }
+    }
+
+    // Unblock group member - updated to handle both context
+    async function unblockGroupMember(groupId, userId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/${userId}/unblock`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert('Member unblocked successfully', 'success');
+        await loadBlockedMembers(groupId);
+      } catch (error) {
+        console.error('Error unblocking member:', error);
+        InnovateAPI.showAlert(error.message, 'error');
+      }
+    }
+
+    // Show Add Group Members Modal
+    function showAddGroupMembersModal(groupId) {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px;"><i class="fas fa-user-plus"></i> Add Members to Group</h3>
+            <p style="margin: 8px 0 0 0; color: var(--ig-secondary-text); font-size: 14px;">Search and add community members to this group</p>
+          </div>
+          <div style="padding: 24px;">
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px;">Search Community Members</label>
+              <input type="text" id="searchGroupUsers" placeholder="Type username to search..." 
+                oninput="searchUsersToAddToGroup(${groupId})"
+                style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text);">
+            </div>
+            
+            <div id="searchGroupResults" style="max-height: 300px; overflow-y: auto;"></div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+              <button onclick="this.closest('.ig-modal-overlay').remove()" 
+                style="padding: 12px 24px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function searchUsersToAddToGroup(groupId) {
+      const query = document.getElementById('searchGroupUsers').value.trim();
+      const resultsDiv = document.getElementById('searchGroupResults');
+      
+      if (query.length < 2) {
+        resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-secondary-text);">Type at least 2 characters to search</div>';
+        return;
+      }
+
+      try {
+        // Get community members
+        const membersRes = await InnovateAPI.apiRequest(`/communities/${state.communityId}/members`);
+        
+        // Get current group members to filter them out
+        const groupMembersRes = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        const groupMembersData = await groupMembersRes.json();
+        const groupMemberIds = groupMembersData.members ? groupMembersData.members.map(m => m.user_id) : [];
+        
+        // Filter community members who are not in the group and match the query
+        const filteredMembers = membersRes.members.filter(user => 
+          !groupMemberIds.includes(user.user_id) && 
+          user.username.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        if (filteredMembers.length > 0) {
+          resultsDiv.innerHTML = filteredMembers.map(user => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--ig-border);">
+              <img src="${user.profile_picture || '/images/default-avatar.svg'}" 
+                style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+              <div style="flex: 1;">
+                <div style="font-weight: 600;">${user.username}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">Community member</div>
+              </div>
+              <button onclick="addUserToGroup(${groupId}, ${user.user_id}, '${user.username}')" 
+                style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-plus"></i> Add
+              </button>
+            </div>
+          `).join('');
+        } else {
+          resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-secondary-text);">No available members found</div>';
+        }
+      } catch (error) {
+        console.error('Error searching users:', error);
+        resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ig-error);">Error searching users</div>';
+      }
+    }
+
+    async function addUserToGroup(groupId, userId, username) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/members/add`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ userId })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        InnovateAPI.showAlert(`${username} added to group successfully!`, 'success');
+        // Refresh the search to update the results
+        searchUsersToAddToGroup(groupId);
+        // Reload the members list in settings
+        await loadGroupMembers(groupId);
+      } catch (error) {
+        console.error('Error adding member:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to add member', 'error');
       }
     }
 
@@ -7964,16 +8996,18 @@
 
     async function inviteUserToCommunity(userId) {
       try {
-        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/invite`, {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/members/add`, {
           method: 'POST',
           body: JSON.stringify({ userId })
         });
         
         if (res.success) {
-          InnovateAPI.showAlert('Invitation sent!', 'success');
+          InnovateAPI.showAlert('Member added successfully!', 'success');
+          // Refresh the search to update the results
+          searchUsersToAdd();
         }
       } catch (error) {
-        InnovateAPI.showAlert('Failed to send invitation', 'error');
+        InnovateAPI.showAlert(error.message || 'Failed to add member', 'error');
       }
     }
 
@@ -8312,6 +9346,11 @@
                           <i class="fas fa-user-times"></i>
                           Remove
                         </button>
+                        <button onclick="blockMember(${member.user_id}, '${member.username}', event)" 
+                          class="member-btn btn-block">
+                          <i class="fas fa-ban"></i>
+                          Block
+                        </button>
                       </div>
                     ` : isCreator && isCurrentUserAdmin ? `
                       <div class="member-protected">
@@ -8398,6 +9437,143 @@
       } catch (error) {
         console.error('Error removing member:', error);
         InnovateAPI.showAlert(error.message || 'Failed to remove member', 'error');
+      }
+    }
+
+    // Block member from community
+    async function blockMember(userId, username, event) {
+      if (event) event.stopPropagation();
+      
+      if (!confirm(`Are you sure you want to block ${username}? They will be removed from the community and cannot rejoin.`)) {
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/members/${userId}/block`, {
+          method: 'POST'
+        });
+
+        if (res.success) {
+          InnovateAPI.showAlert('Member blocked successfully', 'success');
+          loadMembersList(); // Reload the list
+          await loadCommunityData(); // Update member count
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to block member', 'error');
+      }
+    }
+
+    // Unblock member from community
+    async function unblockMember(userId, username) {
+      if (!confirm(`Are you sure you want to unblock ${username}?`)) {
+        return;
+      }
+
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/members/${userId}/block`, {
+          method: 'DELETE'
+        });
+
+        if (res.success) {
+          InnovateAPI.showAlert('Member unblocked successfully', 'success');
+          loadBlockedList(); // Reload the list
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to unblock member', 'error');
+      }
+    }
+
+    // View Blocked Users
+    function viewBlockedUsers() {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal members-modal">
+          <div class="members-modal-header">
+            <h3 style="margin: 0; font-size: 22px; color: white; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+              <i class="fas fa-ban"></i>
+              Blocked Users
+            </h3>
+            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Manage blocked users in your community</p>
+          </div>
+          <div class="members-modal-body" id="blockedList">
+            <div style="text-align: center; padding: 40px;">
+              <div class="ig-spinner"></div>
+            </div>
+          </div>
+          <div class="members-modal-footer">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 12px 28px; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-weight: 600;">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadBlockedList();
+    }
+
+    async function loadBlockedList() {
+      const listDiv = document.getElementById('blockedList');
+      
+      try {
+        const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}/blocked`);
+        
+        if (res.success && res.blockedUsers.length > 0) {
+          listDiv.innerHTML = `
+            <div class="members-grid">
+              ${res.blockedUsers.map(user => {
+                const blockedDate = new Date(user.blocked_at).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                });
+                
+                return `
+                  <div class="member-card" style="border-left: 3px solid var(--ig-error);">
+                    <div class="member-card-header">
+                      <div class="member-avatar-wrapper">
+                        <img src="${user.profile_picture || '/images/default-avatar.svg'}" class="member-avatar">
+                      </div>
+                      
+                      <div class="member-info">
+                        <div class="member-name">${user.username}</div>
+                        <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                          Blocked by ${user.blocked_by_username || 'Admin'} on ${blockedDate}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="member-actions">
+                      <button onclick="unblockMember(${user.user_id}, '${user.username}')" 
+                        class="member-btn btn-promote">
+                        <i class="fas fa-unlock"></i>
+                        Unblock
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          listDiv.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.5;">🚫</div>
+              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-primary-text);">No blocked users</div>
+              <div style="font-size: 14px; color: var(--ig-secondary-text);">Blocked users will appear here</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading blocked users:', error);
+        listDiv.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+            <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--ig-error);">Failed to load blocked users</div>
+            <div style="font-size: 14px; color: var(--ig-secondary-text);">Please try again later</div>
+          </div>
+        `;
       }
     }
 

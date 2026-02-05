@@ -1572,4 +1572,265 @@ router.delete('/:communityId/members/:userId', authMiddleware, (req, res) => {
   );
 });
 
+// Add member to community (by admin)
+router.post('/:communityId/members/add', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId } = req.params;
+  const { userId } = req.body;
+  const currentUserId = req.user.userId;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can add members' });
+      }
+
+      // Check if user exists
+      db.get('SELECT id, username FROM users WHERE id = ?', [userId], (err, user) => {
+        if (err || !user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Check if user is already a member
+        db.get(
+          'SELECT * FROM community_members WHERE community_id = ? AND user_id = ?',
+          [communityId, userId],
+          (err, existingMember) => {
+            if (existingMember) {
+              return res.status(400).json({ error: 'User is already a member' });
+            }
+
+            // Add member
+            db.run(
+              'INSERT INTO community_members (community_id, user_id, role) VALUES (?, ?, ?)',
+              [communityId, userId, 'member'],
+              function(err) {
+                if (err) {
+                  return res.status(500).json({ error: 'Error adding member' });
+                }
+
+                // Get community name for notification
+                db.get('SELECT name FROM communities WHERE id = ?', [communityId], (err, community) => {
+                  if (!err && community) {
+                    // Create notification
+                    db.run(
+                      'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+                      [userId, 'community_added', `You have been added to ${community.name}`, communityId],
+                      function(notifErr) {
+                        if (notifErr) {
+                          console.error('Error creating notification:', notifErr);
+                        }
+                      }
+                    );
+
+                    // Emit socket notification
+                    const io = req.app.get('io');
+                    if (io) {
+                      io.to(`user-${userId}`).emit('notification:received', {
+                        type: 'community_added',
+                        content: `You have been added to ${community.name}`,
+                        communityId: communityId
+                      });
+                    }
+                  }
+
+                  res.json({ 
+                    success: true, 
+                    message: 'Member added successfully',
+                    user: {
+                      id: user.id,
+                      username: user.username
+                    }
+                  });
+                });
+              }
+            );
+          }
+        );
+      });
+    }
+  );
+});
+
+// Block user in community
+router.post('/:communityId/members/:userId/block', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, userId } = req.params;
+  const targetUserId = parseInt(userId);
+  const currentUserId = req.user.userId;
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can block members' });
+      }
+
+      // Cannot block yourself
+      if (parseInt(targetUserId) === currentUserId) {
+        return res.status(400).json({ error: 'You cannot block yourself' });
+      }
+
+      // Check if target is the community creator
+      db.get('SELECT admin_id FROM communities WHERE id = ?', [communityId], (err, community) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error checking community' });
+        }
+
+        if (community && parseInt(targetUserId) === community.admin_id) {
+          return res.status(400).json({ error: 'Cannot block the community creator' });
+        }
+
+        // Check if already blocked
+        db.get(
+          'SELECT * FROM community_blocked_users WHERE community_id = ? AND user_id = ?',
+          [communityId, targetUserId],
+          (err, existing) => {
+            if (existing) {
+              return res.status(400).json({ error: 'User is already blocked' });
+            }
+
+            // Remove from members if they are one
+            db.run(
+              'DELETE FROM community_members WHERE community_id = ? AND user_id = ?',
+              [communityId, targetUserId],
+              function(err) {
+                if (err) {
+                  console.error('Error removing member:', err);
+                }
+
+                // Add to blocked list
+                db.run(
+                  'INSERT INTO community_blocked_users (community_id, user_id, blocked_by) VALUES (?, ?, ?)',
+                  [communityId, targetUserId, currentUserId],
+                  function(err) {
+                    if (err) {
+                      return res.status(500).json({ error: 'Error blocking user' });
+                    }
+
+                    // Create notification
+                    db.run(
+                      'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+                      [targetUserId, 'community_blocked', 'You have been blocked from the community', communityId],
+                      function(notifErr) {
+                        if (notifErr) {
+                          console.error('Error creating notification:', notifErr);
+                        }
+                      }
+                    );
+
+                    // Emit socket notification
+                    const io = req.app.get('io');
+                    if (io) {
+                      io.to(`user-${targetUserId}`).emit('notification:received', {
+                        type: 'community_blocked',
+                        content: 'You have been blocked from the community',
+                        communityId: communityId
+                      });
+                    }
+
+                    res.json({ success: true, message: 'User blocked successfully' });
+                  }
+                );
+              }
+            );
+          }
+        );
+      });
+    }
+  );
+});
+
+// Unblock user in community
+router.delete('/:communityId/members/:userId/block', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId, userId } = req.params;
+  const targetUserId = parseInt(userId);
+  const currentUserId = req.user.userId;
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can unblock members' });
+      }
+
+      // Remove from blocked list
+      db.run(
+        'DELETE FROM community_blocked_users WHERE community_id = ? AND user_id = ?',
+        [communityId, targetUserId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error unblocking user' });
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).json({ error: 'User is not blocked' });
+          }
+
+          // Create notification
+          db.run(
+            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+            [targetUserId, 'community_unblocked', 'You have been unblocked from the community', communityId],
+            function(notifErr) {
+              if (notifErr) {
+                console.error('Error creating notification:', notifErr);
+              }
+            }
+          );
+
+          res.json({ success: true, message: 'User unblocked successfully' });
+        }
+      );
+    }
+  );
+});
+
+// Get blocked users list
+router.get('/:communityId/blocked', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { communityId } = req.params;
+  const currentUserId = req.user.userId;
+
+  // Verify current user is admin
+  db.get(
+    'SELECT role FROM community_members WHERE community_id = ? AND user_id = ?',
+    [communityId, currentUserId],
+    (err, member) => {
+      if (err || !member || member.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can view blocked users' });
+      }
+
+      // Get blocked users list
+      db.all(
+        `SELECT cbu.*, u.username, u.profile_picture, u2.username as blocked_by_username
+         FROM community_blocked_users cbu
+         JOIN users u ON cbu.user_id = u.id
+         LEFT JOIN users u2 ON cbu.blocked_by = u2.id
+         WHERE cbu.community_id = ?
+         ORDER BY cbu.blocked_at DESC`,
+        [communityId],
+        (err, blockedUsers) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error fetching blocked users' });
+          }
+
+          res.json({ success: true, blockedUsers });
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;

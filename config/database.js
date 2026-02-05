@@ -1285,6 +1285,22 @@ const migrateDatabase = () => {
         UNIQUE(community_id)
       )
     `);
+
+    // Community blocked users table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS community_blocked_users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        blocked_by INTEGER NOT NULL,
+        reason TEXT,
+        blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (community_id) REFERENCES communities(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (blocked_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(community_id, user_id)
+      )
+    `);
   });
 };
 
