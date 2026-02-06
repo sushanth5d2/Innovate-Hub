@@ -1148,6 +1148,25 @@ const migrateDatabase = () => {
       }
     });
     
+    // Add pinning columns to group_polls
+    db.run(`ALTER TABLE group_polls ADD COLUMN pinned_at DATETIME`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding pinned_at column to group_polls:', err);
+      }
+    });
+    
+    db.run(`ALTER TABLE group_polls ADD COLUMN pinned_by INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding pinned_by column to group_polls:', err);
+      }
+    });
+    
+    db.run(`ALTER TABLE group_polls ADD COLUMN pin_expires_at DATETIME`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding pin_expires_at column to group_polls:', err);
+      }
+    });
+    
     // Add fullname column to users if not exists
     db.run(`
       ALTER TABLE users ADD COLUMN fullname TEXT

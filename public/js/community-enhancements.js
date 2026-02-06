@@ -803,23 +803,24 @@ async function confirmForward(postId) {
 
 // ==================== PIN MESSAGE WITH TIMER ====================
 
-function showPinTimerModal(postId) {
+function showPinTimerModal(postId, isPoll = false) {
+  const itemType = isPoll ? 'Poll' : 'Message';
   const modal = document.createElement('div');
   modal.className = 'ig-modal-overlay';
   modal.innerHTML = `
     <div class="ig-modal" style="max-width: 400px;">
       <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
         <h3 style="margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px;">
-          <i class="fas fa-thumbtack"></i> Pin Message
+          <i class="fas fa-thumbtack"></i> Pin ${itemType}
         </h3>
       </div>
       <div style="padding: 24px;">
         <p style="margin: 0 0 20px 0; color: var(--ig-secondary-text); font-size: 14px;">
-          How long do you want to pin this message?
+          How long do you want to pin this ${itemType.toLowerCase()}?
         </p>
         
         <div style="display: flex; flex-direction: column; gap: 12px;">
-          <button onclick="pinMessageWithDuration(${postId}, 1)" 
+          <button onclick="pinMessageWithDuration(${postId}, 1, ${isPoll})" 
             style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
             onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
             onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
@@ -827,7 +828,7 @@ function showPinTimerModal(postId) {
             <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
           </button>
           
-          <button onclick="pinMessageWithDuration(${postId}, 7)" 
+          <button onclick="pinMessageWithDuration(${postId}, 7, ${isPoll})" 
             style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
             onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
             onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
@@ -835,7 +836,7 @@ function showPinTimerModal(postId) {
             <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
           </button>
           
-          <button onclick="pinMessageWithDuration(${postId}, 30)" 
+          <button onclick="pinMessageWithDuration(${postId}, 30, ${isPoll})" 
             style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
             onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
             onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
@@ -843,7 +844,7 @@ function showPinTimerModal(postId) {
             <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
           </button>
           
-          <button onclick="pinMessageWithDuration(${postId}, null)" 
+          <button onclick="pinMessageWithDuration(${postId}, null, ${isPoll})" 
             style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'"
             onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
@@ -869,35 +870,39 @@ function showPinTimerModal(postId) {
   });
 }
 
-async function pinMessageWithDuration(postId, days) {
+async function pinMessageWithDuration(postId, days, isPoll = false) {
   const state = window.state || {};
   const groupId = state.currentGroupId;
+  const itemType = isPoll ? 'poll' : 'message';
+  const endpoint = isPoll ? `/community-groups/${groupId}/polls/${postId}/pin` : `/community-groups/${groupId}/posts/${postId}/pin`;
   
   // Close the modal
   document.querySelector('.ig-modal-overlay')?.remove();
   
   try {
-    const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts/${postId}/pin`, {
+    const response = await InnovateAPI.apiRequest(endpoint, {
       method: 'POST',
       body: JSON.stringify({ pinDuration: days })
     });
     
     if (response.success) {
       const durationText = days ? `for ${days} day${days > 1 ? 's' : ''}` : 'until unpinned';
-      InnovateAPI.showAlert(`Message pinned ${durationText}!`, 'success');
+      InnovateAPI.showAlert(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} pinned ${durationText}!`, 'success');
       
-      // Reload chat to show pinned message
-      if (typeof loadChatView === 'function') {
+      // Reload chat or polls to show pinned item
+      if (isPoll && typeof loadGroupPolls === 'function') {
+        await loadGroupPolls(groupId);
+      } else if (typeof loadChatView === 'function') {
         await loadChatView(groupId);
       } else if (typeof loadGroupChat === 'function') {
         await loadGroupChat();
       }
     } else {
-      throw new Error(response.error || 'Failed to pin message');
+      throw new Error(response.error || `Failed to pin ${itemType}`);
     }
   } catch (error) {
-    console.error('Error pinning message:', error);
-    InnovateAPI.showAlert('Failed to pin message', 'error');
+    console.error(`Error pinning ${itemType}:`, error);
+    InnovateAPI.showAlert(`Failed to pin ${itemType}`, 'error');
   }
 }
 

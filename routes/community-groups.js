@@ -1953,7 +1953,9 @@ router.get('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, res
                     userVote: userVote ? userVote.option_index : null,
                     percentages: voteCounts.map(count => totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0),
                     expiresAt: poll.expires_at,
-                    isExpired: poll.expires_at && new Date(poll.expires_at) < new Date()
+                    isExpired: poll.expires_at && new Date(poll.expires_at) < new Date(),
+                    user_id: poll.user_id,
+                    created_at: poll.created_at
                   };
 
                   res.json({ success: true, poll: results });
@@ -1979,9 +1981,12 @@ router.get('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
       if (err || !member) return res.status(403).json({ error: 'You must be a member' });
 
       db.all(
-        `SELECT gp.*, u.username, u.profile_picture
+        `SELECT gp.*, u.username, u.profile_picture,
+         gp.pinned_at, gp.pinned_by, gp.pin_expires_at,
+         pin_user.username as pinned_by_username
          FROM group_polls gp
          JOIN users u ON gp.user_id = u.id
+         LEFT JOIN users pin_user ON gp.pinned_by = pin_user.id
          WHERE gp.group_id = ?
          ORDER BY gp.created_at ASC`,
         [groupId],
@@ -2023,6 +2028,172 @@ router.get('/community-groups/:groupId/polls', authMiddleware, (req, res) => {
           });
         }
       );
+    }
+  );
+});
+
+// Delete poll
+router.delete('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const userId = req.user.userId;
+
+  // Check if user is member
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      // Check if user is poll owner or admin
+      db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?', [pollId, groupId], (err, poll) => {
+        if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
+
+        const isOwner = poll.user_id === userId;
+        const isAdmin = member.role === 'admin';
+
+        if (!isOwner && !isAdmin) {
+          return res.status(403).json({ error: 'Not authorized to delete this poll' });
+        }
+
+        db.run('DELETE FROM group_polls WHERE id = ?', [pollId], (err) => {
+          if (err) return res.status(500).json({ error: 'Error deleting poll' });
+
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`community_group_${groupId}`).emit('poll:deleted', { groupId, pollId });
+          }
+
+          res.json({ success: true });
+        });
+      });
+    }
+  );
+});
+
+// Pin poll
+router.post('/community-groups/:groupId/polls/:pollId/pin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const userId = req.user.userId;
+  const { pinDuration } = req.body; // 1, 7, 30 days or null (forever)
+
+  // Check if user is admin
+  db.get('SELECT role FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+      if (member.role !== 'admin') return res.status(403).json({ error: 'Only admins can pin polls' });
+
+      // Calculate expiration date
+      let pinExpiresAt = null;
+      if (pinDuration) {
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + pinDuration);
+        pinExpiresAt = expiryDate.toISOString();
+      }
+
+      db.run(
+        'UPDATE group_polls SET pinned_at = CURRENT_TIMESTAMP, pinned_by = ?, pin_expires_at = ? WHERE id = ? AND group_id = ?',
+        [userId, pinExpiresAt, pollId, groupId],
+        (err) => {
+          if (err) return res.status(500).json({ error: 'Error pinning poll' });
+
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`community_group_${groupId}`).emit('poll:pinned', {
+              groupId,
+              pollId,
+              pinnedBy: userId,
+              pinExpiresAt
+            });
+          }
+
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Unpin poll
+router.post('/community-groups/:groupId/polls/:pollId/unpin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const userId = req.user.userId;
+
+  // Check if user is admin
+  db.get('SELECT role FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+      if (member.role !== 'admin') return res.status(403).json({ error: 'Only admins can unpin polls' });
+
+      db.run(
+        'UPDATE group_polls SET pinned_at = NULL, pinned_by = NULL, pin_expires_at = NULL WHERE id = ? AND group_id = ?',
+        [pollId, groupId],
+        (err) => {
+          if (err) return res.status(500).json({ error: 'Error unpinning poll' });
+
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`community_group_${groupId}`).emit('poll:unpinned', { groupId, pollId });
+          }
+
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Update poll (edit)
+router.put('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, pollId } = req.params;
+  const userId = req.user.userId;
+  const { question, options } = req.body;
+
+  if (!question || !options || !Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ error: 'Question and at least 2 options required' });
+  }
+
+  // Check if user is member
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      // Check if user is poll owner or admin
+      db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?', [pollId, groupId], (err, poll) => {
+        if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
+
+        const isOwner = poll.user_id === userId;
+        const isAdmin = member.role === 'admin';
+
+        if (!isOwner && !isAdmin) {
+          return res.status(403).json({ error: 'Not authorized to edit this poll' });
+        }
+
+        db.run(
+          'UPDATE group_polls SET question = ?, options = ? WHERE id = ? AND group_id = ?',
+          [question, JSON.stringify(options), pollId, groupId],
+          (err) => {
+            if (err) return res.status(500).json({ error: 'Error updating poll' });
+
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`community_group_${groupId}`).emit('poll:updated', {
+                groupId,
+                pollId,
+                question,
+                options
+              });
+            }
+
+            res.json({ success: true });
+          }
+        );
+      });
     }
   );
 });
