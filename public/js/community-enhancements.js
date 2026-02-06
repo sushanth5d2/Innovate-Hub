@@ -372,6 +372,17 @@ function showMessageMenu(postId, isOwner, isAdmin, event) {
     onClick: () => replyToMessage(postId)
   });
   
+  // Check if message is currently pinned
+  const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
+  const isPinned = messageEl?.dataset.pinned === 'true';
+  
+  actions.push({
+    icon: 'fa-thumbtack',
+    label: isPinned ? 'Unpin Message' : 'Pin Message',
+    color: 'var(--ig-primary-text)',
+    onClick: () => isPinned ? unpinMessage(postId) : showPinTimerModal(postId)
+  });
+  
   actions.push({
     icon: 'fa-share',
     label: 'Forward',
@@ -790,6 +801,134 @@ async function confirmForward(postId) {
   }
 }
 
+// ==================== PIN MESSAGE WITH TIMER ====================
+
+function showPinTimerModal(postId) {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 400px;">
+      <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+        <h3 style="margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px;">
+          <i class="fas fa-thumbtack"></i> Pin Message
+        </h3>
+      </div>
+      <div style="padding: 24px;">
+        <p style="margin: 0 0 20px 0; color: var(--ig-secondary-text); font-size: 14px;">
+          How long do you want to pin this message?
+        </p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button onclick="pinMessageWithDuration(${postId}, 1)" 
+            style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+            onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+            onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+            <span>📅 1 Day</span>
+            <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+          </button>
+          
+          <button onclick="pinMessageWithDuration(${postId}, 7)" 
+            style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+            onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+            onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+            <span>📅 7 Days</span>
+            <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+          </button>
+          
+          <button onclick="pinMessageWithDuration(${postId}, 30)" 
+            style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+            onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+            onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+            <span>📅 30 Days</span>
+            <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+          </button>
+          
+          <button onclick="pinMessageWithDuration(${postId}, null)" 
+            style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+            <span>📌 Until I unpin</span>
+            <i class="fas fa-infinity" style="font-size: 16px;"></i>
+          </button>
+        </div>
+      </div>
+      <div style="padding: 16px 24px; border-top: 1px solid var(--ig-border); text-align: right;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+          style="padding: 10px 20px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer; font-weight: 500;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Close on overlay click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+async function pinMessageWithDuration(postId, days) {
+  const state = window.state || {};
+  const groupId = state.currentGroupId;
+  
+  // Close the modal
+  document.querySelector('.ig-modal-overlay')?.remove();
+  
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts/${postId}/pin`, {
+      method: 'POST',
+      body: JSON.stringify({ pinDuration: days })
+    });
+    
+    if (response.success) {
+      const durationText = days ? `for ${days} day${days > 1 ? 's' : ''}` : 'until unpinned';
+      InnovateAPI.showAlert(`Message pinned ${durationText}!`, 'success');
+      
+      // Reload chat to show pinned message
+      if (typeof loadChatView === 'function') {
+        await loadChatView(groupId);
+      } else if (typeof loadGroupChat === 'function') {
+        await loadGroupChat();
+      }
+    } else {
+      throw new Error(response.error || 'Failed to pin message');
+    }
+  } catch (error) {
+    console.error('Error pinning message:', error);
+    InnovateAPI.showAlert('Failed to pin message', 'error');
+  }
+}
+
+async function unpinMessage(postId) {
+  const state = window.state || {};
+  const groupId = state.currentGroupId;
+  
+  try {
+    const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts/${postId}/pin`, {
+      method: 'POST',
+      body: JSON.stringify({})  // Empty body to unpin
+    });
+    
+    if (response.success) {
+      InnovateAPI.showAlert('Message unpinned!', 'success');
+      
+      // Reload chat to update UI
+      if (typeof loadChatView === 'function') {
+        await loadChatView(groupId);
+      } else if (typeof loadGroupChat === 'function') {
+        await loadGroupChat();
+      }
+    } else {
+      throw new Error(response.error || 'Failed to unpin message');
+    }
+  } catch (error) {
+    console.error('Error unpinning message:', error);
+    InnovateAPI.showAlert('Failed to unpin message', 'error');
+  }
+}
+
 // ==================== POLL SYSTEM ====================
 
 function showPollCreator() {
@@ -1076,6 +1215,9 @@ window.replyToMessage = replyToMessage;
 window.cancelReply = cancelReply;
 window.forwardMessage = forwardMessage;
 window.confirmForward = confirmForward;
+window.showPinTimerModal = showPinTimerModal;
+window.pinMessageWithDuration = pinMessageWithDuration;
+window.unpinMessage = unpinMessage;
 window.showPollCreator = showPollCreator;
 window.addPollOption = addPollOption;
 window.createPoll = createPoll;

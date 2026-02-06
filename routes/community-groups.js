@@ -1551,6 +1551,7 @@ router.post('/community-groups/:groupId/posts/:postId/pin', authMiddleware, (req
   const db = getDb();
   const userId = req.user.userId;
   const { groupId, postId } = req.params;
+  const { pinDuration } = req.body; // Duration in days: 1, 7, 30, or null for "until unpin"
 
   // Check if user is a member (optionally check for admin/moderator role)
   db.get(
@@ -1575,7 +1576,7 @@ router.post('/community-groups/:groupId/posts/:postId/pin', authMiddleware, (req
           if (isPinned) {
             // Unpin message
             db.run(
-              'UPDATE community_group_posts SET pinned_at = NULL, pinned_by = NULL WHERE id = ?',
+              'UPDATE community_group_posts SET pinned_at = NULL, pinned_by = NULL, pin_expires_at = NULL WHERE id = ?',
               [postId],
               (err) => {
                 if (err) {
@@ -1592,10 +1593,18 @@ router.post('/community-groups/:groupId/posts/:postId/pin', authMiddleware, (req
               }
             );
           } else {
+            // Calculate expiration date if duration is provided
+            let pinExpiresAt = null;
+            if (pinDuration) {
+              const now = new Date();
+              now.setDate(now.getDate() + parseInt(pinDuration));
+              pinExpiresAt = now.toISOString();
+            }
+
             // Pin message
             db.run(
-              'UPDATE community_group_posts SET pinned_at = CURRENT_TIMESTAMP, pinned_by = ? WHERE id = ?',
-              [userId, postId],
+              'UPDATE community_group_posts SET pinned_at = CURRENT_TIMESTAMP, pinned_by = ?, pin_expires_at = ? WHERE id = ?',
+              [userId, pinExpiresAt, postId],
               (err) => {
                 if (err) {
                   return res.status(500).json({ error: 'Failed to pin message' });
@@ -1604,10 +1613,10 @@ router.post('/community-groups/:groupId/posts/:postId/pin', authMiddleware, (req
                 // Notify via socket
                 const io = req.app.get('io');
                 if (io) {
-                  io.to(`community_group_${groupId}`).emit('message:pinned', { messageId: postId });
+                  io.to(`community_group_${groupId}`).emit('message:pinned', { messageId: postId, expiresAt: pinExpiresAt });
                 }
 
-                res.json({ success: true, pinned: true, message: 'Message pinned' });
+                res.json({ success: true, pinned: true, message: 'Message pinned', expiresAt: pinExpiresAt });
               }
             );
           }

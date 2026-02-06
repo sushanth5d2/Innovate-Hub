@@ -158,6 +158,38 @@ setInterval(() => {
       }
     });
   });
+  
+  // Clean up expired pinned messages
+  db.all(`
+    SELECT id, group_id 
+    FROM community_group_posts 
+    WHERE pin_expires_at IS NOT NULL 
+    AND datetime(pin_expires_at) <= datetime('now')
+    AND pinned_at IS NOT NULL
+  `, (err, expiredPins) => {
+    if (err) {
+      console.error('Error fetching expired pins:', err);
+      return;
+    }
+    
+    // Notify via socket and unpin
+    expiredPins.forEach(msg => {
+      io.to(`community_group_${msg.group_id}`).emit('message:unpinned', { messageId: msg.id });
+    });
+    
+    // Unpin expired messages
+    db.run(`
+      UPDATE community_group_posts 
+      SET pinned_at = NULL, pinned_by = NULL, pin_expires_at = NULL 
+      WHERE pin_expires_at IS NOT NULL 
+      AND datetime(pin_expires_at) <= datetime('now')
+    `, (err) => {
+      if (err) console.error('Error unpinning expired messages:', err);
+      else if (expiredPins.length > 0) {
+        console.log(`Unpinned ${expiredPins.length} expired pinned messages`);
+      }
+    });
+  });
 }, 60000); // Run every 60 seconds
 
 // Socket.IO connection handling
