@@ -4163,19 +4163,21 @@
         const existingLeaveGroup = Array.from(menuItems).find(item => item.textContent.toLowerCase().includes('leave group'));
         if (existingLeaveGroup) existingLeaveGroup.remove();
         
-        // Add after the last visible menu item before admin section
-        const blockedUsersItem = Array.from(menuItems).find(item => item.textContent.toLowerCase().includes('blocked users'));
-        if (blockedUsersItem) {
-          blockedUsersItem.after(leaveGroupItem);
+        // Insert the Exit Group menu item before the admin section
+        const adminFeatures = document.getElementById('adminOnlyFeatures');
+        if (adminFeatures) {
+          // Insert before admin section
+          adminFeatures.parentNode.insertBefore(leaveGroupItem, adminFeatures);
         } else {
-          const lastVisibleItem = Array.from(menuItems).filter(item => item.style.display !== 'none').pop();
-          if (lastVisibleItem) {
-            lastVisibleItem.after(leaveGroupItem);
+          // Fallback: find last menu item and insert after it
+          const allMenuItems = document.querySelectorAll('.community-right .menu-item');
+          const lastMenuItem = allMenuItems[allMenuItems.length - 1];
+          if (lastMenuItem) {
+            lastMenuItem.after(leaveGroupItem);
           }
         }
         
         // Show admin features section if user is admin
-        const adminFeatures = document.getElementById('adminOnlyFeatures');
         if (adminFeatures && isAdmin) {
           adminFeatures.style.display = 'block';
           
@@ -5209,10 +5211,13 @@
             if (list) list.scrollTop = list.scrollHeight;
           }, 100);
           
-          // Load reactions for all messages
+          // Load reactions and link previews for all messages
           sortedPosts.forEach(msg => {
             if (msg.id) {
               loadMessageReactions(msg.id);
+              // Load link previews (check if user is the sender)
+              const isOwnMessage = msg.user_id == state.user?.id;
+              loadLinkPreviews(msg, isOwnMessage);
             }
           });
         } else {
@@ -10655,6 +10660,11 @@
       const hasContent = contentText && contentText.trim() !== '';
       const editedBadge = msg.is_edited ? '<span style="font-style: italic; opacity: 0.6; margin-left: 4px;">(edited)</span>' : '';
       
+      // Extract URLs for link preview
+      const urlRegex = /(https?:\/\/[^\s<]+)/g;
+      const urls = contentText.match(urlRegex) || [];
+      const linkPreviewId = `link-preview-${msg.id}`;
+      
       if (isOwn) {
         // Own message - on the right with gradient
         return `
@@ -10664,6 +10674,7 @@
                 ${replyToHTML}
                 <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText, true) : ''}</div>
                 ${attachmentsHTML}
+                <div id="${linkPreviewId}" style="margin-top: 8px;"></div>
                 <div class="message-time" style="font-size: 11px; opacity: 0.8; text-align: right; margin-top: 4px;">
                   ${formatTimestampIST(msg.created_at)}${editedBadge}
                 </div>
@@ -10703,6 +10714,7 @@
                 ${replyToHTML}
                 <div class="message-content" style="word-wrap: break-word; margin-bottom: 4px;">${hasContent ? linkify(contentText) : ''}</div>
                 ${attachmentsHTML}
+                <div id="${linkPreviewId}" style="margin-top: 8px;"></div>
                 <div class="message-time" style="font-size: 11px; opacity: 0.7; text-align: right; margin-top: 4px;">
                   ${formatTimestampIST(msg.created_at)}${editedBadge}
                 </div>
@@ -10720,6 +10732,149 @@
           </div>
         `;
       }
+    }
+    
+    // Fetch and display link preview
+    async function fetchAndDisplayLinkPreview(url, containerId, isOwnMessage = false) {
+      console.log('Fetching link preview for:', url, 'Container:', containerId);
+      try {
+        const response = await InnovateAPI.apiRequest('/link-preview', {
+          method: 'POST',
+          body: JSON.stringify({ url })
+        });
+        
+        console.log('Link preview response:', response);
+        
+        if (response.success && response.preview) {
+          const preview = response.preview;
+          
+          // Cache the preview for future use
+          linkPreviewCache.set(url, preview);
+          
+          const container = document.getElementById(containerId);
+          
+          console.log('Container found:', !!container, 'Preview title:', preview.title);
+          
+          if (!container || !preview.title) return;
+          
+          const bgColor = isOwnMessage ? 'rgba(255, 255, 255, 0.15)' : 'var(--ig-hover)';
+          const borderColor = isOwnMessage ? 'rgba(255, 255, 255, 0.3)' : 'var(--ig-border)';
+          const textColor = isOwnMessage ? 'rgba(255, 255, 255, 0.95)' : 'var(--ig-primary-text)';
+          const secondaryColor = isOwnMessage ? 'rgba(255, 255, 255, 0.7)' : 'var(--ig-secondary-text)';
+          
+          container.innerHTML = `
+            <a href="${preview.url}" target="_blank" rel="noopener noreferrer" 
+               style="display: block; background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; transition: all 0.2s;"
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              ${preview.image ? `
+                <img src="${preview.image}" 
+                     style="width: 100%; height: 150px; object-fit: cover; display: block;"
+                     onerror="this.style.display='none'"/>
+              ` : ''}
+              <div style="padding: 12px;">
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color: ${textColor}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  ${preview.title}
+                </div>
+                ${preview.description ? `
+                  <div style="font-size: 12px; color: ${secondaryColor}; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    ${preview.description}
+                  </div>
+                ` : ''}
+                <div style="font-size: 11px; color: ${secondaryColor}; opacity: 0.8;">
+                  <i class="fas fa-external-link-alt" style="margin-right: 4px;"></i>${preview.siteName}
+                </div>
+              </div>
+            </a>
+          `;
+        }
+      } catch (error) {
+        console.error('Error fetching link preview:', error);
+      }
+    }
+    
+    // Cache for link previews to avoid duplicate requests
+    const linkPreviewCache = new Map();
+    
+    // Load link previews for a message
+    function loadLinkPreviews(msg, isOwnMessage = false) {
+      console.log('loadLinkPreviews called for message:', msg.id, 'content:', msg.content);
+      if (!msg.content) return;
+      
+      // Decrypt content if encrypted
+      let contentToCheck = msg.content;
+      if (msg.content.includes('U2FsdGVk')) {
+        // Content is encrypted, decrypt it first
+        const key = E2EEncryption.keys[state.currentGroupId];
+        if (key) {
+          try {
+            contentToCheck = CryptoJS.AES.decrypt(msg.content, key).toString(CryptoJS.enc.Utf8);
+            console.log('Decrypted content for URL check:', contentToCheck);
+          } catch (error) {
+            console.log('Failed to decrypt for link preview:', error);
+            return;
+          }
+        } else {
+          console.log('No encryption key available, skipping link preview');
+          return;
+        }
+      }
+      
+      const urlRegex = /(https?:\/\/[^\s<]+)/g;
+      const urls = contentToCheck.match(urlRegex);
+      
+      console.log('URLs found:', urls);
+      
+      if (urls && urls.length > 0) {
+        const containerId = `link-preview-${msg.id}`;
+        console.log('Will fetch preview for:', urls[0], 'Container ID:', containerId);
+        
+        // Check cache first
+        if (linkPreviewCache.has(urls[0])) {
+          console.log('Using cached preview for:', urls[0]);
+          displayCachedLinkPreview(linkPreviewCache.get(urls[0]), containerId, isOwnMessage);
+        } else {
+          // Only fetch preview for the first URL to avoid clutter
+          fetchAndDisplayLinkPreview(urls[0], containerId, isOwnMessage);
+        }
+      }
+    }
+    
+    // Display cached link preview
+    function displayCachedLinkPreview(preview, containerId, isOwnMessage = false) {
+      const container = document.getElementById(containerId);
+      if (!container || !preview || !preview.title) return;
+      
+      const bgColor = isOwnMessage ? 'rgba(255, 255, 255, 0.15)' : 'var(--ig-hover)';
+      const borderColor = isOwnMessage ? 'rgba(255, 255, 255, 0.3)' : 'var(--ig-border)';
+      const textColor = isOwnMessage ? 'rgba(255, 255, 255, 0.95)' : 'var(--ig-primary-text)';
+      const secondaryColor = isOwnMessage ? 'rgba(255, 255, 255, 0.7)' : 'var(--ig-secondary-text)';
+      
+      container.innerHTML = `
+        <a href="${preview.url}" target="_blank" rel="noopener noreferrer" 
+           style="display: block; background: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; transition: all 0.2s;"
+           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+          ${preview.image ? `
+            <img src="${preview.image}" 
+                 style="width: 100%; height: 150px; object-fit: cover; display: block;"
+                 onerror="this.style.display='none'"/>
+          ` : ''}
+          <div style="padding: 12px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color: ${textColor}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${preview.title}
+            </div>
+            ${preview.description ? `
+              <div style="font-size: 12px; color: ${secondaryColor}; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                ${preview.description}
+              </div>
+            ` : ''}
+            <div style="font-size: 11px; color: ${secondaryColor}; opacity: 0.8;">
+              <i class="fas fa-external-link-alt" style="margin-right: 4px;"></i>${preview.siteName}
+            </div>
+          </div>
+        </a>
+      `;
     }
     
     function appendChatMessage(msg) {
@@ -10744,6 +10899,10 @@
       list.appendChild(messageEl.firstElementChild);
       list.scrollTop = list.scrollHeight;
       console.log('Message appended successfully');
+      
+      // Load link preview for the new message
+      const isOwnMessage = msg.user_id == state.user?.id || msg.sender_id == state.user?.id;
+      loadLinkPreviews(msg, isOwnMessage);
     }
     
     // Handle file selection and show preview

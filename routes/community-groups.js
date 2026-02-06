@@ -2953,5 +2953,70 @@ router.post('/community-groups/:groupId/mark-read', authMiddleware, (req, res) =
   );
 });
 
+// Fetch URL metadata for link previews
+router.post('/link-preview', authMiddleware, async (req, res) => {
+  const { url } = req.body;
+  
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  try {
+    const https = require('https');
+    const http = require('http');
+    const urlModule = require('url');
+    
+    const parsedUrl = urlModule.parse(url);
+    const protocol = parsedUrl.protocol === 'https:' ? https : http;
+    
+    const options = {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 5000
+    };
+
+    protocol.get(url, options, (response) => {
+      let data = '';
+      
+      response.on('data', (chunk) => {
+        data += chunk;
+        // Limit data size to prevent abuse
+        if (data.length > 500000) {
+          response.destroy();
+        }
+      });
+      
+      response.on('end', () => {
+        // Extract meta tags
+        const titleMatch = data.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) || 
+                          data.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const descMatch = data.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i) ||
+                         data.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+        const imageMatch = data.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+        const siteMatch = data.match(/<meta\s+property=["']og:site_name["']\s+content=["']([^"']+)["']/i);
+
+        const preview = {
+          url: url,
+          title: titleMatch ? titleMatch[1].substring(0, 200) : null,
+          description: descMatch ? descMatch[1].substring(0, 300) : null,
+          image: imageMatch ? imageMatch[1] : null,
+          siteName: siteMatch ? siteMatch[1] : new URL(url).hostname
+        };
+
+        res.json({ success: true, preview });
+      });
+    }).on('error', (err) => {
+      console.error('Link preview error:', err);
+      res.json({ success: false, error: 'Failed to fetch preview' });
+    });
+
+  } catch (error) {
+    console.error('Link preview error:', error);
+    res.json({ success: false, error: 'Invalid URL' });
+  }
+});
+
 module.exports = router;
 
