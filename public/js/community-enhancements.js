@@ -712,6 +712,12 @@ function cancelReply() {
   if (replyPreview) {
     replyPreview.remove();
   }
+  // Also handle replyIndicator in community view
+  const replyIndicator = document.getElementById('replyIndicator');
+  if (replyIndicator) {
+    replyIndicator.style.display = 'none';
+    replyIndicator.innerHTML = '';
+  }
 }
 
 async function forwardMessage(postId) {

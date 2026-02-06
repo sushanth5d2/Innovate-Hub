@@ -619,12 +619,27 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
           cgp.*,
           u.username,
           u.profile_picture,
-          reply_user.username as reply_to_username,
-          reply_post.content as reply_to_content,
+          CASE 
+            WHEN reply_poll.id IS NOT NULL THEN poll_author.username
+            WHEN reply_post.id IS NOT NULL THEN reply_user.username
+            ELSE NULL
+          END as reply_to_username,
+          CASE 
+            WHEN reply_poll.id IS NOT NULL THEN reply_poll.question
+            WHEN reply_post.id IS NOT NULL THEN reply_post.content
+            ELSE NULL
+          END as reply_to_content,
+          CASE 
+            WHEN reply_poll.id IS NOT NULL THEN 'poll'
+            WHEN reply_post.id IS NOT NULL THEN 'message'
+            ELSE NULL
+          END as reply_to_type,
           pin_user.username as pinned_by_username
         FROM community_group_posts cgp
         JOIN users u ON cgp.user_id = u.id
-        LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id
+        LEFT JOIN group_polls reply_poll ON cgp.reply_to = reply_poll.id AND reply_poll.group_id = cgp.group_id
+        LEFT JOIN users poll_author ON reply_poll.user_id = poll_author.id
+        LEFT JOIN community_group_posts reply_post ON cgp.reply_to = reply_post.id AND reply_post.group_id = cgp.group_id AND reply_poll.id IS NULL
         LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
         LEFT JOIN users pin_user ON cgp.pinned_by = pin_user.id
         WHERE cgp.group_id = ? AND (cgp.is_deleted IS NULL OR cgp.is_deleted = 0)
