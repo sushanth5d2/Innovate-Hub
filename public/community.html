@@ -10773,7 +10773,7 @@
       if (isOwn) {
         // Own message - on the right with gradient
         return `
-          <div data-post-id="${msg.id}" data-author="${senderName}" style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+          <div data-post-id="${msg.id}" data-author="${senderName}" data-pinned="${msg.pinned_at ? 'true' : 'false'}" style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
             <div style="max-width: 70%;">
               <div style="padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                 ${replyToHTML}
@@ -10799,7 +10799,7 @@
       } else {
         // Other user's message - on the left with DP
         return `
-          <div data-post-id="${msg.id}" data-author="${senderName}" class="message-item" style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+          <div data-post-id="${msg.id}" data-author="${senderName}" data-pinned="${msg.pinned_at ? 'true' : 'false'}" class="message-item" style="display: flex; justify-content: flex-start; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
             <img 
               src="${profilePic}" 
               alt="${senderName}"

@@ -628,10 +628,7 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
         LEFT JOIN users reply_user ON reply_post.user_id = reply_user.id
         LEFT JOIN users pin_user ON cgp.pinned_by = pin_user.id
         WHERE cgp.group_id = ? AND (cgp.is_deleted IS NULL OR cgp.is_deleted = 0)
-        ORDER BY 
-          CASE WHEN cgp.pinned_at IS NOT NULL THEN 0 ELSE 1 END,
-          cgp.pinned_at DESC,
-          cgp.created_at ASC
+        ORDER BY cgp.created_at ASC
       `;
 
       db.all(query, [groupId], (err, posts) => {
