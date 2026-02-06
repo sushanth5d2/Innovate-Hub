@@ -5286,6 +5286,9 @@
       }
     }
 
+    // Expose loadChatView to window for external scripts
+    window.loadChatView = loadChatView;
+
     // ==================== POLL FUNCTIONS ====================
     function showPollCreator() {
       const modal = document.createElement('div');
@@ -10598,6 +10601,11 @@
             filepath = (att.filepath || att.url || att.path || '').replace(/\.(jpg|jpeg|png|gif|webp)\.[0-9]+$/i, '.$1');
             filename = att.filename || att.name || 'file';
             type = att.type || att.file_type || getFileTypeFromUrl(filepath);
+          }
+          
+          // Ensure filepath starts with / for proper absolute URL
+          if (filepath && !filepath.startsWith('/') && !filepath.startsWith('http')) {
+            filepath = '/' + filepath;
           }
           
           console.log(`  filepath: ${filepath}`);

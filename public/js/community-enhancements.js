@@ -543,30 +543,12 @@ async function saveEditedMessage(postId) {
     }
     
     document.querySelector('.ig-modal-overlay')?.remove();
-    
-    // Update message in UI
-    const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
-    if (messageEl) {
-      const contentEl = messageEl.querySelector('.message-content');
-      if (contentEl) {
-        contentEl.textContent = content;
-      }
-      
-      // Add edited indicator
-      let editedBadge = messageEl.querySelector('.edited-badge');
-      if (!editedBadge) {
-        editedBadge = document.createElement('span');
-        editedBadge.className = 'edited-badge';
-        editedBadge.style.cssText = 'color: var(--ig-secondary-text); font-size: 12px; margin-left: 8px; font-style: italic;';
-        editedBadge.textContent = '(edited)';
-        const timeEl = messageEl.querySelector('.message-time');
-        if (timeEl) {
-          timeEl.appendChild(editedBadge);
-        }
-      }
-    }
-    
     InnovateAPI.showAlert('Message updated', 'success');
+    
+    // Reload chat to show updated message with preserved attachments
+    if (window.loadChatView) {
+      await window.loadChatView(state.currentGroupId);
+    }
   } catch (error) {
     console.error('Error editing message:', error);
     InnovateAPI.showAlert('Failed to update message', 'error');
@@ -611,8 +593,8 @@ async function saveEditedAttachment(postId) {
     InnovateAPI.showAlert('Attachment replaced successfully', 'success');
     
     // Reload chat to show updated attachment
-    if (window.loadGroupChat) {
-      window.loadGroupChat(state.currentGroupId);
+    if (window.loadChatView) {
+      await window.loadChatView(state.currentGroupId);
     }
   } catch (error) {
     console.error('Error replacing attachment:', error);
