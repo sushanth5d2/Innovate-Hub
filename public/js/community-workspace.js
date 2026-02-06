@@ -242,29 +242,113 @@
     state.groups.forEach(g => {
       const row = document.createElement('div');
       row.className = 'ws-item' + (state.currentGroup?.id === g.id ? ' active' : '');
+      row.style.position = 'relative';
 
       const left = document.createElement('div');
       left.style.minWidth = '0';
+      left.style.flex = '1';
+
+      const titleRow = document.createElement('div');
+      titleRow.style.display = 'flex';
+      titleRow.style.alignItems = 'center';
+      titleRow.style.gap = '6px';
+
+      // Add pin icon if pinned
+      if (g.is_pinned) {
+        const pinIcon = document.createElement('span');
+        pinIcon.textContent = '📌';
+        pinIcon.style.fontSize = '14px';
+        pinIcon.title = 'Pinned';
+        titleRow.appendChild(pinIcon);
+      }
 
       const t = document.createElement('div');
       t.className = 'ws-item-title';
       t.textContent = g.name;
+      t.style.flex = '1';
+
+      titleRow.appendChild(t);
 
       const s = document.createElement('div');
       s.className = 'ws-item-sub';
       s.textContent = `${g.member_count || 0} members` + (g.is_member ? '' : ' • Join to access');
 
-      left.appendChild(t);
+      left.appendChild(titleRow);
       left.appendChild(s);
+
+      const rightSection = document.createElement('div');
+      rightSection.style.display = 'flex';
+      rightSection.style.alignItems = 'center';
+      rightSection.style.gap = '8px';
+
+      // Add unread count badge if there are unread messages
+      if (g.unread_count && g.unread_count > 0) {
+        const unreadBadge = document.createElement('div');
+        unreadBadge.className = 'ws-badge';
+        unreadBadge.style.cssText = `
+          background: #0095f6;
+          color: white;
+          border-radius: 50%;
+          min-width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 0 6px;
+        `;
+        unreadBadge.textContent = g.unread_count > 99 ? '99+' : g.unread_count;
+        rightSection.appendChild(unreadBadge);
+      }
+
+      // Add three-dot menu button BEFORE badge for members
+      if (g.is_member) {
+        const menuBtn = document.createElement('button');
+        menuBtn.innerHTML = '⋮';
+        menuBtn.className = 'group-menu-btn';
+        menuBtn.style.cssText = `
+          background: var(--ig-hover-overlay);
+          border: none;
+          color: var(--ig-primary-text);
+          font-size: 24px;
+          cursor: pointer;
+          padding: 4px 10px;
+          line-height: 1;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 32px;
+          height: 32px;
+          transition: all 0.2s;
+        `;
+        menuBtn.title = 'More options';
+        menuBtn.onmouseenter = () => {
+          menuBtn.style.background = 'var(--ig-border)';
+        };
+        menuBtn.onmouseleave = () => {
+          menuBtn.style.background = 'var(--ig-hover-overlay)';
+        };
+        menuBtn.onclick = (e) => {
+          e.stopPropagation();
+          showGroupContextMenu(e, g);
+        };
+        rightSection.appendChild(menuBtn);
+      }
 
       const badge = document.createElement('div');
       badge.className = 'ws-badge';
       badge.textContent = g.is_member ? 'Member' : 'Join';
+      rightSection.appendChild(badge);
 
       row.appendChild(left);
-      row.appendChild(badge);
+      row.appendChild(rightSection);
 
-      row.addEventListener('click', async () => {
+      row.addEventListener('click', async (e) => {
+        // Don't trigger if clicking the menu button
+        if (e.target.classList.contains('group-menu-btn')) return;
+        
         try {
           if (!g.is_member) {
             await InnovateAPI.apiRequest(`/community-groups/${g.id}/join`, { method: 'POST' });
@@ -274,11 +358,18 @@
           setGroupSelectedUI(true);
           el.contextTitle.textContent = `# ${g.name}`;
           el.contextSub.textContent = g.description || 'Group workspace';
-          renderGroups();
+          
           if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) {
             el.sidebar.classList.remove('open');
           }
           await refreshAllForGroup();
+          
+          // Mark as read when opening the group and reload groups
+          if (g.unread_count > 0) {
+            await markGroupAsRead(g.id);
+            await loadGroups();
+            renderGroups();
+          }
         } catch (e) {
           InnovateAPI.showAlert(e.message || 'Failed to open group', 'error');
         }
@@ -286,6 +377,123 @@
 
       el.groupsList.appendChild(row);
     });
+  }
+
+  function showGroupContextMenu(event, group) {
+    // Remove any existing context menu
+    const existingMenu = document.querySelector('.group-context-menu');
+    if (existingMenu) {
+      existingMenu.remove();
+    }
+
+    const menu = document.createElement('div');
+    menu.className = 'group-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      min-width: 180px;
+      padding: 8px 0;
+    `;
+
+    const options = [
+      {
+        label: group.is_pinned ? '📌 Unpin chat' : '📌 Pin chat',
+        action: async () => {
+          try {
+            if (group.is_pinned) {
+              await InnovateAPI.apiRequest(`/community-groups/${group.id}/pin`, { method: 'DELETE' });
+              group.is_pinned = 0;
+            } else {
+              await InnovateAPI.apiRequest(`/community-groups/${group.id}/pin`, { method: 'POST' });
+              group.is_pinned = 1;
+            }
+            await loadGroups();
+            renderGroups();
+            InnovateAPI.showAlert(group.is_pinned ? 'Group pinned' : 'Group unpinned', 'success');
+          } catch (e) {
+            InnovateAPI.showAlert(e.message || 'Failed to update pin status', 'error');
+          }
+        }
+      },
+      {
+        label: '✓ Mark all as read',
+        action: async () => {
+          try {
+            await markGroupAsRead(group.id);
+            await loadGroups();
+            renderGroups();
+            InnovateAPI.showAlert('Marked all as read', 'success');
+          } catch (e) {
+            InnovateAPI.showAlert(e.message || 'Failed to mark as read', 'error');
+          }
+        },
+        disabled: !group.unread_count || group.unread_count === 0
+      }
+    ];
+
+    options.forEach(opt => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        padding: 12px 16px;
+        cursor: ${opt.disabled ? 'not-allowed' : 'pointer'};
+        color: ${opt.disabled ? 'var(--ig-secondary-text)' : 'var(--ig-primary-text)'};
+        opacity: ${opt.disabled ? '0.5' : '1'};
+        font-size: 14px;
+        transition: background 0.2s;
+        user-select: none;
+      `;
+      item.textContent = opt.label;
+
+      if (!opt.disabled) {
+        item.onmouseenter = () => {
+          item.style.background = 'rgba(255, 255, 255, 0.1)';
+        };
+        item.onmouseleave = () => {
+          item.style.background = 'transparent';
+        };
+        item.onclick = async () => {
+          menu.remove();
+          await opt.action();
+        };
+      }
+
+      menu.appendChild(item);
+    });
+
+    // Position the menu
+    const rect = event.target.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.right = `${window.innerWidth - rect.right}px`;
+
+    document.body.appendChild(menu);
+
+    // Close menu when clicking outside
+    setTimeout(() => {
+      document.addEventListener('click', function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
+        }
+      });
+    }, 0);
+  }
+
+  async function markGroupAsRead(groupId) {
+    try {
+      await InnovateAPI.apiRequest(`/community-groups/${groupId}/mark-read`, { method: 'POST' });
+      // Update the local state immediately
+      const group = state.groups.find(g => g.id === groupId);
+      if (group) {
+        group.unread_count = 0;
+      }
+    } catch (e) {
+      console.error('Error marking group as read:', e);
+      throw e;
+    }
   }
 
   async function loadCommunity() {
@@ -624,6 +832,13 @@
     const data = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/posts`);
     state.chat = data.posts || [];
     renderChat();
+    
+    // Mark as read after loading chat and reload groups list
+    if (state.currentGroup && state.currentGroup.unread_count > 0) {
+      await markGroupAsRead(state.currentGroup.id);
+      await loadGroups();
+      renderGroups();
+    }
   }
 
   async function sendChat(locationObj) {
@@ -649,6 +864,11 @@
     el.chatInput.value = '';
     el.chatAttach.value = '';
     await loadGroupChat();
+    
+    // After sending, mark as read and reload groups (updates read pointer to latest message)
+    await markGroupAsRead(state.currentGroup.id);
+    await loadGroups();
+    renderGroups();
   }
 
   async function promptAndSendLocation() {

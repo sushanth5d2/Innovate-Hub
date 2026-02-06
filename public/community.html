@@ -130,6 +130,25 @@
       text-overflow: ellipsis;
     }
 
+    /* Group context menu button */
+    .group-menu-btn {
+      opacity: 0.7;
+      transition: opacity 0.2s, background 0.2s !important;
+    }
+
+    .group-menu-btn:hover {
+      opacity: 1 !important;
+    }
+
+    .group-item:hover .group-menu-btn {
+      opacity: 1;
+    }
+
+    /* Context menu animation */
+    .group-context-menu {
+      animation: fadeIn 0.15s ease-out;
+    }
+
     .left-footer {
       padding: 16px;
       border-top: 1px solid var(--ig-border);
@@ -330,7 +349,42 @@
     .menu-icon {
       width: 24px;
       text-align: center;
-      color: var(--ig-secondary-text);
+      color: var(--ig-blue);
+    }
+
+    /* Group Action Buttons */
+    .group-action-btn {
+      width: 100%;
+      padding: 14px 16px;
+      border: none;
+      background: transparent;
+      color: var(--ig-primary-text);
+      text-align: left;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+      margin-bottom: 4px;
+    }
+
+    .group-action-btn:hover {
+      background: var(--ig-hover);
+    }
+
+    .group-action-btn.danger {
+      color: #e74c3c;
+    }
+
+    .group-action-btn.danger:hover {
+      background: rgba(231, 76, 60, 0.1);
+    }
+
+    .group-action-btn i {
+      width: 20px;
+      text-align: center;
     }
 
     /* Content Cards */
@@ -2321,11 +2375,13 @@
       const urlParams = new URLSearchParams(window.location.search);
       state.communityId = urlParams.get('id') || window.location.pathname.split('/').pop();
       
-      // Check if there's a group parameter in URL
+      // Check if there's a group parameter in URL and action=join for invite link
       const groupIdFromUrl = urlParams.get('groupId');
+      const actionFromUrl = urlParams.get('action');
       console.log('=== DOMContentLoaded Initialization ===');
       console.log('Community ID:', state.communityId);
       console.log('Group ID from URL:', groupIdFromUrl);
+      console.log('Action from URL:', actionFromUrl);
 
       await Promise.all([
         loadCommunityData()
@@ -2336,21 +2392,34 @@
       await loadGroups();
       console.log('Groups loaded, count:', state.groups.length);
       
-      // Always start with Announcements tab on page load/refresh
-      // Clear any groupId from URL to start fresh
-      if (groupIdFromUrl) {
-        console.log('Clearing groupId from URL to start fresh');
+      // Check if this is an invite link (has groupId and action=join)
+      if (groupIdFromUrl && actionFromUrl === 'join') {
+        console.log('Invite link detected, attempting to join group:', groupIdFromUrl);
+        // Switch to groups tab
+        switchLeftTab('groups');
+        // Wait a bit for UI to settle
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Try to select the group (which will show join UI)
+        await selectGroup(parseInt(groupIdFromUrl));
+        // Clean up URL
         const url = new URL(window.location);
-        url.searchParams.delete('groupId');
+        url.searchParams.delete('action');
         window.history.replaceState({}, '', url);
+      } else {
+        // Normal flow: start with Announcements tab on page load/refresh
+        console.log('Starting with Announcements tab (default)');
+        if (groupIdFromUrl) {
+          console.log('Clearing groupId from URL to start fresh');
+          const url = new URL(window.location);
+          url.searchParams.delete('groupId');
+          window.history.replaceState({}, '', url);
+        }
+        // Show announcements by default (Announcements tab is already active)
+        await loadAnnouncements();
       }
       
       // Initialize right sidebar with community view
       updateRightSidebarForCommunity();
-      
-      console.log('Starting with Announcements tab (default)');
-      // Show announcements by default (Announcements tab is already active)
-      await loadAnnouncements();
 
       setupSocketListeners();
       setupResponsive();
@@ -2572,8 +2641,13 @@
         return;
       }
       
-      // Sort groups by latest message time (most recent first)
+      // Sort groups: pinned first, then by latest message time (most recent first)
       const sortedGroups = [...state.groups].sort((a, b) => {
+        // First sort by pinned status
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        
+        // Then by latest message time
         const timeA = a.latest_message_time ? new Date(a.latest_message_time).getTime() : 0;
         const timeB = b.latest_message_time ? new Date(b.latest_message_time).getTime() : 0;
         return timeB - timeA;
@@ -2581,8 +2655,31 @@
 
       content.innerHTML = searchHtml + '<div id="groupsListContainer">' + sortedGroups.map(group => {
         const latestMsg = group.latest_message || '';
+        
         // Attempt decryption for preview if content appears encrypted
-        const previewMsg = E2EEncryption.decrypt(latestMsg, group.id);
+        let previewMsg = '';
+        if (latestMsg) {
+          // Check if message looks encrypted
+          if (latestMsg.includes('U2FsdGVk')) {
+            // Try to decrypt if we have the key
+            const key = E2EEncryption.keys[group.id];
+            if (key) {
+              try {
+                const decrypted = CryptoJS.AES.decrypt(latestMsg, key).toString(CryptoJS.enc.Utf8);
+                previewMsg = decrypted || '💬 New message';
+              } catch (error) {
+                previewMsg = '💬 New message';
+              }
+            } else {
+              // No key available, show generic message
+              previewMsg = '💬 New message';
+            }
+          } else {
+            // Not encrypted
+            previewMsg = latestMsg;
+          }
+        }
+        
         const unreadCount = group.unread_count || 0;
         const truncatedMsg = previewMsg.length > 30 ? previewMsg.substring(0, 30) + '...' : previewMsg;
         
@@ -2599,12 +2696,18 @@
           : group.name.charAt(0).toUpperCase();
         
         return `
-          <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})">
+          <div class="group-item ${state.currentGroupId == group.id ? 'active' : ''}" onclick="selectGroup(${group.id})" style="position: relative;">
             <div class="group-avatar">${avatarContent}</div>
-            <div class="group-info">
+            <div class="group-info" style="flex: 1; min-width: 0;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <div class="group-name">${group.name}</div>
-                ${unreadCount > 0 ? `<span style="background: var(--ig-blue); color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600;">${unreadCount}</span>` : ''}
+                <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
+                  ${group.is_pinned ? '<span style="font-size: 14px;" title="Pinned">📌</span>' : ''}
+                  <div class="group-name" style="flex: 1; min-width: 0;">${group.name}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-left: 8px;">
+                  ${unreadCount > 0 ? `<span style="background: var(--ig-blue); color: white; border-radius: 50%; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; padding: 0 6px;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : ''}
+                  ${group.is_member ? `<button class="group-menu-btn" onclick="event.stopPropagation(); showGroupContextMenu(event, ${group.id}, ${group.is_pinned}, ${unreadCount})" style="background: var(--ig-hover-overlay); border: none; color: var(--ig-primary-text); font-size: 20px; cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; opacity: 0.7; transition: all 0.2s;" onmouseenter="this.style.opacity='1'; this.style.background='var(--ig-border)'" onmouseleave="this.style.opacity='0.7'; this.style.background='var(--ig-hover-overlay)'">⋮</button>` : ''}
+                </div>
               </div>
               <div class="group-desc" style="color: ${previewMsg ? 'var(--ig-primary-text)' : 'var(--ig-secondary-text)'}; font-weight: ${unreadCount > 0 ? '600' : '400'};">
                 ${previewMsg ? truncatedMsg : displayDesc}
@@ -3537,6 +3640,269 @@
       loadGroupView(state.currentGroupId);
     }
 
+    // ==================== GROUP CONTEXT MENU FUNCTIONS ====================
+    function showGroupContextMenu(event, groupId, isPinned, unreadCount) {
+      // Remove any existing context menu
+      const existingMenu = document.querySelector('.group-context-menu');
+      if (existingMenu) {
+        existingMenu.remove();
+      }
+
+      const menu = document.createElement('div');
+      menu.className = 'group-context-menu';
+      menu.style.cssText = `
+        position: fixed;
+        background: var(--ig-primary-background);
+        border: 1px solid var(--ig-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        min-width: 180px;
+        padding: 8px 0;
+        animation: fadeIn 0.15s ease-out;
+      `;
+
+      const options = [
+        {
+          label: isPinned ? '📌 Unpin chat' : '📌 Pin chat',
+          action: async () => {
+            try {
+              if (isPinned) {
+                await InnovateAPI.apiRequest(`/community-groups/${groupId}/pin`, { method: 'DELETE' });
+              } else {
+                await InnovateAPI.apiRequest(`/community-groups/${groupId}/pin`, { method: 'POST' });
+              }
+              await loadGroups();
+              renderGroupsList();
+              InnovateAPI.showAlert(isPinned ? 'Group unpinned' : 'Group pinned', 'success');
+            } catch (e) {
+              InnovateAPI.showAlert(e.message || 'Failed to update pin status', 'error');
+            }
+          }
+        },
+        {
+          label: '✓ Mark all as read',
+          action: async () => {
+            try {
+              await markGroupAsRead(groupId);
+              await loadGroups();
+              renderGroupsList();
+              InnovateAPI.showAlert('Marked all as read', 'success');
+            } catch (e) {
+              InnovateAPI.showAlert(e.message || 'Failed to mark as read', 'error');
+            }
+          },
+          disabled: !unreadCount || unreadCount === 0
+        }
+      ];
+
+      options.forEach(opt => {
+        const item = document.createElement('div');
+        item.style.cssText = `
+          padding: 12px 16px;
+          cursor: ${opt.disabled ? 'not-allowed' : 'pointer'};
+          color: ${opt.disabled ? 'var(--ig-secondary-text)' : 'var(--ig-primary-text)'};
+          opacity: ${opt.disabled ? '0.5' : '1'};
+          font-size: 14px;
+          transition: background 0.2s;
+          user-select: none;
+        `;
+        item.textContent = opt.label;
+
+        if (!opt.disabled) {
+          item.onmouseenter = () => {
+            item.style.background = 'rgba(255, 255, 255, 0.1)';
+          };
+          item.onmouseleave = () => {
+            item.style.background = 'transparent';
+          };
+          item.onclick = async () => {
+            menu.remove();
+            await opt.action();
+          };
+        }
+
+        menu.appendChild(item);
+      });
+
+      // Position the menu
+      const rect = event.target.getBoundingClientRect();
+      menu.style.top = `${rect.bottom + 4}px`;
+      menu.style.right = `${window.innerWidth - rect.right}px`;
+
+      document.body.appendChild(menu);
+
+      // Close menu when clicking outside
+      setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+          if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+      }, 0);
+    }
+
+    async function markGroupAsRead(groupId) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/mark-read`, { method: 'POST' });
+        // Update the local state immediately
+        const group = state.groups.find(g => g.id === groupId);
+        if (group) {
+          group.unread_count = 0;
+        }
+      } catch (e) {
+        console.error('Error marking group as read:', e);
+        throw e;
+      }
+    }
+
+    // ==================== GROUP JOIN UI FUNCTIONS ====================
+    function showPublicGroupJoinUI(groupId, group) {
+      const centerContent = document.getElementById('centerContent');
+      const centerTitle = document.getElementById('centerTitle');
+      const centerSubtitle = document.getElementById('centerSubtitle');
+      
+      // Update header
+      centerTitle.textContent = group.name;
+      centerSubtitle.textContent = group.description || 'Public Group';
+      
+      // Hide tabs
+      document.getElementById('centerTabs').style.display = 'none';
+      document.getElementById('centerActions').innerHTML = '';
+      
+      // Show join UI
+      centerContent.innerHTML = `
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 40px;">
+          <div style="width: 120px; height: 120px; margin: 0 auto 24px; border-radius: 24px; background: linear-gradient(135deg, var(--ig-blue), #5B86E5); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+            ${group.profile_picture ? `<img src="${group.profile_picture}" style="width: 100%; height: 100%; border-radius: 24px; object-fit: cover;">` : '<i class="fas fa-users"></i>'}
+          </div>
+          <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text); text-align: center;">${group.name}</div>
+          <div style="font-size: 16px; color: var(--ig-secondary-text); margin-bottom: 8px; text-align: center;">${group.description || 'Public Group'}</div>
+          <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 32px; text-align: center;">
+            <i class="fas fa-globe"></i> Public Group • ${group.member_count || 0} members
+          </div>
+          <button class="btn btn-primary" onclick="joinPublicGroup(${groupId})" style="max-width: 300px; margin: 0 auto; width: 100%; padding: 14px 24px; font-size: 16px; font-weight: 600;">
+            <i class="fas fa-user-plus"></i> Join Group
+          </button>
+        </div>
+      `;
+    }
+
+    function showPrivateGroupJoinRequestUI(groupId, group) {
+      const centerContent = document.getElementById('centerContent');
+      const centerTitle = document.getElementById('centerTitle');
+      const centerSubtitle = document.getElementById('centerSubtitle');
+      
+      // Update header
+      centerTitle.textContent = group.name;
+      centerSubtitle.textContent = group.description || 'Private Group';
+      
+      // Hide tabs
+      document.getElementById('centerTabs').style.display = 'none';
+      document.getElementById('centerActions').innerHTML = '';
+      
+      // Show join request UI
+      centerContent.innerHTML = `
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 40px;">
+          <div style="width: 120px; height: 120px; margin: 0 auto 24px; border-radius: 24px; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+            ${group.profile_picture ? `<img src="${group.profile_picture}" style="width: 100%; height: 100%; border-radius: 24px; object-fit: cover;">` : '<i class="fas fa-lock"></i>'}
+          </div>
+          <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text); text-align: center;">${group.name}</div>
+          <div style="font-size: 16px; color: var(--ig-secondary-text); margin-bottom: 8px; text-align: center;">${group.description || 'Private Group'}</div>
+          <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 32px; text-align: center;">
+            <i class="fas fa-lock"></i> Private Group • ${group.member_count || 0} members
+          </div>
+          <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto; width: 100%;">
+            <div style="font-size: 14px; color: var(--ig-secondary-text); text-align: center; line-height: 1.6;">
+              <i class="fas fa-info-circle"></i> This is a private group. Your request will be sent to the group admin for approval.
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="requestToJoinPrivateGroup(${groupId})" style="max-width: 300px; margin: 0 auto; width: 100%; padding: 14px 24px; font-size: 16px; font-weight: 600;">
+            <i class="fas fa-paper-plane"></i> Request to Join
+          </button>
+        </div>
+      `;
+    }
+
+    function showPendingJoinRequestUI(groupId, group) {
+      const centerContent = document.getElementById('centerContent');
+      const centerTitle = document.getElementById('centerTitle');
+      const centerSubtitle = document.getElementById('centerSubtitle');
+      
+      // Update header
+      centerTitle.textContent = group.name;
+      centerSubtitle.textContent = group.description || 'Private Group';
+      
+      // Hide tabs
+      document.getElementById('centerTabs').style.display = 'none';
+      document.getElementById('centerActions').innerHTML = '';
+      
+      // Show pending request UI
+      centerContent.innerHTML = `
+        <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 40px;">
+          <div style="width: 120px; height: 120px; margin: 0 auto 24px; border-radius: 24px; background: linear-gradient(135deg, #f093fb, #f5576c); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px;">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--ig-primary-text); text-align: center;">Request Pending</div>
+          <div style="font-size: 16px; color: var(--ig-secondary-text); margin-bottom: 32px; text-align: center; line-height: 1.6;">
+            Your request to join <strong>${group.name}</strong> is waiting for admin approval.
+          </div>
+          <button class="btn" onclick="cancelJoinRequest(${groupId})" style="max-width: 300px; margin: 0 auto; width: 100%; padding: 14px 24px; font-size: 16px; font-weight: 600; background: transparent; border: 1px solid var(--ig-border); color: var(--ig-primary-text);">
+            <i class="fas fa-times"></i> Cancel Request
+          </button>
+        </div>
+      `;
+    }
+
+    async function joinPublicGroup(groupId) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, { method: 'POST' });
+        InnovateAPI.showAlert('Joined group successfully!', 'success');
+        await loadGroups();
+        renderGroupsList();
+        // Reload the group to show content
+        await selectGroup(groupId);
+      } catch (error) {
+        if (error.message && error.message.includes('blocked')) {
+          InnovateAPI.showAlert('You are blocked from this group', 'error');
+        } else {
+          InnovateAPI.showAlert(error.message || 'Failed to join group', 'error');
+        }
+      }
+    }
+
+    async function requestToJoinPrivateGroup(groupId) {
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join-request`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        InnovateAPI.showAlert('Join request sent to admin', 'success');
+        await loadGroups();
+        renderGroupsList();
+        // Reload the group to show pending UI
+        await selectGroup(groupId);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to send request', 'error');
+      }
+    }
+
+    async function cancelJoinRequest(groupId) {
+      try {
+        // We need to get the request first to delete it
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/join-request`, { method: 'DELETE' });
+        InnovateAPI.showAlert('Request cancelled', 'success');
+        await loadGroups();
+        renderGroupsList();
+        // Show the join UI again
+        await selectGroup(groupId);
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to cancel request', 'error');
+      }
+    }
+
     // ==================== GROUP SELECTION ====================
     async function selectGroup(groupId) {
       console.log('selectGroup called with groupId:', groupId);
@@ -3563,13 +3929,13 @@
       url.searchParams.set('groupId', groupId);
       window.history.pushState({}, '', url);
 
-      // Check if user is a member, if not and group is private, show join request
+      // Check if user is a member, if not show appropriate join UI
       try {
         const groupDetails = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
         
         // If user is not a member (is_member is 0 or undefined)
         if (!groupDetails.group.is_member || groupDetails.group.is_member === 0) {
-          // Not a member
+          // Not a member - show join UI instead of auto-joining
           if (groupDetails.group.is_public === 0) {
             // Private group - check if already has pending request
             if (groupDetails.group.join_request_status === 'pending') {
@@ -3578,35 +3944,13 @@
               return; // Don't load group content
             } else {
               // Show join request button
-              showPrivateGroupJoinRequest(groupId, groupDetails.group);
+              showPrivateGroupJoinRequestUI(groupId, groupDetails.group);
               return; // Don't load group content
             }
           } else {
-            // Public group - try to auto join
-            try {
-              await InnovateAPI.apiRequest(`/community-groups/${groupId}/join`, {
-                method: 'POST'
-              });
-              InnovateAPI.showAlert('Joined group successfully!', 'success');
-              console.log('Joined group successfully');
-              // Reload groups list to update state
-              await loadGroups();
-              // Refresh group details after joining
-              const updatedGroupDetails = await InnovateAPI.apiRequest(`/community-groups/${groupId}`);
-              if (!updatedGroupDetails.group.is_member) {
-                InnovateAPI.showAlert('Failed to join group', 'error');
-                return; // Don't continue if join failed
-              }
-            } catch (joinError) {
-              // If join fails, show error and return
-              console.log('Join attempt failed:', joinError.message);
-              if (joinError.message && joinError.message.includes('blocked')) {
-                InnovateAPI.showAlert('You are blocked from this group', 'error');
-              } else {
-                InnovateAPI.showAlert('Failed to join group: ' + (joinError.message || 'Unknown error'), 'error');
-              }
-              return; // Don't load group content if join failed
-            }
+            // Public group - show join button (don't auto-join)
+            showPublicGroupJoinUI(groupId, groupDetails.group);
+            return; // Don't load group content
           }
         }
       } catch (error) {
@@ -3666,6 +4010,18 @@
       
       await loadGroupView(groupId);
       console.log('loadGroupView completed');
+      
+      // Mark messages as read and refresh groups list
+      const currentGroup = state.groups.find(g => g.id === groupId);
+      if (currentGroup && currentGroup.unread_count > 0) {
+        try {
+          await markGroupAsRead(groupId);
+          await loadGroups();
+        } catch (e) {
+          console.error('Error marking as read:', e);
+        }
+      }
+      
       renderGroupsList(); // Update active state
     }
 
@@ -3769,7 +4125,13 @@
             item.style.display = isAdmin ? 'flex' : 'none';
           } else if (text.includes('join requests')) {
             item.onclick = () => showGroupJoinRequests(groupId);
-            item.style.display = isAdmin && groupData.is_public === 0 ? 'flex' : 'none';
+            const shouldShow = isAdmin && groupData.is_public === 0;
+            item.style.display = shouldShow ? 'flex' : 'none';
+            
+            // Update join requests badge count if visible
+            if (shouldShow) {
+              updateGroupJoinRequestsBadge(groupId);
+            }
           } else {
             item.style.display = 'none';
           }
@@ -4412,6 +4774,36 @@
       }
     }
 
+    async function updateGroupJoinRequestsBadge(groupId) {
+      try {
+        const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests`, {
+          headers: {
+            'Authorization': `Bearer ${InnovateAPI.getToken()}`
+          }
+        });
+        
+        const data = await res.json();
+        const badge = document.getElementById('joinRequestsBadge');
+        
+        if (res.ok && data.requests && badge) {
+          const count = data.requests.length;
+          badge.textContent = count;
+          
+          // Visual indicator: highlight if there are pending requests
+          if (count > 0) {
+            badge.style.background = 'var(--ig-error)';
+            badge.style.display = 'block';
+          } else {
+            badge.textContent = '0';
+            badge.style.background = 'var(--ig-secondary-text)';
+            badge.style.display = 'block';
+          }
+        }
+      } catch (error) {
+        console.error('Error updating group join requests badge:', error);
+      }
+    }
+
     async function approveGroupJoinRequest(groupId, userId) {
       try {
         const res = await fetch(`${InnovateAPI.API_URL}/community-groups/${groupId}/join-requests/${userId}/approve`, {
@@ -4426,6 +4818,7 @@
         
         InnovateAPI.showAlert('Join request approved', 'success');
         await loadGroupJoinRequestsList(groupId);
+        await updateGroupJoinRequestsBadge(groupId);
       } catch (error) {
         console.error('Error approving request:', error);
         InnovateAPI.showAlert(error.message, 'error');
@@ -4446,6 +4839,7 @@
         
         InnovateAPI.showAlert('Join request rejected', 'success');
         await loadGroupJoinRequestsList(groupId);
+        await updateGroupJoinRequestsBadge(groupId);
       } catch (error) {
         console.error('Error rejecting request:', error);
         InnovateAPI.showAlert(error.message, 'error');
@@ -9842,7 +10236,155 @@
     }
 
     function showGroupActions() {
-      console.log('Group actions coming soon');
+      // Get current group and user info
+      const currentGroup = state.groups.find(g => g.id === state.currentGroupId);
+      if (!currentGroup) return;
+      
+      const currentUser = InnovateAPI.getCurrentUser();
+      
+      // Remove existing modal
+      const existing = document.getElementById('groupActionsModal');
+      if (existing) existing.remove();
+      
+      // Create modal
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.id = 'groupActionsModal';
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+      
+      // Determine if user is admin
+      const isAdmin = currentGroup.creator_id === currentUser.id || currentGroup.role === 'admin';
+      
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 400px; padding: 0; border-radius: 12px; background: var(--ig-primary-background);">
+          <div style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">Group Actions</h3>
+          </div>
+          <div style="padding: 12px;">
+            ${isAdmin ? `
+              <button class="group-action-btn" onclick="editGroup(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-edit"></i> Edit Group
+              </button>
+              <button class="group-action-btn" onclick="manageMembers(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-users-cog"></i> Manage Members
+              </button>
+              <button class="group-action-btn" onclick="showInviteLink(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-link"></i> Invite Link
+              </button>
+              <button class="group-action-btn danger" onclick="confirmDeleteGroup(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-trash"></i> Delete Group
+              </button>
+            ` : `
+              <button class="group-action-btn" onclick="showInviteLink(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-link"></i> Invite Link
+              </button>
+              <button class="group-action-btn danger" onclick="exitGroup(${currentGroup.id}); document.getElementById('groupActionsModal').remove();">
+                <i class="fas fa-sign-out-alt"></i> Exit Group
+              </button>
+            `}
+          </div>
+          <div style="padding: 12px 20px; border-top: 1px solid var(--ig-border);">
+            <button class="btn" onclick="document.getElementById('groupActionsModal').remove();" style="width: 100%; background: transparent; border: 1px solid var(--ig-border);">
+              Cancel
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    }
+
+    async function exitGroup(groupId) {
+      if (!confirm('Are you sure you want to exit this group? You will need to join again to access it.')) {
+        return;
+      }
+      
+      try {
+        await InnovateAPI.apiRequest(`/community-groups/${groupId}/leave`, { method: 'POST' });
+        InnovateAPI.showAlert('You have left the group', 'success');
+        
+        // Reload groups and show groups list
+        await loadGroups();
+        renderGroupsList();
+        
+        // Clear the center content
+        state.currentGroupId = null;
+        const centerContent = document.getElementById('centerContent');
+        const centerTitle = document.getElementById('centerTitle');
+        const centerSubtitle = document.getElementById('centerSubtitle');
+        
+        centerTitle.textContent = 'Groups';
+        centerSubtitle.textContent = 'Select a group to start chatting';
+        
+        document.getElementById('centerTabs').style.display = 'none';
+        document.getElementById('centerActions').innerHTML = '';
+        
+        centerContent.innerHTML = `
+          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center;">
+            <div class="empty-icon">👥</div>
+            <div class="empty-title">Select a group</div>
+            <div class="empty-text">Choose from the left sidebar</div>
+          </div>
+        `;
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to exit group', 'error');
+      }
+    }
+
+    function showInviteLink(groupId) {
+      const group = state.groups.find(g => g.id === groupId);
+      if (!group) return;
+      
+      // Create invite link
+      const inviteUrl = `${window.location.origin}/communities/${state.communityId}?groupId=${groupId}&action=join`;
+      
+      // Remove existing modal
+      const existing = document.getElementById('inviteLinkModal');
+      if (existing) existing.remove();
+      
+      // Create modal
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.id = 'inviteLinkModal';
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+      
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 500px; padding: 0; border-radius: 12px; background: var(--ig-primary-background);">
+          <div style="padding: 20px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700;">Invite to ${group.name}</h3>
+          </div>
+          <div style="padding: 20px;">
+            <p style="margin-bottom: 16px; color: var(--ig-secondary-text);">Share this link to invite people to this group:</p>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <input type="text" id="inviteLinkInput" value="${inviteUrl}" readonly
+                style="flex: 1; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px;">
+              <button class="btn btn-primary" onclick="copyInviteLink()">
+                <i class="fas fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div style="padding: 12px 20px; border-top: 1px solid var(--ig-border);">
+            <button class="btn" onclick="document.getElementById('inviteLinkModal').remove();" style="width: 100%; background: transparent; border: 1px solid var(--ig-border);">
+              Close
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+    }
+
+    function copyInviteLink() {
+      const input = document.getElementById('inviteLinkInput');
+      if (input) {
+        input.select();
+        document.execCommand('copy');
+        InnovateAPI.showAlert('Link copied to clipboard!', 'success');
+      }
     }
 
     function setupResponsive() {

@@ -1301,6 +1301,33 @@ const migrateDatabase = () => {
         UNIQUE(community_id, user_id)
       )
     `);
+
+    // Group message read status per user
+    db.run(`
+      CREATE TABLE IF NOT EXISTS group_message_reads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        last_read_message_id INTEGER,
+        last_read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(group_id, user_id)
+      )
+    `);
+
+    // Pinned groups per user
+    db.run(`
+      CREATE TABLE IF NOT EXISTS pinned_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        pinned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(group_id, user_id)
+      )
+    `);
   });
 };
 

@@ -143,14 +143,23 @@ router.get('/communities/:communityId/groups', authMiddleware, (req, res) => {
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id) as member_count,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member,
       (SELECT content FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message,
-      (SELECT created_at FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message_time
+      (SELECT created_at FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message_time,
+      (SELECT COUNT(*) FROM pinned_groups WHERE group_id = cg.id AND user_id = ?) as is_pinned,
+      (
+        SELECT COUNT(*) 
+        FROM community_group_posts cgp
+        LEFT JOIN group_message_reads gmr ON gmr.group_id = cg.id AND gmr.user_id = ?
+        WHERE cgp.group_id = cg.id 
+        AND (gmr.last_read_message_id IS NULL OR cgp.id > gmr.last_read_message_id)
+        AND cgp.user_id != ?
+      ) as unread_count
     FROM community_groups cg
     JOIN users u ON cg.creator_id = u.id
     WHERE cg.community_id = ?
-    ORDER BY latest_message_time DESC, cg.created_at DESC
+    ORDER BY is_pinned DESC, latest_message_time DESC, cg.created_at DESC
   `;
 
-  db.all(query, [userId, communityId], (err, groups) => {
+  db.all(query, [userId, userId, userId, userId, communityId], (err, groups) => {
     if (err) {
       console.error('Error fetching groups:', err);
       return res.status(500).json({ error: 'Error fetching groups', details: err.message });
@@ -2379,6 +2388,79 @@ router.post('/community-groups/:groupId/request-join', authMiddleware, (req, res
   );
 });
 
+// Create join request for private group
+router.post('/community-groups/:groupId/join-request', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // First check if group exists and is private
+  db.get(
+    'SELECT id, name, is_public FROM community_groups WHERE id = ?',
+    [groupId],
+    (err, group) => {
+      if (err) {
+        console.error('Error checking group:', err);
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+
+      if (!group) {
+        return res.status(404).json({ success: false, error: 'Group not found' });
+      }
+
+      // Check if user is already a member
+      db.get(
+        'SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?',
+        [groupId, userId],
+        (err, member) => {
+          if (err) {
+            console.error('Error checking membership:', err);
+            return res.status(500).json({ success: false, error: 'Database error' });
+          }
+
+          if (member) {
+            return res.status(400).json({ success: false, error: 'Already a member' });
+          }
+
+          // Check if there's already a pending request
+          db.get(
+            'SELECT id FROM community_group_join_requests WHERE group_id = ? AND user_id = ? AND status = ?',
+            [groupId, userId, 'pending'],
+            (err, existingRequest) => {
+              if (err) {
+                console.error('Error checking existing request:', err);
+                return res.status(500).json({ success: false, error: 'Database error' });
+              }
+
+              if (existingRequest) {
+                return res.status(400).json({ success: false, error: 'Request already pending' });
+              }
+
+              // Create the join request
+              db.run(
+                'INSERT INTO community_group_join_requests (group_id, user_id, status) VALUES (?, ?, ?)',
+                [groupId, userId, 'pending'],
+                function(err) {
+                  if (err) {
+                    console.error('Error creating join request:', err);
+                    return res.status(500).json({ success: false, error: 'Failed to create request' });
+                  }
+
+                  res.json({ 
+                    success: true, 
+                    message: 'Join request created',
+                    requestId: this.lastID
+                  });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 // Get join requests for a group
 router.get('/community-groups/:groupId/join-requests', authMiddleware, (req, res) => {
   const db = getDb();
@@ -2518,6 +2600,31 @@ router.post('/community-groups/:groupId/join-requests/:userId/reject', authMiddl
           res.json({ success: true, message: 'Join request rejected' });
         }
       );
+    }
+  );
+});
+
+// Cancel own join request
+router.delete('/community-groups/:groupId/join-request', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Delete own join request
+  db.run(
+    'DELETE FROM community_group_join_requests WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    function(err) {
+      if (err) {
+        console.error('Error canceling join request:', err);
+        return res.status(500).json({ error: 'Error canceling join request' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Join request not found' });
+      }
+
+      res.json({ success: true, message: 'Join request canceled' });
     }
   );
 });
@@ -2739,6 +2846,107 @@ router.delete('/community-groups/:groupId/blocked/:userId', authMiddleware, (req
           }
 
           res.json({ success: true, message: 'Member unblocked' });
+        }
+      );
+    }
+  );
+});
+
+// Pin a group for the current user
+router.post('/community-groups/:groupId/pin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if user is a member of the group
+  db.get(
+    'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) {
+        return res.status(403).json({ error: 'You must be a member of this group' });
+      }
+
+      // Pin the group
+      db.run(
+        'INSERT OR IGNORE INTO pinned_groups (group_id, user_id) VALUES (?, ?)',
+        [groupId, userId],
+        (err) => {
+          if (err) {
+            console.error('Error pinning group:', err);
+            return res.status(500).json({ error: 'Error pinning group' });
+          }
+
+          res.json({ success: true, message: 'Group pinned successfully' });
+        }
+      );
+    }
+  );
+});
+
+// Unpin a group for the current user
+router.delete('/community-groups/:groupId/pin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  db.run(
+    'DELETE FROM pinned_groups WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err) => {
+      if (err) {
+        console.error('Error unpinning group:', err);
+        return res.status(500).json({ error: 'Error unpinning group' });
+      }
+
+      res.json({ success: true, message: 'Group unpinned successfully' });
+    }
+  );
+});
+
+// Mark all messages as read in a group
+router.post('/community-groups/:groupId/mark-read', authMiddleware, (req, res) => {
+  const db = getDb();
+  const groupId = req.params.groupId;
+  const userId = req.user.userId;
+
+  // Check if user is a member
+  db.get(
+    'SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) {
+        return res.status(403).json({ error: 'You must be a member of this group' });
+      }
+
+      // Get the latest message ID in this group
+      db.get(
+        'SELECT id FROM community_group_posts WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
+        [groupId],
+        (err, post) => {
+          if (err) {
+            console.error('Error getting latest message:', err);
+            return res.status(500).json({ error: 'Error marking as read' });
+          }
+
+          const lastMessageId = post ? post.id : 0;
+
+          // Update or insert the read status
+          db.run(
+            `INSERT INTO group_message_reads (group_id, user_id, last_read_message_id, last_read_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+             ON CONFLICT(group_id, user_id) 
+             DO UPDATE SET last_read_message_id = ?, last_read_at = CURRENT_TIMESTAMP`,
+            [groupId, userId, lastMessageId, lastMessageId],
+            (err) => {
+              if (err) {
+                console.error('Error updating read status:', err);
+                return res.status(500).json({ error: 'Error marking as read' });
+              }
+
+              res.json({ success: true, message: 'All messages marked as read' });
+            }
+          );
         }
       );
     }
