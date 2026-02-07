@@ -86,4 +86,30 @@ router.delete('/:notificationId', authMiddleware, (req, res) => {
   );
 });
 
+// Clean duplicate join request notifications
+router.post('/cleanup/duplicates', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  // Remove duplicate join_request notifications, keeping only the newest one for each community/user pair
+  const query = `
+    DELETE FROM notifications 
+    WHERE id NOT IN (
+      SELECT MAX(id) 
+      FROM notifications 
+      WHERE user_id = ? AND type = 'join_request'
+      GROUP BY related_id, created_by
+    )
+    AND user_id = ? AND type = 'join_request'
+  `;
+
+  db.run(query, [userId, userId], function(err) {
+    if (err) {
+      console.error('Error cleaning duplicates:', err);
+      return res.status(500).json({ error: 'Error cleaning duplicates' });
+    }
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
 module.exports = router;

@@ -2532,6 +2532,17 @@
         const res = await InnovateAPI.apiRequest(`/communities/${state.communityId}`);
         if (res.success) {
           state.community = res.community;
+          
+          // Check if user has access to this community
+          if (!res.community.is_public && !res.community.is_member) {
+            // Redirect back to communities page with message
+            InnovateAPI.showAlert('You do not have access to this private community.', 'error');
+            setTimeout(() => {
+              window.location.href = '/communities';
+            }, 2000);
+            return;
+          }
+          
           document.getElementById('communityName').textContent = res.community.name;
           document.getElementById('communitySubtitle').textContent = res.community.description || 'Community';
           document.getElementById('rightName').textContent = res.community.name;
@@ -2596,6 +2607,16 @@
         }
       } catch (error) {
         console.error('Error loading community:', error);
+        
+        // Check if it's a 403 (forbidden) error for private communities
+        if (error.status === 403 || (error.message && error.message.includes('private'))) {
+          InnovateAPI.showAlert('You do not have access to this private community. Please request to join first.', 'error');
+          setTimeout(() => {
+            window.location.href = '/communities';
+          }, 2000);
+        } else {
+          InnovateAPI.showAlert('Error loading community data.', 'error');
+        }
       }
     }
 

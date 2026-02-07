@@ -434,7 +434,23 @@
         
         card.onclick = (e) => {
           if (!e.target.classList.contains('ig-action-btn')) {
-            window.location.href = `/community/${community.id}`;
+            // Check if it's a private community and user is not a member
+            if (!community.is_public && !community.is_member && community.join_request_status !== 'pending') {
+              // Show message to request access instead of navigating
+              InnovateAPI.showAlert('This is a private community. Click "Request to Join" button to send a join request.', 'info');
+              return;
+            }
+            
+            // If pending request, show message
+            if (!community.is_member && community.join_request_status === 'pending') {
+              InnovateAPI.showAlert('Your join request is pending approval from the community admin.', 'info');
+              return;
+            }
+            
+            // Only navigate if user is a member or community is public
+            if (community.is_member || community.is_public) {
+              window.location.href = `/community/${community.id}`;
+            }
           }
         };
         
@@ -494,17 +510,18 @@
           });
 
           if (!response.ok) {
-            const data = await response.json();
+            const data = await response.json().catch(() => ({ error: 'Failed to send join request' }));
             throw new Error(data.error || 'Failed to send join request');
           }
           
           // Update button to show request is pending
           button.innerHTML = '<i class="fas fa-clock"></i> Pending';
-          button.style.background = '#f59e0b';
+          button.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
           button.style.color = 'white';
           button.style.border = 'none';
           button.disabled = true;
           button.style.cursor = 'not-allowed';
+          button.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.3)';
           
           InnovateAPI.showAlert('Join request sent! Waiting for admin approval.', 'success');
         }

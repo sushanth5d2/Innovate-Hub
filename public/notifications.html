@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Notifications • Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .ig-notification-item {
       display: flex;
@@ -57,6 +58,11 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ig-follow-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
     }
     .ig-following-btn {
       background-color: var(--ig-secondary-background);
@@ -67,6 +73,11 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ig-following-btn:hover {
+      background-color: var(--ig-hover);
+      transform: translateY(-1px);
     }
   </style>
 </head>
@@ -255,6 +266,18 @@
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined the same event as you!`;
       } else if (notification.type === 'community_join') {
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined your community.`;
+      } else if (notification.type === 'join_request') {
+        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> requested to join your community.`;
+        actionButton = `
+          <div class="ig-notification-action" style="display: flex; gap: 8px;">
+            <button class="ig-follow-btn" onclick="approveJoinRequest(${notification.related_id}, ${notification.created_by}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px; display: flex; align-items: center; gap: 6px;" title="Accept">
+              <i class="fas fa-check"></i> Accept
+            </button>
+            <button class="ig-following-btn" onclick="declineJoinRequest(${notification.related_id}, ${notification.created_by}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px; display: flex; align-items: center; gap: 6px;" title="Decline">
+              <i class="fas fa-times"></i> Decline
+            </button>
+          </div>
+        `;
       } else if (notification.type === 'community_invite') {
         notificationText = `You've been invited to join <span class="ig-notification-username">${notification.content.replace("You've been invited to join ", "")}</span>`;
         actionButton = `
@@ -279,7 +302,16 @@
 
     // Format time ago
     function formatTimeAgo(timestamp) {
-      const date = new Date(timestamp);
+      if (!timestamp) return 'Unknown';
+      
+      // Handle SQLite datetime format: "2026-02-07 12:00:00"
+      // SQLite stores in UTC, so we need to explicitly handle it
+      let dateStr = timestamp;
+      if (dateStr.includes(' ') && !dateStr.includes('T') && !dateStr.includes('Z')) {
+        dateStr = dateStr.replace(' ', 'T') + 'Z'; // Add 'Z' to indicate UTC
+      }
+      
+      const date = new Date(dateStr);
       const now = new Date();
       const diff = now - date;
       const minutes = Math.floor(diff / 60000);
@@ -304,6 +336,8 @@
         
         if (type === 'message') {
           window.location.href = '/messages';
+        } else if (type === 'join_request' && referenceId) {
+          window.location.href = `/community/${referenceId}`;
         } else if (type === 'community_invite' && referenceId) {
           window.location.href = `/community/${referenceId}`;
         } else if (type === 'event_invite' && referenceId) {
@@ -420,6 +454,100 @@
       } catch (error) {
         console.error('Error rejecting invite:', error);
         InnovateAPI.showAlert('Failed to decline invitation', 'error');
+      }
+    }
+
+    // Approve join request
+    async function approveJoinRequest(communityId, userId, notificationId, event) {
+      event.stopPropagation();
+      const actionDiv = event.target.closest('.ig-notification-action');
+      const notifItem = event.target.closest('.ig-notification-item');
+      try {
+        // Disable buttons immediately
+        const buttons = actionDiv.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+        
+        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/join-requests/${userId}/approve`, {
+          method: 'POST'
+        });
+        
+        if (response.success) {
+          // Replace buttons with success message
+          actionDiv.innerHTML = `
+            <div style="color: #10b981; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-check-circle"></i>
+              Approved
+            </div>
+          `;
+          InnovateAPI.showAlert('Join request approved!', 'success');
+          
+          // Mark notification as read and remove the notification item
+          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
+            method: 'PUT'
+          });
+          
+          // Remove the notification from UI after delay
+          setTimeout(() => {
+            notifItem.style.transition = 'opacity 0.3s';
+            notifItem.style.opacity = '0';
+            setTimeout(() => {
+              notifItem.remove();
+            }, 300);
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('Error approving request:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to approve request', 'error');
+        // Re-enable buttons on error
+        const buttons = actionDiv.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = false);
+      }
+    }
+
+    // Decline join request
+    async function declineJoinRequest(communityId, userId, notificationId, event) {
+      event.stopPropagation();
+      const actionDiv = event.target.closest('.ig-notification-action');
+      const notifItem = event.target.closest('.ig-notification-item');
+      try {
+        // Disable buttons immediately
+        const buttons = actionDiv.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+        
+        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/join-requests/${userId}/decline`, {
+          method: 'POST'
+        });
+        
+        if (response.success) {
+          // Replace buttons with declined message
+          actionDiv.innerHTML = `
+            <div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-times-circle"></i>
+              Declined
+            </div>
+          `;
+          InnovateAPI.showAlert('Join request declined', 'success');
+          
+          // Mark notification as read and remove the notification item
+          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
+            method: 'PUT'
+          });
+          
+          // Remove the notification from UI after delay
+          setTimeout(() => {
+            notifItem.style.transition = 'opacity 0.3s';
+            notifItem.style.opacity = '0';
+            setTimeout(() => {
+              notifItem.remove();
+            }, 300);
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('Error declining request:', error);
+        InnovateAPI.showAlert(error.message || 'Failed to decline request', 'error');
+        // Re-enable buttons on error
+        const buttons = actionDiv.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = false);
       }
     }
 

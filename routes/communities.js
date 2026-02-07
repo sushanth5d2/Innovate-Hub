@@ -229,6 +229,7 @@ router.post('/:communityId/leave', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'Admin cannot leave the community. Transfer admin rights first.' });
     }
 
+    // Delete membership
     db.run(
       'DELETE FROM community_members WHERE community_id = ? AND user_id = ?',
       [communityId, userId],
@@ -236,6 +237,29 @@ router.post('/:communityId/leave', authMiddleware, (req, res) => {
         if (err) {
           return res.status(500).json({ error: 'Error leaving community' });
         }
+        
+        // Also clean up any join requests for this user
+        db.run(
+          'DELETE FROM community_join_requests WHERE community_id = ? AND user_id = ?',
+          [communityId, userId],
+          (err) => {
+            if (err) {
+              console.error('Error cleaning up join requests:', err);
+            }
+          }
+        );
+        
+        // Delete any related notifications
+        db.run(
+          'DELETE FROM notifications WHERE type = ? AND related_id = ? AND created_by = ?',
+          ['join_request', communityId, userId],
+          (err) => {
+            if (err) {
+              console.error('Error cleaning up notifications:', err);
+            }
+          }
+        );
+        
         res.json({ success: true });
       }
     );
@@ -1127,51 +1151,39 @@ router.post('/:id/request-join', authMiddleware, (req, res) => {
               if (existingRequest) {
                 if (existingRequest.status === 'pending') {
                   return res.status(400).json({ error: 'You already have a pending request for this community' });
-                } else if (existingRequest.status === 'declined') {
-                  return res.status(400).json({ error: 'Your previous request was declined. Please contact the admin.' });
+                } else {
+                  // Clean up old request (approved or any other status) and related notifications
+                  db.run(
+                    'DELETE FROM community_join_requests WHERE community_id = ? AND user_id = ?',
+                    [communityId, userId],
+                    (err) => {
+                      if (err) {
+                        console.error('Error deleting old request:', err);
+                      }
+                    }
+                  );
+                  
+                  // Also clean up old notifications
+                  db.run(
+                    'DELETE FROM notifications WHERE type = ? AND related_id = ? AND created_by = ?',
+                    ['join_request', communityId, userId],
+                    (err) => {
+                      if (err) {
+                        console.error('Error deleting old notifications:', err);
+                      }
+                    }
+                  );
+                  
+                  // Wait a moment for cleanup, then create new request
+                  setTimeout(() => {
+                    createJoinRequest(communityId, userId, community, db, req, res);
+                  }, 100);
+                  return;
                 }
               }
 
               // Create join request
-              db.run(
-                `INSERT INTO community_join_requests (community_id, user_id, status) 
-                 VALUES (?, ?, 'pending')`,
-                [communityId, userId],
-                function(err) {
-                  if (err) {
-                    return res.status(500).json({ error: 'Error creating join request' });
-                  }
-
-                  // Create notification for admin
-                  db.get('SELECT username FROM users WHERE id = ?', [userId], (err, user) => {
-                    if (!err && user) {
-                      db.run(
-                        `INSERT INTO notifications (user_id, type, content, related_id, created_by) 
-                         VALUES (?, 'join_request', ?, ?, ?)`,
-                        [
-                          community.admin_id,
-                          `${user.username} requested to join ${community.name}`,
-                          communityId,
-                          userId
-                        ]
-                      );
-
-                      // Emit socket event for real-time notification
-                      const io = req.app.get('io');
-                      if (io) {
-                        io.to(`user_${community.admin_id}`).emit('notification:receive', {
-                          type: 'join_request',
-                          content: `${user.username} requested to join ${community.name}`,
-                          related_id: communityId,
-                          created_at: new Date().toISOString()
-                        });
-                      }
-                    }
-                  });
-
-                  res.json({ success: true, message: 'Join request sent successfully' });
-                }
-              );
+              createJoinRequest(communityId, userId, community, db, req, res);
             }
           );
         }
@@ -1179,6 +1191,68 @@ router.post('/:id/request-join', authMiddleware, (req, res) => {
     }
   );
 });
+
+// Helper function to create join request
+function createJoinRequest(communityId, userId, community, db, req, res) {
+  // First, delete any old notifications for this user/community combination to prevent duplicates
+  db.run(
+    'DELETE FROM notifications WHERE type = ? AND related_id = ? AND created_by = ? AND user_id = ?',
+    ['join_request', communityId, userId, community.admin_id],
+    (delErr) => {
+      if (delErr) {
+        console.error('Error deleting old notifications:', delErr);
+      }
+      
+      // Now create the join request
+      db.run(
+        `INSERT INTO community_join_requests (community_id, user_id, status) 
+         VALUES (?, ?, 'pending')`,
+        [communityId, userId],
+        function(err) {
+          if (err) {
+            console.error('Error creating join request:', err);
+            return res.status(500).json({ error: 'Error creating join request', details: err.message });
+          }
+
+          // Create notification for admin
+          db.get('SELECT username FROM users WHERE id = ?', [userId], (err, user) => {
+            if (!err && user) {
+              // Create the new notification
+              db.run(
+                `INSERT INTO notifications (user_id, type, content, related_id, created_by, created_at) 
+                 VALUES (?, 'join_request', ?, ?, ?, CURRENT_TIMESTAMP)`,
+                [
+                  community.admin_id,
+                  `${user.username} requested to join ${community.name}`,
+                  communityId,
+                  userId
+                ],
+                function(err) {
+                  if (err) {
+                    console.error('Error creating notification:', err);
+                  }
+                }
+              );
+
+              // Emit socket event for real-time notification
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`user_${community.admin_id}`).emit('notification:receive', {
+                  type: 'join_request',
+                  content: `${user.username} requested to join ${community.name}`,
+                  related_id: communityId,
+                  created_at: new Date().toISOString()
+                });
+              }
+            }
+          });
+
+          res.json({ success: true, message: 'Join request sent successfully' });
+        }
+      );
+    }
+  );
+}
 
 // Get join requests (for private communities)
 router.get('/:id/join-requests', authMiddleware, (req, res) => {
@@ -1255,6 +1329,29 @@ router.post('/:id/join-requests/:userId/approve', authMiddleware, (req, res) => 
                 // Ignore if already a member
                 console.log('Member already exists or error:', err);
               }
+              
+              // Clean up the join request after approval
+              db.run(
+                'DELETE FROM community_join_requests WHERE community_id = ? AND user_id = ?',
+                [communityId, requestUserId],
+                (err) => {
+                  if (err) {
+                    console.error('Error cleaning up join request:', err);
+                  }
+                }
+              );
+              
+              // Delete the notification for this join request
+              db.run(
+                'DELETE FROM notifications WHERE type = ? AND related_id = ? AND created_by = ?',
+                ['join_request', communityId, requestUserId],
+                (err) => {
+                  if (err) {
+                    console.error('Error deleting notification:', err);
+                  }
+                }
+              );
+              
               res.json({ success: true });
             }
           );
@@ -1283,14 +1380,26 @@ router.post('/:id/join-requests/:userId/decline', authMiddleware, (req, res) => 
         return res.status(403).json({ error: 'Only admin can decline requests' });
       }
 
-      // Update request status
+      // Delete the request (instead of marking as declined, to allow re-requesting later)
       db.run(
-        'UPDATE community_join_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE community_id = ? AND user_id = ?',
-        ['declined', communityId, requestUserId],
+        'DELETE FROM community_join_requests WHERE community_id = ? AND user_id = ?',
+        [communityId, requestUserId],
         function(err) {
           if (err) {
             return res.status(500).json({ error: 'Error declining request' });
           }
+          
+          // Delete the notification for this join request
+          db.run(
+            'DELETE FROM notifications WHERE type = ? AND related_id = ? AND created_by = ?',
+            ['join_request', communityId, requestUserId],
+            (err) => {
+              if (err) {
+                console.error('Error deleting notification:', err);
+              }
+            }
+          );
+          
           res.json({ success: true });
         }
       );
