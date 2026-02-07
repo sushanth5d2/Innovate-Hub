@@ -254,22 +254,58 @@
 
       <!-- Create event modal -->
       <div id="createEventModal" class="ig-modal-overlay" style="display:none;">
-        <div class="ig-modal" style="max-width: 760px;">
-          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
-              <div style="font-weight: 900; font-size: 18px;">Create event</div>
-              <button id="closeCreateEvent" type="button" class="exp-icon-btn">✕</button>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
-              <div class="exp-field"><label>Title</label><input id="ceTitle" placeholder="Event title" /></div>
-              <div class="exp-field"><label>Date & time</label><input id="ceDate" type="datetime-local" /></div>
+        <div style="max-width: 760px; width: 90%; max-height: 90vh; margin: auto; display: flex; flex-direction: column; background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;">
+          <div style="padding: 18px; border-bottom: 1px solid var(--ig-border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <div style="font-weight: 900; font-size: 18px;">Create event</div>
+            <button id="closeCreateEvent" type="button" class="exp-icon-btn">✕</button>
+          </div>
+          
+          <div id="createEventModalContent" style="overflow-y: auto; overflow-x: hidden; padding: 18px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="exp-field"><label>Title</label><input id="ceTitle" placeholder="Event title" required /></div>
+              <div class="exp-field"><label>Date & time</label><input id="ceDate" type="datetime-local" required /></div>
               <div class="exp-field"><label>City</label><input id="ceCity" placeholder="Hyderabad" /></div>
               <div class="exp-field"><label>Category</label><input id="ceCategory" placeholder="Concert / Party / Trip" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="ceLocation" placeholder="Venue name, area" /></div>
+              <div class="exp-field" style="grid-column: 1 / -1;">
+                <label>Upload Cover Photo (optional)</label>
+                <input id="ceCoverFile" type="file" accept="image/*" style="padding: 8px;" />
+                <small style="color: var(--ig-secondary-text); display: block; margin-top: 4px;">Or use URL below</small>
+              </div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Cover image URL (optional)</label><input id="ceCover" placeholder="https://..." /></div>
+              <div class="exp-field"><label>Maximum Persons Allowed</label><input id="ceMaxPersons" type="number" min="1" placeholder="e.g., 100" /></div>
+              <div class="exp-field">
+                <label>Pricing</label>
+                <select id="cePricingType" style="padding: 8px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;">
+                  <option value="free">Free</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
               <div class="exp-field"><label>Organizer name (optional)</label><input id="ceOrganizer" placeholder="Brand / Organizer" /></div>
-              <div class="exp-field"><label>Important note (optional)</label><input id="ceNote" placeholder="Entry rules, ID required..." /></div>
+            </div>
+            
+            <div class="exp-field"><label>Important note (optional)</label><textarea id="ceNote" placeholder="Entry rules, ID required, age restrictions, dress code, what to bring, etc..." style="min-height: 80px;"></textarea></div>
+            
+            <!-- Fare options (shown only when Paid is selected) -->
+            <div id="fareOptionsContainer" style="display: none; margin-top: 12px; padding: 12px; background: var(--ig-hover); border-radius: 8px;">
+              <div style="font-weight: 600; margin-bottom: 10px; color: var(--ig-primary-text);">Select Fare Options:</div>
+              <div style="display: grid; gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" id="fareSingleCheck" style="width: 18px; height: 18px;" />
+                  <span style="flex: 1;">Single</span>
+                  <input id="fareSingle" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" id="fareCoupleCheck" style="width: 18px; height: 18px;" />
+                  <span style="flex: 1;">Couple</span>
+                  <input id="fareCouple" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                  <input type="checkbox" id="fareGroupCheck" style="width: 18px; height: 18px;" />
+                  <span style="flex: 1;">Group</span>
+                  <input id="fareGroup" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
+                </label>
+              </div>
             </div>
             <div class="exp-field"><label>Description</label><textarea id="ceDesc" placeholder="Describe the event..."></textarea></div>
             <label style="display:flex; gap: 10px; align-items:center; margin-top: 10px; color: var(--ig-secondary-text);">

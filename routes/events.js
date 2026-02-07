@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
 const crypto = require('crypto');
+const upload = require('../middleware/upload');
 
 function generateTicketCode() {
   // 32 hex chars (~128 bits) is enough for unguessable codes.
@@ -300,7 +301,7 @@ router.delete('/reminders/:reminderId', authMiddleware, (req, res) => {
 });
 
 // Create event
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', authMiddleware, upload.single('cover_photo'), (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const {
@@ -315,17 +316,26 @@ router.post('/', authMiddleware, (req, res) => {
     category,
     cover_image,
     organizer_name,
-    important_note
+    important_note,
+    max_persons,
+    pricing_type = 'free',
+    fare_single,
+    fare_couple,
+    fare_group,
+    fare_options
   } = req.body;
+
+  // Use uploaded file path if available, otherwise use cover_image URL
+  const finalCoverImage = req.file ? `/uploads/images/${req.file.filename}` : (cover_image || null);
 
   const query = `
     INSERT INTO events (
       creator_id, title, description, event_date,
       is_public, city, category,
       location, cover_image, organizer_name, important_note,
-      notes
+      notes, max_persons, pricing_type, fare_single, fare_couple, fare_group, fare_options
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -339,13 +349,20 @@ router.post('/', authMiddleware, (req, res) => {
       city || null,
       category || null,
       location,
-      cover_image || null,
+      finalCoverImage,
       organizer_name || null,
       important_note || null,
-      notes
+      notes,
+      max_persons || null,
+      pricing_type || 'free',
+      fare_single || null,
+      fare_couple || null,
+      fare_group || null,
+      fare_options || null
     ],
     function(err) {
     if (err) {
+      console.error('Error creating event:', err);
       return res.status(500).json({ error: 'Error creating event' });
     }
 

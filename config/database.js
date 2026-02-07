@@ -1034,6 +1034,43 @@ const migrateDatabase = () => {
       }
     });
 
+    // New event fields for enhanced functionality
+    db.run(`ALTER TABLE events ADD COLUMN max_persons INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding max_persons column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN pricing_type TEXT DEFAULT 'free'`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding pricing_type column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN fare_single INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding fare_single column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN fare_couple INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding fare_couple column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN fare_group INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding fare_group column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN fare_options TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding fare_options column to events:', err);
+      }
+    });
+
     // Ticketing tables/columns (safe for existing DBs)
     db.run(`
       CREATE TABLE IF NOT EXISTS event_ticket_types (

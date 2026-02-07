@@ -1062,6 +1062,7 @@ body {
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease;
+  padding: 20px;
 }
 
 @keyframes fadeIn {
@@ -1070,16 +1071,15 @@ body {
 }
 
 .ig-modal {
-  background-color: var(--ig-secondary-background);
+  background-color: transparent;
   border-radius: 12px;
   min-width: 400px;
   max-width: 90%;
-  overflow: hidden;
   animation: slideUp 0.3s ease;
 }
 
 @keyframes slideUp {
-  from { transform: translateY(50px); opacity: 0; }
+  from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 

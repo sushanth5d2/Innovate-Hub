@@ -27,6 +27,9 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === 'banner') {
       uploadPath = './uploads/community';
       console.log('Using community folder (from fieldname)');
+    } else if (file.fieldname === 'cover_photo') {
+      uploadPath = './uploads/images';
+      console.log('Using images folder (from cover_photo fieldname)');
     }
     // Then check path-specific routes
     else if (req.path.includes('profile') || req.originalUrl.includes('profile')) {

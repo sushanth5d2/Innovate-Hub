@@ -868,6 +868,31 @@
 
   function closeCreateEvent() {
     document.getElementById('createEventModal').style.display = 'none';
+    
+    // Reset all form fields
+    document.getElementById('ceTitle').value = '';
+    document.getElementById('ceDate').value = '';
+    document.getElementById('ceCity').value = '';
+    document.getElementById('ceCategory').value = '';
+    document.getElementById('ceLocation').value = '';
+    document.getElementById('ceCoverFile').value = '';
+    document.getElementById('ceCover').value = '';
+    document.getElementById('ceMaxPersons').value = '';
+    document.getElementById('cePricingType').value = 'free';
+    document.getElementById('ceOrganizer').value = '';
+    document.getElementById('ceNote').value = '';
+    document.getElementById('ceDesc').value = '';
+    document.getElementById('fareOptionsContainer').style.display = 'none';
+    
+    // Reset fare checkboxes and inputs
+    ['fareSingleCheck', 'fareCoupleCheck', 'fareGroupCheck'].forEach(id => {
+      document.getElementById(id).checked = false;
+    });
+    ['fareSingle', 'fareCouple', 'fareGroup'].forEach(id => {
+      const input = document.getElementById(id);
+      input.value = '';
+      input.disabled = true;
+    });
   }
 
   async function createEvent() {
@@ -878,9 +903,12 @@
     const city = document.getElementById('ceCity').value.trim();
     const category = document.getElementById('ceCategory').value.trim();
     const cover_image = document.getElementById('ceCover').value.trim();
+    const cover_file = document.getElementById('ceCoverFile').files[0];
     const organizer_name = document.getElementById('ceOrganizer').value.trim();
     const important_note = document.getElementById('ceNote').value.trim();
     const is_public = document.getElementById('cePublic').checked;
+    const max_persons = document.getElementById('ceMaxPersons').value;
+    const pricing_type = document.getElementById('cePricingType').value;
 
     if (!title || !event_date) {
       showAlert && showAlert('Title and date required', 'error');
@@ -888,22 +916,51 @@
     }
 
     try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description || '');
+      formData.append('event_date', event_date);
+      formData.append('location', location);
+      formData.append('city', city);
+      formData.append('category', category);
+      formData.append('organizer_name', organizer_name);
+      formData.append('important_note', important_note);
+      formData.append('is_public', is_public ? '1' : '0');
+      formData.append('notes', '');
+      formData.append('max_persons', max_persons || '');
+      formData.append('pricing_type', pricing_type);
+
+      // Handle cover image (file or URL)
+      if (cover_file) {
+        formData.append('cover_photo', cover_file);
+      } else if (cover_image) {
+        formData.append('cover_image', cover_image);
+      }
+
+      // Handle fare options if paid
+      if (pricing_type === 'paid') {
+        const fareOptions = [];
+        
+        if (document.getElementById('fareSingleCheck').checked) {
+          fareOptions.push('single');
+          formData.append('fare_single', document.getElementById('fareSingle').value || '0');
+        }
+        if (document.getElementById('fareCoupleCheck').checked) {
+          fareOptions.push('couple');
+          formData.append('fare_couple', document.getElementById('fareCouple').value || '0');
+        }
+        if (document.getElementById('fareGroupCheck').checked) {
+          fareOptions.push('group');
+          formData.append('fare_group', document.getElementById('fareGroup').value || '0');
+        }
+        
+        formData.append('fare_options', JSON.stringify(fareOptions));
+      }
+
       const res = await fetch('/api/events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...tokenHeaders() },
-        body: JSON.stringify({
-          title,
-          description,
-          event_date,
-          location,
-          city,
-          category,
-          cover_image: cover_image || null,
-          organizer_name: organizer_name || null,
-          important_note: important_note || null,
-          is_public: is_public ? 1 : 0,
-          notes: ''
-        })
+        headers: { ...tokenHeaders() }, // No Content-Type for FormData
+        body: formData
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
@@ -914,6 +971,33 @@
     } catch (e) {
       showAlert && showAlert(e.message, 'error');
     }
+  }
+
+  // Handle pricing type change
+  function handlePricingTypeChange() {
+    const pricingType = document.getElementById('cePricingType').value;
+    const fareContainer = document.getElementById('fareOptionsContainer');
+    
+    if (pricingType === 'paid') {
+      fareContainer.style.display = 'block';
+    } else {
+      fareContainer.style.display = 'none';
+    }
+  }
+
+  // Handle fare checkbox changes
+  function handleFareCheckbox(checkboxId, inputId) {
+    const checkbox = document.getElementById(checkboxId);
+    const input = document.getElementById(inputId);
+    
+    checkbox.addEventListener('change', () => {
+      input.disabled = !checkbox.checked;
+      if (checkbox.checked) {
+        input.focus();
+      } else {
+        input.value = '';
+      }
+    });
   }
 
   // ===== Wire up =====
@@ -967,6 +1051,12 @@
     document.getElementById('closeCreateEvent').addEventListener('click', closeCreateEvent);
     document.getElementById('openCreateEvent').addEventListener('click', openCreateEvent);
     document.getElementById('createEventSubmit').addEventListener('click', createEvent);
+    document.getElementById('cePricingType').addEventListener('change', handlePricingTypeChange);
+    
+    // Wire up fare checkboxes
+    handleFareCheckbox('fareSingleCheck', 'fareSingle');
+    handleFareCheckbox('fareCoupleCheck', 'fareCouple');
+    handleFareCheckbox('fareGroupCheck', 'fareGroup');
 
     document.getElementById('closeCheckin').addEventListener('click', closeCheckin);
     document.getElementById('btnCheckinGo').addEventListener('click', checkInCode);
