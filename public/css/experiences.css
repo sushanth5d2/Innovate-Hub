@@ -343,15 +343,45 @@
   gap: 10px;
 }
 
+/* Transparent scrollbar for button container */
+.exp-detail-panel > div:has(.exp-cta) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.exp-detail-panel > div:has(.exp-cta)::-webkit-scrollbar {
+  height: 4px;
+}
+
+.exp-detail-panel > div:has(.exp-cta)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.exp-detail-panel > div:has(.exp-cta)::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+.exp-detail-panel > div:has(.exp-cta)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.15);
+}
+
 .exp-btn {
-  height: 44px;
+  height: 48px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
   color: var(--ig-primary-text);
   cursor: pointer;
-  padding: 0 16px;
+  padding: 0 20px;
   font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .exp-btn.primary {
@@ -361,6 +391,11 @@
 }
 
 .exp-btn:active { opacity: 0.7; }
+
+.exp-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 
 .exp-drawer {
   position: fixed;
@@ -417,4 +452,27 @@
   color: var(--ig-secondary-text);
   font-size: 12px;
   margin-top: 6px;
+}
+
+/* Countdown timer animation */
+#countdownTimer > div {
+  transition: transform 0.3s ease;
+}
+
+#countdownTimer > div:hover {
+  transform: scale(1.1);
+}
+
+/* Share button pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+#btnShareEvent:hover {
+  animation: pulse 1.5s ease-in-out infinite;
 }

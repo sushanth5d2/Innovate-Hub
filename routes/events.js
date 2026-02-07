@@ -1133,7 +1133,7 @@ router.get('/:eventId', authMiddleware, (req, res) => {
 });
 
 // Update event
-router.put('/:eventId', authMiddleware, (req, res) => {
+router.put('/:eventId', authMiddleware, upload.single('cover_photo'), (req, res) => {
   const db = getDb();
   const { eventId } = req.params;
   const userId = req.user.userId;
@@ -1148,8 +1148,17 @@ router.put('/:eventId', authMiddleware, (req, res) => {
     category,
     cover_image,
     organizer_name,
-    important_note
+    important_note,
+    max_persons,
+    pricing_type,
+    fare_single,
+    fare_couple,
+    fare_group,
+    fare_options
   } = req.body;
+
+  // Use uploaded file path if available, otherwise use cover_image URL or keep existing
+  const finalCoverImage = req.file ? `/uploads/images/${req.file.filename}` : (cover_image || null);
 
   db.run(
     `UPDATE events 
@@ -1164,6 +1173,12 @@ router.put('/:eventId', authMiddleware, (req, res) => {
          organizer_name = COALESCE(?, organizer_name),
          important_note = COALESCE(?, important_note),
          notes = ?,
+         max_persons = ?,
+         pricing_type = COALESCE(?, pricing_type),
+         fare_single = ?,
+         fare_couple = ?,
+         fare_group = ?,
+         fare_options = ?,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND creator_id = ?`,
     [
@@ -1174,15 +1189,22 @@ router.put('/:eventId', authMiddleware, (req, res) => {
       city ?? null,
       category ?? null,
       location,
-      cover_image ?? null,
+      finalCoverImage,
       organizer_name ?? null,
       important_note ?? null,
       notes,
+      max_persons || null,
+      pricing_type ?? null,
+      fare_single || null,
+      fare_couple || null,
+      fare_group || null,
+      fare_options || null,
       eventId,
       userId
     ],
     function(err) {
       if (err) {
+        console.error('Error updating event:', err);
         return res.status(500).json({ error: 'Error updating event' });
       }
 
