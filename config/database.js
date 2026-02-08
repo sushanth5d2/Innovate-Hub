@@ -889,6 +889,26 @@ const createTables = () => {
         }
       });
 
+      // Add completion_photos column to donations table
+      db.run(`ALTER TABLE donations ADD COLUMN completion_photos TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: completion_photos column migration - ', err.message);
+        }
+      });
+
+      // Add category and city columns to donations table
+      db.run(`ALTER TABLE donations ADD COLUMN category TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: category column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE donations ADD COLUMN city TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: city column migration - ', err.message);
+        }
+      });
+
       // Create hashtags table
       db.run(`
         CREATE TABLE IF NOT EXISTS hashtags (

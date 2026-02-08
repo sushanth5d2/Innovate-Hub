@@ -1,0 +1,1089 @@
+/* Social Service - Modern Design */
+
+.ss-hero {
+  background: linear-gradient(135deg, rgba(0,212,170,0.1) 0%, rgba(0,149,246,0.1) 100%);
+  border: 1px solid rgba(0,212,170,0.2);
+  border-radius: 16px;
+  padding: 32px 24px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.ss-hero-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #00d4aa 0%, #0095f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ss-hero-title {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+
+.ss-hero-subtitle {
+  color: var(--ig-secondary-text);
+  font-size: 16px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.ss-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.ss-stat {
+  background: var(--ig-secondary-background);
+  border: 1px solid var(--ig-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.ss-stat-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: #00d4aa;
+  margin-bottom: 4px;
+}
+
+.ss-stat-label {
+  font-size: 12px;
+  color: var(--ig-secondary-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ss-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--ig-border);
+  padding-bottom: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ss-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ss-tab {
+  flex: 1;
+  min-width: 120px;
+  padding: 14px 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--ig-secondary-text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  position: relative;
+}
+
+.ss-tab.active {
+  color: var(--ig-primary-text);
+  border-bottom-color: var(--ig-blue);
+}
+
+.ss-tab:hover {
+  color: var(--ig-primary-text);
+  background: var(--ig-hover);
+}
+
+/* Donations grid container */
+#donations-list,
+#mine-list,
+#picked-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* Event-style donation cards - matching experiences.css exactly */
+.ss-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ig-border);
+  background: var(--ig-secondary-background);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.ss-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.16);
+}
+
+.ss-card-media {
+  height: 180px;
+  background: radial-gradient(1200px 380px at 20% -20%, rgba(0,212,170,0.25), transparent 50%),
+              radial-gradient(800px 300px at 110% 20%, rgba(237,73,86,0.25), transparent 45%),
+              linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  position: relative;
+}
+
+.ss-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ss-placeholder-image {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1200px 380px at 20% -20%, rgba(0,212,170,0.25), transparent 50%),
+              radial-gradient(800px 300px at 110% 20%, rgba(237,73,86,0.25), transparent 45%),
+              linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+}
+
+.ss-card-media.ss-no-image img {
+  display: none;
+}
+
+.ss-status-chip {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.ss-status-chip.ss-status-available {
+  background: rgba(0,212,170,0.7);
+  border-color: rgba(0,212,170,0.3);
+}
+
+.ss-status-chip.ss-status-assigned {
+  background: rgba(245,158,11,0.7);
+  border-color: rgba(245,158,11,0.3);
+}
+
+.ss-status-chip.ss-status-completed {
+  background: rgba(16,185,129,0.7);
+  border-color: rgba(16,185,129,0.3);
+}
+
+.ss-image-count-chip {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-card-body {
+  padding: 14px 14px 16px;
+}
+
+.ss-card-title {
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  font-size: 14px;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ss-card-meta {
+  color: var(--ig-secondary-text);
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ss-card-time {
+  margin-top: 10px;
+  font-weight: 700;
+  color: var(--ig-secondary-text);
+  font-size: 12px;
+}
+
+/* Badge styles */
+.ss-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ss-badge-available {
+  background: rgba(0,212,170,0.15);
+  color: #00d4aa;
+  border: 1px solid rgba(0,212,170,0.3);
+}
+
+.ss-badge-assigned {
+  background: rgba(245,158,11,0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+
+.ss-badge-completed {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+  border: 1px solid rgba(16,185,129,0.3);
+}
+
+/* Detail Modal */
+#donation-detail-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.ss-detail-container {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  height: 90vh;
+  max-height: 900px;
+  background: var(--ig-primary-background);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ss-detail-images {
+  width: 60%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.ss-detail-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.ss-detail-close:hover {
+  background: rgba(237,73,86,0.9);
+  transform: scale(1.1);
+}
+
+.ss-detail-info {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ig-primary-background);
+}
+
+.ss-detail-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--ig-border);
+  flex-shrink: 0;
+}
+
+.ss-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.ss-detail-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ss-detail-body::-webkit-scrollbar-track {
+  background: var(--ig-secondary-background);
+}
+
+.ss-detail-body::-webkit-scrollbar-thumb {
+  background: var(--ig-border);
+  border-radius: 3px;
+}
+
+.ss-detail-body::-webkit-scrollbar-thumb:hover {
+  background: var(--ig-secondary-text);
+}
+
+.ss-detail-section {
+  margin-bottom: 24px;
+}
+
+.ss-detail-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ig-secondary-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.ss-detail-footer {
+  padding: 20px;
+  border-top: 1px solid var(--ig-border);
+  flex-shrink: 0;
+}
+
+.ss-completion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #donations-list,
+  #mine-list,
+  #picked-list {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .ss-detail-container {
+    flex-direction: column;
+    height: 95vh;
+  }
+  
+  .ss-detail-images {
+    width: 100%;
+    height: 50%;
+  }
+  
+  .ss-detail-info {
+    width: 100%;
+    height: 50%;
+  }
+}
+
+.ss-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ss-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+}
+
+.ss-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  border: none;
+}
+
+.ss-btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.ss-btn-primary:active {
+  transform: translateY(0);
+}
+
+.ss-btn-secondary {
+  background: var(--ig-secondary-background);
+  color: var(--ig-primary-text);
+  border: 1px solid var(--ig-border);
+}
+
+.ss-btn-secondary:hover {
+  background: var(--ig-hover);
+}
+
+.ss-btn-danger {
+  background: var(--ig-secondary-background);
+  color: #ed4956;
+  border: 1px solid rgba(237,73,86,0.3);
+}
+
+.ss-btn-danger:hover {
+  background: rgba(237,73,86,0.1);
+  border-color: #ed4956;
+}
+
+.ss-btn-success {
+  background: #00d4aa;
+  color: white;
+}
+
+.ss-btn-success:hover {
+  background: #00b894;
+}
+
+.ig-btn-text {
+  background: none;
+  border: none;
+  color: var(--ig-text-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.ig-btn-text:hover {
+  background: var(--ig-secondary-background);
+  color: var(--ig-text-primary);
+}
+
+.ss-btn-full:hover {
+  opacity: 0.9;
+}
+
+.ss-btn-full:active {
+  opacity: 0.8;
+}
+
+.ss-completion-photos {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ig-border);
+}
+
+.ss-completion-photos-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-completion-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.ss-completion-photos-grid img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--ig-border);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.ss-completion-photos-grid img:hover {
+  transform: scale(1.05);
+}
+
+.ss-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--ig-secondary-text);
+}
+
+.ss-empty-icon {
+  font-size: 72px;
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+
+.ss-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--ig-primary-text);
+}
+
+.ss-empty-description {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* Modal improvements - matching Create event style */
+#create-modal .ig-modal,
+#completion-modal .ig-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  background: var(--ig-secondary-background);
+}
+
+.ss-modal-header {
+  padding: 18px;
+  border-bottom: 1px solid var(--ig-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.ss-modal-title {
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0;
+  color: var(--ig-primary-text);
+}
+
+.ss-modal-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--ig-primary-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: opacity 0.2s ease;
+}
+
+.ss-modal-close:active {
+  opacity: 0.7;
+}
+
+.ss-modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.ss-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ss-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ss-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.ss-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ss-modal-footer {
+  padding: 18px;
+  border-top: 1px solid var(--ig-border);
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.ss-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .ss-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ss-btn-full {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.ss-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.ss-form-row .ss-form-group {
+  margin: 12px 0;
+}
+
+.ss-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.ss-form-label {
+  display: block;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ig-secondary-text);
+}
+
+/* Not used in clean design
+.ss-form-label-required::after {
+  content: " *";
+  color: #ed4956;
+}
+*/
+
+.ss-form-input,
+.ss-form-textarea {
+  width: 100%;
+  padding: 0 12px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ig-primary-text);
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+
+.ss-form-input:focus,
+.ss-form-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ss-form-input::placeholder,
+.ss-form-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.ss-form-textarea {
+  resize: vertical;
+  min-height: 90px;
+  height: auto;
+  padding: 10px 12px;
+  font-family: inherit;
+}
+
+.ss-file-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ig-primary-text);
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ss-file-input::-webkit-file-upload-button {
+  padding: 6px 12px;
+  margin-right: 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ig-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ss-file-input::-webkit-file-upload-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.ss-file-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ss-info-box {
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ss-info-box i {
+  font-size: 18px;
+  color: var(--ig-blue);
+}
+
+.ss-info-box p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ig-text-primary);
+  line-height: 1.4;
+}
+
+/* Old upload area styles - not used anymore */
+/*
+.ss-upload-area {
+  width: 100%;
+  padding: 56px 24px;
+  border: 2px dashed var(--ig-border);
+  border-radius: 16px;
+  background: var(--ig-secondary-background);
+  color: var(--ig-secondary-text);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.ss-upload-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ss-upload-area:hover {
+  border-color: #667eea;
+  background: var(--ig-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+}
+
+.ss-upload-area:hover::before {
+  opacity: 1;
+}
+
+.ss-upload-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.35);
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+
+.ss-upload-area:hover .ss-upload-icon {
+  transform: scale(1.05) translateY(-2px);
+}
+*/
+
+.ss-image-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.ss-image-preview-item {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ss-image-preview-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ss-image-preview-item img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ss-image-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.ss-image-remove:hover {
+  background: #ed4956;
+  transform: scale(1.1);
+}
+
+.ss-location-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ig-text-primary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.ss-location-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ss-location-btn-share {
+  background: rgba(0,149,246,0.1);
+  border-color: rgba(0,149,246,0.3);
+  color: #0095f6;
+}
+
+.ss-location-btn-share:hover {
+  background: rgba(0,149,246,0.15);
+  border-color: rgba(0,149,246,0.4);
+}
+
+.ss-location-btn i {
+  font-size: 16px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .ss-hero {
+    padding: 24px 16px;
+  }
+
+  .ss-hero-title {
+    font-size: 22px;
+  }
+
+  .ss-hero-subtitle {
+    font-size: 14px;
+  }
+
+  .ss-hero-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ss-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ss-stat-value {
+    font-size: 20px;
+  }
+
+  .ss-tabs {
+    gap: 4px;
+  }
+
+  .ss-tab {
+    flex: unset;
+    min-width: 100px;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+
+  .ss-card-images {
+    max-height: 250px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .ss-card-images img {
+    height: 150px;
+  }
+
+  .ss-card-content {
+    padding: 16px;
+  }
+
+  .ss-card-title {
+    font-size: 18px;
+  }
+
+  .ss-card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ss-btn {
+    width: 100%;
+  }
+
+  .ss-modal-body {
+    padding: 16px;
+  }
+
+  .ss-image-preview {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .ss-hero-stats {
+    gap: 8px;
+  }
+
+  .ss-stat {
+    padding: 12px;
+  }
+
+  .ss-card {
+    margin-bottom: 16px;
+  }
+
+  .ss-card-header {
+    gap: 10px;
+  }
+
+  .ss-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .ss-completion-photos-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ss-modal-header {
+    padding: 20px;
+  }
+
+  .ss-modal-title {
+    font-size: 18px;
+  }
+
+  .ss-modal-close {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .ss-modal-body {
+    padding: 24px 20px;
+  }
+
+  .ss-modal-footer {
+    padding: 16px 20px;
+  }
+
+  .ss-form-label {
+    font-size: 13px;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ig-modal-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.ig-modal {
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
