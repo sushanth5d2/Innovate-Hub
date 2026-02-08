@@ -687,7 +687,14 @@
   let crosspathInterval = null;
   const crosspathState = {
     enabledEvents: new Set(), // Track which events have crosspath enabled
-    watchId: null // Geolocation watch ID
+    watchId: null, // Geolocation watch ID
+    activeTab: 'enable' // Track active tab
+  };
+
+  // Global function to switch crosspath tabs
+  window.switchCrosspathTab = function(tabName) {
+    crosspathState.activeTab = tabName;
+    loadCrosspath();
   };
 
   async function loadCrosspath() {
@@ -751,69 +758,95 @@
         }
       }
 
-      // Build UI
-      let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
-
-      // Show crosspath toggles for each event
-      html += '<div style="background: rgba(0,149,246,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,149,246,0.2);">';
-      html += '<div style="font-weight: 900; margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;"><span>📍</span> Enable Crosspath</div>';
-      html += '<div style="font-size: 13px; color: var(--ig-secondary-text); margin-bottom: 12px;">Share your location to discover nearby attendees at your events (within 500m)</div>';
+      // Build UI with tabs
+      const activeTab = crosspathState.activeTab || 'enable';
       
-      upcomingEvents.forEach(event => {
-        const isEnabled = enabledEvents[event.id] || false;
-        html += `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-weight: 600; font-size: 14px;">${event.title}</div>
-              <div style="font-size: 12px; color: var(--ig-secondary-text);">${shortDateLabel(event.event_date)}</div>
-            </div>
-            <label class="crosspath-toggle" style="position: relative; display: inline-block; width: 48px; height: 24px;">
-              <input type="checkbox" id="cp-toggle-${event.id}" data-event-id="${event.id}" ${isEnabled ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
-              <span class="crosspath-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 24px; border: 2px solid var(--ig-border);"></span>
-            </label>
-          </div>
-        `;
-      });
+      let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
+      
+      // Tab Navigation
+      html += '<div style="display: flex; gap: 8px; border-bottom: 2px solid var(--ig-border); padding-bottom: 0;">';
+      html += `
+        <button onclick="switchCrosspathTab('enable')" class="crosspath-tab" data-tab="enable" style="flex: 1; padding: 12px; background: ${activeTab === 'enable' ? 'var(--ig-blue)' : 'transparent'}; color: ${activeTab === 'enable' ? 'white' : 'var(--ig-secondary-text)'}; border: none; border-bottom: 3px solid ${activeTab === 'enable' ? 'var(--ig-blue)' : 'transparent'}; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; border-radius: 8px 8px 0 0;" onmouseover="if('${activeTab}' !== 'enable') this.style.backgroundColor='var(--ig-hover)'" onmouseout="if('${activeTab}' !== 'enable') this.style.backgroundColor='transparent'">
+          📍 Enable Crosspath
+        </button>
+        <button onclick="switchCrosspathTab('attendees')" class="crosspath-tab" data-tab="attendees" style="flex: 1; padding: 12px; background: ${activeTab === 'attendees' ? 'var(--ig-blue)' : 'transparent'}; color: ${activeTab === 'attendees' ? 'white' : 'var(--ig-secondary-text)'}; border: none; border-bottom: 3px solid ${activeTab === 'attendees' ? 'var(--ig-blue)' : 'transparent'}; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; border-radius: 8px 8px 0 0; position: relative;" onmouseover="if('${activeTab}' !== 'attendees') this.style.backgroundColor='var(--ig-hover)'" onmouseout="if('${activeTab}' !== 'attendees') this.style.backgroundColor='transparent'">
+          🎯 Nearby Attendees ${allMatches.length > 0 ? `<span style="position: absolute; top: 8px; right: 8px; background: #ff4458; color: white; border-radius: 10px; padding: 2px 6px; font-size: 11px; font-weight: 700;">${allMatches.length}</span>` : ''}
+        </button>
+      `;
       html += '</div>';
-
-      // Show matches
-      if (allMatches.length > 0) {
-        html += '<div style="background: rgba(0,212,170,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,212,170,0.2);">';
-        html += '<div style="font-weight: 900; margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;"><span>🎯</span> Nearby Attendees</div>';
+      
+      // Tab Content
+      html += '<div id="crosspath-tab-content">';
+      
+      if (activeTab === 'enable') {
+        // Enable Crosspath Tab
+        html += '<div style="background: rgba(0,149,246,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,149,246,0.2);">';
+        html += '<div style="font-size: 13px; color: var(--ig-secondary-text); margin-bottom: 16px;">Share your location to discover nearby attendees at your events (within 500m)</div>';
         
-        allMatches.forEach(match => {
-          const distance = match.distance_meters ? `${match.distance_meters}m away` : 'Nearby';
-          const timeAgo = match.matched_at ? formatTimeAgo(match.matched_at) : '';
-          const profilePic = match.profile_picture || '/images/default-avatar.png';
-          
+        upcomingEvents.forEach(event => {
+          const isEnabled = enabledEvents[event.id] || false;
           html += `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
-              <img src="${profilePic}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(0,212,170,0.5);" onerror="this.src='/images/default-avatar.png'" />
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
               <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 700; font-size: 14px;">@${match.username}</div>
-                <div style="font-size: 12px; color: var(--ig-secondary-text);">
-                  ${match.event_title} • ${distance}
-                </div>
-                ${timeAgo ? `<div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">${timeAgo}</div>` : ''}
+                <div style="font-weight: 600; font-size: 14px;">${event.title}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">${shortDateLabel(event.event_date)}</div>
               </div>
-              <button class="exp-btn primary" onclick="openDM(${match.id}, '${match.username.replace(/'/g, "\\'")}')" style="min-width: 80px; font-size: 13px; padding: 8px 16px;">
-                💬 DM
-              </button>
+              <label class="crosspath-toggle" style="position: relative; display: inline-block; width: 48px; height: 24px;">
+                <input type="checkbox" id="cp-toggle-${event.id}" data-event-id="${event.id}" ${isEnabled ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+                <span class="crosspath-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 24px; border: 2px solid var(--ig-border);"></span>
+              </label>
             </div>
           `;
         });
         html += '</div>';
-      } else if (crosspathState.enabledEvents.size > 0) {
-        html += `
-          <div style="color: var(--ig-secondary-text); padding: 20px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 12px;">
-            <div style="font-size: 40px; margin-bottom: 8px; opacity: 0.4;">🔍</div>
-            <div style="font-size: 14px;">Looking for nearby attendees...</div>
-            <div style="font-size: 12px; margin-top: 6px;">You'll be notified when other attendees are within 500m of you</div>
-          </div>
-        `;
+      } else {
+        // Nearby Attendees Tab
+        html += '<div style="background: rgba(0,212,170,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,212,170,0.2);">';
+        
+        if (allMatches.length > 0) {
+          allMatches.forEach(match => {
+            const distance = match.distance_meters ? `${match.distance_meters}m away` : 'Nearby';
+            const timeAgo = match.matched_at ? formatTimeAgo(match.matched_at) : '';
+            const profilePic = match.profile_picture || '/images/default-avatar.png';
+            
+            html += `
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
+                <img src="${profilePic}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(0,212,170,0.5);" onerror="this.src='/images/default-avatar.png'" />
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 700; font-size: 14px;">@${match.username}</div>
+                  <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                    Attending <span style="font-weight: 600; color: var(--ig-primary-text);">${match.event_title}</span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">${distance}${timeAgo ? ' • ' + timeAgo : ''}</div>
+                </div>
+                <button class="exp-btn primary" onclick="openDM(${match.id}, '${match.username.replace(/'/g, "\\'")}')" style="min-width: 80px; font-size: 13px; padding: 8px 16px;">
+                  💬 DM
+                </button>
+              </div>
+            `;
+          });
+        } else if (crosspathState.enabledEvents.size > 0) {
+          html += `
+            <div style="color: var(--ig-secondary-text); padding: 20px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 8px; opacity: 0.4;">🔍</div>
+              <div style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">Looking for nearby attendees...</div>
+              <div style="font-size: 12px;">You'll be notified when other attendees are within 500m of you</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div style="color: var(--ig-secondary-text); padding: 20px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 8px; opacity: 0.4;">📍</div>
+              <div style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">No Active Crosspath</div>
+              <div style="font-size: 12px;">Enable crosspath on your events to discover nearby attendees</div>
+            </div>
+          `;
+        }
+        html += '</div>';
       }
-
-      html += '</div>';
+      
+      html += '</div>'; // Close tab content
+      html += '</div>'; // Close main container
       list.innerHTML = html;
 
       // Wire up toggle switches

@@ -17,15 +17,24 @@
             <span style="opacity:0.7;">▾</span>
           </button>
 
-          <div class="exp-search" title="Search">
+          <div class="exp-search exp-search-desktop" title="Search">
             <span style="opacity:0.7;">🔎</span>
             <input id="searchInput" type="text" placeholder="Search experiences..." />
           </div>
 
           <div class="exp-actions">
-            <button class="exp-pill" id="filtersBtn" type="button">Filters</button>
+            <button class="exp-icon-btn exp-search-mobile-btn" id="mobileSearchBtn" type="button" title="Search" style="display: none;">🔎</button>
+            <button class="exp-pill" id="filtersBtn" type="button"><span class="filter-text">Filters</span><span class="filter-icon" style="display: none;">⚙️</span></button>
             <button class="exp-icon-btn" id="openCreateEvent" type="button" title="Create event">＋</button>
             <a class="exp-icon-btn" href="/notifications" title="Notifications" style="text-decoration:none;">🔔</a>
+          </div>
+          
+          <!-- Mobile search overlay -->
+          <div class="exp-search-mobile-overlay" id="mobileSearchOverlay" style="display: none;">
+            <div class="exp-search-mobile-container">
+              <button class="exp-icon-btn" id="closeMobileSearch" type="button">←</button>
+              <input id="searchInputMobile" type="text" placeholder="Search experiences..." style="flex: 1; border: none; background: transparent; color: var(--ig-primary-text); font-size: 15px; outline: none;" />
+            </div>
           </div>
         </div>
       </header>
@@ -702,5 +711,51 @@
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
       <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
       <script src="/js/events-experiences.js"></script>
+      
+      <script>
+        // Mobile search functionality
+        (function() {
+          const mobileSearchBtn = document.getElementById('mobileSearchBtn');
+          const mobileSearchOverlay = document.getElementById('mobileSearchOverlay');
+          const closeMobileSearch = document.getElementById('closeMobileSearch');
+          const searchInput = document.getElementById('searchInput');
+          const searchInputMobile = document.getElementById('searchInputMobile');
+          
+          if (mobileSearchBtn && mobileSearchOverlay) {
+            // Open mobile search
+            mobileSearchBtn.addEventListener('click', function() {
+              mobileSearchOverlay.style.display = 'block';
+              searchInputMobile.value = searchInput.value;
+              searchInputMobile.focus();
+            });
+            
+            // Close mobile search
+            closeMobileSearch.addEventListener('click', function() {
+              mobileSearchOverlay.style.display = 'none';
+              searchInput.value = searchInputMobile.value;
+              // Trigger search event if needed
+              if (typeof window.onSearchChange === 'function') {
+                window.onSearchChange();
+              }
+            });
+            
+            // Sync mobile search with desktop
+            searchInputMobile.addEventListener('input', function() {
+              searchInput.value = searchInputMobile.value;
+              // Trigger search event if needed
+              if (typeof window.onSearchChange === 'function') {
+                window.onSearchChange();
+              }
+            });
+            
+            // Handle escape key to close
+            searchInputMobile.addEventListener('keydown', function(e) {
+              if (e.key === 'Escape') {
+                closeMobileSearch.click();
+              }
+            });
+          }
+        })();
+      </script>
     </body>
     </html>

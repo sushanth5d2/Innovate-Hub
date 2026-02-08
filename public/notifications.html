@@ -101,7 +101,10 @@
   <main class="ig-main">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
       <h2 style="font-size: 24px; font-weight: 600;">Notifications</h2>
-      <button class="ig-following-btn" onclick="markAllAsRead()">Mark all read</button>
+      <div style="display: flex; gap: 12px;">
+        <button class="ig-following-btn" onclick="markAllAsRead()">Mark all read</button>
+        <button class="ig-following-btn" onclick="clearAllNotifications()" style="color: var(--ig-error, #ed4956);">Clear</button>
+      </div>
     </div>
 
     <div class="ig-settings-section">
@@ -264,6 +267,11 @@
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> invited you to an event.`;
       } else if (notification.type === 'crosspath') {
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined the same event as you!`;
+      } else if (notification.type === 'crosspath_match') {
+        // Extract event name from notification content and format with username highlighted
+        const username = notification.username || 'Someone';
+        const contentWithBoldUsername = notification.content.replace(username, `<span class="ig-notification-username">${username}</span>`);
+        notificationText = contentWithBoldUsername;
       } else if (notification.type === 'community_join') {
         notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined your community.`;
       } else if (notification.type === 'join_request') {
@@ -344,6 +352,8 @@
           window.location.href = `/events/${referenceId}`;
         } else if (type === 'crosspath' && referenceId) {
           window.location.href = `/events/${referenceId}`;
+        } else if (type === 'crosspath_match' && referenceId) {
+          window.location.href = `/events/${referenceId}`;
         } else if (referenceId) {
           window.location.href = `/post/${referenceId}`;
         }
@@ -397,6 +407,25 @@
         InnovateAPI.showAlert('All notifications marked as read', 'success');
       } catch (error) {
         console.error('Error marking all as read:', error);
+      }
+    }
+
+    // Clear all notifications
+    async function clearAllNotifications() {
+      if (!confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
+        return;
+      }
+      
+      try {
+        const response = await InnovateAPI.apiRequest('/notifications/clear/all', {
+          method: 'DELETE'
+        });
+        
+        loadNotifications();
+        InnovateAPI.showAlert(`Cleared ${response.deleted || 'all'} notifications`, 'success');
+      } catch (error) {
+        console.error('Error clearing notifications:', error);
+        InnovateAPI.showAlert('Failed to clear notifications', 'error');
       }
     }
 

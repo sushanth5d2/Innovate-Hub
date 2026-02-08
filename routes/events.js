@@ -553,19 +553,20 @@ function checkProximityAndNotify(req, db, userId, eventId, latitude, longitude) 
                       // Notify user1 (current user)
                       const notification1 = {
                         type: 'crosspath_match',
-                        content: `${other.username} is nearby at ${eventTitle}! (${Math.round(distance)}m away)`,
-                        related_id: other.user_id
+                        content: `${other.username} is also attending ${eventTitle}`,
+                        related_id: eventId,
+                        created_by: other.user_id
                       };
                       
                       db.run(
-                        `INSERT INTO notifications (user_id, type, content, related_id)
-                         VALUES (?, ?, ?, ?)`,
-                        [userId, notification1.type, notification1.content, notification1.related_id],
+                        `INSERT INTO notifications (user_id, type, content, related_id, created_by)
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [userId, notification1.type, notification1.content, notification1.related_id, notification1.created_by],
                         function() {
                           // Emit real-time notification via Socket.IO
                           const io = req.app.get('io');
                           if (io) {
-                            io.to(`user_${userId}`).emit('notification:received', {
+                            io.to(`user_${userId}`).emit('notification:receive', {
                               id: this.lastID,
                               ...notification1,
                               created_at: new Date().toISOString()
@@ -579,19 +580,20 @@ function checkProximityAndNotify(req, db, userId, eventId, latitude, longitude) 
                         if (currentUser) {
                           const notification2 = {
                             type: 'crosspath_match',
-                            content: `${currentUser.username} is nearby at ${eventTitle}! (${Math.round(distance)}m away)`,
-                            related_id: userId
+                            content: `${currentUser.username} is also attending ${eventTitle}`,
+                            related_id: eventId,
+                            created_by: userId
                           };
                           
                           db.run(
-                            `INSERT INTO notifications (user_id, type, content, related_id)
-                             VALUES (?, ?, ?, ?)`,
-                            [other.user_id, notification2.type, notification2.content, notification2.related_id],
+                            `INSERT INTO notifications (user_id, type, content, related_id, created_by)
+                             VALUES (?, ?, ?, ?, ?)`,
+                            [other.user_id, notification2.type, notification2.content, notification2.related_id, notification2.created_by],
                             function() {
                               // Emit real-time notification via Socket.IO
                               const io = req.app.get('io');
                               if (io) {
-                                io.to(`user_${other.user_id}`).emit('notification:received', {
+                                io.to(`user_${other.user_id}`).emit('notification:receive', {
                                   id: this.lastID,
                                   ...notification2,
                                   created_at: new Date().toISOString()

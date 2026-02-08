@@ -16,7 +16,7 @@ router.get('/', authMiddleware, (req, res) => {
       (n.created_by IS NOT NULL AND u.id = n.created_by)
       OR (
         n.created_by IS NULL
-        AND n.type IN ('follow', 'message', 'crosspath', 'crosspath_accepted', 'community_join')
+        AND n.type IN ('follow', 'message', 'crosspath', 'crosspath_accepted', 'crosspath_match', 'community_join')
         AND u.id = n.related_id
       )
     )
@@ -64,6 +64,23 @@ router.put('/read/all', authMiddleware, (req, res) => {
         return res.status(500).json({ error: 'Error marking all notifications as read' });
       }
       res.json({ success: true });
+    }
+  );
+});
+
+// Delete all notifications (must come before /:notificationId route)
+router.delete('/clear/all', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.run(
+    'DELETE FROM notifications WHERE user_id = ?',
+    [userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error clearing notifications' });
+      }
+      res.json({ success: true, deleted: this.changes });
     }
   );
 });
