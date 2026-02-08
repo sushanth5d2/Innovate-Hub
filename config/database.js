@@ -602,6 +602,39 @@ const createTables = () => {
       )
     `);
 
+    // Crosspath locations - tracks live locations when crosspath is enabled
+    db.run(`
+      CREATE TABLE IF NOT EXISTS crosspath_locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        is_active BOOLEAN DEFAULT 1,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        UNIQUE(user_id, event_id)
+      )
+    `);
+
+    // Crosspath matches - stores users who came within proximity
+    db.run(`
+      CREATE TABLE IF NOT EXISTS crosspath_matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        user1_id INTEGER NOT NULL,
+        user2_id INTEGER NOT NULL,
+        distance_meters REAL,
+        matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notification_sent BOOLEAN DEFAULT 0,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (user1_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user2_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Notifications table
     db.run(`
       CREATE TABLE IF NOT EXISTS notifications (

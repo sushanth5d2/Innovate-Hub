@@ -682,60 +682,306 @@
     }
   }
 
-  // ===== Crosspath / Reminders (keep basic) =====
+  // ===== Crosspath (Location-based) =====
+  
+  let crosspathInterval = null;
+  const crosspathState = {
+    enabledEvents: new Set(), // Track which events have crosspath enabled
+    watchId: null // Geolocation watch ID
+  };
+
   async function loadCrosspath() {
     const list = document.getElementById('crosspathList');
     if (!list) return;
     list.innerHTML = '<div class="ig-spinner"></div>';
 
     try {
-      const res = await fetch('/api/events/crosspath/pending', { headers: tokenHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load requests');
+      // Get all user's upcoming events to show crosspath toggles
+      const eventsRes = await fetch('/api/events', { headers: tokenHeaders() });
+      const eventsData = await eventsRes.json();
+      if (!eventsRes.ok) throw new Error(eventsData.error || 'Failed to load events');
 
-      const reqs = data.requests || [];
-      if (!reqs.length) {
-        list.innerHTML = '<div style="color: var(--ig-secondary-text); padding: 14px;">No crosspath requests.</div>';
+      // Load enabled states from database
+      const statesRes = await fetch('/api/events/crosspath/enabled-states', { headers: tokenHeaders() });
+      const statesData = await statesRes.json();
+      const enabledEvents = statesData.enabledEvents || {};
+
+      // Restore crosspathState from database
+      crosspathState.enabledEvents.clear();
+      Object.keys(enabledEvents).forEach(eventId => {
+        if (enabledEvents[eventId]) {
+          crosspathState.enabledEvents.add(parseInt(eventId));
+        }
+      });
+
+      // Start tracking if any events are enabled
+      if (crosspathState.enabledEvents.size > 0) {
+        startLocationTracking();
+      }
+
+      const upcomingEvents = (eventsData.events || []).filter(e => {
+        const eventDate = new Date(normalizeSqliteDate(e.event_date));
+        return eventDate >= new Date();
+      });
+
+      if (upcomingEvents.length === 0) {
+        list.innerHTML = `
+          <div style="color: var(--ig-secondary-text); padding: 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.4;">🎯</div>
+            <div style="font-weight: 700; margin-bottom: 8px;">No Upcoming Events</div>
+            <div style="font-size: 14px;">Enable crosspath on your event tickets to meet nearby attendees!</div>
+          </div>
+        `;
         return;
       }
 
-      list.innerHTML = reqs
-        .map((r) => {
-          return `
-            <div class="exp-section">
-              <div style="font-weight:900;">@${r.user_username}</div>
-              <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px;">Event: ${r.event_title || ''}</div>
-              <div class="exp-cta">
-                <button class="exp-btn primary" data-cp="${r.id}" data-act="accept">Accept</button>
-                <button class="exp-btn" data-cp="${r.id}" data-act="reject">Reject</button>
+      // Load all matches for all events
+      const allMatches = [];
+      for (const event of upcomingEvents) {
+        try {
+          const matchRes = await fetch(`/api/events/${event.id}/crosspath/matches`, { headers: tokenHeaders() });
+          const matchData = await matchRes.json();
+          if (matchRes.ok && matchData.matches) {
+            matchData.matches.forEach(m => {
+              allMatches.push({ ...m, event_title: event.title, event_id: event.id });
+            });
+          }
+        } catch (e) {
+          console.error('Error loading matches for event', event.id, e);
+        }
+      }
+
+      // Build UI
+      let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
+
+      // Show crosspath toggles for each event
+      html += '<div style="background: rgba(0,149,246,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,149,246,0.2);">';
+      html += '<div style="font-weight: 900; margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;"><span>📍</span> Enable Crosspath</div>';
+      html += '<div style="font-size: 13px; color: var(--ig-secondary-text); margin-bottom: 12px;">Share your location to discover nearby attendees at your events (within 500m)</div>';
+      
+      upcomingEvents.forEach(event => {
+        const isEnabled = enabledEvents[event.id] || false;
+        html += `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 14px;">${event.title}</div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text);">${shortDateLabel(event.event_date)}</div>
+            </div>
+            <label class="crosspath-toggle" style="position: relative; display: inline-block; width: 48px; height: 24px;">
+              <input type="checkbox" id="cp-toggle-${event.id}" data-event-id="${event.id}" ${isEnabled ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+              <span class="crosspath-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 24px; border: 2px solid var(--ig-border);"></span>
+            </label>
+          </div>
+        `;
+      });
+      html += '</div>';
+
+      // Show matches
+      if (allMatches.length > 0) {
+        html += '<div style="background: rgba(0,212,170,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(0,212,170,0.2);">';
+        html += '<div style="font-weight: 900; margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;"><span>🎯</span> Nearby Attendees</div>';
+        
+        allMatches.forEach(match => {
+          const distance = match.distance_meters ? `${match.distance_meters}m away` : 'Nearby';
+          const timeAgo = match.matched_at ? formatTimeAgo(match.matched_at) : '';
+          const profilePic = match.profile_picture || '/images/default-avatar.png';
+          
+          html += `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
+              <img src="${profilePic}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(0,212,170,0.5);" onerror="this.src='/images/default-avatar.png'" />
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; font-size: 14px;">@${match.username}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text);">
+                  ${match.event_title} • ${distance}
+                </div>
+                ${timeAgo ? `<div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">${timeAgo}</div>` : ''}
               </div>
+              <button class="exp-btn primary" onclick="openDM(${match.id}, '${match.username.replace(/'/g, "\\'")}')" style="min-width: 80px; font-size: 13px; padding: 8px 16px;">
+                💬 DM
+              </button>
             </div>
           `;
-        })
-        .join('');
-
-      list.querySelectorAll('button[data-cp]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-cp');
-          const act = btn.getAttribute('data-act');
-          try {
-            const res2 = await fetch(`/api/events/crosspath/${id}/${act}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...tokenHeaders() }
-            });
-            const d2 = await res2.json();
-            if (!res2.ok) throw new Error(d2.error || 'Failed');
-            showAlert && showAlert('Updated', 'success');
-            loadCrosspath();
-          } catch (e) {
-            showAlert && showAlert(e.message, 'error');
-          }
         });
+        html += '</div>';
+      } else if (crosspathState.enabledEvents.size > 0) {
+        html += `
+          <div style="color: var(--ig-secondary-text); padding: 20px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 12px;">
+            <div style="font-size: 40px; margin-bottom: 8px; opacity: 0.4;">🔍</div>
+            <div style="font-size: 14px;">Looking for nearby attendees...</div>
+            <div style="font-size: 12px; margin-top: 6px;">You'll be notified when other attendees are within 500m of you</div>
+          </div>
+        `;
+      }
+
+      html += '</div>';
+      list.innerHTML = html;
+
+      // Wire up toggle switches
+      upcomingEvents.forEach(event => {
+        const toggle = document.getElementById(`cp-toggle-${event.id}`);
+        if (toggle) {
+          toggle.addEventListener('change', async (e) => {
+            if (e.target.checked) {
+              await enableCrossPath(event.id);
+            } else {
+              await disableCrossPath(event.id);
+            }
+          });
+        }
       });
+
     } catch (e) {
-      list.innerHTML = `<div style="color: var(--ig-secondary-text); padding: 14px;">${e.message}</div>`;
+      list.innerHTML = `<div style="color: var(--ig-secondary-text); padding: 14px;">Error loading crosspath: ${e.message}</div>`;
     }
   }
+
+  async function enableCrossPath(eventId) {
+    if (!navigator.geolocation) {
+      showAlert && showAlert('Geolocation is not supported by your browser', 'error');
+      return;
+    }
+
+    try {
+      // Get current position
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+
+      // Enable crosspath on server
+      const res = await fetch(`/api/events/${eventId}/crosspath/enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tokenHeaders() },
+        body: JSON.stringify({ latitude, longitude })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to enable crosspath');
+
+      crosspathState.enabledEvents.add(eventId);
+      
+      // Start location tracking if not already started
+      startLocationTracking();
+
+      showAlert && showAlert('Crosspath enabled! You\'ll be notified when nearby attendees are found', 'success');
+      
+      // Reload to show any immediate matches
+      setTimeout(() => loadCrosspath(), 1000);
+
+    } catch (err) {
+      console.error('Geolocation error:', err);
+      showAlert && showAlert('Could not get your location. Please enable location permissions.', 'error');
+      
+      // Uncheck the toggle
+      const toggle = document.getElementById(`cp-toggle-${eventId}`);
+      if (toggle) toggle.checked = false;
+    }
+  }
+
+  async function disableCrossPath(eventId) {
+    try {
+      const res = await fetch(`/api/events/${eventId}/crosspath/disable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tokenHeaders() }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to disable crosspath');
+
+      crosspathState.enabledEvents.delete(eventId);
+
+      // Stop tracking if no events enabled
+      if (crosspathState.enabledEvents.size === 0) {
+        stopLocationTracking();
+      }
+
+      showAlert && showAlert('Crosspath disabled', 'success');
+      loadCrosspath();
+
+    } catch (err) {
+      showAlert && showAlert(err.message, 'error');
+    }
+  }
+
+  function startLocationTracking() {
+    // Clear any existing interval
+    if (crosspathInterval) {
+      clearInterval(crosspathInterval);
+    }
+
+    // Update location every 30 seconds
+    crosspathInterval = setInterval(async () => {
+      if (crosspathState.enabledEvents.size === 0) {
+        stopLocationTracking();
+        return;
+      }
+
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000 // Accept positions up to 1 minute old
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+
+        // Update location for all enabled events
+        for (const eventId of crosspathState.enabledEvents) {
+          try {
+            await fetch(`/api/events/${eventId}/crosspath/update-location`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...tokenHeaders() },
+              body: JSON.stringify({ latitude, longitude })
+            });
+          } catch (e) {
+            console.error('Error updating location for event', eventId, e);
+          }
+        }
+
+      } catch (err) {
+        console.error('Error getting location:', err);
+      }
+    }, 30000); // Every 30 seconds
+  }
+
+  function stopLocationTracking() {
+    if (crosspathInterval) {
+      clearInterval(crosspathInterval);
+      crosspathInterval = null;
+    }
+  }
+
+  function formatTimeAgo(dateStr) {
+    const date = new Date(normalizeSqliteDate(dateStr));
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  }
+
+  // Open DM with a user
+  function openDM(userId, username) {
+    // Navigate to messages page with this user
+    window.location.href = `/messages?user=${userId}`;
+  }
+
+  // Expose to global scope
+  window.openDM = openDM;
 
   async function loadReminders() {
     const list = document.getElementById('remindersList');

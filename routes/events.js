@@ -343,6 +343,298 @@ function respondToCrosspath(req, res) {
   );
 }
 
+// Enable crosspath for an event with location
+router.post('/:eventId/crosspath/enable', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+  const { latitude, longitude } = req.body;
+
+  if (!latitude || !longitude) {
+    return res.status(400).json({ error: 'Latitude and longitude required' });
+  }
+
+  // Check if user is attending/creating this event
+  const checkQuery = `
+    SELECT 1 FROM events WHERE id = ? AND creator_id = ?
+    UNION
+    SELECT 1 FROM event_attendees WHERE event_id = ? AND user_id = ? AND status = 'accepted'
+  `;
+
+  db.get(checkQuery, [eventId, userId, eventId, userId], (err, attending) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error checking event participation' });
+    }
+
+    if (!attending) {
+      return res.status(403).json({ error: 'You must be attending this event to enable crosspath' });
+    }
+
+    // Insert or update location
+    db.run(
+      `INSERT INTO crosspath_locations (user_id, event_id, latitude, longitude, is_active, last_updated)
+       VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_id, event_id) 
+       DO UPDATE SET latitude = ?, longitude = ?, is_active = 1, last_updated = CURRENT_TIMESTAMP`,
+      [userId, eventId, latitude, longitude, latitude, longitude],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error enabling crosspath' });
+        }
+
+        // Check for nearby users and create matches
+        checkProximityAndNotify(req, db, userId, eventId, latitude, longitude);
+
+        res.json({ success: true, message: 'Crosspath enabled' });
+      }
+    );
+  });
+});
+
+// Disable crosspath for an event
+router.post('/:eventId/crosspath/disable', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+
+  db.run(
+    'UPDATE crosspath_locations SET is_active = 0 WHERE user_id = ? AND event_id = ?',
+    [userId, eventId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error disabling crosspath' });
+      }
+
+      res.json({ success: true, message: 'Crosspath disabled' });
+    }
+  );
+});
+
+// Update live location for crosspath
+router.post('/:eventId/crosspath/update-location', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+  const { latitude, longitude } = req.body;
+
+  if (!latitude || !longitude) {
+    return res.status(400).json({ error: 'Latitude and longitude required' });
+  }
+
+  db.run(
+    `UPDATE crosspath_locations 
+     SET latitude = ?, longitude = ?, last_updated = CURRENT_TIMESTAMP 
+     WHERE user_id = ? AND event_id = ? AND is_active = 1`,
+    [latitude, longitude, userId, eventId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error updating location' });
+      }
+
+      if (this.changes > 0) {
+        // Check for nearby users and create matches
+        checkProximityAndNotify(req, db, userId, eventId, latitude, longitude);
+      }
+
+      res.json({ success: true });
+    }
+  );
+});
+
+// Get crosspath enabled states for user's events
+router.get('/crosspath/enabled-states', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT event_id, is_active
+    FROM crosspath_locations
+    WHERE user_id = ? AND is_active = 1
+  `;
+
+  db.all(query, [userId], (err, states) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching enabled states' });
+    }
+
+    const enabledEvents = states.reduce((acc, s) => {
+      acc[s.event_id] = true;
+      return acc;
+    }, {});
+
+    res.json({ success: true, enabledEvents });
+  });
+});
+
+// Get crosspath matches for an event
+router.get('/:eventId/crosspath/matches', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT DISTINCT
+      u.id,
+      u.username,
+      u.profile_picture,
+      u.bio,
+      cm.distance_meters,
+      cm.matched_at,
+      cl.latitude,
+      cl.longitude,
+      cl.last_updated
+    FROM crosspath_matches cm
+    JOIN users u ON (cm.user1_id = u.id OR cm.user2_id = u.id)
+    LEFT JOIN crosspath_locations cl ON cl.user_id = u.id AND cl.event_id = cm.event_id AND cl.is_active = 1
+    WHERE cm.event_id = ?
+      AND (cm.user1_id = ? OR cm.user2_id = ?)
+      AND u.id != ?
+    ORDER BY cm.matched_at DESC
+  `;
+
+  db.all(query, [eventId, userId, userId, userId], (err, matches) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching matches' });
+    }
+
+    res.json({ success: true, matches });
+  });
+});
+
+// Helper function to check proximity and send notifications
+function checkProximityAndNotify(req, db, userId, eventId, latitude, longitude) {
+  const io = req.app.get('io');
+  
+  // Find other users with crosspath enabled for the same event
+  const query = `
+    SELECT cl.*, u.username
+    FROM crosspath_locations cl
+    JOIN users u ON cl.user_id = u.id
+    WHERE cl.event_id = ? 
+      AND cl.user_id != ? 
+      AND cl.is_active = 1
+      AND datetime(cl.last_updated) > datetime('now', '-10 minutes')
+  `;
+
+  db.all(query, [eventId, userId], (err, nearbyUsers) => {
+    if (err || !nearbyUsers) return;
+
+    nearbyUsers.forEach(other => {
+      const distance = calculateDistance(
+        latitude, 
+        longitude, 
+        other.latitude, 
+        other.longitude
+      );
+
+      // If within 500 meters
+      if (distance <= 500) {
+        // Check if match already exists
+        db.get(
+          `SELECT id FROM crosspath_matches 
+           WHERE event_id = ? 
+             AND ((user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?))`,
+          [eventId, userId, other.user_id, other.user_id, userId],
+          (err, existingMatch) => {
+            if (!existingMatch) {
+              // Create new match
+              db.run(
+                `INSERT INTO crosspath_matches (event_id, user1_id, user2_id, distance_meters, notification_sent)
+                 VALUES (?, ?, ?, ?, 0)`,
+                [eventId, userId, other.user_id, Math.round(distance)],
+                function(err) {
+                  if (!err) {
+                    const matchId = this.lastID;
+                    
+                    // Send notifications to both users
+                    db.get('SELECT title FROM events WHERE id = ?', [eventId], (err, event) => {
+                      const eventTitle = event ? event.title : 'an event';
+                      
+                      // Notify user1 (current user)
+                      const notification1 = {
+                        type: 'crosspath_match',
+                        content: `${other.username} is nearby at ${eventTitle}! (${Math.round(distance)}m away)`,
+                        related_id: other.user_id
+                      };
+                      
+                      db.run(
+                        `INSERT INTO notifications (user_id, type, content, related_id)
+                         VALUES (?, ?, ?, ?)`,
+                        [userId, notification1.type, notification1.content, notification1.related_id],
+                        function() {
+                          // Emit real-time notification via Socket.IO
+                          const io = req.app.get('io');
+                          if (io) {
+                            io.to(`user_${userId}`).emit('notification:received', {
+                              id: this.lastID,
+                              ...notification1,
+                              created_at: new Date().toISOString()
+                            });
+                          }
+                        }
+                      );
+
+                      // Notify user2 (other user)
+                      db.get('SELECT username FROM users WHERE id = ?', [userId], (err, currentUser) => {
+                        if (currentUser) {
+                          const notification2 = {
+                            type: 'crosspath_match',
+                            content: `${currentUser.username} is nearby at ${eventTitle}! (${Math.round(distance)}m away)`,
+                            related_id: userId
+                          };
+                          
+                          db.run(
+                            `INSERT INTO notifications (user_id, type, content, related_id)
+                             VALUES (?, ?, ?, ?)`,
+                            [other.user_id, notification2.type, notification2.content, notification2.related_id],
+                            function() {
+                              // Emit real-time notification via Socket.IO
+                              const io = req.app.get('io');
+                              if (io) {
+                                io.to(`user_${other.user_id}`).emit('notification:received', {
+                                  id: this.lastID,
+                                  ...notification2,
+                                  created_at: new Date().toISOString()
+                                });
+                              }
+                            }
+                          );
+                        }
+                      });
+
+                      // Mark notification as sent
+                      db.run(
+                        'UPDATE crosspath_matches SET notification_sent = 1 WHERE id = ?',
+                        [matchId]
+                      );
+                    });
+                  }
+                }
+              );
+            }
+          }
+        );
+      }
+    });
+  });
+}
+
+// Calculate distance between two coordinates using Haversine formula (returns meters)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
 // Get all events for user
 router.get('/', authMiddleware, (req, res) => {
   const db = getDb();
