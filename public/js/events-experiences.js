@@ -5,12 +5,14 @@
     // Fallback if app.js not loaded
     if (!localStorage.getItem('token')) {
       window.location.href = '/login';
+      return;
     }
   }
 
   const state = {
     tab: 'discover',
-    city: localStorage.getItem('exp-city') || 'Hyderabad',
+    city: localStorage.getItem('exp-city') || '',
+    category: localStorage.getItem('exp-category') || '',
     query: '',
     discoverEvents: [],
     myEvents: [],
@@ -18,7 +20,9 @@
     activeTicketsEventId: null,
     activeOrdersEventId: null,
     activeManageEventId: null,
-    createEventPassTypes: [] // Temporary array for pass types being added to new event
+    createEventPassTypes: [], // Temporary array for pass types being added to new event
+    availableCities: [],
+    availableCategories: []
   };
 
   function tokenHeaders() {
@@ -84,23 +88,34 @@
 
   async function loadDiscover() {
     const grid = document.getElementById('expDiscoverGrid');
-    if (!grid) return;
+    if (!grid) {
+      console.error('expDiscoverGrid element not found');
+      return;
+    }
     grid.innerHTML = '<div class="ig-spinner"></div>';
 
     try {
       const qs = new URLSearchParams();
       if (state.city) qs.set('city', state.city);
+      if (state.category) qs.set('category', state.category);
       if (state.query) qs.set('q', state.query);
 
+      console.log('Loading discover events with filters:', { city: state.city, category: state.category, query: state.query });
       const res = await fetch(`/api/events/discover?${qs.toString()}`, { headers: tokenHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load events');
 
+      console.log('Loaded', data.events?.length || 0, 'events');
       state.discoverEvents = data.events || [];
       renderEventGrid(grid, state.discoverEvents, { showCreatorBadge: true });
       updateHeaderCopy();
     } catch (e) {
-      grid.innerHTML = `<div style="color: var(--ig-secondary-text); padding: 20px;">${e.message}</div>`;
+      console.error('Error loading discover events:', e);
+      grid.innerHTML = `<div style="color: var(--ig-primary-text); padding: 40px 20px; text-align: center; min-height: 200px;">
+        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🎉</div>
+        <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No events yet</div>
+        <div style="color: var(--ig-secondary-text); font-size: 14px;">${e.message}</div>
+      </div>`;
     }
   }
 
@@ -130,7 +145,11 @@
     const currentUser = getCurrentUser ? getCurrentUser() : null;
 
     if (!events.length) {
-      container.innerHTML = `<div style="color: var(--ig-secondary-text); padding: 20px;">No events found.</div>`;
+      container.innerHTML = `<div style="color: var(--ig-primary-text); padding: 60px 20px; text-align: center; min-height: 300px;">
+        <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;">🎭</div>
+        <div style="font-size: 20px; font-weight: 700; margin-bottom: 10px;">No events found</div>
+        <div style="color: var(--ig-secondary-text); font-size: 14px; max-width: 400px; margin: 0 auto;">Try changing your filters or be the first to create an event!</div>
+      </div>`;
       return;
     }
 
@@ -184,8 +203,18 @@
     const subtitle = document.getElementById('expHeaderSubtitle');
     if (!title || !subtitle) return;
 
-    title.textContent = `All Experiences in ${state.city || 'your city'}`;
-    subtitle.textContent = 'Parties, concerts & trips in one place';
+    if (state.city) {
+      title.textContent = `All Experiences in ${state.city}`;
+    } else {
+      title.textContent = 'All Experiences';
+    }
+    
+    // Update subtitle based on filters
+    if (state.category) {
+      subtitle.textContent = `${state.category} events`;
+    } else {
+      subtitle.textContent = 'Parties, concerts & trips in one place';
+    }
   }
 
   let countdownInterval = null;
@@ -378,6 +407,7 @@
 
     // Organizer-only actions
     document.getElementById('btnEditEvent').style.display = isOrganizer ? '' : 'none';
+    document.getElementById('btnDeleteEvent').style.display = isOrganizer ? '' : 'none';
     document.getElementById('btnOrders').style.display = isOrganizer ? '' : 'none';
     document.getElementById('btnCheckin').style.display = isOrganizer ? '' : 'none';
     document.getElementById('btnSecurityStaff').style.display = isOrganizer ? '' : 'none';
@@ -412,14 +442,103 @@
 
   function applyFilters() {
     const city = document.getElementById('filterCity').value;
+    const category = document.getElementById('filterCategory').value;
+    
     state.city = city;
+    state.category = category;
+    
     localStorage.setItem('exp-city', city);
+    localStorage.setItem('exp-category', category);
+
+    // Update city button label
+    const cityLabel = document.getElementById('cityLabel');
+    if (cityLabel) {
+      cityLabel.textContent = city || 'All Cities';
+    }
 
     const q = document.getElementById('searchInput').value.trim();
     state.query = q;
 
     closeFilters();
     if (state.tab === 'discover') loadDiscover();
+  }
+
+  function clearFilters() {
+    document.getElementById('filterCity').value = '';
+    document.getElementById('filterCategory').value = '';
+    state.city = '';
+    state.category = '';
+    state.query = '';
+    
+    localStorage.removeItem('exp-city');
+    localStorage.removeItem('exp-category');
+
+    // Update city button label
+    const cityLabel = document.getElementById('cityLabel');
+    if (cityLabel) {
+      cityLabel.textContent = 'All Cities';
+    }
+
+    document.getElementById('searchInput').value = '';
+    
+    closeFilters();
+    if (state.tab === 'discover') loadDiscover();
+  }
+
+  async function loadFilterOptions() {
+    try {
+      const res = await fetch('/api/events/filters/options', { headers: tokenHeaders() });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load filter options');
+
+      state.availableCities = data.cities || [];
+      state.availableCategories = data.categories || [];
+
+      // Populate city filter
+      const citySelect = document.getElementById('filterCity');
+      if (citySelect) {
+        citySelect.innerHTML = '<option value="">All Cities</option>';
+        state.availableCities.forEach(city => {
+          const option = document.createElement('option');
+          option.value = city;
+          option.textContent = city;
+          citySelect.appendChild(option);
+        });
+      }
+
+      // Populate category filter
+      const categorySelect = document.getElementById('filterCategory');
+      if (categorySelect) {
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        state.availableCategories.forEach(category => {
+          const option = document.createElement('option');
+          option.value = category;
+          option.textContent = category;
+          categorySelect.appendChild(option);
+        });
+      }
+
+      // Set saved values
+      if (state.city && citySelect) citySelect.value = state.city;
+      if (state.category && categorySelect) categorySelect.value = state.category;
+
+      // Update city button label
+      const cityLabel = document.getElementById('cityLabel');
+      if (cityLabel) {
+        cityLabel.textContent = state.city || 'All Cities';
+      }
+    } catch (e) {
+      console.error('Error loading filter options:', e);
+      // Don't fail silently - at least show default options
+      const citySelect = document.getElementById('filterCity');
+      if (citySelect && !citySelect.innerHTML) {
+        citySelect.innerHTML = '<option value="">All Cities</option>';
+      }
+      const categorySelect = document.getElementById('filterCategory');
+      if (categorySelect && !categorySelect.innerHTML) {
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+      }
+    }
   }
 
   // ===== Passes =====
@@ -1752,6 +1871,10 @@ let html5QrCode = null;
       }
       
       closeCreateEvent();
+      
+      // Reload filter options to show new city/category
+      await loadFilterOptions();
+      
       setTab('mine');
       loadMine();
       showAlert && showAlert('Event created', 'success');
@@ -2139,6 +2262,33 @@ let html5QrCode = null;
     if (btnCancel) btnCancel.style.display = 'none';
   }
   
+  async function deleteEvent() {
+    const ev = state.activeEvent;
+    if (!ev) return;
+
+    if (!confirm(`Delete "${ev.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/events/${ev.id}`, {
+        method: 'DELETE',
+        headers: tokenHeaders()
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete event');
+
+      closeEventDetail();
+      await loadFilterOptions(); // Refresh filter options since event was deleted
+      setTab('mine'); // Switch to my events tab
+      loadMine();
+      showAlert && showAlert('Event deleted successfully', 'success');
+    } catch (e) {
+      showAlert && showAlert(e.message, 'error');
+    }
+  }
+
   async function updateEvent() {
     const eventId = document.getElementById('eeEventId').value;
     const title = document.getElementById('eeTitle').value.trim();
@@ -2190,6 +2340,7 @@ let html5QrCode = null;
       
       closeEditEvent();
       closeEventDetail(); // Close detail view
+      await loadFilterOptions(); // Refresh filter options in case city/category changed
       setTab('mine'); // Refresh my events
       loadMine();
       showAlert && showAlert('Event updated successfully', 'success');
@@ -2316,90 +2467,188 @@ let html5QrCode = null;
 
   // ===== Wire up =====
   function wire() {
-    const cityBtn = document.getElementById('cityBtn');
-    const cityLabel = document.getElementById('cityLabel');
-    if (cityLabel) cityLabel.textContent = state.city;
+    try {
+      const cityBtn = document.getElementById('cityBtn');
+      const cityLabel = document.getElementById('cityLabel');
+      if (cityLabel) cityLabel.textContent = state.city || 'All Cities';
 
-    document.getElementById('filtersBtn').addEventListener('click', openFilters);
-    document.getElementById('filtersOverlay').addEventListener('click', closeFilters);
-    document.getElementById('closeFilters').addEventListener('click', closeFilters);
-    document.getElementById('applyFilters').addEventListener('click', applyFilters);
+      const filtersBtn = document.getElementById('filtersBtn');
+      const filtersOverlay = document.getElementById('filtersOverlay');
+      const closeFiltersBtn = document.getElementById('closeFilters');
+      const applyFiltersBtn = document.getElementById('applyFilters');
+      const clearFiltersBtn = document.getElementById('clearFilters');
 
-    document.getElementById('searchInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        state.query = e.target.value.trim();
-        loadDiscover();
+      if (filtersBtn) filtersBtn.addEventListener('click', openFilters);
+      if (filtersOverlay) {
+        filtersOverlay.addEventListener('click', (e) => {
+          // Only close if clicking the overlay itself, not the drawer
+          if (e.target.id === 'filtersOverlay') closeFilters();
+        });
       }
-    });
+      if (closeFiltersBtn) closeFiltersBtn.addEventListener('click', closeFilters);
+      if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', applyFilters);
+      if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearFilters);
 
-    document.getElementById('cityBtn').addEventListener('click', () => {
-      openFilters();
-      document.getElementById('filterCity').focus();
-    });
-
-    document.getElementById('closeEventOverlay').addEventListener('click', closeEventDetail);
-    document.getElementById('eventOverlay').addEventListener('click', (e) => {
-      if (e.target.id === 'eventOverlay') closeEventDetail();
-    });
-
-    document.getElementById('btnShareEvent').addEventListener('click', () => {
-      if (state.activeEvent) {
-        shareEvent(state.activeEvent);
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            state.query = e.target.value.trim();
+            loadDiscover();
+          }
+        });
       }
-    });
 
-    document.getElementById('btnSelectTickets').addEventListener('click', openTicketsModal);
-    document.getElementById('btnEditEvent').addEventListener('click', openEditEvent);
-    document.getElementById('btnOrders').addEventListener('click', openOrders);
-    document.getElementById('btnCheckin').addEventListener('click', openCheckin);
-    document.getElementById('btnSecurityStaff').addEventListener('click', openSecurityStaff);
+      if (cityBtn) {
+        cityBtn.addEventListener('click', () => {
+          openFilters();
+          const filterCity = document.getElementById('filterCity');
+          if (filterCity) filterCity.focus();
+        });
+      }
 
-    document.getElementById('closeTickets').addEventListener('click', closeTicketsModal);
-    document.getElementById('ticketQty').addEventListener('input', updateTicketTotal);
-    document.getElementById('ticketsModal').addEventListener('change', (e) => {
-      if (e.target && e.target.name === 'ticketType') updateTicketTotal();
-    });
-    document.getElementById('btnCheckout').addEventListener('click', checkoutTickets);
+      const closeEventOverlay = document.getElementById('closeEventOverlay');
+      if (closeEventOverlay) closeEventOverlay.addEventListener('click', closeEventDetail);
+      
+      const eventOverlay = document.getElementById('eventOverlay');
+      if (eventOverlay) {
+        eventOverlay.addEventListener('click', (e) => {
+          if (e.target.id === 'eventOverlay') closeEventDetail();
+        });
+      }
 
-    document.getElementById('closeOrders').addEventListener('click', closeOrders);
+      const btnShareEvent = document.getElementById('btnShareEvent');
+      if (btnShareEvent) {
+        btnShareEvent.addEventListener('click', () => {
+          if (state.activeEvent) {
+            shareEvent(state.activeEvent);
+          }
+        });
+      }
 
-    document.getElementById('closeManagePasses').addEventListener('click', closeManagePasses);
-    document.getElementById('btnCreatePassType').addEventListener('click', createPassType);
+      const btnSelectTickets = document.getElementById('btnSelectTickets');
+      if (btnSelectTickets) btnSelectTickets.addEventListener('click', openTicketsModal);
+      
+      const btnEditEvent = document.getElementById('btnEditEvent');
+      if (btnEditEvent) btnEditEvent.addEventListener('click', openEditEvent);
+      
+      const btnDeleteEvent = document.getElementById('btnDeleteEvent');
+      if (btnDeleteEvent) btnDeleteEvent.addEventListener('click', deleteEvent);
+      
+      const btnOrders = document.getElementById('btnOrders');
+      if (btnOrders) btnOrders.addEventListener('click', openOrders);
+      
+      const btnCheckin = document.getElementById('btnCheckin');
+      if (btnCheckin) btnCheckin.addEventListener('click', openCheckin);
+      
+      const btnSecurityStaff = document.getElementById('btnSecurityStaff');
+      if (btnSecurityStaff) btnSecurityStaff.addEventListener('click', openSecurityStaff);
 
-    document.getElementById('closeEditPass').addEventListener('click', closeEditPass);
-    document.getElementById('saveEditPass').addEventListener('click', saveEditPassType);
+      const closeTickets = document.getElementById('closeTickets');
+      if (closeTickets) closeTickets.addEventListener('click', closeTicketsModal);
+      
+      const ticketQty = document.getElementById('ticketQty');
+      if (ticketQty) ticketQty.addEventListener('input', updateTicketTotal);
+      
+      const ticketsModal = document.getElementById('ticketsModal');
+      if (ticketsModal) {
+        ticketsModal.addEventListener('change', (e) => {
+          if (e.target && e.target.name === 'ticketType') updateTicketTotal();
+        });
+      }
+      
+      const btnCheckout = document.getElementById('btnCheckout');
+      if (btnCheckout) btnCheckout.addEventListener('click', checkoutTickets);
 
-    document.getElementById('closeCreateEvent').addEventListener('click', closeCreateEvent);
-    document.getElementById('openCreateEvent').addEventListener('click', openCreateEvent);
-    document.getElementById('createEventSubmit').addEventListener('click', createEvent);
-    document.getElementById('btnAddPassType').addEventListener('click', addPassTypeToCreate);
-    document.getElementById('cePassMode').addEventListener('change', handlePassModeChange);
+      const closeOrdersBtn = document.getElementById('closeOrders');
+      if (closeOrdersBtn) closeOrdersBtn.addEventListener('click', closeOrders);
 
-    // Edit event modal
-    document.getElementById('closeEditEvent').addEventListener('click', closeEditEvent);
-    document.getElementById('editEventSubmit').addEventListener('click', updateEvent);
-    document.getElementById('btnAddPassTypeInEdit').addEventListener('click', addPassTypeInEdit);
-    document.getElementById('btnCancelPassTypeEdit').addEventListener('click', cancelPassTypeEdit);
-    document.getElementById('eeNewPassMode').addEventListener('change', handleEditPassModeChange);
+      const closeManagePassesBtn = document.getElementById('closeManagePasses');
+      if (closeManagePassesBtn) closeManagePassesBtn.addEventListener('click', closeManagePasses);
+      
+      const btnCreatePassType = document.getElementById('btnCreatePassType');
+      if (btnCreatePassType) btnCreatePassType.addEventListener('click', createPassType);
 
-    document.getElementById('closeCheckin').addEventListener('click', closeCheckin);
-    document.getElementById('btnCheckinGo').addEventListener('click', checkInCode);
-    document.getElementById('btnScanMethod').addEventListener('click', () => toggleScanMethod('scan'));
-    document.getElementById('btnManualMethod').addEventListener('click', () => toggleScanMethod('manual'));
+      const closeEditPassBtn = document.getElementById('closeEditPass');
+      if (closeEditPassBtn) closeEditPassBtn.addEventListener('click', closeEditPass);
+      
+      const saveEditPass = document.getElementById('saveEditPass');
+      if (saveEditPass) saveEditPass.addEventListener('click', saveEditPassType);
 
-    document.getElementById('closeSecurityStaff').addEventListener('click', closeSecurityStaff);
-    document.getElementById('btnAddStaff').addEventListener('click', addSecurityStaff);
+      const closeCreateEventBtn = document.getElementById('closeCreateEvent');
+      if (closeCreateEventBtn) closeCreateEventBtn.addEventListener('click', closeCreateEvent);
+      
+      const openCreateEventBtn = document.getElementById('openCreateEvent');
+      if (openCreateEventBtn) openCreateEventBtn.addEventListener('click', openCreateEvent);
+      
+      const createEventSubmit = document.getElementById('createEventSubmit');
+      if (createEventSubmit) createEventSubmit.addEventListener('click', createEvent);
+      
+      const btnAddPassType = document.getElementById('btnAddPassType');
+      if (btnAddPassType) btnAddPassType.addEventListener('click', addPassTypeToCreate);
+      
+      const cePassMode = document.getElementById('cePassMode');
+      if (cePassMode) cePassMode.addEventListener('change', handlePassModeChange);
 
-    // Default filter values
-    document.getElementById('filterCity').value = state.city;
-    updateHeaderCopy();
+      // Edit event modal
+      const closeEditEventBtn = document.getElementById('closeEditEvent');
+      if (closeEditEventBtn) closeEditEventBtn.addEventListener('click', closeEditEvent);
+      
+      const editEventSubmit = document.getElementById('editEventSubmit');
+      if (editEventSubmit) editEventSubmit.addEventListener('click', updateEvent);
+      
+      const btnAddPassTypeInEdit = document.getElementById('btnAddPassTypeInEdit');
+      if (btnAddPassTypeInEdit) btnAddPassTypeInEdit.addEventListener('click', addPassTypeInEdit);
+      
+      const btnCancelPassTypeEdit = document.getElementById('btnCancelPassTypeEdit');
+      if (btnCancelPassTypeEdit) btnCancelPassTypeEdit.addEventListener('click', cancelPassTypeEdit);
+      
+      const eeNewPassMode = document.getElementById('eeNewPassMode');
+      if (eeNewPassMode) eeNewPassMode.addEventListener('change', handleEditPassModeChange);
 
-    // Tabs
-    document.querySelectorAll('[data-exp-tab]').forEach((btn) => {
-      btn.addEventListener('click', () => setTab(btn.getAttribute('data-exp-tab')));
-    });
+      const closeCheckinBtn = document.getElementById('closeCheckin');
+      if (closeCheckinBtn) closeCheckinBtn.addEventListener('click', closeCheckin);
+      
+      const btnCheckinGo = document.getElementById('btnCheckinGo');
+      if (btnCheckinGo) btnCheckinGo.addEventListener('click', checkInCode);
+      
+      const btnScanMethod = document.getElementById('btnScanMethod');
+      if (btnScanMethod) btnScanMethod.addEventListener('click', () => toggleScanMethod('scan'));
+      
+      const btnManualMethod = document.getElementById('btnManualMethod');
+      if (btnManualMethod) btnManualMethod.addEventListener('click', () => toggleScanMethod('manual'));
 
-    setTab('discover');
+      const closeSecurityStaffBtn = document.getElementById('closeSecurityStaff');
+      if (closeSecurityStaffBtn) closeSecurityStaffBtn.addEventListener('click', closeSecurityStaff);
+      
+      const btnAddStaff = document.getElementById('btnAddStaff');
+      if (btnAddStaff) btnAddStaff.addEventListener('click', addSecurityStaff);
+
+      // Tabs
+      document.querySelectorAll('[data-exp-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => setTab(btn.getAttribute('data-exp-tab')));
+      });
+
+      // Load filter options first, then load content
+      loadFilterOptions().then(() => {
+        updateHeaderCopy();
+        setTab('discover');
+      }).catch(err => {
+        console.error('Error initializing filters:', err);
+        // Even if filters fail, still show content
+        updateHeaderCopy();
+        setTab('discover');
+      });
+    } catch (error) {
+      console.error('Error in wire() function:', error);
+      // Still try to load the page even if there are errors
+      try {
+        updateHeaderCopy();
+        setTab('discover');
+      } catch (e) {
+        console.error('Failed to initialize page:', e);
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', wire);

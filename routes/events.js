@@ -378,11 +378,51 @@ router.get('/', authMiddleware, (req, res) => {
   });
 });
 
+// Get available cities and categories for filters
+router.get('/filters/options', authMiddleware, (req, res) => {
+  const db = getDb();
+
+  // Get distinct cities and categories from public upcoming events
+  db.all(
+    `SELECT DISTINCT 
+       CASE WHEN city IS NOT NULL AND city != '' THEN city END as city
+     FROM events 
+     WHERE is_public = 1 AND datetime(event_date) >= datetime('now') AND city IS NOT NULL AND city != ''
+     ORDER BY city ASC`,
+    [],
+    (err, cities) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error fetching cities' });
+      }
+
+      db.all(
+        `SELECT DISTINCT 
+           CASE WHEN category IS NOT NULL AND category != '' THEN category END as category
+         FROM events 
+         WHERE is_public = 1 AND datetime(event_date) >= datetime('now') AND category IS NOT NULL AND category != ''
+         ORDER BY category ASC`,
+        [],
+        (err2, categories) => {
+          if (err2) {
+            return res.status(500).json({ error: 'Error fetching categories' });
+          }
+
+          res.json({
+            success: true,
+            cities: cities.map(c => c.city).filter(Boolean),
+            categories: categories.map(c => c.category).filter(Boolean)
+          });
+        }
+      );
+    }
+  );
+});
+
 // Discover public events (experiences-style listing)
 router.get('/discover', authMiddleware, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
-  const { city, q } = req.query || {};
+  const { city, category, q } = req.query || {};
 
   const params = [userId];
   let where = `WHERE e.is_public = 1 AND datetime(e.event_date) >= datetime('now')`;
@@ -390,6 +430,11 @@ router.get('/discover', authMiddleware, (req, res) => {
   if (city && String(city).trim()) {
     where += ` AND (LOWER(COALESCE(e.city,'')) = LOWER(?) OR LOWER(COALESCE(e.location,'')) LIKE LOWER(?))`;
     params.push(String(city).trim(), `%${String(city).trim()}%`);
+  }
+
+  if (category && String(category).trim()) {
+    where += ` AND LOWER(COALESCE(e.category,'')) = LOWER(?)`;
+    params.push(String(category).trim());
   }
 
   if (q && String(q).trim()) {

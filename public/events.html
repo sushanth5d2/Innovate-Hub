@@ -165,6 +165,7 @@
               <div class="exp-cta" style="display: flex; gap: 12px; min-width: max-content; padding-bottom: 4px;">
                 <button class="exp-btn primary" id="btnSelectTickets" type="button" style="min-width: 140px;">Select Tickets</button>
                 <button class="exp-btn" id="btnEditEvent" type="button" style="display:none; min-width: 140px;">Edit Event</button>
+                <button class="exp-btn" id="btnDeleteEvent" type="button" style="display:none; min-width: 120px; background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
                 <button class="exp-btn" id="btnOrders" type="button" style="display:none; min-width: 120px;">Orders</button>
                 <button class="exp-btn" id="btnCheckin" type="button" style="display:none; min-width: 120px;">Check-in</button>
                 <button class="exp-btn" id="btnSecurityStaff" type="button" style="display:none; min-width: 140px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">🔐 Security Staff</button>
@@ -184,18 +185,19 @@
         <div class="exp-field">
           <label>City</label>
           <select id="filterCity">
-            <option>Hyderabad</option>
-            <option>Bengaluru</option>
-            <option>Mumbai</option>
-            <option>Delhi</option>
-            <option>Chennai</option>
-            <option>Pune</option>
-            <option>Kolkata</option>
+            <option value="">All Cities</option>
+          </select>
+        </div>
+        <div class="exp-field">
+          <label>Category</label>
+          <select id="filterCategory">
+            <option value="">All Categories</option>
           </select>
         </div>
         <div class="exp-hint">Tip: Press Enter in search to apply.</div>
         <div style="display:flex; gap: 10px; margin-top: 16px;">
           <button class="exp-btn" type="button" id="applyFilters">Apply</button>
+          <button class="exp-btn" type="button" id="clearFilters" style="background: rgba(255,255,255,0.1);">Clear</button>
         </div>
       </div>
 
@@ -346,8 +348,8 @@
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div class="exp-field"><label>Title</label><input id="eeTitle" placeholder="Event title" required /></div>
               <div class="exp-field"><label>Date & time</label><input id="eeDate" type="datetime-local" required /></div>
-              <div class="exp-field"><label>City</label><input id="eeCity" placeholder="Hyderabad" /></div>
-              <div class="exp-field"><label>Category</label><input id="eeCategory" placeholder="Concert / Party / Trip" /></div>
+              <div class="exp-field"><label>City</label><input id="eeCity" placeholder="e.g., Hyderabad, Khammam" /></div>
+              <div class="exp-field"><label>Category</label><input id="eeCategory" placeholder="e.g., Concert, Party, Trip" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="eeLocation" placeholder="Venue name, area" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;">
                 <label>Upload Cover Photo (optional)</label>
@@ -455,8 +457,8 @@
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div class="exp-field"><label>Title</label><input id="ceTitle" placeholder="Event title" required /></div>
               <div class="exp-field"><label>Date & time</label><input id="ceDate" type="datetime-local" required /></div>
-              <div class="exp-field"><label>City</label><input id="ceCity" placeholder="Hyderabad" /></div>
-              <div class="exp-field"><label>Category</label><input id="ceCategory" placeholder="Concert / Party / Trip" /></div>
+              <div class="exp-field"><label>City</label><input id="ceCity" placeholder="e.g., Hyderabad, Khammam" /></div>
+              <div class="exp-field"><label>Category</label><input id="ceCategory" placeholder="e.g., Concert, Party, Trip" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="ceLocation" placeholder="Venue name, area" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;">
                 <label>Upload Cover Photo (optional)</label>
