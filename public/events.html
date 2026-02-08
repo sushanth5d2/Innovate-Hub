@@ -167,6 +167,7 @@
                 <button class="exp-btn" id="btnEditEvent" type="button" style="display:none; min-width: 140px;">Edit Event</button>
                 <button class="exp-btn" id="btnOrders" type="button" style="display:none; min-width: 120px;">Orders</button>
                 <button class="exp-btn" id="btnCheckin" type="button" style="display:none; min-width: 120px;">Check-in</button>
+                <button class="exp-btn" id="btnSecurityStaff" type="button" style="display:none; min-width: 140px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">🔐 Security Staff</button>
               </div>
             </div>
           </div>
@@ -200,45 +201,61 @@
 
       <!-- Tickets modal -->
       <div id="ticketsModal" class="ig-modal-overlay" style="display:none;">
-        <div class="ig-modal" style="max-width: 620px;">
-          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+        <div class="ig-modal" style="max-width: 650px;">
+          <div class="ig-modal-item" style="padding: 24px; text-align: left; background: linear-gradient(180deg, rgba(18,18,18,1) 0%, rgba(10,10,10,1) 100%);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; margin-bottom: 20px;">
               <div>
-                <div id="ticketsTitle" style="font-weight: 900; font-size: 18px;">Select Tickets</div>
-                <div id="ticketsSubtitle" style="color: var(--ig-secondary-text); margin-top: 4px; font-size: 13px;"></div>
+                <div id="ticketsTitle" style="font-weight: 900; font-size: 22px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🎟️ Select Tickets</div>
+                <div id="ticketsSubtitle" style="color: var(--ig-secondary-text); margin-top: 6px; font-size: 13px;"></div>
               </div>
-              <button id="closeTickets" type="button" class="exp-icon-btn">✕</button>
+              <button id="closeTickets" type="button" class="exp-icon-btn" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 18px;">✕</button>
             </div>
 
-            <div id="ticketTypes" style="display:flex; flex-direction:column; gap: 10px; margin-top: 14px;"></div>
+            <div id="ticketTypes" style="display:flex; flex-direction:column; gap: 14px; margin-bottom: 20px; max-height: 400px; overflow-y: auto; padding-right: 4px;"></div>
 
-            <div style="display:flex; gap: 10px; align-items:center; margin-top: 14px;">
-              <div style="font-weight: 900;">Qty</div>
-              <input id="ticketQty" type="number" min="1" max="10" value="1" style="width: 100px; height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: var(--ig-primary-text); padding: 0 12px;" />
-              <div id="ticketTotal" style="margin-left:auto; color: var(--ig-secondary-text);"></div>
+            <div style="display:flex; gap: 14px; align-items:center; padding: 16px; background: rgba(255,255,255,0.04); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+              <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                <div style="font-weight: 900; color: var(--ig-primary-text); font-size: 15px;">Quantity</div>
+                <input id="ticketQty" type="number" min="1" max="10" value="1" style="width: 80px; height: 44px; border-radius: 12px; border: 1.5px solid rgba(102,126,234,0.3); background: rgba(102,126,234,0.08); color: var(--ig-primary-text); padding: 0 12px; font-weight: 700; font-size: 16px; text-align: center;" />
+              </div>
+              <div id="ticketTotal" style="font-weight: 900; color: #00d4aa; font-size: 16px;"></div>
             </div>
 
-            <div style="display:flex; gap: 10px; margin-top: 14px;">
-              <button class="exp-btn" type="button" id="btnCheckout">Confirm</button>
+            <div style="display:flex; gap: 10px; margin-top: 18px;">
+              <button class="exp-btn primary" type="button" id="btnCheckout" style="width: 100%; height: 50px; font-size: 16px; font-weight: 900; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; position: relative; overflow: hidden;">Confirm & Proceed</button>
             </div>
 
-            <div id="ticketsResult" style="margin-top: 12px;"></div>
+            <div id="ticketsResult" style="margin-top: 14px;"></div>
           </div>
         </div>
       </div>
 
       <!-- Orders modal -->
       <div id="ordersModal" class="ig-modal-overlay" style="display:none;">
-        <div class="ig-modal" style="max-width: 720px;">
-          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+        <div class="ig-modal" style="max-width: 850px; width: 90%;">
+          <div class="ig-modal-item" style="padding: 24px; text-align: left; background: linear-gradient(180deg, rgba(18,18,18,1) 0%, rgba(10,10,10,1) 100%);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; margin-bottom: 20px;">
               <div>
-                <div id="ordersTitle" style="font-weight: 900; font-size: 18px;">Manage Orders</div>
-                <div id="ordersSubtitle" style="color: var(--ig-secondary-text); margin-top: 4px; font-size: 13px;"></div>
+                <div id="ordersTitle" style="font-weight: 900; font-size: 22px; background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📋 Manage Orders</div>
+                <div id="ordersSubtitle" style="color: var(--ig-secondary-text); margin-top: 6px; font-size: 13px;"></div>
               </div>
-              <button id="closeOrders" type="button" class="exp-icon-btn">✕</button>
+              <button id="closeOrders" type="button" class="exp-icon-btn" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 18px;">✕</button>
             </div>
-            <div id="ordersList" style="display:flex; flex-direction:column; gap: 10px; margin-top: 14px;"></div>
+            
+            <!-- Order Tabs -->
+            <div style="display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.08); padding-bottom: 0; background: rgba(255,255,255,0.02); border-radius: 12px 12px 0 0; padding: 4px 4px 0 4px;">
+              <button id="orderTabPending" class="order-tab active" data-status="pending" style="flex: 1; padding: 12px 20px; background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-weight: 700; border-bottom: 3px solid transparent; transition: all 0.3s ease; position: relative; border-radius: 8px 8px 0 0;">
+                <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">⏳ Pending</span>
+              </button>
+              <button id="orderTabConfirmed" class="order-tab" data-status="paid" style="flex: 1; padding: 12px 20px; background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-weight: 700; border-bottom: 3px solid transparent; transition: all 0.3s ease; position: relative; border-radius: 8px 8px 0 0;">
+                <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">✓ Confirmed</span>
+              </button>
+              <button id="orderTabAll" class="order-tab" data-status="all" style="flex: 1; padding: 12px 20px; background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-weight: 700; border-bottom: 3px solid transparent; transition: all 0.3s ease; position: relative; border-radius: 8px 8px 0 0;">
+                <span style="display: flex; align-items: center; justify-content: center; gap: 8px;">📊 All</span>
+              </button>
+            </div>
+
+            <div id="ordersList" style="display:flex; flex-direction:column; gap: 14px; max-height: 65vh; overflow-y: auto; padding-right: 4px;"></div>
           </div>
         </div>
       </div>
@@ -339,39 +356,10 @@
               </div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Cover image URL (optional)</label><input id="eeCover" placeholder="https://..." /></div>
               <div class="exp-field"><label>Maximum Persons Allowed (optional)</label><input id="eeMaxPersons" type="number" min="1" placeholder="e.g., 100" /></div>
-              <div class="exp-field">
-                <label>Pricing</label>
-                <select id="eePricingType" style="padding: 8px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;">
-                  <option value="free">Free</option>
-                  <option value="paid">Paid</option>
-                </select>
-              </div>
               <div class="exp-field"><label>Organizer name (optional)</label><input id="eeOrganizer" placeholder="Brand / Organizer" /></div>
             </div>
             
             <div class="exp-field"><label>Important note (optional)</label><textarea id="eeNote" placeholder="Entry rules, ID required, age restrictions, dress code, what to bring, etc..." style="min-height: 80px;"></textarea></div>
-            
-            <!-- Fare options (shown only when Paid is selected) -->
-            <div id="eeFareOptionsContainer" style="display: none; margin-top: 12px; padding: 12px; background: var(--ig-hover); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 10px; color: var(--ig-primary-text);">Select Fare Options:</div>
-              <div style="display: grid; gap: 10px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="eeFareSingleCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Single</span>
-                  <input id="eeFareSingle" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="eeFareCoupleCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Couple</span>
-                  <input id="eeFareCouple" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="eeFareGroupCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Group</span>
-                  <input id="eeFareGroup" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-              </div>
-            </div>
             
             <!-- Pass Types Section -->
             <div style="margin-top: 16px; padding: 16px; background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.2); border-radius: 12px;">
@@ -395,12 +383,9 @@
                     </div>
                     <div class="exp-field">
                       <label>Mode</label>
-                      <select id="eeNewPassMode">
+                      <select id="eeNewPassMode" style="background: var(--ig-secondary-background); color: var(--ig-primary-text);">
                         <option value="free">Free</option>
-                        <option value="venue">Pay at venue</option>
-                        <option value="contact">Contact organizer</option>
-                        <option value="dm">DM organizer</option>
-                        <option value="online">Online (future)</option>
+                        <option value="paid">Paid</option>
                       </select>
                     </div>
                     <div class="exp-field">
@@ -410,6 +395,24 @@
                     <div class="exp-field">
                       <label>Capacity (optional)</label>
                       <input id="eeNewPassCapacity" type="number" min="1" placeholder="e.g., 50" />
+                    </div>
+                  </div>
+                  <!-- Payment methods (shown only when Paid is selected) -->
+                  <div id="eePaymentMethods" style="display: none; margin-top: 10px; padding: 10px; background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.2); border-radius: 6px;">
+                    <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: var(--ig-primary-text);">Payment Methods:</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="eePaymentDM" style="width: 16px; height: 16px;" />
+                        <span style="font-size: 14px;">DM organizer</span>
+                      </label>
+                      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="eePaymentVenue" style="width: 16px; height: 16px;" />
+                        <span style="font-size: 14px;">Pay at venue</span>
+                      </label>
+                      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="eePaymentOnline" style="width: 16px; height: 16px;" />
+                        <span style="font-size: 14px;">Online payment</span>
+                      </label>
                     </div>
                   </div>
                   <div class="exp-field">
@@ -462,39 +465,10 @@
               </div>
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Cover image URL (optional)</label><input id="ceCover" placeholder="https://..." /></div>
               <div class="exp-field"><label>Maximum Persons Allowed (optional)</label><input id="ceMaxPersons" type="number" min="1" placeholder="e.g., 100" /></div>
-              <div class="exp-field">
-                <label>Pricing</label>
-                <select id="cePricingType" style="padding: 8px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;">
-                  <option value="free">Free</option>
-                  <option value="paid">Paid</option>
-                </select>
-              </div>
               <div class="exp-field"><label>Organizer name (optional)</label><input id="ceOrganizer" placeholder="Brand / Organizer" /></div>
             </div>
             
             <div class="exp-field"><label>Important note (optional)</label><textarea id="ceNote" placeholder="Entry rules, ID required, age restrictions, dress code, what to bring, etc..." style="min-height: 80px;"></textarea></div>
-            
-            <!-- Fare options (shown only when Paid is selected) -->
-            <div id="fareOptionsContainer" style="display: none; margin-top: 12px; padding: 12px; background: var(--ig-hover); border-radius: 8px;">
-              <div style="font-weight: 600; margin-bottom: 10px; color: var(--ig-primary-text);">Select Fare Options:</div>
-              <div style="display: grid; gap: 10px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="fareSingleCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Single</span>
-                  <input id="fareSingle" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="fareCoupleCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Couple</span>
-                  <input id="fareCouple" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="fareGroupCheck" style="width: 18px; height: 18px;" />
-                  <span style="flex: 1;">Group</span>
-                  <input id="fareGroup" type="number" min="0" placeholder="₹ Amount" style="width: 150px; padding: 6px; background: var(--ig-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 4px;" disabled />
-                </label>
-              </div>
-            </div>
             
             <!-- Pass Types Section -->
             <div style="margin-top: 16px; padding: 16px; background: rgba(0,149,246,0.05); border: 1px solid rgba(0,149,246,0.2); border-radius: 12px;">
@@ -515,12 +489,9 @@
                   </div>
                   <div class="exp-field">
                     <label>Mode</label>
-                    <select id="cePassMode">
+                    <select id="cePassMode" style="background: var(--ig-secondary-background); color: var(--ig-primary-text);">
                       <option value="free">Free</option>
-                      <option value="venue">Pay at venue</option>
-                      <option value="contact">Contact organizer</option>
-                      <option value="dm">DM organizer</option>
-                      <option value="online">Online (future)</option>
+                      <option value="paid">Paid</option>
                     </select>
                   </div>
                   <div class="exp-field">
@@ -530,6 +501,24 @@
                   <div class="exp-field">
                     <label>Capacity (optional)</label>
                     <input id="cePassCapacity" type="number" min="1" placeholder="e.g., 50" />
+                  </div>
+                </div>
+                <!-- Payment methods (shown only when Paid is selected) -->
+                <div id="cePaymentMethods" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,149,246,0.05); border: 1px solid rgba(0,149,246,0.2); border-radius: 6px;">
+                  <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: var(--ig-primary-text);">Payment Methods:</div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <input type="checkbox" id="cePaymentDM" style="width: 16px; height: 16px;" />
+                      <span style="font-size: 14px;">DM organizer</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <input type="checkbox" id="cePaymentVenue" style="width: 16px; height: 16px;" />
+                      <span style="font-size: 14px;">Pay at venue</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <input type="checkbox" id="cePaymentOnline" style="width: 16px; height: 16px;" />
+                      <span style="font-size: 14px;">Online payment</span>
+                    </label>
                   </div>
                 </div>
                 <div class="exp-field">
@@ -562,15 +551,110 @@
 
       <!-- Check-in modal -->
       <div id="checkinModal" class="ig-modal-overlay" style="display:none;">
-        <div class="ig-modal" style="max-width: 520px;">
-          <div class="ig-modal-item" style="padding: 18px; text-align: left;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
-              <div style="font-weight: 900; font-size: 18px;">Check-in pass</div>
+        <div class="ig-modal" style="max-width: 620px;">
+          <div class="ig-modal-item" style="padding: 24px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; margin-bottom: 20px;">
+              <div>
+                <div style="font-weight: 900; font-size: 20px; color: var(--ig-primary-text); margin-bottom: 4px;">Verify Pass</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">Scan or enter pass code to check-in attendees</div>
+              </div>
               <button id="closeCheckin" type="button" class="exp-icon-btn">✕</button>
             </div>
-            <div class="exp-field"><label>Pass code</label><input id="checkinCode" placeholder="Paste/enter code" /></div>
-            <button class="exp-btn primary" id="btnCheckinGo" type="button">Check-in</button>
-            <div id="checkinResult" class="exp-hint" style="margin-top: 10px;"></div>
+            
+            <!-- Scanner Method Toggle -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <button id="btnScanMethod" class="exp-btn" type="button" style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📷 Scan QR Code</button>
+              <button id="btnManualMethod" class="exp-btn" type="button" style="flex: 1;">⌨️ Enter Manually</button>
+            </div>
+            
+            <!-- QR Scanner Section -->
+            <div id="qrScannerSection" style="display: none;">
+              <div style="background: rgba(0,0,0,0.2); border-radius: 16px; padding: 16px; margin-bottom: 16px; border: 2px solid rgba(102,126,234,0.3);">
+                <div id="qr-reader" style="border-radius: 12px; overflow: hidden;"></div>
+                <div id="qr-reader-status" style="margin-top: 12px; text-align: center; font-size: 13px; color: var(--ig-secondary-text); display: none;">
+                  <div style="font-weight: 700; margin-bottom: 4px;">📷 Camera Ready</div>
+                  <div>Point camera at QR code to scan</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Manual Entry Section -->
+            <div id="manualEntrySection">
+              <div class="exp-field">
+                <label style="font-weight: 700; font-size: 13px; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 0.5px;">Pass Code</label>
+                <input id="checkinCode" placeholder="Paste the full pass code here" style="font-family: 'Courier New', monospace; font-size: 14px; padding: 12px;" />
+              </div>
+              <button class="exp-btn primary" id="btnCheckinGo" type="button" style="width: 100%; padding: 14px; font-weight: 800; font-size: 15px;">🔍 Verify & Check-in</button>
+            </div>
+            
+            <!-- Result Display -->
+            <div id="checkinResult" style="margin-top: 16px; display: none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Staff Management Modal -->
+      <div id="securityStaffModal" class="ig-modal-overlay" style="display:none;">
+        <div class="ig-modal" style="max-width: 700px; max-height: 90vh; display: flex; flex-direction: column;">
+          <div class="ig-modal-item" style="padding: 0; text-align: left; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+            <!-- Fixed Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px; padding: 24px; background: var(--ig-background); border-bottom: 2px solid rgba(102,126,234,0.3); flex-shrink: 0;">
+              <div>
+                <div style="font-weight: 900; font-size: 22px; color: var(--ig-primary-text); margin-bottom: 4px;">🔐 Security Staff</div>
+                <div style="font-size: 13px; color: var(--ig-secondary-text);">Manage venue check-in personnel</div>
+              </div>
+              <button id="closeSecurityStaff" type="button" class="exp-icon-btn">✕</button>
+            </div>
+            
+            <!-- Scrollable Content -->
+            <div style="padding: 24px; overflow-y: auto; flex: 1;">
+              <!-- Section 1: Scanner App Link -->
+              <div style="background: linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%); padding: 20px; border-radius: 16px; border: 2px solid rgba(102,126,234,0.4); margin-bottom: 24px; box-shadow: 0 4px 12px rgba(102,126,234,0.15);">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                  <div style="background: rgba(102,126,234,0.3); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">📱</div>
+                  <div>
+                    <div style="font-weight: 900; font-size: 16px; color: var(--ig-primary-text);">Mobile Scanner App</div>
+                    <div style="font-size: 12px; color: var(--ig-secondary-text);">Share this link with security staff</div>
+                  </div>
+                </div>
+                <div style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 12px; color: #00d4aa; word-break: break-all; margin-bottom: 12px; border: 1px solid rgba(0,212,170,0.3);" id="scannerUrl"></div>
+                <button class="exp-btn" onclick="copyScannerURL()" style="width: 100%; font-size: 14px; padding: 12px; font-weight: 700; background: rgba(0,212,170,0.2); border-color: rgba(0,212,170,0.4); color: #00d4aa;">📋 Copy Scanner Link</button>
+              </div>
+
+              <!-- Section 2: Add New Staff -->
+              <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                  <div style="background: rgba(0,212,170,0.2); width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;">➕</div>
+                  <div style="font-weight: 900; font-size: 16px; color: var(--ig-primary-text);">Add New Staff Member</div>
+                </div>
+                <div class="exp-field" style="margin-bottom: 14px;">
+                  <label style="font-size: 12px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 0.5px;">Full Name</label>
+                  <input id="staffFullName" placeholder="e.g., John Smith" style="padding: 12px; font-size: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);" />
+                </div>
+                <div class="exp-field" style="margin-bottom: 14px;">
+                  <label style="font-size: 12px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 0.5px;">Username (Login ID)</label>
+                  <input id="staffUsername" placeholder="Min 3 characters" style="padding: 12px; font-size: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);" />
+                </div>
+                <div class="exp-field" style="margin-bottom: 16px;">
+                  <label style="font-size: 12px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 0.5px;">Password</label>
+                  <input id="staffPassword" type="password" placeholder="Min 6 characters" style="padding: 12px; font-size: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);" />
+                </div>
+                <button class="exp-btn primary" id="btnAddStaff" type="button" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 800; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">✓ Create Staff Account</button>
+                <div id="addStaffResult" class="exp-hint" style="margin-top: 10px; font-size: 13px; font-weight: 600;"></div>
+              </div>
+
+              <!-- Section 3: Current Staff List -->
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                  <div style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;">👥</div>
+                  <div>
+                    <div style="font-weight: 900; font-size: 16px; color: var(--ig-primary-text);">Active Staff (<span id="staffCount">0</span>)</div>
+                    <div style="font-size: 12px; color: var(--ig-secondary-text);">Manage your security team</div>
+                  </div>
+                </div>
+                <div id="staffList" style="max-height: 400px; overflow-y: auto; padding-right: 4px;"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -614,6 +698,7 @@
       <script src="/js/app.js"></script>
       <script src="/js/instagram-theme.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+      <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
       <script src="/js/events-experiences.js"></script>
     </body>
     </html>

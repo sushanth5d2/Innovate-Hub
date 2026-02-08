@@ -536,9 +536,15 @@
   <script>
     const socket = io();
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    // Check for username query parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    const usernameParam = urlParams.get('username');
+    
+    // Get userId from path or use query parameter
     const pathParts = window.location.pathname.split('/');
-    const userId = pathParts[pathParts.length - 1] || currentUser.id;
-    const isOwnProfile = currentUser.id == userId;
+    let userId = usernameParam ? null : (pathParts[pathParts.length - 1] || currentUser.id);
+    let isOwnProfile = !usernameParam && (currentUser.id == userId);
     let activeTab = 'posts';
     let listModalPreviousOverflow = '';
 
@@ -549,7 +555,32 @@
 
     async function loadProfile() {
       try {
-        const response = await fetch(`/api/users/${userId}`, {
+        let profileUrl;
+        
+        // If username is provided, fetch by username
+        if (usernameParam) {
+          // First, get user by searching for username
+          const searchResponse = await fetch(`/api/search/users?q=${encodeURIComponent(usernameParam)}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (!searchResponse.ok) throw new Error('Failed to find user');
+          
+          const searchData = await searchResponse.json();
+          const foundUser = searchData.users?.find(u => u.username === usernameParam);
+          
+          if (!foundUser) throw new Error('User not found');
+          
+          userId = foundUser.id;
+          isOwnProfile = currentUser.id == userId;
+          profileUrl = `/api/users/${userId}`;
+        } else {
+          profileUrl = `/api/users/${userId}`;
+        }
+        
+        const response = await fetch(profileUrl, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -608,7 +639,11 @@
         }
       } catch (error) {
         console.error('Error loading profile:', error);
-        alert('Failed to load profile');
+        alert(error.message || 'Failed to load profile. This user may not exist.');
+        // Redirect to home after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
       }
     }
 
@@ -1062,8 +1097,10 @@
     }
 
     // Initialize
-    loadProfile();
-    loadPosts();
+    (async function init() {
+      await loadProfile();
+      await loadPosts();
+    })();
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </body>

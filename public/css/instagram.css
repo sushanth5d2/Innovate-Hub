@@ -1057,7 +1057,7 @@ body {
   right: 0;
   bottom: 0;
   background-color: var(--ig-overlay);
-  z-index: 300;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;

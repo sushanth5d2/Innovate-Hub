@@ -74,6 +74,170 @@ function sendDirectMessage(req, db, senderId, receiverId, content) {
 }
 
 // =========================
+// Check-in Staff Management
+// =========================
+
+// Check-in staff login (separate from user authentication)
+router.post('/checkin-staff/login', async (req, res) => {
+  const db = getDb();
+  const { event_id, username, password } = req.body || {};
+
+  if (!event_id || !username || !password) {
+    return res.status(400).json({ error: 'Event ID, username, and password required' });
+  }
+
+  try {
+    // Verify staff credentials
+    db.get(
+      `SELECT s.*, e.title, e.event_date, e.location
+       FROM event_checkin_staff s
+       JOIN events e ON e.id = s.event_id
+       WHERE s.event_id = ? AND s.username = ? AND s.password = ? AND s.is_active = 1`,
+      [event_id, username, password],
+      (err, staff) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!staff) return res.status(401).json({ error: 'Invalid credentials' });
+
+        // Update last login
+        db.run(
+          'UPDATE event_checkin_staff SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
+          [staff.id]
+        );
+
+        // Generate JWT token for staff
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign(
+          { staffId: staff.id, eventId: staff.event_id, type: 'checkin_staff' },
+          process.env.JWT_SECRET || 'your-secret-key',
+          { expiresIn: '12h' }
+        );
+
+        res.json({
+          success: true,
+          token,
+          event: {
+            id: staff.event_id,
+            title: staff.title,
+            event_date: staff.event_date,
+            location: staff.location
+          },
+          staff: {
+            username: staff.username,
+            full_name: staff.full_name
+          }
+        });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Create check-in staff account (event creator only)
+router.post('/:eventId/checkin-staff', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+  const { username, password, full_name } = req.body || {};
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  if (username.length < 3 || password.length < 6) {
+    return res.status(400).json({ error: 'Username min 3 chars, password min 6 chars' });
+  }
+
+  try {
+    const authz = await requireEventCreator(db, eventId, userId);
+    if (!authz.ok) {
+      return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
+    }
+
+    db.run(
+      `INSERT INTO event_checkin_staff (event_id, username, password, full_name, created_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [eventId, username, password, full_name || username, userId],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE')) {
+            return res.status(400).json({ error: 'Username already exists for this event' });
+          }
+          return res.status(500).json({ error: 'Error creating staff account' });
+        }
+
+        res.json({
+          success: true,
+          staff: {
+            id: this.lastID,
+            username,
+            full_name: full_name || username
+          }
+        });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: 'Error creating staff account' });
+  }
+});
+
+// List check-in staff (event creator only)
+router.get('/:eventId/checkin-staff', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const { eventId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const authz = await requireEventCreator(db, eventId, userId);
+    if (!authz.ok) {
+      return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
+    }
+
+    db.all(
+      `SELECT id, username, full_name, is_active, last_login, created_at
+       FROM event_checkin_staff
+       WHERE event_id = ?
+       ORDER BY created_at DESC`,
+      [eventId],
+      (err, staff) => {
+        if (err) return res.status(500).json({ error: 'Error fetching staff' });
+        res.json({ success: true, staff: staff || [] });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: 'Error fetching staff' });
+  }
+});
+
+// Delete check-in staff (event creator only)
+router.delete('/:eventId/checkin-staff/:staffId', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const { eventId, staffId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const authz = await requireEventCreator(db, eventId, userId);
+    if (!authz.ok) {
+      return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
+    }
+
+    db.run(
+      'DELETE FROM event_checkin_staff WHERE id = ? AND event_id = ?',
+      [staffId, eventId],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Error deleting staff' });
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Staff not found' });
+        }
+        res.json({ success: true });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: 'Error deleting staff' });
+  }
+});
+
+// =========================
 // Crosspath (keep before /:eventId)
 // =========================
 
@@ -515,10 +679,19 @@ router.get('/tickets/mine', authMiddleware, (req, res) => {
            e.title as event_title,
            e.event_date as event_date,
            e.location as event_location,
-           ett.name as ticket_type_name
+           e.city as event_city,
+           e.cover_image as event_cover_image,
+           e.description as event_description,
+           e.important_note as event_important_note,
+           e.category as event_category,
+           ett.name as ticket_type_name,
+           eo.total_cents as ticket_price_cents,
+           eo.currency as ticket_currency,
+           eo.quantity as order_quantity
     FROM event_tickets t
     JOIN events e ON e.id = t.event_id
     LEFT JOIN event_ticket_types ett ON ett.id = t.ticket_type_id
+    LEFT JOIN event_orders eo ON eo.id = t.order_id
     WHERE t.owner_id = ?
     ORDER BY datetime(e.event_date) ASC, t.created_at ASC
   `;
@@ -538,7 +711,7 @@ router.get('/:eventId/tickets/types', authMiddleware, (req, res) => {
 
   db.all(
     `SELECT id, event_id, name, description, payment_mode, contact_text, price_cents, currency, quantity_total, quantity_sold,
-            sales_start, sales_end, is_active
+            sales_start, sales_end, is_active, payment_methods
      FROM event_ticket_types
      WHERE event_id = ? AND is_active = 1
      ORDER BY price_cents ASC, id ASC`,
@@ -573,7 +746,8 @@ router.post('/:eventId/tickets/types', authMiddleware, async (req, res) => {
       currency = 'INR',
       quantity_total = null,
       sales_start = null,
-      sales_end = null
+      sales_end = null,
+      payment_methods = ''
     } = req.body || {};
 
     if (!name || String(name).trim().length < 2) {
@@ -592,7 +766,7 @@ router.post('/:eventId/tickets/types', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid quantity_total' });
     }
 
-    const allowedModes = ['free', 'venue', 'contact', 'dm', 'online'];
+    const allowedModes = ['free', 'venue', 'contact', 'dm', 'online', 'paid'];
     let mode = payment_mode || (normalizedPrice > 0 ? 'venue' : 'free');
     mode = String(mode).toLowerCase();
     if (!allowedModes.includes(mode)) {
@@ -601,9 +775,9 @@ router.post('/:eventId/tickets/types', authMiddleware, async (req, res) => {
 
     db.run(
       `INSERT INTO event_ticket_types
-        (event_id, name, description, payment_mode, contact_text, price_cents, currency, quantity_total, sales_start, sales_end)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [eventId, name, description || '', mode, contact_text || '', normalizedPrice, currency, normalizedQty, sales_start, sales_end],
+        (event_id, name, description, payment_mode, contact_text, price_cents, currency, quantity_total, sales_start, sales_end, payment_methods)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [eventId, name, description || '', mode, contact_text || '', normalizedPrice, currency, normalizedQty, sales_start, sales_end, payment_methods || ''],
       function(err) {
         if (err) {
           return res.status(500).json({ error: 'Error creating ticket type' });
@@ -630,7 +804,7 @@ router.get('/:eventId/tickets/types/manage', authMiddleware, async (req, res) =>
 
     db.all(
       `SELECT id, event_id, name, description, payment_mode, contact_text, price_cents, currency,
-              quantity_total, quantity_sold, sales_start, sales_end, is_active, created_at, updated_at
+              quantity_total, quantity_sold, sales_start, sales_end, is_active, payment_methods, created_at, updated_at
        FROM event_ticket_types
        WHERE event_id = ?
        ORDER BY is_active DESC, price_cents ASC, id ASC`,
@@ -669,10 +843,11 @@ router.put('/:eventId/tickets/types/:typeId', authMiddleware, async (req, res) =
       quantity_total,
       sales_start,
       sales_end,
-      is_active
+      is_active,
+      payment_methods
     } = req.body || {};
 
-    const allowedModes = ['free', 'venue', 'contact', 'dm', 'online'];
+    const allowedModes = ['free', 'venue', 'contact', 'dm', 'online', 'paid'];
     let mode = payment_mode;
     if (mode !== undefined && mode !== null && mode !== '') {
       mode = String(mode).toLowerCase();
@@ -708,6 +883,7 @@ router.put('/:eventId/tickets/types/:typeId', authMiddleware, async (req, res) =
          sales_start = COALESCE(?, sales_start),
          sales_end = COALESCE(?, sales_end),
          is_active = COALESCE(?, is_active),
+         payment_methods = COALESCE(?, payment_methods),
          updated_at = CURRENT_TIMESTAMP
        WHERE id = ? AND event_id = ?`,
       [
@@ -721,6 +897,7 @@ router.put('/:eventId/tickets/types/:typeId', authMiddleware, async (req, res) =
         sales_start ?? null,
         sales_end ?? null,
         (is_active === undefined || is_active === null) ? null : (is_active ? 1 : 0),
+        payment_methods ?? null,
         typeId,
         eventId
       ],
@@ -881,21 +1058,33 @@ router.post('/:eventId/tickets/checkout', authMiddleware, (req, res) => {
 
                 const orderId = this.lastID;
 
-                if (!isInstantIssue) {
-                  db.run('COMMIT');
+                // Auto-RSVP user as interested when they place an order
+                db.run(
+                  `INSERT INTO event_attendees (event_id, user_id, status)
+                   VALUES (?, ?, 'accepted')
+                   ON CONFLICT(event_id, user_id) DO UPDATE SET status = 'accepted'`,
+                  [eventId, buyerId],
+                  (rsvpErr) => {
+                    if (rsvpErr) {
+                      console.error('Auto-RSVP error:', rsvpErr);
+                      // Continue anyway
+                    }
 
-                  // Offline payment flow: DM the organizer so they can coordinate payment and then confirm.
-                  db.get(
-                    'SELECT creator_id FROM events WHERE id = ?',
-                    [eventId],
-                    async (e2, eventRow) => {
-                      const organizerId = eventRow?.creator_id;
-                      if (organizerId) {
-                        db.get('SELECT username FROM users WHERE id = ?', [buyerId], async (e3, buyerRow) => {
-                          const buyerName = buyerRow?.username || `User ${buyerId}`;
-                          const how = mode === 'contact' || mode === 'dm' ? 'Contact/DM' : 'Pay at venue';
-                          const money = `${currency} ${(totalCents / 100).toFixed(2)}`;
-                          const dm = `Pass request for "${ticketType.event_title}"
+                    if (!isInstantIssue) {
+                      db.run('COMMIT');
+
+                      // Offline payment flow: DM the organizer so they can coordinate payment and then confirm.
+                      db.get(
+                        'SELECT creator_id FROM events WHERE id = ?',
+                        [eventId],
+                        async (e2, eventRow) => {
+                          const organizerId = eventRow?.creator_id;
+                          if (organizerId) {
+                            db.get('SELECT username FROM users WHERE id = ?', [buyerId], async (e3, buyerRow) => {
+                              const buyerName = buyerRow?.username || `User ${buyerId}`;
+                              const how = mode === 'contact' || mode === 'dm' ? 'Contact/DM' : 'Pay at venue';
+                              const money = `${currency} ${(totalCents / 100).toFixed(2)}`;
+                              const dm = `Pass request for "${ticketType.event_title}"
 Type: ${ticketType.name}
 Qty: ${qty}
 Amount: ${money}
@@ -904,48 +1093,69 @@ Order ID: ${orderId}
 Buyer: @${buyerName}
 
 Reply to confirm payment, then mark order paid to issue QR passes.`;
-                          await sendDirectMessage(req, db, buyerId, organizerId, dm);
-                        });
-                      }
-                    }
-                  );
+                              await sendDirectMessage(req, db, buyerId, organizerId, dm);
+                            });
+                          }
+                        }
+                      );
 
-                  return res.json({
-                    success: true,
-                    order: { id: orderId, status: orderStatus, total_cents: totalCents, currency },
-                    message: 'Order created. The organizer has been notified via DM for offline payment and will send your pass QR after confirmation.'
-                  });
-                }
-
-                // Issue tickets immediately for free orders
-                const issuedTickets = [];
-                const insertStmt = db.prepare(
-                  `INSERT INTO event_tickets (order_id, event_id, ticket_type_id, owner_id, code, status)
-                   VALUES (?, ?, ?, ?, ?, 'issued')`
-                );
-
-                let pending = qty;
-                for (let i = 0; i < qty; i++) {
-                  const code = generateTicketCode();
-                  issuedTickets.push({ code });
-                  insertStmt.run([orderId, eventId, ticket_type_id, buyerId, code], (ticketErr) => {
-                    pending--;
-                    if (ticketErr) {
-                      insertStmt.finalize();
-                      db.run('ROLLBACK');
-                      return res.status(500).json({ error: 'Error issuing tickets' });
-                    }
-                    if (pending === 0) {
-                      insertStmt.finalize();
-                      db.run('COMMIT');
                       return res.json({
                         success: true,
                         order: { id: orderId, status: orderStatus, total_cents: totalCents, currency },
-                        tickets: issuedTickets
+                        message: 'Order created. The organizer has been notified via DM for offline payment and will send your pass QR after confirmation.'
                       });
                     }
-                  });
-                }
+
+                    // Issue tickets immediately for free orders
+                    const issuedTickets = [];
+                    const insertStmt = db.prepare(
+                      `INSERT INTO event_tickets (order_id, event_id, ticket_type_id, owner_id, code, status)
+                       VALUES (?, ?, ?, ?, ?, 'issued')`
+                    );
+
+                    let pending = qty;
+                    for (let i = 0; i < qty; i++) {
+                      const code = generateTicketCode();
+                      issuedTickets.push({ code });
+                      insertStmt.run([orderId, eventId, ticket_type_id, buyerId, code], (ticketErr) => {
+                        pending--;
+                        if (ticketErr) {
+                          insertStmt.finalize();
+                          db.run('ROLLBACK');
+                          return res.status(500).json({ error: 'Error issuing tickets' });
+                        }
+                        if (pending === 0) {
+                          insertStmt.finalize();
+                          db.run('COMMIT');
+                          
+                          // Send DM to buyer with pass details
+                          const codes = issuedTickets.map(t => t.code).join('\n');
+                          const passMsg = `🎉 Your pass has been issued!
+
+Event: ${ticketType.event_title}
+Ticket Type: ${ticketType.name}
+Quantity: ${qty}
+${qty > 1 ? 'Pass Codes:\n' + codes : 'Pass Code: ' + codes}
+
+✅ View your pass with QR code:
+Go to Events → Passes tab
+
+💡 Show the QR code at the venue entry for check-in.`;
+                          
+                          sendDirectMessage(req, db, buyerId, buyerId, passMsg).catch(err => {
+                            console.error('Failed to send pass DM:', err);
+                          });
+                          
+                          return res.json({
+                            success: true,
+                            order: { id: orderId, status: orderStatus, total_cents: totalCents, currency },
+                            tickets: issuedTickets
+                          });
+                        }
+                      });
+                    }
+                  }
+                );
               }
             );
           }
@@ -1030,14 +1240,31 @@ router.post('/:eventId/orders/:orderId/mark-paid', authMiddleware, async (req, r
                         }
                         db.run('COMMIT');
 
-                        // Auto-DM buyer with issued codes (so they receive QR/pass details)
-                        const codes = issued.map(t => t.code).join(', ');
-                        const msg = `Your pass is issued for event #${eventId}.
-Order ID: ${orderId}
-Codes: ${codes}
+                        // Get event and ticket type details for better DM
+                        db.get(
+                          `SELECT e.title as event_title, ett.name as ticket_type_name
+                           FROM events e
+                           LEFT JOIN event_ticket_types ett ON ett.id = ?
+                           WHERE e.id = ?`,
+                          [typeId, eventId],
+                          async (detailErr, details) => {
+                            const eventTitle = details?.event_title || `Event #${eventId}`;
+                            const ticketName = details?.ticket_type_name || 'Pass';
+                            const codes = issued.map(t => t.code).join('\n');
+                            const passMsg = `🎉 Payment confirmed! Your pass has been issued.
 
-Open Events → Passes to view QR.`;
-                        await sendDirectMessage(req, db, userId, order.buyer_id, msg);
+Event: ${eventTitle}
+Ticket Type: ${ticketName}
+Quantity: ${issueQty}
+${issueQty > 1 ? 'Pass Codes:\n' + codes : 'Pass Code: ' + codes}
+
+✅ View your pass with QR code:
+Go to Events → Passes tab
+
+💡 Show the QR code at the venue entry for check-in.`;
+                            await sendDirectMessage(req, db, userId, order.buyer_id, passMsg);
+                          }
+                        );
 
                         return res.json({ success: true, tickets: issued });
                       }
@@ -1055,11 +1282,10 @@ Open Events → Passes to view QR.`;
   }
 });
 
-// Organizer: check-in a ticket by code
-router.post('/:eventId/tickets/check-in', authMiddleware, async (req, res) => {
+// Organizer/Staff: check-in a ticket by code (supports both event creator and check-in staff auth)
+router.post('/:eventId/tickets/check-in', async (req, res) => {
   const db = getDb();
   const { eventId } = req.params;
-  const userId = req.user.userId;
   const { code } = req.body || {};
 
   if (!code || String(code).length < 8) {
@@ -1067,22 +1293,97 @@ router.post('/:eventId/tickets/check-in', authMiddleware, async (req, res) => {
   }
 
   try {
-    const authz = await requireEventCreator(db, eventId, userId);
-    if (!authz.ok) {
-      return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Not authorized' });
     }
 
-    db.run(
-      `UPDATE event_tickets
-       SET status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?
-       WHERE event_id = ? AND code = ? AND status = 'issued'`,
-      [userId, eventId, code],
-      function(err) {
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+    
+    let userId = null;
+    let staffId = null;
+    let authType = null;
+    
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Check if it's staff or user auth
+      if (decoded.type === 'checkin_staff') {
+        staffId = decoded.staffId;
+        authType = 'staff';
+        
+        // Verify staff is for this event
+        if (decoded.eventId !== Number(eventId)) {
+          return res.status(403).json({ error: 'Not authorized for this event' });
+        }
+      } else if (decoded.userId) {
+        userId = decoded.userId;
+        authType = 'creator';
+        
+        // Verify user is event creator
+        const authz = await requireEventCreator(db, eventId, userId);
+        if (!authz.ok) {
+          return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
+        }
+      } else {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    } catch (jwtErr) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // First, get ticket details before updating
+    db.get(
+      `SELECT t.*, u.username as attendee_name, ett.name as ticket_type_name
+       FROM event_tickets t
+       LEFT JOIN users u ON u.id = t.owner_id
+       LEFT JOIN event_ticket_types ett ON ett.id = t.ticket_type_id
+       WHERE t.event_id = ? AND t.code = ?`,
+      [eventId, code],
+      (err, ticket) => {
         if (err) return res.status(500).json({ error: 'Error checking in ticket' });
-        if (this.changes === 0) {
+        
+        if (!ticket) {
           return res.status(400).json({ error: 'Ticket not found or already used' });
         }
-        res.json({ success: true });
+        
+        if (ticket.status === 'checked_in') {
+          return res.status(400).json({ 
+            error: 'Ticket not found or already used',
+            details: {
+              status: 'already_checked_in',
+              checked_in_at: ticket.checked_in_at,
+              attendee: ticket.attendee_name
+            }
+          });
+        }
+
+        // Now update the ticket (use staffId or userId as checked_in_by)
+        const checkedInBy = staffId || userId;
+        db.run(
+          `UPDATE event_tickets
+           SET status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?
+           WHERE event_id = ? AND code = ? AND status = 'issued'`,
+          [checkedInBy, eventId, code],
+          function(updateErr) {
+            if (updateErr) return res.status(500).json({ error: 'Error checking in ticket' });
+            if (this.changes === 0) {
+              return res.status(400).json({ error: 'Ticket not found or already used' });
+            }
+            
+            res.json({ 
+              success: true,
+              ticket: {
+                code: ticket.code,
+                attendee: ticket.attendee_name || 'Guest',
+                ticket_type: ticket.ticket_type_name || 'Pass',
+                checked_in_at: new Date().toISOString()
+              }
+            });
+          }
+        );
       }
     );
   } catch {
@@ -1094,17 +1395,26 @@ router.post('/:eventId/tickets/check-in', authMiddleware, async (req, res) => {
 router.get('/:eventId', authMiddleware, (req, res) => {
   const db = getDb();
   const { eventId } = req.params;
+  const userId = req.user.userId;
 
   const query = `
     SELECT e.*,
            u.username as creator_username,
-           u.profile_picture as creator_picture
+           u.profile_picture as creator_picture,
+           ea.status as user_rsvp_status,
+           (SELECT COUNT(*) FROM event_attendees WHERE event_id = e.id AND status = 'accepted') as interested_count,
+           (SELECT COUNT(*) FROM event_attendees WHERE event_id = e.id AND status = 'accepted') as attendee_count,
+           (SELECT COUNT(*) FROM event_attendees WHERE event_id = e.id) as total_invited,
+           (SELECT MIN(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as min_price_cents,
+           (SELECT MAX(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as max_price_cents,
+           (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency
     FROM events e
     JOIN users u ON e.creator_id = u.id
+    LEFT JOIN event_attendees ea ON e.id = ea.event_id AND ea.user_id = ?
     WHERE e.id = ?
   `;
 
-  db.get(query, [eventId], (err, event) => {
+  db.get(query, [userId, eventId], (err, event) => {
     if (err || !event) {
       return res.status(404).json({ error: 'Event not found' });
     }

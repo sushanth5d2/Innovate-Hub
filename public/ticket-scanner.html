@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ticket Scanner - Innovate Hub</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="/css/experiences.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .scanner-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .scanner-header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    .scanner-header h1 {
+      font-size: 28px;
+      font-weight: 900;
+      color: white;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .scanner-header p {
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .login-form, .scanner-section {
+      background: rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 30px;
+      border: 2px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      color: rgba(255,255,255,0.8);
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.3);
+      color: white;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: rgba(0,0,0,0.4);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(102,126,234,0.4);
+    }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    #reader {
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      border: 3px solid rgba(255,255,255,0.2);
+    }
+
+    .scan-result {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 16px;
+      display: none;
+    }
+
+    .scan-result.success {
+      background: rgba(0,212,170,0.2);
+      border: 2px solid rgba(0,212,170,0.4);
+    }
+
+    .scan-result.error {
+      background: rgba(239,68,68,0.2);
+      border: 2px solid rgba(239,68,68,0.4);
+    }
+
+    .scan-result h3 {
+      margin: 0 0 12px 0;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .scan-result p {
+      margin: 6px 0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .stat-card {
+      background: rgba(0,0,0,0.3);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 900;
+      color: #00d4aa;
+      margin-bottom: 4px;
+    }
+
+    .stat-card .label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .alert {
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .alert.error {
+      background: rgba(239,68,68,0.2);
+      border: 2px solid rgba(239,68,68,0.4);
+      color: #ff5757;
+    }
+
+    .event-info {
+      background: rgba(102,126,234,0.15);
+      padding: 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(102,126,234,0.3);
+      margin-bottom: 20px;
+    }
+
+    .event-info h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      font-weight: 900;
+      color: white;
+    }
+
+    .event-info p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    /* Result Modal */
+    .result-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .result-modal.show {
+      display: flex;
+    }
+
+    .result-modal-content {
+      background: rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 3px solid;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .result-modal-content.success {
+      border-color: #00d4aa;
+      background: linear-gradient(135deg, rgba(0,212,170,0.2) 0%, rgba(0,212,170,0.1) 100%);
+    }
+
+    .result-modal-content.error {
+      border-color: #ff5757;
+      background: linear-gradient(135deg, rgba(255,87,87,0.2) 0%, rgba(255,87,87,0.1) 100%);
+    }
+
+    .result-modal-content h2 {
+      margin: 0 0 20px 0;
+      font-size: 28px;
+      font-weight: 900;
+      text-align: center;
+      color: white;
+    }
+
+    .result-modal-content .details {
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .result-modal-content .details p {
+      margin: 10px 0;
+      font-size: 15px;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.6;
+    }
+
+    .result-modal-content .details strong {
+      color: rgba(255,255,255,0.6);
+      font-weight: 700;
+    }
+
+    .result-modal-content button {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .result-modal-content.success button {
+      background: linear-gradient(135deg, #00d4aa 0%, #00a885 100%);
+      color: white;
+    }
+
+    .result-modal-content.error button {
+      background: linear-gradient(135deg, #ff5757 0%, #cc4545 100%);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanner-container">
+    <!-- Header -->
+    <div class="scanner-header">
+      <h1>
+        <span>🎫</span>
+        <span>Ticket Scanner</span>
+      </h1>
+      <p>Secure venue entry verification system</p>
+    </div>
+
+    <!-- Login Form (shown initially) -->
+    <div id="loginSection" class="login-form">
+      <h2 style="color: white; font-size: 22px; font-weight: 900; margin: 0 0 24px 0; text-align: center;">Check-in Staff Login</h2>
+      
+      <div id="loginError" class="alert error" style="display: none;"></div>
+
+      <div class="form-group">
+        <label>Event ID</label>
+        <input type="text" id="eventId" placeholder="Enter event ID number">
+      </div>
+
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Your check-in username">
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Your password">
+      </div>
+
+      <button class="btn-primary" id="btnLogin">Login to Scanner</button>
+    </div>
+
+    <!-- Scanner Section (shown after login) -->
+    <div id="scannerSection" class="scanner-section" style="display: none;">
+      <!-- Event Info -->
+      <div id="eventInfo" class="event-info"></div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="value" id="statScanned">0</div>
+          <div class="label">Scanned</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" id="statValid">0</div>
+          <div class="label">Valid</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" id="statInvalid">0</div>
+          <div class="label">Invalid</div>
+        </div>
+      </div>
+
+      <!-- QR Scanner -->
+      <div style="margin-top: 24px;">
+        <h3 style="color: white; font-size: 18px; font-weight: 900; margin: 0 0 16px 0; text-align: center;">📷 Scan QR Code</h3>
+        <div id="reader"></div>
+        
+        <!-- Manual Entry Fallback -->
+        <div style="text-align: center; margin-bottom: 16px;">
+          <button class="btn-secondary" id="btnToggleManual">⌨️ Enter Code Manually</button>
+        </div>
+
+        <div id="manualEntry" style="display: none; margin-top: 16px;">
+          <div class="form-group">
+            <label>Pass Code</label>
+            <input type="text" id="manualCode" placeholder="Paste or type pass code">
+          </div>
+          <button class="btn-primary" id="btnVerifyManual">Verify Code</button>
+        </div>
+      </div>
+
+      <!-- Scan Result -->
+      <div id="scanResult" class="scan-result"></div>
+
+      <!-- Logout -->
+      <button class="btn-secondary" id="btnLogout" style="margin-top: 24px;">🚪 Logout</button>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div id="resultModal" class="result-modal">
+    <div id="resultModalContent" class="result-modal-content">
+      <h2 id="resultTitle"></h2>
+      <div id="resultDetails" class="details"></div>
+      <button id="btnModalOk">OK - Next Scan</button>
+    </div>
+  </div>
+
+  <!-- Include html5-qrcode library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
+  <script>
+    let scanner = null;
+    let authToken = null;
+    let eventData = null;
+    let stats = { scanned: 0, valid: 0, invalid: 0 };
+
+    // Login
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const eventId = document.getElementById('eventId').value.trim();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errorDiv = document.getElementById('loginError');
+
+      errorDiv.style.display = 'none';
+
+      if (!eventId || !username || !password) {
+        errorDiv.textContent = 'Please fill all fields';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/events/checkin-staff/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_id: eventId, username, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+
+        authToken = data.token;
+        eventData = data.event;
+        
+        // Show scanner section
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('scannerSection').style.display = 'block';
+        
+        // Display event info
+        document.getElementById('eventInfo').innerHTML = `
+          <h3>${eventData.title}</h3>
+          <p>📅 ${new Date(eventData.event_date).toLocaleString()}</p>
+          <p>📍 ${eventData.location || 'Venue TBA'}</p>
+          <p style="color: #00d4aa; font-weight: 700;">✓ Logged in as: ${username}</p>
+        `;
+
+        // Start QR scanner
+        initScanner();
+
+      } catch (e) {
+        errorDiv.textContent = e.message;
+        errorDiv.style.display = 'block';
+      }
+    });
+
+    // Initialize QR Scanner
+    function initScanner() {
+      scanner = new Html5Qrcode("reader");
+      
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        onScanError
+      ).catch(err => {
+        console.error('Camera error:', err);
+        alert('Camera access denied or not available. Please use manual entry.');
+      });
+    }
+
+    // On successful QR scan
+    function onScanSuccess(decodedText) {
+      // Stop scanner immediately
+      if (scanner && scanner.isScanning) {
+        scanner.stop().then(() => {
+          verifyTicket(decodedText);
+        }).catch(() => {
+          verifyTicket(decodedText);
+        });
+      } else {
+        verifyTicket(decodedText);
+      }
+    }
+
+    function onScanError(error) {
+      // Ignore continuous scanning errors
+    }
+
+    // Verify ticket
+    async function verifyTicket(code) {
+      stats.scanned++;
+      document.getElementById('statScanned').textContent = stats.scanned;
+
+      try {
+        const res = await fetch(`/api/events/${eventData.id}/tickets/check-in`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          stats.invalid++;
+          document.getElementById('statInvalid').textContent = stats.invalid;
+          
+          showResultModal('error', '❌ INVALID PASS', `
+            <p><strong>Error:</strong> ${data.error}</p>
+            <p style="color: rgba(255,255,255,0.6); margin-top: 12px;">⚠️ This pass cannot be accepted. Do not allow entry.</p>
+          `);
+          
+          playSound('error');
+          
+        } else {
+          stats.valid++;
+          document.getElementById('statValid').textContent = stats.valid;
+          
+          const ticket = data.ticket || {};
+          showResultModal('success', '✅ VALID PASS', `
+            <p><strong>👤 Attendee:</strong> <span style="color: #00d4aa; font-size: 16px;">${ticket.attendee || 'Guest'}</span></p>
+            <p><strong>🎫 Ticket Type:</strong> ${ticket.ticket_type || 'Pass'}</p>
+            <p><strong>⏰ Checked In:</strong> ${new Date(ticket.checked_in_at).toLocaleString()}</p>
+            <p style="color: #00d4aa; margin-top: 16px; font-weight: 700;">✓ ALLOW ENTRY</p>
+          `);
+          
+          playSound('success');
+        }
+
+      } catch (e) {
+        showResultModal('error', '⚠️ VERIFICATION ERROR', `
+          <p>${e.message}</p>
+          <p style="color: rgba(255,255,255,0.6); margin-top: 12px;">Please check your connection and try again.</p>
+        `);
+      }
+    }
+
+    // Show result modal
+    function showResultModal(type, title, detailsHTML) {
+      const modal = document.getElementById('resultModal');
+      const content = document.getElementById('resultModalContent');
+      const titleEl = document.getElementById('resultTitle');
+      const detailsEl = document.getElementById('resultDetails');
+      
+      // Set content
+      titleEl.textContent = title;
+      detailsEl.innerHTML = detailsHTML;
+      
+      // Set styling
+      content.className = `result-modal-content ${type}`;
+      
+      // Show modal
+      modal.classList.add('show');
+    }
+
+    // Close modal and restart scanner
+    document.getElementById('btnModalOk').addEventListener('click', () => {
+      const modal = document.getElementById('resultModal');
+      modal.classList.remove('show');
+      
+      // Restart scanner
+      if (scanner && !scanner.isScanning) {
+        scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          onScanError
+        ).catch(err => {
+          console.error('Failed to restart scanner:', err);
+        });
+      }
+    });
+
+    // Play sound feedback
+    function playSound(type) {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      if (type === 'success') {
+        oscillator.frequency.value = 800;
+      } else {
+        oscillator.frequency.value = 300;
+      }
+      
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.2);
+    }
+
+    // Toggle manual entry
+    document.getElementById('btnToggleManual').addEventListener('click', () => {
+      const manual = document.getElementById('manualEntry');
+      manual.style.display = manual.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Manual verification
+    document.getElementById('btnVerifyManual').addEventListener('click', () => {
+      const code = document.getElementById('manualCode').value.trim();
+      if (code) {
+        verifyTicket(code);
+        document.getElementById('manualCode').value = '';
+      }
+    });
+
+    // Logout
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      if (scanner) {
+        scanner.stop().catch(() => {});
+      }
+      
+      authToken = null;
+      eventData = null;
+      stats = { scanned: 0, valid: 0, invalid: 0 };
+      
+      document.getElementById('loginSection').style.display = 'block';
+      document.getElementById('scannerSection').style.display = 'none';
+      document.getElementById('eventId').value = '';
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+    });
+
+    // Handle Enter key in login form
+    ['eventId', 'username', 'password'].forEach(id => {
+      document.getElementById(id).addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          document.getElementById('btnLogin').click();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -380,6 +380,7 @@
     document.getElementById('btnEditEvent').style.display = isOrganizer ? '' : 'none';
     document.getElementById('btnOrders').style.display = isOrganizer ? '' : 'none';
     document.getElementById('btnCheckin').style.display = isOrganizer ? '' : 'none';
+    document.getElementById('btnSecurityStaff').style.display = isOrganizer ? '' : 'none';
 
     // Start live countdown timer
     startLiveCountdown(ev.event_date);
@@ -434,27 +435,100 @@
 
       const tickets = data.tickets || [];
       if (!tickets.length) {
-        list.innerHTML = '<div style="color: var(--ig-secondary-text); padding: 14px;">No passes yet. Open an event and select tickets.</div>';
+        list.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+            <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;">🎫</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--ig-primary-text); margin-bottom: 8px;">No passes yet</div>
+            <div style="color: var(--ig-secondary-text); font-size: 14px;">Book tickets from events to see them here</div>
+          </div>
+        `;
         return;
       }
 
       list.innerHTML = tickets
-        .map((t) => {
+        .map((t, idx) => {
+          // Use actual cover image or fallback to placeholder
+          const coverImg = t.event_cover_image ? t.event_cover_image : placeholderImage(t.event_title || 'Event');
+          const eventDate = formatTimestamp ? formatTimestamp(t.event_date) : new Date(normalizeSqliteDate(t.event_date)).toLocaleString();
+          const location = [t.event_location, t.event_city].filter(Boolean).join(' · ');
+          
+          // Calculate per-ticket price (divide total by quantity if multiple tickets)
+          const orderQty = t.order_quantity || 1;
+          const perTicketCents = t.ticket_price_cents ? Math.floor(t.ticket_price_cents / orderQty) : 0;
+          const money = perTicketCents > 0 ? formatMoney(perTicketCents, t.ticket_currency || 'INR') : 'Free';
+          
+          const gradients = [
+            'linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%)',
+            'linear-gradient(135deg, rgba(236,72,153,0.15) 0%, rgba(239,68,68,0.15) 100%)',
+            'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(147,51,234,0.15) 100%)',
+            'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(239,68,68,0.15) 100%)'
+          ];
+          const bgGradient = gradients[idx % gradients.length];
+          
           return `
-            <div class="exp-section" style="padding: 14px;">
-              <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
-                <div>
-                  <div style="font-weight:900;">${t.event_title || 'Event'}</div>
-                  <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px;">${t.ticket_type_name || 'Pass'} • ${formatTimestamp ? formatTimestamp(t.event_date) : ''}</div>
-                  <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 2px;">${t.event_location || ''}</div>
+            <div class="pass-card" style="border-radius: 20px; overflow: hidden; background: ${bgGradient}; border: 2px solid rgba(255,255,255,0.1); position: relative; transition: all 0.3s ease;" onmouseenter="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 32px rgba(0,0,0,0.5)';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)';">
+              <!-- Status Badge -->
+              <div style="position: absolute; top: 16px; right: 16px; z-index: 10; background: linear-gradient(135deg, rgba(0,212,170,0.95) 0%, rgba(0,168,150,0.95) 100%); padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 800; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.2);">✓ ISSUED</div>
+              
+              <!-- Main Horizontal Layout -->
+              <div style="display: flex; min-height: 320px;">
+                <!-- Left: Event Cover Photo -->
+                <div style="flex: 0 0 45%; position: relative; overflow: hidden; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
+                  <img src="${coverImg}" alt="${t.event_title}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.95;" onerror="this.style.display='none';" />
+                  <div style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.95) 100%); padding: 20px;">
+                    <div style="font-weight: 900; font-size: 22px; color: white; margin-bottom: 6px; line-height: 1.2;">${t.event_title || 'Event'}</div>
+                    <div style="display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.85); font-size: 13px;">
+                      <span>📍</span>
+                      <span>${location || 'Location TBA'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div style="color: var(--ig-secondary-text); font-size: 12px;">${t.status || 'issued'}</div>
-              </div>
-              <div style="margin-top: 12px; display:flex; gap: 14px; align-items:center; flex-wrap:wrap;">
-                <div id="qr-${t.id}" style="background:#fff; padding: 8px; border-radius: 12px;"></div>
-                <div style="color: var(--ig-secondary-text); font-size: 12px;">
-                  <div><strong style="color: var(--ig-primary-text);">Code</strong>: ${t.code}</div>
-                  <div class="exp-hint">Show this QR/code at entry for check-in.</div>
+                
+                <!-- Right: Ticket Details -->
+                <div style="flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+                  <!-- Ticket Info Cards -->
+                  <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: rgba(0,0,0,0.25); padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                      <div style="color: var(--ig-secondary-text); font-size: 11px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">🎫 TICKET TYPE</div>
+                      <div style="font-weight: 900; font-size: 17px; color: var(--ig-primary-text);">${t.ticket_type_name || 'Pass'}</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                      <div style="color: var(--ig-secondary-text); font-size: 11px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">💰 PRICE</div>
+                      <div style="font-weight: 900; font-size: 20px; color: #00d4aa;">${money}</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.25); padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                      <div style="color: var(--ig-secondary-text); font-size: 11px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">📅 EVENT DATE</div>
+                      <div style="font-weight: 700; font-size: 14px; color: var(--ig-primary-text);">${eventDate}</div>
+                    </div>
+                  </div>
+                  
+                  <!-- QR Code Section -->
+                  <div style="background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%); padding: 18px; border-radius: 14px; border: 2px solid rgba(255,255,255,0.1); margin-top: auto;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 900; font-size: 15px; color: var(--ig-primary-text); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                          <span style="font-size: 18px;">🎟️</span>
+                          <span>Your Pass</span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.35); padding: 8px 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; font-weight: 700; color: #00d4aa; margin-bottom: 8px; border: 1px dashed rgba(0,212,170,0.3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.code}</div>
+                        <div style="color: var(--ig-secondary-text); font-size: 11px; line-height: 1.4;">
+                          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                            <span>✓</span>
+                            <span>Show QR code at entry</span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 6px;">
+                            <span>✓</span>
+                            <span>Keep this pass safe</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style="flex-shrink: 0;">
+                        <div style="background: white; padding: 10px; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.3);">
+                          <div id="qr-${t.id}"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -468,16 +542,24 @@
           const el = document.getElementById(`qr-${t.id}`);
           if (!el) return;
           el.innerHTML = '';
-          // payload can be expanded later
           new window.QRCode(el, {
             text: String(t.code),
-            width: 128,
-            height: 128
+            width: 140,
+            height: 140,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.H
           });
         });
       }
     } catch (e) {
-      list.innerHTML = `<div style="color: var(--ig-secondary-text); padding: 14px;">${e.message}</div>`;
+      list.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+          <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;">⚠️</div>
+          <div style="font-size: 18px; font-weight: 700; color: var(--ig-error); margin-bottom: 8px;">Failed to load passes</div>
+          <div style="color: var(--ig-secondary-text); font-size: 14px;">${e.message}</div>
+        </div>
+      `;
     }
   }
 
@@ -616,25 +698,82 @@
       }
 
       list.innerHTML = types
-        .map((t) => {
+        .map((t, idx) => {
           const price = t.price_cents ? formatMoney(t.price_cents, t.currency) : 'Free';
+          const isFree = !t.price_cents || t.price_cents === 0;
           const how = String(t.payment_mode || '').toUpperCase();
-          const contact = t.contact_text ? `<div class="exp-hint">${t.contact_text}</div>` : '';
+          const contact = t.contact_text ? `<div class="exp-hint" style="margin-top: 8px; padding: 8px 12px; background: rgba(102,126,234,0.1); border-radius: 8px; font-size: 12px;">${t.contact_text}</div>` : '';
+          
+          // Determine icon based on ticket name
+          let icon = '🎫';
+          const nameLower = String(t.name || '').toLowerCase();
+          if (nameLower.includes('vip') || nameLower.includes('premium')) icon = '👑';
+          else if (nameLower.includes('couple') || nameLower.includes('pair')) icon = '💑';
+          else if (nameLower.includes('group') || nameLower.includes('family')) icon = '👨‍👩‍👧‍👦';
+          else if (nameLower.includes('student') || nameLower.includes('child')) icon = '🎓';
+          else if (nameLower.includes('single')) icon = '🙋';
+          
+          const description = (t.description || '').trim() || how;
+          const shortDesc = description.length > 120 ? description.substring(0, 120) + '...' : description;
+          const hasLongDesc = description.length > 120;
+          
+          const gradients = [
+            'linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%)',
+            'linear-gradient(135deg, rgba(236,72,153,0.15) 0%, rgba(239,68,68,0.15) 100%)',
+            'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(147,51,234,0.15) 100%)',
+            'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(239,68,68,0.15) 100%)'
+          ];
+          const borderColors = [
+            'rgba(102,126,234,0.3)',
+            'rgba(236,72,153,0.3)',
+            'rgba(59,130,246,0.3)',
+            'rgba(245,158,11,0.3)'
+          ];
+          const bgGradient = gradients[idx % gradients.length];
+          const borderColor = borderColors[idx % borderColors.length];
+          
           return `
-            <label style="display:flex; gap:10px; padding: 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.03); cursor:pointer;">
-              <input type="radio" name="ticketType" value="${t.id}" data-price="${t.price_cents || 0}" data-currency="${t.currency || 'INR'}" style="margin-top: 4px;" />
-              <div style="flex:1;">
-                <div style="display:flex; justify-content:space-between; gap: 10px;">
-                  <div style="font-weight:900;">${t.name}</div>
-                  <div style="font-weight:900;">${price}</div>
+            <label class="ticket-card" data-ticket-id="${t.id}" style="display:flex; gap:16px; padding: 18px; border-radius: 16px; border: 2px solid ${borderColor}; background: ${bgGradient}; cursor:pointer; transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.4)';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%); pointer-events: none;"></div>
+              <div style="position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-top: 2px;">
+                <input type="radio" name="ticketType" value="${t.id}" data-price="${t.price_cents || 0}" data-currency="${t.currency || 'INR'}" style="position: absolute; opacity: 0; width: 24px; height: 24px; cursor: pointer;" onchange="document.querySelectorAll('.ticket-card').forEach(c => c.style.borderColor = c.querySelector('input').checked ? '#667eea' : '${borderColor}'); this.parentElement.parentElement.style.borderColor='#667eea';" />
+                <div class="custom-radio" style="width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                  <div style="width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); transform: scale(0); transition: transform 0.3s ease;"></div>
                 </div>
-                <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px;">${(t.description || '').trim() || how}</div>
+              </div>
+              <div style="flex:1; position: relative; z-index: 1;">
+                <div style="display:flex; justify-content:space-between; align-items:start; gap: 12px; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">${icon}</span>
+                    <div style="font-weight:900; font-size: 17px; color: var(--ig-primary-text);">${t.name}</div>
+                  </div>
+                  <div style="font-weight:900; font-size: 18px; ${isFree ? 'color: #00d4aa;' : 'background: linear-gradient(135deg, #00d4aa 0%, #00a896 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;'}">${price}</div>
+                </div>
+                <div style="color: var(--ig-secondary-text); font-size: 13px; line-height: 1.5; margin-bottom: 6px;" id="desc-${t.id}">${shortDesc}</div>
+                ${hasLongDesc ? `<button type="button" onclick="event.preventDefault(); const desc=document.getElementById('desc-${t.id}'); const full='${description.replace(/'/g, "\\'").replace(/\n/g, ' ')}'; if(desc.textContent.includes('...')){desc.textContent=full; this.textContent='Show less';}else{desc.textContent='${shortDesc.replace(/'/g, "\\'").replace(/\n/g, ' ')}'; this.textContent='Read more';}" style="color: #667eea; font-size: 12px; font-weight: 700; background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline;">Read more</button>` : ''}
                 ${contact}
+                ${how && how !== 'FREE' ? `<div style="margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(0,0,0,0.3); border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--ig-secondary-text);"><span>💳</span> ${how}</div>` : ''}
               </div>
             </label>
           `;
         })
         .join('');
+      
+      // Add CSS for checked state
+      const style = document.createElement('style');
+      style.textContent = `
+        .ticket-card input:checked ~ .custom-radio {
+          border-color: #667eea !important;
+          background: rgba(102,126,234,0.2) !important;
+        }
+        .ticket-card input:checked ~ .custom-radio > div {
+          transform: scale(1) !important;
+        }
+      `;
+      if (!document.getElementById('ticket-card-styles')) {
+        style.id = 'ticket-card-styles';
+        document.head.appendChild(style);
+      }
 
       // select first by default
       const first = list.querySelector('input[name="ticketType"]');
@@ -664,11 +803,15 @@
     const t = selectedTicket();
     const el = document.getElementById('ticketTotal');
     if (!t) {
-      el.textContent = '';
+      el.innerHTML = '';
       return;
     }
     const total = (t.priceCents || 0) * qty;
-    el.textContent = total ? `Total: ${formatMoney(total, t.currency)}` : 'Total: Free';
+    if (total) {
+      el.innerHTML = `<div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 14px;">💰</span><span style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;">Total:</span><span style="font-size: 18px;">${formatMoney(total, t.currency)}</span></div>`;
+    } else {
+      el.innerHTML = `<div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 14px;">🎉</span><span style="font-size: 18px; color: #00d4aa;">Free</span></div>`;
+    }
   }
 
   async function checkoutTickets() {
@@ -700,8 +843,40 @@
       } else {
         result.innerHTML = `<div style="color: var(--ig-primary-text); font-weight: 800;">Order created.</div><div class="exp-hint">Organizer will DM you after confirming payment.</div>`;
       }
+      
+      // Refresh event data to update Interested count and Popularity
+      await refreshEventDetail(ev.id);
     } catch (e) {
       result.innerHTML = `<div style="color: var(--ig-error);">${e.message}</div>`;
+    }
+  }
+
+  async function refreshEventDetail(eventId) {
+    try {
+      const res = await fetch(`/api/events/${eventId}`, { headers: tokenHeaders() });
+      const data = await res.json();
+      if (!res.ok) return;
+      
+      const updatedEvent = data.event;
+      if (!updatedEvent) return;
+      
+      // Update state arrays
+      if (state.myEvents) {
+        const idx = state.myEvents.findIndex(e => e.id === eventId);
+        if (idx !== -1) state.myEvents[idx] = { ...state.myEvents[idx], ...updatedEvent };
+      }
+      if (state.discoverEvents) {
+        const idx = state.discoverEvents.findIndex(e => e.id === eventId);
+        if (idx !== -1) state.discoverEvents[idx] = { ...state.discoverEvents[idx], ...updatedEvent };
+      }
+      
+      // Update active event and refresh the detail view
+      if (state.activeEvent && state.activeEvent.id === eventId) {
+        state.activeEvent = { ...state.activeEvent, ...updatedEvent };
+        openEventDetail(state.activeEvent); // Refresh the display
+      }
+    } catch (e) {
+      console.error('Error refreshing event:', e);
     }
   }
 
@@ -711,68 +886,212 @@
     if (!ev) return;
 
     state.activeOrdersEventId = ev.id;
+    state.currentOrderStatus = 'pending'; // Default to pending
     const modal = document.getElementById('ordersModal');
-    const list = document.getElementById('ordersList');
-    const title = document.getElementById('ordersTitle');
-    const subtitle = document.getElementById('ordersSubtitle');
-
-    title.textContent = 'Manage Orders';
-    subtitle.textContent = `${ev.title || 'Event'} • Pending payments`;
-    list.innerHTML = '<div class="ig-spinner"></div>';
 
     modal.style.display = 'flex';
+    
+    // Initialize active tab styling
+    const activeTab = document.getElementById('orderTabPending');
+    if (activeTab) {
+      activeTab.style.color = 'var(--ig-primary-text)';
+      activeTab.style.borderBottomColor = '#f59e0b';
+      activeTab.style.background = 'rgba(245,158,11,0.08)';
+    }
+    
+    // Set up tab click handlers
+    document.querySelectorAll('.order-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const status = tab.getAttribute('data-status');
+        state.currentOrderStatus = status;
+        
+        // Update active tab styling
+        document.querySelectorAll('.order-tab').forEach(t => {
+          t.classList.remove('active');
+          t.style.color = 'var(--ig-secondary-text)';
+          t.style.borderBottomColor = 'transparent';
+          t.style.background = 'none';
+        });
+        tab.classList.add('active');
+        tab.style.color = 'var(--ig-primary-text)';
+        tab.style.borderBottomColor = '#f59e0b';
+        tab.style.background = 'rgba(245,158,11,0.08)';
+        
+        loadOrdersForStatus(ev, status);
+      });
+    });
+    
+    // Load initial orders (pending)
+    loadOrdersForStatus(ev, 'pending');
+  }
+
+  async function loadOrdersForStatus(ev, status) {
+    const list = document.getElementById('ordersList');
+    const subtitle = document.getElementById('ordersSubtitle');
+    
+    const statusLabels = {
+      pending: 'Pending payments',
+      paid: 'Confirmed orders',
+      all: 'All orders'
+    };
+    
+    subtitle.textContent = `${ev.title || 'Event'} • ${statusLabels[status] || 'Orders'}`;
+    list.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; padding: 60px 20px;"><div class="ig-spinner"></div></div>';
 
     try {
-      const res = await fetch(`/api/events/${ev.id}/orders?status=pending`, { headers: tokenHeaders() });
+      const url = status === 'all' 
+        ? `/api/events/${ev.id}/orders`
+        : `/api/events/${ev.id}/orders?status=${status}`;
+        
+      const res = await fetch(url, { headers: tokenHeaders() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
 
       const orders = data.orders || [];
       if (!orders.length) {
-        list.innerHTML = '<div style="color: var(--ig-secondary-text);">No pending orders.</div>';
+        const emptyIcons = {
+          pending: '⏳',
+          paid: '✓',
+          all: '📋'
+        };
+        const emptyMessages = {
+          pending: 'No pending orders',
+          paid: 'No confirmed orders yet',
+          all: 'No orders yet'
+        };
+        list.innerHTML = `
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+            <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;">${emptyIcons[status] || '📋'}</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--ig-primary-text); margin-bottom: 8px;">${emptyMessages[status] || 'No orders'}</div>
+            <div style="color: var(--ig-secondary-text); font-size: 14px;">Orders will appear here once customers book tickets</div>
+          </div>
+        `;
         return;
       }
 
       list.innerHTML = orders
-        .map((o) => {
+        .map((o, idx) => {
           const money = o.total_cents ? formatMoney(o.total_cents, o.currency) : 'Free';
+          const date = new Date(o.created_at).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          const isPaid = o.status === 'paid';
+          const statusBadge = isPaid
+            ? '<span style="background: linear-gradient(135deg, rgba(0,212,170,0.2) 0%, rgba(0,168,150,0.2) 100%); color: #00d4aa; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; border: 1.5px solid rgba(0,212,170,0.3); display: inline-flex; align-items: center; gap: 6px;"><span style="font-size: 14px;">✓</span> CONFIRMED</span>'
+            : '<span style="background: linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(245,158,11,0.2) 100%); color: #ffc107; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; border: 1.5px solid rgba(255,193,7,0.3); display: inline-flex; align-items: center; gap: 6px;"><span style="font-size: 14px;">⏳</span> PENDING</span>';
+          
+          const actionBtn = !isPaid
+            ? `<button class="exp-btn primary" data-order="${o.id}" style="font-size: 14px; height: 42px; padding: 0 20px; background: linear-gradient(135deg, #00d4aa 0%, #00a896 100%); border: none; font-weight: 800; white-space: nowrap;"><span style="display: flex; align-items: center; gap: 8px;">✓ Mark Paid & Issue</span></button>`
+            : `<div style="display: flex; align-items: center; gap: 8px; color: #00d4aa; font-size: 13px; font-weight: 700; padding: 8px 16px; background: rgba(0,212,170,0.1); border-radius: 12px; border: 1.5px solid rgba(0,212,170,0.2);"><span style="font-size: 16px;">🎫</span> Ticket Issued</div>`;
+
+          // Profile picture with fallback to initial avatar
+          const hasProfilePic = o.buyer_picture && o.buyer_picture !== '/default-avatar.png';
+          const firstLetter = o.buyer_username?.charAt(0)?.toUpperCase() || 'U';
+          const profileUrl = `/profile.html?username=${encodeURIComponent(o.buyer_username)}`;
+          
+          const profileImage = hasProfilePic 
+            ? `<img src="${o.buyer_picture}" alt="${o.buyer_username}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+               <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: white;">${firstLetter}</div>`
+            : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; color: white;">${firstLetter}</div>`;
+
+          const gradients = [
+            'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(236,72,153,0.12) 100%)',
+            'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(147,51,234,0.12) 100%)',
+            'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(236,72,153,0.12) 100%)',
+            'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(59,130,246,0.12) 100%)'
+          ];
+          const bgGradient = gradients[idx % gradients.length];
+          
+          const borderColors = [
+            'rgba(245,158,11,0.3)',
+            'rgba(59,130,246,0.3)',
+            'rgba(168,85,247,0.3)',
+            'rgba(34,197,94,0.3)'
+          ];
+          const borderColor = borderColors[idx % borderColors.length];
+
           return `
-            <div class="exp-section" style="padding: 14px;">
-              <div style="display:flex; justify-content:space-between; gap: 10px;">
-                <div>
-                  <div style="font-weight: 900;">@${o.buyer_username}</div>
-                  <div style="color: var(--ig-secondary-text); font-size: 12px; margin-top: 4px;">${o.ticket_type_name || 'Pass'} • Qty ${o.quantity} • ${money}</div>
+            <div class="order-card" style="padding: 18px; border-radius: 16px; border: 2px solid ${borderColor}; background: ${bgGradient}; position: relative; overflow: hidden; transition: all 0.3s ease;" onmouseenter="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(0,0,0,0.4)';" onmouseleave="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%); pointer-events: none;"></div>
+              <div style="display:flex; justify-content:space-between; gap: 16px; align-items: start; position: relative; z-index: 1;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                    <a href="${profileUrl}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ig-primary-text); transition: all 0.2s ease; padding: 4px; border-radius: 12px;" onmouseenter="this.style.background='rgba(255,255,255,0.08)';" onmouseleave="this.style.background='transparent';">
+                      <div style="width: 44px; height: 44px; border-radius: 50%; overflow: hidden; border: 2.5px solid rgba(255,255,255,0.2); background: linear-gradient(135deg, rgba(102,126,234,0.3) 0%, rgba(118,75,162,0.3) 100%); flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                        ${profileImage}
+                      </div>
+                      <div style="font-weight: 900; font-size: 16px;">@${o.buyer_username}</div>
+                    </a>
+                    ${statusBadge}
+                  </div>
+                  <div style="display: grid; gap: 8px; color: var(--ig-secondary-text); font-size: 13px; line-height: 1.6;">
+                    <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(0,0,0,0.2); border-radius: 8px; width: fit-content;">
+                      <span style="font-size: 16px;">🎫</span>
+                      <span style="font-weight: 600;">${o.ticket_type_name || 'Pass'}</span>
+                      <span style="color: var(--ig-primary-text); font-weight: 800;">× ${o.quantity}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 700;">
+                      <span style="font-size: 16px;">💰</span>
+                      <span style="color: ${o.total_cents ? '#00d4aa' : '#ffc107'}; font-size: 15px;">${money}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 16px;">📅</span>
+                      <span>${date}</span>
+                    </div>
+                    ${o.payment_mode ? `<div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 16px;">💳</span>
+                      <span style="text-transform: capitalize; font-weight: 600;">${o.payment_mode}</span>
+                    </div>` : ''}
+                  </div>
                 </div>
-                <button class="exp-btn primary" data-order="${o.id}">Mark paid & issue</button>
+                <div style="flex-shrink: 0; display: flex; align-items: center;">
+                  ${actionBtn}
+                </div>
               </div>
             </div>
           `;
         })
         .join('');
 
-      list.querySelectorAll('button[data-order]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const orderId = btn.getAttribute('data-order');
-          btn.disabled = true;
-          btn.textContent = 'Issuing...';
-          try {
-            const res2 = await fetch(`/api/events/${ev.id}/orders/${orderId}/mark-paid`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...tokenHeaders() }
-            });
-            const d2 = await res2.json();
-            if (!res2.ok) throw new Error(d2.error || 'Failed');
-            btn.textContent = 'Issued';
-            loadPasses();
-          } catch (e) {
-            btn.disabled = false;
-            btn.textContent = 'Mark paid & issue';
-            showAlert && showAlert(e.message, 'error');
-          }
+      // Add event listeners to pending order buttons
+      if (status === 'pending' || status === 'all') {
+        list.querySelectorAll('button[data-order]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-order');
+            btn.disabled = true;
+            btn.innerHTML = '<span style="display: flex; align-items: center; gap: 8px;"><div class="ig-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div> Processing...</span>';
+            btn.style.opacity = '0.7';
+            try {
+              const res2 = await fetch(`/api/events/${ev.id}/orders/${orderId}/mark-paid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...tokenHeaders() }
+              });
+              const d2 = await res2.json();
+              if (!res2.ok) throw new Error(d2.error || 'Failed');
+              showAlert && showAlert('Order confirmed and ticket issued!', 'success');
+              loadOrdersForStatus(ev, state.currentOrderStatus || 'pending');
+              loadPasses();
+            } catch (e) {
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn.innerHTML = '<span style="display: flex; align-items: center; gap: 8px;">✓ Mark Paid & Issue</span>';
+              showAlert && showAlert(e.message, 'error');
+            }
+          });
         });
-      });
+      }
     } catch (e) {
-      list.innerHTML = `<div style="color: var(--ig-secondary-text);">${e.message}</div>`;
+      list.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center;">
+          <div style="font-size: 64px; margin-bottom: 16px; opacity: 0.3;">⚠️</div>
+          <div style="font-size: 18px; font-weight: 700; color: var(--ig-error); margin-bottom: 8px;">Failed to load orders</div>
+          <div style="color: var(--ig-secondary-text); font-size: 14px;">${e.message}</div>
+        </div>
+      `;
     }
   }
 
@@ -968,18 +1287,23 @@
     document.getElementById('editPassModal').style.display = 'none';
   }
 
-  async function checkInCode() {
+  // Check-in function that can be called from button or QR scanner
+  async function performCheckin(passCode) {
     const ev = state.activeEvent;
     if (!ev) return;
 
-    const code = document.getElementById('checkinCode').value.trim();
+    const code = passCode || document.getElementById('checkinCode').value.trim();
     const out = document.getElementById('checkinResult');
-    out.textContent = '';
+    out.style.display = 'none';
+    out.innerHTML = '';
 
     if (code.length < 8) {
-      out.textContent = 'Enter a valid code';
+      showCheckinResult('error', '⚠️ Invalid Code', 'Please enter a valid pass code (at least 8 characters)');
       return;
     }
+
+    // Show loading
+    showCheckinResult('loading', '🔍 Verifying...', 'Checking pass authenticity...');
 
     try {
       const res = await fetch(`/api/events/${ev.id}/tickets/check-in`, {
@@ -988,24 +1312,355 @@
         body: JSON.stringify({ code })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      out.textContent = 'Checked in';
-      out.style.color = 'var(--ig-blue)';
+      
+      if (!res.ok) {
+        if (data.error === 'Ticket not found or already used') {
+          if (data.details?.status === 'already_checked_in') {
+            const checkedTime = data.details.checked_in_at ? new Date(data.details.checked_in_at).toLocaleString() : 'earlier';
+            showCheckinResult('error', '⚠️ Already Checked In', 
+              `This pass was already used.<br/><br/>
+              <strong>Attendee:</strong> ${data.details.attendee || 'Unknown'}<br/>
+              <strong>Checked in:</strong> ${checkedTime}<br/><br/>
+              ⚠️ This could be a duplicate attempt.`);
+          } else {
+            showCheckinResult('error', '❌ Invalid or Used Pass', 'This pass code is either:<br/>• Not genuine (fake/invalid)<br/>• Already checked in<br/>• For a different event');
+          }
+        } else {
+          showCheckinResult('error', '❌ Verification Failed', data.error || 'Could not verify this pass');
+        }
+        return;
+      }
+      
+      // Success - pass is genuine and ticket info returned
+      const ticket = data.ticket || {};
+      showCheckinResult('success', '✅ Pass Verified - Check-in Complete!', 
+        `<div style="font-size: 13px; margin-top: 12px; line-height: 1.8;">
+          <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; margin-bottom: 8px;">
+            <div style="margin-bottom: 6px;"><strong>👤 Attendee:</strong> <span style="color: #00d4aa; font-weight: 700;">${ticket.attendee || 'Guest'}</span></div>
+            <div style="margin-bottom: 6px;"><strong>🎫 Ticket Type:</strong> ${ticket.ticket_type || 'Pass'}</div>
+            <div><strong>📅 Event:</strong> ${ev.title}</div>
+          </div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text); text-align: center; margin-top: 12px;">
+            ✓ Pass is genuine and has been marked as checked in
+          </div>
+        </div>`);
+      
+      // Clear input for next scan
+      setTimeout(() => {
+        document.getElementById('checkinCode').value = '';
+        document.getElementById('checkinCode').focus();
+      }, 2000);
+      
     } catch (e) {
-      out.textContent = e.message;
-      out.style.color = 'var(--ig-error)';
+      showCheckinResult('error', '❌ Verification Error', e.message || 'Network error - please try again');
     }
   }
+
+  // Wrapper for button click
+  async function checkInCode() {
+    await performCheckin();
+  }
+
+  function showCheckinResult(type, title, message) {
+    const out = document.getElementById('checkinResult');
+    const colors = {
+      success: { bg: 'rgba(0, 212, 170, 0.15)', border: 'rgba(0, 212, 170, 0.3)', text: '#00d4aa' },
+      error: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', text: '#ef4444' },
+      loading: { bg: 'rgba(102, 126, 234, 0.15)', border: 'rgba(102, 126, 234, 0.3)', text: '#667eea' }
+    };
+    const style = colors[type] || colors.loading;
+    
+    out.style.display = 'block';
+    out.innerHTML = `
+      <div style="background: ${style.bg}; border: 2px solid ${style.border}; border-radius: 14px; padding: 18px;">
+        <div style="font-weight: 900; font-size: 16px; color: ${style.text}; margin-bottom: 8px;">${title}</div>
+        <div style="color: var(--ig-secondary-text); font-size: 13px; line-height: 1.6;">${message}</div>
+      </div>
+    `;
+  }
+
+let html5QrCode = null;
 
   function openCheckin() {
     document.getElementById('checkinModal').style.display = 'flex';
     document.getElementById('checkinCode').value = '';
-    document.getElementById('checkinResult').textContent = '';
+    document.getElementById('checkinResult').style.display = 'none';
+    document.getElementById('checkinResult').innerHTML = '';
+    
+    // Default to manual entry
+    document.getElementById('manualEntrySection').style.display = 'block';
+    document.getElementById('qrScannerSection').style.display = 'none';
+    
+    // Focus input
+    setTimeout(() => {
+      document.getElementById('checkinCode').focus();
+    }, 100);
   }
 
   function closeCheckin() {
+    // Stop scanner if running
+    if (html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop().catch(() => {});
+    }
     document.getElementById('checkinModal').style.display = 'none';
   }
+  
+  async function startQRScanner() {
+    const readerDiv = document.getElementById('qr-reader');
+    const statusDiv = document.getElementById('qr-reader-status');
+    
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode("qr-reader");
+    }
+    
+    // Don't start if already scanning
+    if (html5QrCode.isScanning) {
+      statusDiv.style.display = 'block';
+      return;
+    }
+    
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" }, // Use back camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        (decodedText) => {
+          // Success! Got QR code
+          if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().catch(() => {});
+          }
+          
+          // Show manual section and trigger check-in
+          toggleScanMethod('manual');
+          document.getElementById('checkinCode').value = decodedText;
+          performCheckin(decodedText);
+        },
+        (errorMessage) => {
+          // Scanning errors (no QR found) - ignore
+        }
+      );
+      statusDiv.style.display = 'block';
+    } catch (err) {
+      readerDiv.innerHTML = `
+        <div style="padding: 40px 20px; text-align: center; background: rgba(255,87,87,0.1); border-radius: 12px; border: 2px dashed rgba(255,87,87,0.3);">
+          <div style="font-size: 36px; margin-bottom: 12px;">❌</div>
+          <div style="font-weight: 700; font-size: 14px; color: #ff5757; margin-bottom: 8px;">Camera Access Denied</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text); line-height: 1.5;">
+            Please allow camera permissions in your browser settings and try again.
+          </div>
+        </div>
+      `;
+    }
+  }
+  
+  function toggleScanMethod(method) {
+    const scanBtn = document.getElementById('btnScanMethod');
+    const manualBtn = document.getElementById('btnManualMethod');
+    const scanSection = document.getElementById('qrScannerSection');
+    const manualSection = document.getElementById('manualEntrySection');
+    
+    if (method === 'scan') {
+      scanBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      scanBtn.style.color = 'white';
+      manualBtn.style.background = '';
+      manualBtn.style.color = '';
+      scanSection.style.display = 'block';
+      manualSection.style.display = 'none';
+      
+      // Start scanner
+      startQRScanner();
+    } else {
+      // Stop scanner
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(() => {});
+      }
+      
+      manualBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      manualBtn.style.color = 'white';
+      scanBtn.style.background = '';
+      scanBtn.style.color = '';
+      scanSection.style.display = 'none';
+      manualSection.style.display = 'block';
+      document.getElementById('checkinCode').focus();
+    }
+  }
+
+  // ===== Security Staff Management =====
+  async function openSecurityStaff() {
+    const ev = state.activeEvent;
+    if (!ev) return;
+
+    document.getElementById('securityStaffModal').style.display = 'flex';
+    document.getElementById('staffFullName').value = '';
+    document.getElementById('staffUsername').value = '';
+    document.getElementById('staffPassword').value = '';
+    document.getElementById('addStaffResult').textContent = '';
+    
+    // Set scanner URL
+    const scannerUrl = `${window.location.origin}/ticket-scanner.html`;
+    document.getElementById('scannerUrl').textContent = scannerUrl;
+    
+    // Load staff list
+    await loadSecurityStaff();
+  }
+
+  function closeSecurityStaff() {
+    document.getElementById('securityStaffModal').style.display = 'none';
+  }
+
+  function copyScannerURL() {
+    const url = document.getElementById('scannerUrl').textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      alert('Scanner URL copied to clipboard!');
+    });
+  }
+
+  async function loadSecurityStaff() {
+    const ev = state.activeEvent;
+    if (!ev) return;
+
+    const list = document.getElementById('staffList');
+    list.innerHTML = '<div class="ig-spinner"></div>';
+
+    try {
+      const res = await fetch(`/api/events/${ev.id}/checkin-staff`, {
+        headers: tokenHeaders()
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const staff = data.staff || [];
+      document.getElementById('staffCount').textContent = staff.length;
+
+      if (!staff.length) {
+        list.innerHTML = `
+          <div style="padding: 20px; text-align: center; color: var(--ig-secondary-text); font-size: 14px;">
+            No security staff added yet. Add staff members above.
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = staff.map(s => {
+        const lastLogin = s.last_login ? new Date(s.last_login).toLocaleString() : 'Never';
+        const isActive = s.is_active ? '✓ Active' : '✗ Inactive';
+        const statusColor = s.is_active ? '#00d4aa' : '#ff5757';
+
+        return `
+          <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 900; font-size: 14px; color: var(--ig-primary-text); margin-bottom: 6px;">${s.full_name || s.username}</div>
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; font-size: 11px; color: var(--ig-secondary-text);">
+                  <strong>Username:</strong>
+                  <span style="font-family: 'Courier New', monospace; color: #00d4aa;">${s.username}</span>
+                  
+                  <strong>Event ID:</strong>
+                  <span>${ev.id}</span>
+                  
+                  <strong>Last Login:</strong>
+                  <span>${lastLogin}</span>
+                  
+                  <strong>Status:</strong>
+                  <span style="color: ${statusColor}; font-weight: 700;">${isActive}</span>
+                </div>
+              </div>
+              <button onclick="deleteStaff(${s.id})" class="exp-icon-btn" style="background: rgba(255,59,48,0.15); border-color: rgba(255,59,48,0.3); color: #ff3b30; flex-shrink: 0;">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    } catch (e) {
+      list.innerHTML = `<div style="color: var(--ig-error); padding: 14px; text-align: center;">${e.message}</div>`;
+    }
+  }
+
+  async function addSecurityStaff() {
+    const ev = state.activeEvent;
+    if (!ev) return;
+
+    const fullName = document.getElementById('staffFullName').value.trim();
+    const username = document.getElementById('staffUsername').value.trim();
+    const password = document.getElementById('staffPassword').value.trim();
+    const result = document.getElementById('addStaffResult');
+
+    result.textContent = '';
+
+    if (!username || !password) {
+      result.textContent = 'Username and password are required';
+      result.style.color = 'var(--ig-error)';
+      return;
+    }
+
+    if (username.length < 3) {
+      result.textContent = 'Username must be at least 3 characters';
+      result.style.color = 'var(--ig-error)';
+      return;
+    }
+
+    if (password.length < 6) {
+      result.textContent = 'Password must be at least 6 characters';
+      result.style.color = 'var(--ig-error)';
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/events/${ev.id}/checkin-staff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...tokenHeaders() },
+        body: JSON.stringify({ username, password, full_name: fullName })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      result.textContent = '✓ Staff member added successfully!';
+      result.style.color = '#00d4aa';
+
+      // Clear form
+      document.getElementById('staffFullName').value = '';
+      document.getElementById('staffUsername').value = '';
+      document.getElementById('staffPassword').value = '';
+
+      // Reload staff list
+      await loadSecurityStaff();
+
+    } catch (e) {
+      result.textContent = e.message;
+      result.style.color = 'var(--ig-error)';
+    }
+  }
+
+  async function deleteStaff(staffId) {
+    const ev = state.activeEvent;
+    if (!ev) return;
+
+    if (!confirm('Remove this staff member? They will no longer be able to check-in tickets.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/events/${ev.id}/checkin-staff/${staffId}`, {
+        method: 'DELETE',
+        headers: tokenHeaders()
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      await loadSecurityStaff();
+
+    } catch (e) {
+      alert(`Error: ${e.message}`);
+    }
+  }
+
+  // Expose deleteStaff to global for inline onclick
+  window.deleteStaff = deleteStaff;
+  window.copyScannerURL = copyScannerURL;
 
   // ===== Create Event Modal =====
   function openCreateEvent() {
@@ -1027,21 +1682,9 @@
     document.getElementById('ceCoverFile').value = '';
     document.getElementById('ceCover').value = '';
     document.getElementById('ceMaxPersons').value = '';
-    document.getElementById('cePricingType').value = 'free';
     document.getElementById('ceOrganizer').value = '';
     document.getElementById('ceNote').value = '';
     document.getElementById('ceDesc').value = '';
-    document.getElementById('fareOptionsContainer').style.display = 'none';
-    
-    // Reset fare checkboxes and inputs
-    ['fareSingleCheck', 'fareCoupleCheck', 'fareGroupCheck'].forEach(id => {
-      document.getElementById(id).checked = false;
-    });
-    ['fareSingle', 'fareCouple', 'fareGroup'].forEach(id => {
-      const input = document.getElementById(id);
-      input.value = '';
-      input.disabled = true;
-    });
     
     // Reset pass types form
     state.createEventPassTypes = [];
@@ -1067,7 +1710,6 @@
     const important_note = document.getElementById('ceNote').value.trim();
     const is_public = document.getElementById('cePublic').checked;
     const max_persons = document.getElementById('ceMaxPersons').value;
-    const pricing_type = document.getElementById('cePricingType').value;
 
     if (!title || !event_date) {
       showAlert && showAlert('Title and date required', 'error');
@@ -1087,33 +1729,12 @@
       formData.append('is_public', is_public ? '1' : '0');
       formData.append('notes', '');
       formData.append('max_persons', max_persons || '');
-      formData.append('pricing_type', pricing_type);
 
       // Handle cover image (file or URL)
       if (cover_file) {
         formData.append('cover_photo', cover_file);
       } else if (cover_image) {
         formData.append('cover_image', cover_image);
-      }
-
-      // Handle fare options if paid
-      if (pricing_type === 'paid') {
-        const fareOptions = [];
-        
-        if (document.getElementById('fareSingleCheck').checked) {
-          fareOptions.push('single');
-          formData.append('fare_single', document.getElementById('fareSingle').value || '0');
-        }
-        if (document.getElementById('fareCoupleCheck').checked) {
-          fareOptions.push('couple');
-          formData.append('fare_couple', document.getElementById('fareCouple').value || '0');
-        }
-        if (document.getElementById('fareGroupCheck').checked) {
-          fareOptions.push('group');
-          formData.append('fare_group', document.getElementById('fareGroup').value || '0');
-        }
-        
-        formData.append('fare_options', JSON.stringify(fareOptions));
       }
 
       const res = await fetch('/api/events', {
@@ -1152,7 +1773,8 @@
             price_cents: Math.floor((parseFloat(passType.price) || 0) * 100),
             quantity_total: passType.capacity ? parseInt(passType.capacity) : null,
             description: passType.description || '',
-            contact_text: passType.contact || ''
+            contact_text: passType.contact || '',
+            payment_methods: passType.paymentMethods || ''
           })
         });
       }
@@ -1177,7 +1799,6 @@
     document.getElementById('eeLocation').value = event.location || '';
     document.getElementById('eeCover').value = event.cover_image || '';
     document.getElementById('eeMaxPersons').value = event.max_persons || '';
-    document.getElementById('eePricingType').value = event.pricing_type || 'free';
     document.getElementById('eeOrganizer').value = event.organizer_name || '';
     document.getElementById('eeNote').value = event.important_note || '';
     document.getElementById('eeDesc').value = event.description || '';
@@ -1188,34 +1809,6 @@
       const date = new Date(normalizeSqliteDate(event.event_date));
       const localISOTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       document.getElementById('eeDate').value = localISOTime;
-    }
-    
-    // Handle pricing type and fare options
-    handleEditPricingTypeChange();
-    
-    // Parse and populate fare options if they exist
-    if (event.fare_options) {
-      try {
-        const fareOpts = JSON.parse(event.fare_options);
-        
-        if (fareOpts.includes('single')) {
-          document.getElementById('eeFareSingleCheck').checked = true;
-          document.getElementById('eeFareSingle').disabled = false;
-          document.getElementById('eeFareSingle').value = event.fare_single || '';
-        }
-        if (fareOpts.includes('couple')) {
-          document.getElementById('eeFareCoupleCheck').checked = true;
-          document.getElementById('eeFareCouple').disabled = false;
-          document.getElementById('eeFareCouple').value = event.fare_couple || '';
-        }
-        if (fareOpts.includes('group')) {
-          document.getElementById('eeFareGroupCheck').checked = true;
-          document.getElementById('eeFareGroup').disabled = false;
-          document.getElementById('eeFareGroup').value = event.fare_group || '';
-        }
-      } catch (e) {
-        console.error('Error parsing fare options:', e);
-      }
     }
     
     // Load pass types for this event
@@ -1245,6 +1838,12 @@
         const capacityStr = pt.quantity_total ? ` • Capacity: ${pt.quantity_sold || 0}/${pt.quantity_total}` : '';
         const statusBadge = pt.is_active ? '<span style="background: rgba(0,212,170,0.15); color: #00d4aa; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active</span>' : '<span style="background: rgba(255,59,48,0.15); color: #ff3b30; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Inactive</span>';
         
+        // Properly escape all string values for onclick handler
+        const escapeName = (pt.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '');
+        const escapeDesc = (pt.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '');
+        const escapeContact = (pt.contact_text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '');
+        const escapePaymentMethods = (pt.payment_methods || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '');
+        
         return `
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px;">
             <div style="flex: 1; min-width: 0;">
@@ -1257,7 +1856,7 @@
               </div>
             </div>
             <div style="display: flex; gap: 8px; flex-shrink: 0;">
-              <button type="button" onclick="editExistingPassType(${eventId}, ${pt.id}, '${pt.name.replace(/'/g, "\\'")}', '${pt.payment_mode}', ${pt.price_cents || 0}, ${pt.quantity_total || 'null'}, '${(pt.description || '').replace(/'/g, "\\'")}', '${(pt.contact_text || '').replace(/'/g, "\\'")}', ${pt.is_active ? 1 : 0})" class="exp-icon-btn" style="width: auto; padding: 6px 12px; font-size: 12px; background: rgba(0,149,246,0.15); border-color: rgba(0,149,246,0.3); color: #0095f6;" title="Edit">
+              <button type="button" onclick="editExistingPassType(${eventId}, ${pt.id}, '${escapeName}', '${pt.payment_mode}', ${pt.price_cents || 0}, ${pt.quantity_total || 'null'}, '${escapeDesc}', '${escapeContact}', ${pt.is_active ? 1 : 0}, '${escapePaymentMethods}')" class="exp-icon-btn" style="width: auto; padding: 6px 12px; font-size: 12px; background: rgba(0,149,246,0.15); border-color: rgba(0,149,246,0.3); color: #0095f6;" title="Edit">
                 ✏️
               </button>
               <button type="button" onclick="togglePassTypeStatus(${eventId}, ${pt.id}, ${pt.is_active ? 0 : 1})" class="exp-icon-btn" style="width: auto; padding: 6px 12px; font-size: 12px; background: rgba(168,85,247,0.15); border-color: rgba(168,85,247,0.3); color: #a855f7;" title="${pt.is_active ? 'Deactivate' : 'Activate'}">
@@ -1292,6 +1891,19 @@
       return;
     }
 
+    // Collect payment methods if paid
+    let paymentMethods = [];
+    if (mode === 'paid') {
+      if (document.getElementById('eePaymentDM').checked) paymentMethods.push('dm');
+      if (document.getElementById('eePaymentVenue').checked) paymentMethods.push('venue');
+      if (document.getElementById('eePaymentOnline').checked) paymentMethods.push('online');
+      
+      if (paymentMethods.length === 0) {
+        showAlert && showAlert('Please select at least one payment method for paid passes', 'error');
+        return;
+      }
+    }
+
     const isEditing = editingTypeId && editingTypeId.value;
 
     try {
@@ -1308,7 +1920,8 @@
           price_cents: Math.floor((parseFloat(price) || 0) * 100),
           quantity_total: capacity ? parseInt(capacity) : null,
           description: description || '',
-          contact_text: contact || ''
+          contact_text: contact || '',
+          payment_methods: paymentMethods.join(',')
         })
       });
       
@@ -1322,6 +1935,10 @@
       document.getElementById('eeNewPassCapacity').value = '';
       document.getElementById('eeNewPassDesc').value = '';
       document.getElementById('eeNewPassContact').value = '';
+      document.getElementById('eePaymentDM').checked = false;
+      document.getElementById('eePaymentVenue').checked = false;
+      document.getElementById('eePaymentOnline').checked = false;
+      document.getElementById('eePaymentMethods').style.display = 'none';
       if (editingTypeId) editingTypeId.value = '';
       
       // Reset form title and button
@@ -1346,7 +1963,7 @@
   }
   
   // Edit existing pass type (populate form for editing)
-  window.editExistingPassType = function(eventId, typeId, name, paymentMode, priceCents, quantityTotal, description, contactText, isActive) {
+  window.editExistingPassType = function(eventId, typeId, name, paymentMode, priceCents, quantityTotal, description, contactText, isActive, paymentMethods) {
     // Populate the form with existing data
     document.getElementById('eeNewPassName').value = name;
     document.getElementById('eeNewPassMode').value = paymentMode;
@@ -1354,6 +1971,20 @@
     document.getElementById('eeNewPassCapacity').value = quantityTotal || '';
     document.getElementById('eeNewPassDesc').value = description || '';
     document.getElementById('eeNewPassContact').value = contactText || '';
+    
+    // Handle payment methods
+    if (paymentMode === 'paid' && paymentMethods) {
+      const methods = paymentMethods.split(',');
+      document.getElementById('eePaymentDM').checked = methods.includes('dm');
+      document.getElementById('eePaymentVenue').checked = methods.includes('venue');
+      document.getElementById('eePaymentOnline').checked = methods.includes('online');
+      document.getElementById('eePaymentMethods').style.display = 'block';
+    } else {
+      document.getElementById('eePaymentDM').checked = false;
+      document.getElementById('eePaymentVenue').checked = false;
+      document.getElementById('eePaymentOnline').checked = false;
+      document.getElementById('eePaymentMethods').style.display = 'none';
+    }
     
     // Store the editing type ID in a hidden field
     let editingTypeIdInput = document.getElementById('eeEditingPassTypeId');
@@ -1478,21 +2109,9 @@
     document.getElementById('eeCoverFile').value = '';
     document.getElementById('eeCover').value = '';
     document.getElementById('eeMaxPersons').value = '';
-    document.getElementById('eePricingType').value = 'free';
     document.getElementById('eeOrganizer').value = '';
     document.getElementById('eeNote').value = '';
     document.getElementById('eeDesc').value = '';
-    document.getElementById('eeFareOptionsContainer').style.display = 'none';
-    
-    // Reset fare checkboxes
-    ['eeFareSingleCheck', 'eeFareCoupleCheck', 'eeFareGroupCheck'].forEach(id => {
-      document.getElementById(id).checked = false;
-    });
-    ['eeFareSingle', 'eeFareCouple', 'eeFareGroup'].forEach(id => {
-      const input = document.getElementById(id);
-      input.value = '';
-      input.disabled = true;
-    });
     
     // Reset pass types fields
     document.getElementById('eeNewPassName').value = '';
@@ -1534,7 +2153,6 @@
     const important_note = document.getElementById('eeNote').value.trim();
     const is_public = document.getElementById('eePublic').checked;
     const max_persons = document.getElementById('eeMaxPersons').value;
-    const pricing_type = document.getElementById('eePricingType').value;
 
     if (!title || !event_date) {
       showAlert && showAlert('Title and date required', 'error');
@@ -1554,33 +2172,12 @@
       formData.append('is_public', is_public ? '1' : '0');
       formData.append('notes', '');
       formData.append('max_persons', max_persons || '');
-      formData.append('pricing_type', pricing_type);
 
       // Handle cover image (file or URL)
       if (cover_file) {
         formData.append('cover_photo', cover_file);
       } else if (cover_image) {
         formData.append('cover_image', cover_image);
-      }
-
-      // Handle fare options if paid
-      if (pricing_type === 'paid') {
-        const fareOptions = [];
-        
-        if (document.getElementById('eeFareSingleCheck').checked) {
-          fareOptions.push('single');
-          formData.append('fare_single', document.getElementById('eeFareSingle').value || '0');
-        }
-        if (document.getElementById('eeFareCoupleCheck').checked) {
-          fareOptions.push('couple');
-          formData.append('fare_couple', document.getElementById('eeFareCouple').value || '0');
-        }
-        if (document.getElementById('eeFareGroupCheck').checked) {
-          fareOptions.push('group');
-          formData.append('fare_group', document.getElementById('eeFareGroup').value || '0');
-        }
-        
-        formData.append('fare_options', JSON.stringify(fareOptions));
       }
 
       const res = await fetch(`/api/events/${eventId}`, {
@@ -1600,32 +2197,37 @@
       showAlert && showAlert(e.message, 'error');
     }
   }
-  
-  // Handle edit pricing type change
-  function handleEditPricingTypeChange() {
-    const pricingType = document.getElementById('eePricingType').value;
-    const fareContainer = document.getElementById('eeFareOptionsContainer');
+
+  // Handle pass mode change for create event
+  function handlePassModeChange() {
+    const mode = document.getElementById('cePassMode').value;
+    const paymentMethods = document.getElementById('cePaymentMethods');
     
-    if (pricingType === 'paid') {
-      fareContainer.style.display = 'block';
+    if (mode === 'paid') {
+      paymentMethods.style.display = 'block';
     } else {
-      fareContainer.style.display = 'none';
+      paymentMethods.style.display = 'none';
+      // Uncheck all payment methods
+      document.getElementById('cePaymentDM').checked = false;
+      document.getElementById('cePaymentVenue').checked = false;
+      document.getElementById('cePaymentOnline').checked = false;
     }
   }
 
-  // Handle edit fare checkbox changes
-  function handleEditFareCheckbox(checkboxId, inputId) {
-    const checkbox = document.getElementById(checkboxId);
-    const input = document.getElementById(inputId);
+  // Handle pass mode change for edit event
+  function handleEditPassModeChange() {
+    const mode = document.getElementById('eeNewPassMode').value;
+    const paymentMethods = document.getElementById('eePaymentMethods');
     
-    checkbox.addEventListener('change', () => {
-      input.disabled = !checkbox.checked;
-      if (checkbox.checked) {
-        input.focus();
-      } else {
-        input.value = '';
-      }
-    });
+    if (mode === 'paid') {
+      paymentMethods.style.display = 'block';
+    } else {
+      paymentMethods.style.display = 'none';
+      // Uncheck all payment methods
+      document.getElementById('eePaymentDM').checked = false;
+      document.getElementById('eePaymentVenue').checked = false;
+      document.getElementById('eePaymentOnline').checked = false;
+    }
   }
 
   // Add pass type to create event form
@@ -1642,6 +2244,19 @@
       return;
     }
 
+    // Collect payment methods if paid
+    let paymentMethods = [];
+    if (mode === 'paid') {
+      if (document.getElementById('cePaymentDM').checked) paymentMethods.push('dm');
+      if (document.getElementById('cePaymentVenue').checked) paymentMethods.push('venue');
+      if (document.getElementById('cePaymentOnline').checked) paymentMethods.push('online');
+      
+      if (paymentMethods.length === 0) {
+        showAlert && showAlert('Please select at least one payment method for paid passes', 'error');
+        return;
+      }
+    }
+
     state.createEventPassTypes.push({
       id: Date.now(), // Temporary ID for UI
       name,
@@ -1649,7 +2264,8 @@
       price: price || '0',
       capacity: capacity || '',
       description,
-      contact
+      contact,
+      paymentMethods: paymentMethods.join(',')
     });
 
     // Reset form
@@ -1659,6 +2275,10 @@
     document.getElementById('cePassCapacity').value = '';
     document.getElementById('cePassDesc').value = '';
     document.getElementById('cePassContact').value = '';
+    document.getElementById('cePaymentDM').checked = false;
+    document.getElementById('cePaymentVenue').checked = false;
+    document.getElementById('cePaymentOnline').checked = false;
+    document.getElementById('cePaymentMethods').style.display = 'none';
 
     renderCreateEventPassTypes();
   }
@@ -1688,33 +2308,6 @@
         </div>
       `;
     }).join('');
-  }
-
-  // Handle pricing type change
-  function handlePricingTypeChange() {
-    const pricingType = document.getElementById('cePricingType').value;
-    const fareContainer = document.getElementById('fareOptionsContainer');
-    
-    if (pricingType === 'paid') {
-      fareContainer.style.display = 'block';
-    } else {
-      fareContainer.style.display = 'none';
-    }
-  }
-
-  // Handle fare checkbox changes
-  function handleFareCheckbox(checkboxId, inputId) {
-    const checkbox = document.getElementById(checkboxId);
-    const input = document.getElementById(inputId);
-    
-    checkbox.addEventListener('change', () => {
-      input.disabled = !checkbox.checked;
-      if (checkbox.checked) {
-        input.focus();
-      } else {
-        input.value = '';
-      }
-    });
   }
 
   // Expose functions to global scope for inline onclick handlers
@@ -1759,6 +2352,7 @@
     document.getElementById('btnEditEvent').addEventListener('click', openEditEvent);
     document.getElementById('btnOrders').addEventListener('click', openOrders);
     document.getElementById('btnCheckin').addEventListener('click', openCheckin);
+    document.getElementById('btnSecurityStaff').addEventListener('click', openSecurityStaff);
 
     document.getElementById('closeTickets').addEventListener('click', closeTicketsModal);
     document.getElementById('ticketQty').addEventListener('input', updateTicketTotal);
@@ -1778,28 +2372,23 @@
     document.getElementById('closeCreateEvent').addEventListener('click', closeCreateEvent);
     document.getElementById('openCreateEvent').addEventListener('click', openCreateEvent);
     document.getElementById('createEventSubmit').addEventListener('click', createEvent);
-    document.getElementById('cePricingType').addEventListener('change', handlePricingTypeChange);
     document.getElementById('btnAddPassType').addEventListener('click', addPassTypeToCreate);
-    
-    // Wire up fare checkboxes for create form
-    handleFareCheckbox('fareSingleCheck', 'fareSingle');
-    handleFareCheckbox('fareCoupleCheck', 'fareCouple');
-    handleFareCheckbox('fareGroupCheck', 'fareGroup');
+    document.getElementById('cePassMode').addEventListener('change', handlePassModeChange);
 
     // Edit event modal
     document.getElementById('closeEditEvent').addEventListener('click', closeEditEvent);
     document.getElementById('editEventSubmit').addEventListener('click', updateEvent);
-    document.getElementById('eePricingType').addEventListener('change', handleEditPricingTypeChange);
     document.getElementById('btnAddPassTypeInEdit').addEventListener('click', addPassTypeInEdit);
     document.getElementById('btnCancelPassTypeEdit').addEventListener('click', cancelPassTypeEdit);
-    
-    // Wire up fare checkboxes for edit form
-    handleEditFareCheckbox('eeFareSingleCheck', 'eeFareSingle');
-    handleEditFareCheckbox('eeFareCoupleCheck', 'eeFareCouple');
-    handleEditFareCheckbox('eeFareGroupCheck', 'eeFareGroup');
+    document.getElementById('eeNewPassMode').addEventListener('change', handleEditPassModeChange);
 
     document.getElementById('closeCheckin').addEventListener('click', closeCheckin);
     document.getElementById('btnCheckinGo').addEventListener('click', checkInCode);
+    document.getElementById('btnScanMethod').addEventListener('click', () => toggleScanMethod('scan'));
+    document.getElementById('btnManualMethod').addEventListener('click', () => toggleScanMethod('manual'));
+
+    document.getElementById('closeSecurityStaff').addEventListener('click', closeSecurityStaff);
+    document.getElementById('btnAddStaff').addEventListener('click', addSecurityStaff);
 
     // Default filter values
     document.getElementById('filterCity').value = state.city;

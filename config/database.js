@@ -569,6 +569,24 @@ const createTables = () => {
       )
     `);
 
+    // Check-in staff table (security personnel for venue entry)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS event_checkin_staff (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        full_name TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_login DATETIME,
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(event_id, username)
+      )
+    `);
+
     // Crosspath events table
     db.run(`
       CREATE TABLE IF NOT EXISTS crosspath_events (
@@ -1102,6 +1120,12 @@ const migrateDatabase = () => {
     db.run(`ALTER TABLE event_ticket_types ADD COLUMN contact_text TEXT`, (err) => {
       if (err && !err.message.includes('duplicate column name')) {
         console.error('Error adding contact_text column to event_ticket_types:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE event_ticket_types ADD COLUMN payment_methods TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding payment_methods column to event_ticket_types:', err);
       }
     });
 
