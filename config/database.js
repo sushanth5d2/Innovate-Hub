@@ -153,6 +153,19 @@ const createTables = () => {
       )
     `);
 
+    // Starred messages table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS starred_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        message_id INTEGER NOT NULL,
+        starred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+        UNIQUE(user_id, message_id)
+      )
+    `);
+
     // Messages table
     db.run(`
       CREATE TABLE IF NOT EXISTS messages (
@@ -859,6 +872,25 @@ const createTables = () => {
         }
       });
 
+      // Add pin columns to messages table for direct message pinning
+      db.run(`ALTER TABLE messages ADD COLUMN is_pinned BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: messages is_pinned column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE messages ADD COLUMN pinned_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: messages pinned_at column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE messages ADD COLUMN pinned_by INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: messages pinned_by column migration - ', err.message);
+        }
+      });
+
       // Add pin_expires_at column for pin timer functionality
       db.run(`ALTER TABLE community_group_posts ADD COLUMN pin_expires_at DATETIME`, (err) => {
         if (err && !err.message.includes('duplicate column')) {
@@ -922,6 +954,25 @@ const createTables = () => {
       db.run(`ALTER TABLE donations ADD COLUMN city TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column')) {
           console.log('Note: city column migration - ', err.message);
+        }
+      });
+
+      // Add reply_to_id and timer columns to messages table for reply functionality and timed messages
+      db.run(`ALTER TABLE messages ADD COLUMN reply_to_id INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: reply_to_id column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE messages ADD COLUMN timer INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: timer column migration - ', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE messages ADD COLUMN expires_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: expires_at column migration - ', err.message);
         }
       });
 

@@ -62,7 +62,8 @@ router.get('/:contactId', authMiddleware, (req, res) => {
   const query = `
     SELECT m.*, 
            sender.username as sender_username,
-           sender.profile_picture as sender_picture
+           sender.profile_picture as sender_picture,
+           (SELECT COUNT(*) > 0 FROM starred_messages WHERE user_id = ? AND message_id = m.id) as is_starred
     FROM messages m
     JOIN users sender ON m.sender_id = sender.id
     WHERE ((m.sender_id = ? AND m.receiver_id = ? AND m.is_deleted_by_sender = 0)
@@ -70,7 +71,7 @@ router.get('/:contactId', authMiddleware, (req, res) => {
     ORDER BY m.created_at ASC
   `;
 
-  db.all(query, [userId, contactId, contactId, userId], (err, messages) => {
+  db.all(query, [userId, userId, contactId, contactId, userId], (err, messages) => {
     if (err) {
       return res.status(500).json({ error: 'Error fetching messages' });
     }
@@ -204,7 +205,7 @@ router.post('/send', authMiddleware, (req, res, next) => {
 router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
   const db = getDb();
   const senderId = req.user.userId;
-  const { receiver_id, content, timer } = req.body;
+  const { receiver_id, content, timer, reply_to_id } = req.body;
 
   let attachments = [];
   if (req.files) {
@@ -225,11 +226,11 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
   }
 
   const query = `
-    INSERT INTO messages (sender_id, receiver_id, content, attachments, timer, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (sender_id, receiver_id, content, attachments, timer, expires_at, reply_to_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt], function(err) {
+  db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt, reply_to_id || null], function(err) {
     if (err) {
       return res.status(500).json({ error: 'Error sending message' });
     }
@@ -323,7 +324,79 @@ router.delete('/:messageId', authMiddleware, (req, res) => {
   });
 });
 
-module.exports = router;
+// Pin/Unpin a message
+router.post('/:messageId/pin', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { messageId } = req.params;
+
+  // Check if message exists and user has access
+  const checkQuery = `
+    SELECT * FROM messages 
+    WHERE id = ? AND (sender_id = ? OR receiver_id = ?)
+  `;
+
+  db.get(checkQuery, [messageId, userId, userId], (err, message) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error checking message' });
+    }
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Toggle pin status
+    const updateQuery = `
+      UPDATE messages 
+      SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END,
+          pinned_at = CASE WHEN is_pinned = 0 THEN datetime('now') ELSE NULL END,
+          pinned_by = CASE WHEN is_pinned = 0 THEN ? ELSE NULL END
+      WHERE id = ?
+    `;
+
+    db.run(updateQuery, [userId, messageId], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error updating pin status' });
+      }
+      res.json({ success: true, pinned: message.is_pinned ? false : true });
+    });
+  });
+});
+
+// Star/Favorite a message
+router.post('/:messageId/star', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { messageId } = req.params;
+
+  // Check if already starred
+  const checkQuery = 'SELECT * FROM starred_messages WHERE user_id = ? AND message_id = ?';
+  
+  db.get(checkQuery, [userId, messageId], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error checking star status' });
+    }
+
+    if (row) {
+      // Unstar
+      db.run('DELETE FROM starred_messages WHERE user_id = ? AND message_id = ?', [userId, messageId], function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error removing star' });
+        }
+        res.json({ success: true, starred: false });
+      });
+    } else {
+      // Star
+      db.run('INSERT INTO starred_messages (user_id, message_id, starred_at) VALUES (?, ?, datetime("now"))', 
+        [userId, messageId], 
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error adding star' });
+          }
+          res.json({ success: true, starred: true });
+      });
+    }
+  });
+});
 
 // Delete entire conversation for current user
 router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
@@ -346,3 +419,5 @@ router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
     res.json({ success: true });
   });
 });
+
+module.exports = router;

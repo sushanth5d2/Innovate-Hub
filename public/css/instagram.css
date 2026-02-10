@@ -47,7 +47,7 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
-  padding-bottom: 60px;
+  padding-bottom: 100px;
 }
 
 /* === TOP NAVIGATION === */
@@ -141,18 +141,36 @@ body {
 /* === BOTTOM NAVIGATION === */
 .ig-bottom-nav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 65px;
-  background-color: var(--ig-primary-background);
-  border-top: 1px solid var(--ig-border);
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 85%;
+  max-width: 700px;
+  height: 70px;
+  background: rgba(28, 28, 30, 0.85);
+  border: none;
+  border-radius: 40px;
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 100;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 0 24px;
+  animation: slideUpNav 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideUpNav {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .ig-bottom-nav-item {
@@ -163,36 +181,102 @@ body {
   align-items: center;
   height: 100%;
   gap: 4px;
-  color: var(--ig-secondary-text);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 8px 0;
+  border-radius: 16px;
+  position: relative;
+}
+
+.ig-bottom-nav-item:hover {
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
 }
 
 .ig-bottom-nav-item:active {
-  opacity: 0.5;
+  opacity: 0.7;
+  transform: translateY(0);
 }
 
 .ig-bottom-nav-item svg {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   stroke: currentColor;
   fill: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 .ig-bottom-nav-item.active {
-  color: var(--ig-blue);
+  color: rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .ig-bottom-nav-item.active svg {
   stroke-width: 2.5px;
 }
 
+/* Light theme nav items */
+:root[data-theme="light"] .ig-bottom-nav-item {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+:root[data-theme="light"] .ig-bottom-nav-item:hover {
+  color: rgba(0, 0, 0, 0.95);
+}
+
+:root[data-theme="light"] .ig-bottom-nav-item.active {
+  color: var(--ig-blue);
+  background: rgba(0, 149, 246, 0.1);
+}
+
+:root[data-theme="light"] .ig-bottom-nav-item svg {
+  filter: none;
+}
+
 .ig-bottom-nav-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: -0.2px;
+}
+
+/* Light theme override for bottom nav */
+:root[data-theme="light"] .ig-bottom-nav {
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12),
+              0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Hide bottom nav on messages page */
+.ig-messages-page .ig-bottom-nav {
+  display: none;
+}
+
+/* Adjust body padding for messages page */
+.ig-messages-page {
+  padding-bottom: 0 !important;
+}
+
+/* Responsive adjustments for small screens */
+@media (max-width: 480px) {
+  .ig-bottom-nav {
+    width: 95%;
+    max-width: 360px;
+    bottom: 12px;
+    height: 56px;
+    border-radius: 32px;
+    padding: 0 12px;
+  }
+  
+  .ig-bottom-nav-item svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .ig-bottom-nav-label {
+    font-size: 9px;
+  }
 }
 
 /* === MAIN CONTENT === */
@@ -525,14 +609,14 @@ body {
 .ig-messages-header {
   padding: 20px;
   border-bottom: 1px solid var(--ig-border);
-  display: flex;
+  display: none;
   justify-content: space-between;
   align-items: center;
 }
 
 /* Mobile Messages Header */
 .ig-messages-mobile-header {
-  display: none;
+  display: flex;
   padding: 12px 16px;
   border-bottom: 1px solid var(--ig-border);
   align-items: center;
@@ -543,11 +627,29 @@ body {
 .ig-mobile-back {
   background: none;
   border: none;
-  padding: 4px;
+  padding: 8px;
+  margin-right: 8px;
   cursor: pointer;
   color: var(--ig-primary-text);
   display: flex;
   align-items: center;
+  transition: all 0.2s ease;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ig-mobile-back svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ig-mobile-back:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.1);
+}
+
+.ig-mobile-back:active {
+  transform: scale(0.95);
 }
 
 /* Messages Search */
@@ -705,10 +807,23 @@ body {
 }
 
 .ig-chat-avatar {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#chatAvatarContainer {
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+#chatAvatarIcon {
+  transition: all 0.2s ease;
 }
 
 .ig-chat-username {
@@ -748,8 +863,31 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
+  margin-right: 8px;
   color: var(--ig-primary-text);
+  transition: all 0.2s ease;
+  border-radius: 50%;
+}
+
+.ig-chat-back:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.ig-chat-back:active {
+  transform: scale(0.95);
+}
+
+/* Light theme back button styles */
+:root[data-theme="light"] .ig-mobile-back:hover,
+:root[data-theme="light"] .ig-chat-back:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .ig-mobile-back,
+:root[data-theme="light"] .ig-chat-back {
+  color: #262626;
 }
 
 .ig-chat-messages {
@@ -759,6 +897,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.ig-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ig-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ig-chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.ig-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .ig-message {
@@ -767,6 +925,18 @@ body {
   border-radius: 22px;
   font-size: 14px;
   word-wrap: break-word;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ig-message:hover {
+  filter: brightness(0.95);
+}
+
+.ig-message:hover .ig-message-options-trigger {
+  opacity: 1;
+  visibility: visible;
 }
 
 .ig-message-sent {
@@ -815,6 +985,106 @@ body {
 
 [data-theme="dark"] .ig-message-sent .ig-message-time {
   color: rgba(255, 255, 255, 0.6);
+}
+
+/* Message Context Menu */
+.ig-message-context-menu {
+  position: fixed;
+  background: var(--ig-primary-background);
+  border: 1px solid var(--ig-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 200px;
+  overflow: hidden;
+  display: none;
+}
+
+.ig-message-context-menu.active {
+  display: block;
+}
+
+.ig-message-context-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: var(--ig-primary-text);
+  font-size: 14px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  min-height: 48px; /* Better touch target for mobile */
+}
+
+.ig-message-context-item:active {
+  background: var(--ig-hover);
+  transform: scale(0.98);
+}
+
+.ig-message-context-item:hover {
+  background: var(--ig-hover);
+}
+
+.ig-message-context-item.danger {
+  color: var(--ig-error);
+}
+
+.ig-message-context-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .ig-message-context-menu {
+    min-width: 220px;
+    max-width: 280px;
+  }
+  
+  .ig-message-context-item {
+    padding: 16px 20px;
+    font-size: 15px;
+  }
+  
+  /* Make three-dot buttons more visible on touch devices */
+  .ig-message button[title="More options"] {
+    opacity: 0.9 !important;
+  }
+}
+
+.ig-message-context-divider {
+  height: 1px;
+  background: var(--ig-border);
+  margin: 4px 0;
+}
+
+.ig-message-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  position: relative;
+}
+
+.ig-message-wrapper.sent {
+  flex-direction: row-reverse;
+}
+
+.ig-message-options-trigger {
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--ig-secondary-text);
+}
+
+.ig-message-options-trigger:hover {
+  color: var(--ig-primary-text);
 }
 
 .ig-chat-input-container {
@@ -898,6 +1168,20 @@ body {
     border-right: none;
   }
   
+  /* Responsive circular bottom nav */
+  .ig-bottom-nav {
+    width: 92%;
+    max-width: 380px;
+    bottom: 16px;
+    height: 60px;
+    border-radius: 35px;
+  }
+  
+  .ig-bottom-nav-item svg {
+    width: 26px;
+    height: 26px;
+  }
+  
   /* Mobile Messages Styling */
   .ig-messages-mobile-header {
     display: flex !important;
@@ -957,7 +1241,15 @@ body {
   }
   
   .ig-input-action-btn {
-    display: inline-flex !important;
+    display: inline-flex;
+  }
+  
+  .ig-send-btn {
+    display: inline-flex;
+  }
+  
+  .ig-voice-btn {
+    display: inline-flex;
   }
 }
 
@@ -1606,8 +1898,9 @@ body:has(#fullScreenPostViewer) .ig-bottom-nav {
 }
 
 .ig-attach-option svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .ig-voice-btn {

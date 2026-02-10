@@ -211,6 +211,60 @@ router.delete('/:groupId/members/:userId', (req, res) => {
   );
 });
 
+// Pin/Unpin a group message
+router.post('/:groupId/messages/:messageId/pin', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+
+  // Check if user is a member of the group
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+     UNION
+     SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, userId, groupId, userId],
+    (err, member) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (!member) {
+        return res.status(403).json({ error: 'You are not a member of this group' });
+      }
+
+      // Check if message exists in this group
+      db.get(
+        `SELECT * FROM group_messages WHERE id = ? AND group_id = ?`,
+        [messageId, groupId],
+        (err, message) => {
+          if (err) {
+            return res.status(500).json({ error: 'Error checking message' });
+          }
+          if (!message) {
+            return res.status(404).json({ error: 'Message not found' });
+          }
+
+          // Toggle pin status
+          const updateQuery = `
+            UPDATE group_messages 
+            SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END,
+                pinned_at = CASE WHEN is_pinned = 0 THEN datetime('now') ELSE NULL END,
+                pinned_by = CASE WHEN is_pinned = 0 THEN ? ELSE NULL END
+            WHERE id = ?
+          `;
+
+          db.run(updateQuery, [userId, messageId], function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error updating pin status' });
+            }
+            res.json({ success: true, pinned: message.is_pinned ? false : true });
+          });
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;
 
 // Delete a group (creator or admin only)
