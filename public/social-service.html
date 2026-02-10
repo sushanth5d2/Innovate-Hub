@@ -8,12 +8,18 @@
   <link rel="stylesheet" href="/css/experiences.css">
   <link rel="stylesheet" href="/css/social-service.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
   <!-- Top Navigation -->
   <header class="exp-topbar">
     <div class="exp-topbar-inner">
       <a class="exp-brand" href="/home">Innovate</a>
+
+      <button class="exp-pill" id="cityBtn" type="button" title="Change city">
+        <span id="cityLabel">All Cities</span>
+        <span style="opacity:0.7;">▾</span>
+      </button>
 
       <div class="exp-search exp-search-desktop" title="Search">
         <span style="opacity:0.7;">🔎</span>
@@ -22,6 +28,7 @@
 
       <div class="exp-actions">
         <button class="exp-icon-btn exp-search-mobile-btn" id="mobileSearchBtn" type="button" title="Search" style="display: none;">🔎</button>
+        <button class="exp-pill" id="filtersBtn" type="button"><span class="filter-text">Filters</span><span class="filter-icon" style="display: none;">⚙️</span></button>
         <button class="exp-icon-btn" onclick="openCreateModal()" type="button" title="Create donation">＋</button>
         <a class="exp-icon-btn" href="/notifications" title="Notifications" style="text-decoration:none;">🔔</a>
         <a class="exp-icon-btn" href="/home" title="Home" style="text-decoration:none;">🏠</a>
@@ -38,62 +45,209 @@
   </header>
 
   <!-- Main Content -->
-  <main class="ig-main exp-main" style="padding-bottom: 80px;">
-    <!-- Hero Section -->
-    <div class="ss-hero" id="hero-section">
-      <div class="ss-hero-icon">🤝</div>
-      <h1 class="ss-hero-title">Make a Difference</h1>
-      <p class="ss-hero-subtitle">Donate items you don't need or help pick up donations. Together, we build a better community.</p>
-      
-      <!-- Stats -->
-      <div class="ss-hero-stats">
-        <div class="ss-stat">
-          <div>
-            <div class="ss-stat-value" id="stat-total">0</div>
-            <div class="ss-stat-label">Total Donations</div>
+  <main class="exp-main exp-page" style="padding-bottom: 80px;">
+    <div>
+      <div class="exp-title" id="pageTitle">Social Service</div>
+      <div class="exp-subtitle" id="pageSubtitle">Donate items you don't need or help pick up donations</div>
+      <div class="exp-tabs" role="tablist">
+        <button class="exp-tab" onclick="switchTab('overview')" id="overview-tab" type="button">Overview</button>
+        <button class="exp-tab active" onclick="switchTab('donations')" id="donations-tab" type="button">All Donations</button>
+        <button class="exp-tab" onclick="switchTab('mine')" id="mine-tab" type="button">My Donations</button>
+        <button class="exp-tab" onclick="switchTab('picked')" id="picked-tab" type="button">Picked by Me</button>
+        <button class="exp-tab" onclick="switchTab('map')" id="map-tab" type="button">Map</button>
+      </div>
+    </div>
+
+    <!-- Overview Tab -->
+    <div id="overview-content" style="display: none;">
+      <div class="ss-hero" id="hero-section">
+        <div class="ss-hero-icon">🤝</div>
+        <h1 class="ss-hero-title">Make a Difference</h1>
+        <p class="ss-hero-subtitle">Donate items you don't need or help pick up donations. Together, we build a better community.</p>
+        
+        <!-- Stats -->
+        <div class="ss-hero-stats">
+          <div class="ss-stat">
+            <div>
+              <div class="ss-stat-value" id="stat-total">0</div>
+              <div class="ss-stat-label">TOTAL DONATIONS</div>
+            </div>
           </div>
-        </div>
-        <div class="ss-stat">
-          <div>
-            <div class="ss-stat-value" id="stat-active">0</div>
-            <div class="ss-stat-label">Active</div>
+          <div class="ss-stat">
+            <div>
+              <div class="ss-stat-value" id="stat-active">0</div>
+              <div class="ss-stat-label">ACTIVE</div>
+            </div>
           </div>
-        </div>
-        <div class="ss-stat">
-          <div>
-            <div class="ss-stat-value" id="stat-completed">0</div>
-            <div class="ss-stat-label">Completed</div>
+          <div class="ss-stat">
+            <div>
+              <div class="ss-stat-value" id="stat-completed">0</div>
+              <div class="ss-stat-label">COMPLETED</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="ss-tabs">
-      <button class="ss-tab active" onclick="switchTab('donations')" id="donations-tab">
-        <i class="fas fa-hand-holding-heart"></i> All Donations
-      </button>
-      <button class="ss-tab" onclick="switchTab('mine')" id="mine-tab">
-        <i class="fas fa-user"></i> My Donations
-      </button>
-      <button class="ss-tab" onclick="switchTab('picked')" id="picked-tab">
-        <i class="fas fa-check-circle"></i> Picked by Me
-      </button>
-    </div>
-
     <!-- Donations Tab -->
-    <div id="donations-content">
-      <div id="donations-list"></div>
-    </div>
+    <section id="donations-content">
+      <div id="donations-list" class="exp-grid"></div>
+    </section>
 
     <!-- My Donations Tab -->
-    <div id="mine-content" style="display: none;">
-      <div id="mine-list"></div>
-    </div>
+    <section id="mine-content" style="display: none;">
+      <div id="mine-list" class="exp-grid"></div>
+    </section>
 
     <!-- Picked Tab -->
-    <div id="picked-content" style="display: none;">
-      <div id="picked-list"></div>
+    <section id="picked-content" style="display: none;">
+      <div id="picked-list" class="exp-grid"></div>
+    </section>
+
+    <!-- Map Tab -->
+    <div id="map-content" style="display: none;">
+      <!-- Map Settings Panel (Collapsible) -->
+      <div id="map-settings-panel" style="margin-bottom: 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--ig-border); border-radius: 12px; overflow: hidden;">
+        <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleMapSettings()">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-cog" style="color: #0095f6;"></i>
+            <span style="font-weight: 700; font-size: 15px;">Map & Location Settings</span>
+          </div>
+          <i class="fas fa-chevron-down" id="settings-chevron" style="color: var(--ig-secondary-text); transition: transform 0.3s;"></i>
+        </div>
+        
+        <div id="map-settings-content" style="display: none; padding: 0 16px 16px 16px; border-top: 1px solid var(--ig-border);">
+          <div style="margin-top: 16px; padding: 12px; background: rgba(0,149,246,0.1); border: 1px solid rgba(0,149,246,0.3); border-radius: 8px; font-size: 13px;">
+            <i class="fas fa-info-circle" style="color: #0095f6;"></i>
+            <span style="color: var(--ig-secondary-text);">Control how your donations appear on the map and get notified about nearby donations</span>
+          </div>
+
+          <!-- Show on Map Toggle -->
+          <div class="ss-setting-row" style="margin-top: 16px;">
+            <div>
+              <div class="ss-setting-title">Show My Donations on Map</div>
+              <div class="ss-setting-desc">Allow your available donations to be visible on the public map</div>
+            </div>
+            <label class="ss-toggle">
+              <input type="checkbox" id="show-on-map-toggle" onchange="autoSaveSettings()">
+              <span class="ss-toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Proximity Notifications -->
+          <div class="ss-setting-row" style="padding-top: 16px; border-top: 1px solid var(--ig-border); margin-top: 16px;">
+            <div>
+              <div class="ss-setting-title">Proximity Notifications</div>
+              <div class="ss-setting-desc">Get notified when donations appear within your radius</div>
+            </div>
+            <label class="ss-toggle">
+              <input type="checkbox" id="proximity-notifications-toggle" onchange="toggleProximityDistance(); autoSaveSettings();">
+              <span class="ss-toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Distance Radius -->
+          <div id="distance-setting" style="margin-top: 16px; display: none;">
+            <label class="ss-form-label">Notification Radius</label>
+            <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+              <input type="range" id="proximity-distance" min="100" max="5000" step="100" value="500" 
+                     onchange="updateDistanceValue(); autoSaveSettings();"
+                     style="flex: 1; accent-color: #0095f6;">
+              <div style="min-width: 80px; text-align: right; font-weight: 600; color: var(--ig-primary-text);">
+                <span id="distance-value">500</span>m
+              </div>
+            </div>
+            <div class="ss-file-hint" style="margin-top: 8px;">You'll be notified about new donations within this distance from your location</div>
+          </div>
+
+          <!-- Current Location Info -->
+          <div style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--ig-border);">
+            <div style="font-size: 13px; color: var(--ig-secondary-text);">
+              <i class="fas fa-map-marker-alt" style="color: #ed4956;"></i>
+              <span id="current-location-info">Location access required</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Status Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--ig-border);">
+        <div style="font-size: 14px; color: var(--ig-secondary-text);">
+          <i class="fas fa-map-marker-alt" style="color: #ed4956;"></i>
+          <span id="map-status">Showing available donations on map</span>
+        </div>
+      </div>
+
+      <!-- Nearby Donations List (shown when proximity notifications enabled) -->
+      <div id="nearby-donations-section" style="display: none; margin-bottom: 16px;">
+        <div style="padding: 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--ig-border); border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="font-weight: 700; font-size: 15px; color: var(--ig-primary-text);">
+              <i class="fas fa-location-arrow" style="color: #0095f6;"></i>
+              <span id="nearby-title">Nearby Donations</span>
+            </div>
+            <div id="nearby-count" style="font-size: 13px; color: var(--ig-secondary-text);"></div>
+          </div>
+          <div id="nearby-donations-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;"></div>
+        </div>
+      </div>
+
+      <!-- Map Container -->
+      <div id="donation-map" style="height: calc(100vh - 380px); min-height: 400px; border-radius: 12px; overflow: hidden; border: 1px solid var(--ig-border);"></div>
+      
+      <!-- Map Legend -->
+      <div id="map-legend" style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--ig-border); font-size: 13px;">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 2px solid white;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            ">
+              <span style="font-size: 20px;">🧍</span>
+            </div>
+            <span>Available</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 2px solid white;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            ">
+              <span style="font-size: 20px;">🚶</span>
+            </div>
+            <span>Assigned</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              background: linear-gradient(135deg, #0095f6 0%, #0074cc 100%);
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 2px solid white;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            ">
+              <span style="font-size: 20px;">😊</span>
+            </div>
+            <span>Your Location</span>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -162,6 +316,16 @@
               class="ss-form-input"
               required 
               placeholder="Enter complete pickup address"
+            >
+          </div>
+
+          <div class="ss-form-group">
+            <label class="ss-form-label">Phone Number</label>
+            <input 
+              type="tel" 
+              id="donation-phone" 
+              class="ss-form-input"
+              placeholder="e.g., +91 98765 43210"
             >
           </div>
 
@@ -299,6 +463,32 @@
     </div>
   </div>
 
+  <!-- Filters overlay + drawer -->
+  <div class="exp-overlay" id="filtersOverlay"></div>
+  <div class="exp-drawer" id="filtersDrawer" aria-label="Filters">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap: 12px;">
+      <div style="font-weight: 900; font-size: 16px;">Filters</div>
+      <button class="exp-icon-btn" id="closeFilters" type="button">✕</button>
+    </div>
+    <div class="exp-field">
+      <label>City</label>
+      <select id="filterCity">
+        <option value="">All Cities</option>
+      </select>
+    </div>
+    <div class="exp-field">
+      <label>Category</label>
+      <select id="filterCategory">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <div class="exp-hint">Filter donations by city and category</div>
+    <div style="display:flex; gap: 10px; margin-top: 16px;">
+      <button class="exp-btn" type="button" id="applyFilters">Apply</button>
+      <button class="exp-btn" type="button" id="clearFilters" style="background: rgba(255,255,255,0.1);">Clear</button>
+    </div>
+  </div>
+
   <!-- Bottom Navigation -->
   <nav class="ig-bottom-nav">
     <a href="/home" class="ig-bottom-nav-item">
@@ -366,6 +556,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/js/social-service.js"></script>
 </body>
 </html>

@@ -740,6 +740,22 @@ const createTables = () => {
       )
     `);
 
+    // User map settings table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS user_map_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE,
+        show_on_map BOOLEAN DEFAULT 1,
+        proximity_notifications BOOLEAN DEFAULT 0,
+        proximity_distance INTEGER DEFAULT 500,
+        user_latitude REAL,
+        user_longitude REAL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Todos table
     db.run(`
       CREATE TABLE IF NOT EXISTS todos (
@@ -1250,6 +1266,25 @@ const migrateDatabase = () => {
     `, (err) => {
       if (err && !err.message.includes('duplicate column name')) {
         console.error('Error adding timer column:', err);
+      }
+    });
+
+    // Add category, city, and phone columns to donations
+    db.run(`ALTER TABLE donations ADD COLUMN category TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding category column to donations:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE donations ADD COLUMN city TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding city column to donations:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE donations ADD COLUMN phone TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding phone column to donations:', err);
       }
     });
     
