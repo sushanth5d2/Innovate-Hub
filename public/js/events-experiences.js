@@ -213,7 +213,7 @@
     if (state.category) {
       subtitle.textContent = `${state.category} events`;
     } else {
-      subtitle.textContent = 'Parties, concerts & trips in one place';
+      subtitle.textContent = 'Hackthons, Events & Conerts in one place';
     }
   }
 
