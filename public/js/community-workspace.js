@@ -148,8 +148,12 @@
 
   function formatTime(ts) {
     try {
-      const d = new Date(ts);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      let normalized = ts;
+      if (typeof ts === 'string' && ts.includes(' ') && !ts.includes('T') && !ts.includes('Z') && !ts.includes('+')) {
+        normalized = ts.replace(' ', 'T') + 'Z';
+      }
+      const d = new Date(normalized);
+      return d.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch {
       return '';
     }
