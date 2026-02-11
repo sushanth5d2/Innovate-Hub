@@ -258,23 +258,113 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
 });
 
 // Edit message
-router.put('/:messageId', authMiddleware, (req, res) => {
+router.put('/:messageId', authMiddleware, upload.single('file'), (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
-  const { content } = req.body;
+  const { content, attachmentAction, fileType } = req.body;
 
-  db.run(
-    'UPDATE messages SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND sender_id = ?',
-    [content, messageId, userId],
-    function(err) {
+  // First, get the current message to check ownership and existing file
+  db.get(
+    'SELECT * FROM messages WHERE id = ? AND sender_id = ?',
+    [messageId, userId],
+    (err, message) => {
       if (err) {
-        return res.status(500).json({ error: 'Error editing message' });
+        return res.status(500).json({ error: 'Database error' });
       }
-      if (this.changes === 0) {
+      if (!message) {
         return res.status(404).json({ error: 'Message not found or unauthorized' });
       }
-      res.json({ success: true });
+
+      // Determine the update based on attachment action
+      let newContent = content || message.content;
+      let newType = message.type;
+      let newFilePath = message.content;
+      let newOriginalFilename = message.original_filename;
+
+      // Handle attachment removal
+      if (attachmentAction === 'remove') {
+        newType = 'text';
+        newFilePath = content || '';
+        newOriginalFilename = null;
+      }
+      // Handle attachment replacement with new file
+      else if (attachmentAction === 'replace' && req.file) {
+        const file = req.file;
+        newType = fileType || 'file';
+        
+        // Determine file path based on type
+        if (file.mimetype.startsWith('image/')) {
+          newFilePath = `/uploads/images/${file.filename}`;
+          newType = 'image';
+        } else if (file.mimetype.startsWith('video/')) {
+          newFilePath = `/uploads/videos/${file.filename}`;
+          newType = 'video';
+        } else {
+          newFilePath = `/uploads/files/${file.filename}`;
+          newType = 'file';
+        }
+        
+        newOriginalFilename = file.originalname;
+        // Keep the text content (caption) if provided
+        newContent = content || '';
+      }
+      // Keep existing attachment (text edit only)
+      else {
+        if (message.type !== 'text') {
+          // Don't overwrite the file path with text content
+          newFilePath = message.content;
+          newOriginalFilename = message.original_filename;
+        } else {
+          newFilePath = content;
+        }
+      }
+
+      // Update the message
+      const updateQuery = `
+        UPDATE messages 
+        SET content = ?, 
+            type = ?, 
+            original_filename = ?,
+            updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ? AND sender_id = ?
+      `;
+
+      db.run(
+        updateQuery,
+        [newFilePath, newType, newOriginalFilename, messageId, userId],
+        function(err) {
+          if (err) {
+            console.error('Update error:', err);
+            return res.status(500).json({ error: 'Error editing message' });
+          }
+          if (this.changes === 0) {
+            return res.status(404).json({ error: 'Message not found or unauthorized' });
+          }
+
+          // Emit socket event for real-time update
+          const io = req.app.get('io');
+          if (message.receiver_id) {
+            io.to(`user_${message.receiver_id}`).emit('message_edited', {
+              id: messageId,
+              content: newFilePath,
+              type: newType,
+              original_filename: newOriginalFilename,
+              updated_at: new Date().toISOString()
+            });
+          }
+
+          res.json({ 
+            success: true,
+            message: {
+              id: messageId,
+              content: newFilePath,
+              type: newType,
+              original_filename: newOriginalFilename
+            }
+          });
+        }
+      );
     }
   );
 });
@@ -329,6 +419,9 @@ router.post('/:messageId/pin', authMiddleware, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
+  const { pinDuration } = req.body; // days or null for permanent
+
+  console.log('Pin endpoint called:', { messageId, userId, body: req.body, pinDuration });
 
   // Check if message exists and user has access
   const checkQuery = `
@@ -338,27 +431,71 @@ router.post('/:messageId/pin', authMiddleware, (req, res) => {
 
   db.get(checkQuery, [messageId, userId, userId], (err, message) => {
     if (err) {
+      console.error('Error checking message:', err);
       return res.status(500).json({ error: 'Error checking message' });
     }
     if (!message) {
+      console.log('Message not found');
       return res.status(404).json({ error: 'Message not found' });
     }
 
-    // Toggle pin status
-    const updateQuery = `
-      UPDATE messages 
-      SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END,
-          pinned_at = CASE WHEN is_pinned = 0 THEN datetime('now') ELSE NULL END,
-          pinned_by = CASE WHEN is_pinned = 0 THEN ? ELSE NULL END
-      WHERE id = ?
-    `;
+    console.log('Message found:', { id: message.id, is_pinned: message.is_pinned });
 
-    db.run(updateQuery, [userId, messageId], function(err) {
-      if (err) {
-        return res.status(500).json({ error: 'Error updating pin status' });
+    // Check if pinDuration exists in body (even if it's null)
+    const hasPinDuration = Object.prototype.hasOwnProperty.call(req.body, 'pinDuration');
+    
+    if (hasPinDuration) {
+      // Pinning with duration
+      let pinExpiry = null;
+      if (pinDuration !== null && pinDuration !== undefined) {
+        // Calculate expiry time
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + parseInt(pinDuration));
+        pinExpiry = expiryDate.toISOString();
       }
-      res.json({ success: true, pinned: message.is_pinned ? false : true });
-    });
+      
+      const updateQuery = `
+        UPDATE messages 
+        SET is_pinned = 1,
+            pinned_at = datetime('now'),
+            pinned_by = ?,
+            pin_expires_at = ?
+        WHERE id = ?
+      `;
+      const params = [userId, pinExpiry, messageId];
+      
+      console.log('Pinning message:', { params, pinExpiry });
+      
+      db.run(updateQuery, params, function(err) {
+        if (err) {
+          console.error('Error pinning message:', err);
+          return res.status(500).json({ error: 'Error pinning message: ' + err.message });
+        }
+        console.log('Message pinned successfully');
+        res.json({ success: true, pinned: true });
+      });
+    } else {
+      // Unpinning (no pinDuration in body means unpin)
+      const updateQuery = `
+        UPDATE messages 
+        SET is_pinned = 0,
+            pinned_at = NULL,
+            pinned_by = NULL,
+            pin_expires_at = NULL
+        WHERE id = ?
+      `;
+      
+      console.log('Unpinning message:', messageId);
+      
+      db.run(updateQuery, [messageId], function(err) {
+        if (err) {
+          console.error('Error unpinning message:', err);
+          return res.status(500).json({ error: 'Error unpinning message: ' + err.message });
+        }
+        console.log('Message unpinned successfully');
+        res.json({ success: true, pinned: false });
+      });
+    }
   });
 });
 

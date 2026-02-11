@@ -891,6 +891,13 @@ const createTables = () => {
         }
       });
 
+      // Add pin_expires_at column for messages pin timer functionality
+      db.run(`ALTER TABLE messages ADD COLUMN pin_expires_at DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: messages pin_expires_at column migration - ', err.message);
+        }
+      });
+
       // Add pin_expires_at column for pin timer functionality
       db.run(`ALTER TABLE community_group_posts ADD COLUMN pin_expires_at DATETIME`, (err) => {
         if (err && !err.message.includes('duplicate column')) {

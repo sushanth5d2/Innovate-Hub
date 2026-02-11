@@ -830,6 +830,64 @@
           return;
         }
 
+        // Check for pinned messages
+        const pinnedMessages = data.messages.filter(msg => msg.is_pinned === 1 || msg.is_pinned === true);
+        
+        // Add pinned message banner at the top (if any) - make it sticky
+        if (pinnedMessages.length > 0) {
+          const pinnedMsg = pinnedMessages[0]; // Show most recent pinned message
+          const pinnedContent = pinnedMsg.content || 'Message';
+          const truncatedContent = pinnedContent.length > 50 ? pinnedContent.substring(0, 50) + '...' : pinnedContent;
+          
+          const pinBanner = document.createElement('div');
+          pinBanner.id = 'pinned-message-banner';
+          pinBanner.style.cssText = 'position: sticky; top: 0; z-index: 10; background: linear-gradient(135deg, rgba(0, 149, 246, 0.15) 0%, rgba(138, 43, 226, 0.1) 100%); border-left: 4px solid var(--ig-blue); padding: 12px 16px; margin: 0 0 8px 0; border-radius: 0 0 8px 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);';
+          pinBanner.onmouseover = () => { 
+            pinBanner.style.background = 'linear-gradient(135deg, rgba(0, 149, 246, 0.25) 0%, rgba(138, 43, 226, 0.15) 100%)';
+            pinBanner.style.transform = 'translateY(1px)';
+          };
+          pinBanner.onmouseout = () => { 
+            pinBanner.style.background = 'linear-gradient(135deg, rgba(0, 149, 246, 0.15) 0%, rgba(138, 43, 226, 0.1) 100%)';
+            pinBanner.style.transform = 'translateY(0)';
+          };
+          pinBanner.onclick = () => {
+            // Scroll to pinned message
+            const messageEl = document.querySelector(`[data-message-id="${pinnedMsg.id}"]`);
+            if (messageEl) {
+              messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // Highlight the message briefly
+              const originalBg = messageEl.style.backgroundColor;
+              messageEl.style.backgroundColor = 'rgba(0, 149, 246, 0.3)';
+              messageEl.style.transition = 'background-color 0.3s';
+              setTimeout(() => {
+                messageEl.style.backgroundColor = originalBg;
+                setTimeout(() => {
+                  messageEl.style.transition = '';
+                }, 300);
+              }, 1500);
+            }
+          };
+          pinBanner.innerHTML = `
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; color: var(--ig-blue); margin-bottom: 6px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-thumbtack" style="font-size: 14px;"></i> 
+                  <span>Pinned Message</span>
+                </div>
+                <div style="font-size: 14px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9;">
+                  <strong>${pinnedMsg.sender_username || 'User'}:</strong> ${truncatedContent}
+                </div>
+              </div>
+              <button onclick="event.stopPropagation(); unpinMessageFromBanner(${pinnedMsg.id})" 
+                      style="background: rgba(0, 0, 0, 0.05); border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; flex-shrink: 0;"
+                      onmouseover="this.style.background='rgba(0,0,0,0.15)'; this.style.color='var(--ig-primary-text)'; this.style.transform='scale(1.1)'"
+                      onmouseout="this.style.background='rgba(0,0,0,0.05)'; this.style.color='var(--ig-secondary-text)'; this.style.transform='scale(1)'"
+                      title="Unpin message">×</button>
+            </div>
+          `;
+          messagesContainer.appendChild(pinBanner);
+        }
+
         data.messages.forEach(msg => {
           const isSent = msg.sender_id === user.id;
           const senderLabel = isSent ? 'You' : (msg.sender_username || '');
@@ -847,6 +905,8 @@
           messageEl.dataset.messageId = msg.id;
           messageEl.dataset.messageContent = msg.content;
           messageEl.dataset.isSent = isSent;
+          messageEl.dataset.isPinned = msg.is_pinned ? 'true' : 'false';
+          messageEl.dataset.isStarred = msg.is_starred ? 'true' : 'false';
 
           // Render by type
           if (msg.type === 'image' || msg.type === 'gif') {
@@ -938,7 +998,7 @@
             } catch (_) {
               messageEl.textContent = msg.content || '';
             }
-          } else if (msg.type === 'file' || msg.type === 'video') {
+          } else if (msg.type === 'file' || msg.type === 'video' || msg.type === 'document') {
             const fileName = msg.original_filename || (msg.content || '').split('/').pop();
             const isVideo = msg.type === 'video' || (msg.content || '').match(/\.(mp4|webm|mov|avi)$/i);
             const isPdf = (msg.content || '').match(/\.pdf$/i) || (fileName || '').match(/\.pdf$/i);
@@ -985,22 +1045,56 @@
               messageEl.appendChild(videoWrapper);
             } else {
               const icon = isPdf ? '📄' : isDoc ? '📝' : '📎';
-              messageEl.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px;">
-                  <div style="font-size: 32px;">${icon}</div>
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
-                    <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
-                  </div>
-                  <button onclick="event.stopPropagation(); downloadFile('${msg.content}', '${fileName}')" style="background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Download">
-                    <svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
-                      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
-                    </svg>
-                  </button>
+              
+              const fileWrapper = document.createElement('div');
+              fileWrapper.style.cssText = 'position: relative; display: inline-block;';
+              
+              const fileContainer = document.createElement('div');
+              fileContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px; cursor: pointer;';
+              fileContainer.onclick = (e) => {
+                if (!e.target.closest('button')) {
+                  openMediaPreview(msg.content, 'file', fileName);
+                }
+              };
+              
+              // Add context menu to file
+              fileContainer.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showMessageContextMenu(e, msg.id, msg.content, isSent, msg.type);
+              });
+              
+              fileContainer.innerHTML = `
+                <div style="font-size: 32px;">${icon}</div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+                  <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
                 </div>
               `;
-              messageEl.style.cursor = 'pointer';
-              messageEl.onclick = () => openMediaPreview(msg.content, 'file', fileName);
+              
+              // Add three-dot menu button for mobile
+              const menuBtn = document.createElement('button');
+              menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                showMessageContextMenu(e, msg.id, msg.content, isSent, msg.type);
+              };
+              menuBtn.style.cssText = 'position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.7; z-index: 10;';
+              menuBtn.title = 'More options';
+              menuBtn.innerHTML = `<svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`;
+              
+              const downloadBtn = document.createElement('button');
+              downloadBtn.onclick = (e) => {
+                e.stopPropagation();
+                downloadFile(msg.content, fileName);
+              };
+              downloadBtn.style.cssText = 'background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;';
+              downloadBtn.title = 'Download';
+              downloadBtn.innerHTML = `<svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>`;
+              
+              fileContainer.appendChild(downloadBtn);
+              fileWrapper.appendChild(fileContainer);
+              fileWrapper.appendChild(menuBtn);
+              messageEl.appendChild(fileWrapper);
             }
           } else {
             // Text
@@ -1254,19 +1348,48 @@
       const input = document.getElementById('messageInput');
       const content = input.value.trim();
       
-      if (!content || (!currentContactId && !currentGroupId)) return;
-      
       // Check if editing (support both old and new dataset keys)
       const isEditing = input.dataset.editing || input.dataset.editingMessageId;
+      
+      // Allow sending if: has content, OR is editing with attachment changes, OR has contact/group
+      const hasAttachmentChanges = isEditing && (input.dataset.attachmentAction || window.editingNewFile);
+      if (!hasAttachmentChanges && (!content || (!currentContactId && !currentGroupId))) return;
+      
       if (isEditing) {
         try {
-          await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
-            method: 'PUT',
-            body: JSON.stringify({ content })
-          });
+          const attachmentAction = input.dataset.attachmentAction;
+          const hasNewFile = window.editingNewFile;
+          
+          // If there are attachment changes, use FormData
+          if (attachmentAction === 'remove' || hasNewFile) {
+            const formData = new FormData();
+            formData.append('content', content);
+            formData.append('attachmentAction', attachmentAction || 'keep');
+            
+            if (hasNewFile) {
+              formData.append('file', hasNewFile);
+              formData.append('fileType', input.dataset.newFileType || 'file');
+            }
+            
+            await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
+              method: 'PUT',
+              body: formData
+              // Don't set headers - apiRequest will handle FormData automatically
+            });
+          } else {
+            // Text-only edit
+            await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
+              method: 'PUT',
+              body: JSON.stringify({ content })
+            });
+          }
           
           delete input.dataset.editing;
           delete input.dataset.editingMessageId;
+          delete input.dataset.originalFileType;
+          delete input.dataset.attachmentAction;
+          delete input.dataset.newFileType;
+          delete window.editingNewFile;
           input.value = '';
           input.placeholder = 'Message...';
           
@@ -1277,10 +1400,18 @@
           const sendBtn = document.getElementById('sendBtn');
           sendBtn.innerHTML = '<svg aria-label="Send" fill="currentColor" height="24" viewBox="0 0 24 24" width="24"><path d="M1.464 12.986 23.963.863a.5.5 0 0 1 .71.627l-5.24 20.618a.5.5 0 0 1-.925.114l-5.14-9.47-9.472-5.138a.5.5 0 0 1 .115-.925l-.547.297Z" stroke="currentColor" fill="none" stroke-linejoin="round"></path></svg>';
           
+          // Reset button visibility after edit
+          sendBtn.style.display = 'none';
+          const voiceBtn = document.getElementById('voiceBtn');
+          const moreBtn = document.getElementById('moreBtn');
+          if (voiceBtn) voiceBtn.style.display = 'inline-flex';
+          if (moreBtn) moreBtn.style.display = 'inline-flex';
+          
           loadMessages(currentContactId);
           InnovateAPI.showAlert('Message updated', 'success');
         } catch (error) {
-          InnovateAPI.showAlert('Failed to update message', 'error');
+          console.error('Edit error:', error);
+          InnovateAPI.showAlert('Failed to update message: ' + (error.message || 'Unknown error'), 'error');
         }
         return;
       }
@@ -1822,20 +1953,56 @@
           const isPdf = data.content.match(/\.pdf$/i) || fileName.match(/\.pdf$/i);
           const isDoc = data.content.match(/\.(doc|docx|txt)$/i) || fileName.match(/\.(doc|docx|txt)$/i);
           const icon = isPdf ? '📄' : isDoc ? '📝' : '📎';
-          messageEl.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px; cursor: pointer;" onclick='openMediaPreview(\`${data.content}\`, "file", \`${fileName}\`)'>
-              <div style="font-size: 32px;">${icon}</div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
-                <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
-              </div>
-              <button onclick='event.stopPropagation(); downloadFile(\`${data.content}\`, \`${fileName}\`)' style="background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" title="Download">
-                <svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18">
-                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
-                </svg>
-              </button>
+          
+          const fileWrapper = document.createElement('div');
+          fileWrapper.style.cssText = 'position: relative; display: inline-block;';
+          
+          const fileContainer = document.createElement('div');
+          fileContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px; cursor: pointer;';
+          fileContainer.onclick = (e) => {
+            if (!e.target.closest('button')) {
+              openMediaPreview(data.content, 'file', fileName);
+            }
+          };
+          
+          // Add context menu support
+          fileContainer.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showMessageContextMenu(e, data.id, data.content, false, data.type);
+          });
+          
+          fileContainer.innerHTML = `
+            <div style="font-size: 32px;">${icon}</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
             </div>
           `;
+          
+          // Add three-dot menu button
+          const menuBtn = document.createElement('button');
+          menuBtn.onclick = (e) => {
+            e.stopPropagation();
+            showMessageContextMenu(e, data.id, data.content, false, data.type);
+          };
+          menuBtn.style.cssText = 'position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.7; z-index: 10;';
+          menuBtn.title = 'More options';
+          menuBtn.innerHTML = `<svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`;
+          
+          const downloadBtn = document.createElement('button');
+          downloadBtn.onclick = (e) => {
+            e.stopPropagation();
+            downloadFile(data.content, fileName);
+          };
+          downloadBtn.style.cssText = 'background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;';
+          downloadBtn.title = 'Download';
+          downloadBtn.innerHTML = `<svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>`;
+          
+          fileContainer.appendChild(downloadBtn);
+          fileWrapper.appendChild(fileContainer);
+          fileWrapper.appendChild(menuBtn);
+          messageEl.appendChild(fileWrapper);
         } else if (data.type === 'location') {
           messageEl.className = 'ig-message ig-message-received';
           const loc = JSON.parse(data.content);
@@ -1916,6 +2083,8 @@
         messageEl.dataset.messageId = data.id;
         messageEl.dataset.messageContent = data.content;
         messageEl.dataset.isSent = 'false';
+        messageEl.dataset.isPinned = data.is_pinned ? 'true' : 'false';
+        messageEl.dataset.isStarred = data.is_starred ? 'true' : 'false';
         
         messageEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
@@ -2701,11 +2870,14 @@
     if (messageInput) {
       messageInput.addEventListener('input', (e) => {
         const hasText = e.target.value.trim();
+        const isEditing = e.target.dataset.editingMessageId;
+        const hasAttachmentChange = e.target.dataset.attachmentAction && e.target.dataset.attachmentAction !== 'keep';
         const sendBtn = document.getElementById('sendBtn');
         const voiceBtn = document.getElementById('voiceBtn');
         const moreBtn = document.getElementById('moreBtn');
         
-        if (hasText) {
+        // Show send button if: has text, is editing, or has attachment changes
+        if (hasText || isEditing || hasAttachmentChange) {
           if (sendBtn) sendBtn.style.display = 'inline-flex';
           if (voiceBtn) voiceBtn.style.display = 'none';
           if (moreBtn) moreBtn.style.display = 'none';
@@ -3279,6 +3451,31 @@
       selectedMessageType = type;
       selectedMessageIsSent = isSent;
       
+      // Check if message is pinned
+      const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+      const isPinned = messageEl?.dataset.isPinned === 'true';
+      const isStarred = messageEl?.dataset.isStarred === 'true';
+      
+      // Update pin button text
+      const pinBtn = document.querySelector('[onclick="pinMessage(event)"]');
+      if (pinBtn) {
+        const pinSvg = pinBtn.querySelector('svg');
+        pinBtn.innerHTML = '';
+        pinBtn.appendChild(pinSvg);
+        const textNode = document.createTextNode(isPinned ? ' Unpin' : ' Pin');
+        pinBtn.appendChild(textNode);
+      }
+      
+      // Update star button text
+      const starBtn = document.querySelector('[onclick="starMessage(event)"]');
+      if (starBtn) {
+        const starSvg = starBtn.querySelector('svg');
+        starBtn.innerHTML = '';
+        starBtn.appendChild(starSvg);
+        const textNode = document.createTextNode(isStarred ? ' Unstar' : ' Star');
+        starBtn.appendChild(textNode);
+      }
+      
       const menu = document.getElementById('messageContextMenu');
       
       // Position menu at cursor or touch point
@@ -3389,7 +3586,7 @@
         }
         
         // Simple prompt for now (you can create a modal later)
-        const contactList = conversationsList.slice(0, 5).map((c, i) => `${i + 1}. ${c.contact_username}`).join('\n');
+        const contactList = conversationsList.slice(0, 5).map((c, i) => `${i + 1}. ${c.username}`).join('\n');
         const choice = prompt(`Forward message to:\n${contactList}\n\nEnter number (1-${Math.min(5, conversationsList.length)}):`);
         
         if (choice && !isNaN(choice) && choice >= 1 && choice <= Math.min(5, conversationsList.length)) {
@@ -3403,7 +3600,7 @@
                 content: selectedMessageContent
               })
             });
-            InnovateAPI.showAlert(`Message forwarded to ${selectedContact.contact_username}`, 'success');
+            InnovateAPI.showAlert(`Message forwarded to ${selectedContact.username}`, 'success');
           } catch (error) {
             console.error('Forward error:', error);
             InnovateAPI.showAlert('Failed to forward message: ' + error.message, 'error');
@@ -3419,18 +3616,169 @@
       console.log('Pin message clicked', {selectedMessageId, currentGroupId});
       if (event) event.stopPropagation();
       hideMessageContextMenu();
+      
+      // Check if message is already pinned
+      const messageEl = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
+      const isPinned = messageEl?.dataset.isPinned === 'true';
+      
+      if (isPinned) {
+        // Unpin if already pinned
+        await unpinMessage();
+      } else {
+        // Show duration modal if not pinned
+        showPinTimerModal();
+      }
+    }
+    
+    function showPinTimerModal() {
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 400px;">
+          <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
+            <h3 style="margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-thumbtack"></i> Pin Message
+            </h3>
+          </div>
+          <div style="padding: 24px;">
+            <p style="margin: 0 0 20px 0; color: var(--ig-secondary-text); font-size: 14px;">
+              How long do you want to pin this message?
+            </p>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button onclick="pinMessageWithDuration(1)" 
+                style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+                onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+                onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+                <span>📅 1 Day</span>
+                <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+              </button>
+              
+              <button onclick="pinMessageWithDuration(7)" 
+                style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+                onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+                onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+                <span>📅 7 Days</span>
+                <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+              </button>
+              
+              <button onclick="pinMessageWithDuration(30)" 
+                style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+                onmouseover="this.style.background='var(--ig-hover)'; this.style.borderColor='var(--ig-blue)'"
+                onmouseout="this.style.background='var(--ig-secondary-background)'; this.style.borderColor='var(--ig-border)'">
+                <span>📅 30 Days</span>
+                <i class="fas fa-chevron-right" style="font-size: 12px; opacity: 0.5;"></i>
+              </button>
+              
+              <button onclick="pinMessageWithDuration(null)" 
+                style="padding: 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; align-items: center;"
+                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'"
+                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                <span>📌 Until I unpin</span>
+                <i class="fas fa-infinity" style="font-size: 16px;"></i>
+              </button>
+            </div>
+          </div>
+          <div style="padding: 16px 24px; border-top: 1px solid var(--ig-border); text-align: right;">
+            <button onclick="this.closest('.ig-modal-overlay').remove()" 
+              style="padding: 10px 20px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer; font-weight: 500;">
+              Cancel
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+      });
+    }
+    
+    async function pinMessageWithDuration(days) {
+      // Close the modal
+      document.querySelector('.ig-modal-overlay')?.remove();
+      
       try {
         const endpoint = currentGroupId 
           ? `/groups/${currentGroupId}/messages/${selectedMessageId}/pin`
           : `/messages/${selectedMessageId}/pin`;
         
-        console.log('Calling pin endpoint:', endpoint);
-        const result = await InnovateAPI.apiRequest(endpoint, { method: 'POST' });
+        console.log('Calling pin endpoint:', endpoint, 'with duration:', days);
+        const result = await InnovateAPI.apiRequest(endpoint, { 
+          method: 'POST',
+          body: JSON.stringify({ pinDuration: days })
+        });
         console.log('Pin result:', result);
-        InnovateAPI.showAlert('Message pinned', 'success');
+        
+        const durationText = days ? `for ${days} day${days > 1 ? 's' : ''}` : 'until unpinned';
+        InnovateAPI.showAlert(`Message pinned ${durationText}!`, 'success');
+        
+        // Reload messages to show updated pin status
+        if (currentGroupId) {
+          await loadGroupChat();
+        } else if (currentContactId) {
+          await loadMessages(currentContactId);
+        }
       } catch (error) {
         console.error('Pin error:', error);
         InnovateAPI.showAlert('Failed to pin message: ' + error.message, 'error');
+      }
+    }
+    
+    async function unpinMessage() {
+      try {
+        const endpoint = currentGroupId 
+          ? `/groups/${currentGroupId}/messages/${selectedMessageId}/pin`
+          : `/messages/${selectedMessageId}/pin`;
+        
+        console.log('Calling unpin endpoint:', endpoint);
+        const result = await InnovateAPI.apiRequest(endpoint, { 
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        console.log('Unpin result:', result);
+        
+        InnovateAPI.showAlert('Message unpinned!', 'success');
+        
+        // Reload messages to show updated pin status
+        if (currentGroupId) {
+          await loadGroupChat();
+        } else if (currentContactId) {
+          await loadMessages(currentContactId);
+        }
+      } catch (error) {
+        console.error('Unpin error:', error);
+        InnovateAPI.showAlert('Failed to unpin message: ' + error.message, 'error');
+      }
+    }
+    
+    async function unpinMessageFromBanner(messageId) {
+      console.log('Unpinning message from banner:', messageId);
+      try {
+        const endpoint = currentGroupId 
+          ? `/groups/${currentGroupId}/messages/${messageId}/pin`
+          : `/messages/${messageId}/pin`;
+        
+        console.log('Calling unpin endpoint:', endpoint);
+        const result = await InnovateAPI.apiRequest(endpoint, { 
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        console.log('Unpin result:', result);
+        
+        InnovateAPI.showAlert('Message unpinned!', 'success');
+        
+        // Reload messages to show updated pin status
+        if (currentGroupId) {
+          await loadGroupChat();
+        } else if (currentContactId) {
+          await loadMessages(currentContactId);
+        }
+      } catch (error) {
+        console.error('Unpin error:', error);
+        InnovateAPI.showAlert('Failed to unpin message: ' + error.message, 'error');
       }
     }
 
@@ -3446,6 +3794,11 @@
         console.log('Star response:', response);
         const action = response.starred ? 'starred' : 'unstarred';
         InnovateAPI.showAlert(`Message ${action}`, 'success');
+        
+        // Reload messages to show updated star status
+        if (currentContactId) {
+          await loadMessages(currentContactId);
+        }
       } catch (error) {
         console.error('Star error:', error);
         InnovateAPI.showAlert('Failed to star message: ' + error.message, 'error');
@@ -3469,19 +3822,201 @@
       // Remove any existing previews/indicators
       previewContainer.innerHTML = '';
       
-      input.value = selectedMessageContent;
+      // Get the message element to check for attachments
+      const messageEl = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
+      const hasFile = selectedMessageType !== 'text';
+      
+      // For file messages, don't show the file path in the input
+      // File paths start with /uploads/, so we can check for that
+      if (!hasFile) {
+        input.value = selectedMessageContent || '';
+      } else if (selectedMessageContent && !selectedMessageContent.startsWith('/uploads/')) {
+        // If there's additional text content with the file, show it
+        input.value = selectedMessageContent;
+      } else {
+        input.value = '';
+      }
+      
       input.dataset.editingMessageId = selectedMessageId;
+      
+      // Initialize attachment state
+      if (hasFile) {
+        input.dataset.originalFileType = selectedMessageType;
+        input.dataset.attachmentAction = 'keep'; // keep, remove, or replace
+      }
+      
+      // Show send button in edit mode
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.style.display = 'inline-flex';
+      
+      const voiceBtn = document.getElementById('voiceBtn');
+      const moreBtn = document.getElementById('moreBtn');
+      if (voiceBtn) voiceBtn.style.display = 'none';
+      if (moreBtn) moreBtn.style.display = 'none';
+      
       input.focus();
       
       // Show edit indicator
       const editIndicator = document.createElement('div');
       editIndicator.className = 'ig-edit-indicator';
       editIndicator.style.cssText = 'padding: 8px 12px; background: var(--ig-secondary-background); border-left: 3px solid #ffa500; margin-bottom: 4px; border-radius: 8px; position: relative;';
-      editIndicator.innerHTML = `
-        <div style="font-size: 12px; color: #ffa500; font-weight: 600;">Editing message</div>
-        <button onclick="cancelEdit()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ig-secondary-text); font-size: 20px; line-height: 1;">×</button>
+      
+      let indicatorHTML = `
+        <div style="font-size: 12px; color: #ffa500; font-weight: 600; margin-bottom: 8px;">Editing message</div>
       `;
+      
+      // Show existing attachment if present
+      if (hasFile && messageEl) {
+        const fileContainer = messageEl.querySelector('.ig-message-file, .ig-message-image, .ig-message-video');
+        if (fileContainer) {
+          const filePreview = fileContainer.cloneNode(true);
+          filePreview.style.cssText = 'max-width: 200px; margin: 8px 0; position: relative;';
+          filePreview.id = 'editAttachmentPreview';
+          
+          // Add remove button
+          const removeBtn = document.createElement('button');
+          removeBtn.onclick = () => removeEditAttachment();
+          removeBtn.style.cssText = 'position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 24px; height: 24px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10;';
+          removeBtn.innerHTML = '×';
+          removeBtn.title = 'Remove attachment';
+          filePreview.appendChild(removeBtn);
+          
+          editIndicator.appendChild(filePreview);
+        }
+      }
+      
+      // Add file upload buttons for edit mode
+      indicatorHTML += `
+        <div id="editFileButtons" style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+          <label class="ig-edit-file-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--ig-blue); color: white; border-radius: 6px; cursor: pointer; font-size: 12px;">
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+            Image
+            <input type="file" accept="image/*" onchange="replaceEditAttachment(this.files[0], 'image')" style="display: none;">
+          </label>
+          <label class="ig-edit-file-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--ig-blue); color: white; border-radius: 6px; cursor: pointer; font-size: 12px;">
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" stroke-width="2">
+              <path d="M23 7l-7 5 7 5V7z"/>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            Video
+            <input type="file" accept="video/*" onchange="replaceEditAttachment(this.files[0], 'video')" style="display: none;">
+          </label>
+          <label class="ig-edit-file-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--ig-blue); color: white; border-radius: 6px; cursor: pointer; font-size: 12px;">
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" stroke-width="2">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+              <path d="M13 2v7h7"/>
+            </svg>
+            Document
+            <input type="file" accept=".pdf,.doc,.docx,.txt" onchange="replaceEditAttachment(this.files[0], 'document')" style="display: none;">
+          </label>
+        </div>
+        <button onclick="cancelEdit()" style="position: absolute; right: 8px; top: 8px; background: none; border: none; cursor: pointer; color: var(--ig-secondary-text); font-size: 20px; line-height: 1;">×</button>
+      `;
+      
+      editIndicator.innerHTML = indicatorHTML;
       previewContainer.appendChild(editIndicator);
+    }
+    
+    // Handle attachment removal during edit
+    function removeEditAttachment() {
+      const input = document.getElementById('messageInput');
+      input.dataset.attachmentAction = 'remove';
+      delete input.dataset.newFile;
+      delete input.dataset.newFileType;
+      
+      const preview = document.getElementById('editAttachmentPreview');
+      if (preview) {
+        preview.remove();
+      }
+      
+      // Keep send button visible
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.style.display = 'inline-flex';
+      
+      InnovateAPI.showAlert('Attachment will be removed', 'info');
+    }
+    
+    // Handle attachment replacement during edit
+    function replaceEditAttachment(file, type) {
+      if (!file) return;
+      
+      const input = document.getElementById('messageInput');
+      input.dataset.attachmentAction = 'replace';
+      input.dataset.newFileType = type;
+      
+      // Store file for submission
+      window.editingNewFile = file;
+      
+      // Remove old preview
+      const oldPreview = document.getElementById('editAttachmentPreview');
+      if (oldPreview) {
+        oldPreview.remove();
+      }
+      
+      // Create new preview
+      const editIndicator = document.querySelector('.ig-edit-indicator');
+      const fileButtons = document.getElementById('editFileButtons');
+      
+      const newPreview = document.createElement('div');
+      newPreview.id = 'editAttachmentPreview';
+      newPreview.style.cssText = 'max-width: 200px; margin: 8px 0; position: relative;';
+      
+      if (type === 'image') {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.style.cssText = 'width: 100%; border-radius: 8px;';
+        img.onload = () => URL.revokeObjectURL(img.src);
+        newPreview.appendChild(img);
+      } else if (type === 'video') {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.style.cssText = 'width: 100%; border-radius: 8px;';
+        video.controls = true;
+        newPreview.appendChild(video);
+      } else {
+        const fileInfo = document.createElement('div');
+        fileInfo.style.cssText = 'padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; gap: 8px;';
+        fileInfo.innerHTML = `
+          <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+            <path d="M13 2v7h7"/>
+          </svg>
+          <div style="flex: 1; overflow: hidden;">
+            <div style="font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis;">${file.name}</div>
+            <div style="font-size: 10px; opacity: 0.7;">${(file.size / 1024).toFixed(1)} KB</div>
+          </div>
+        `;
+        newPreview.appendChild(fileInfo);
+      }
+      
+      // Add remove button
+      const removeBtn = document.createElement('button');
+      removeBtn.onclick = () => {
+        input.dataset.attachmentAction = input.dataset.originalFileType ? 'keep' : 'remove';
+        delete window.editingNewFile;
+        newPreview.remove();
+      };
+      removeBtn.style.cssText = 'position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 24px; height: 24px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10;';
+      removeBtn.innerHTML = '×';
+      removeBtn.title = 'Remove attachment';
+      newPreview.appendChild(removeBtn);
+      
+      editIndicator.insertBefore(newPreview, fileButtons);
+      
+      // Show send button when file is selected
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.style.display = 'inline-flex';
+      
+      const voiceBtn = document.getElementById('voiceBtn');
+      const moreBtn = document.getElementById('moreBtn');
+      if (voiceBtn) voiceBtn.style.display = 'none';
+      if (moreBtn) moreBtn.style.display = 'none';
+      
+      InnovateAPI.showAlert('New attachment added', 'success');
     }
 
     function cancelReply() {
@@ -3495,8 +4030,20 @@
       const input = document.getElementById('messageInput');
       const previewContainer = document.getElementById('messagePreviewContainer');
       delete input.dataset.editingMessageId;
+      delete input.dataset.originalFileType;
+      delete input.dataset.attachmentAction;
+      delete input.dataset.newFileType;
+      delete window.editingNewFile;
       input.value = '';
       previewContainer.innerHTML = '';
+      
+      // Reset button visibility
+      const sendBtn = document.getElementById('sendBtn');
+      const voiceBtn = document.getElementById('voiceBtn');
+      const moreBtn = document.getElementById('moreBtn');
+      if (sendBtn) sendBtn.style.display = 'none';
+      if (voiceBtn) voiceBtn.style.display = 'inline-flex';
+      if (moreBtn) moreBtn.style.display = 'inline-flex';
     }
 
     async function messageInfo(event) {
