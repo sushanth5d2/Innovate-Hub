@@ -10,6 +10,7 @@ const { getDb } = require('../config/database');
 const aiProvider = require('../services/ai-provider');
 const upload = require('../middleware/upload');
 const aiMedia = require('../services/ai-media-generator');
+const fileAnalyzer = require('../services/file-analyzer');
 
 // ==================== Models & Config ====================
 
@@ -236,10 +237,15 @@ async function handleAIChatSend(req, res) {
   let attachmentUrl = null;
   let attachmentType = null;
   let originalFilename = null;
+  let fileMimeType = null;
+  let fileAnalysis = null;
+
   if (req.files?.file) {
     const file = req.files.file[0];
     originalFilename = file.originalname;
-    console.log('AI Chat - File uploaded:', originalFilename, 'MIME:', file.mimetype);
+    fileMimeType = file.mimetype;
+    console.log('AI Chat - File uploaded:', originalFilename, 'MIME:', file.mimetype, 'Path:', file.path);
+    
     attachmentUrl = file.mimetype.startsWith('image/')
       ? `/uploads/images/${file.filename}`
       : file.mimetype.startsWith('video/')
@@ -247,6 +253,14 @@ async function handleAIChatSend(req, res) {
         : `/uploads/files/${file.filename}`;
     attachmentType = file.mimetype.startsWith('image/') ? 'image'
       : file.mimetype.startsWith('video/') ? 'video' : 'file';
+
+    // Analyze the file for AI comprehension
+    try {
+      fileAnalysis = await fileAnalyzer.analyzeFile(file.path, file.mimetype, file.originalname);
+      console.log('AI Chat - File analysis:', fileAnalysis.type, 'canAnalyze:', fileAnalysis.canAnalyze, 'requiresVision:', fileAnalysis.requiresVision);
+    } catch (err) {
+      console.error('AI Chat - File analysis failed:', err.message);
+    }
   }
 
   // Allow sending with just a file (no text message required)
@@ -258,7 +272,6 @@ async function handleAIChatSend(req, res) {
     // Determine which model to use
     let selectedModel = model_id;
     if (!selectedModel) {
-      // Get user preference
       const pref = await new Promise((resolve, reject) => {
         db.get('SELECT preferred_model FROM ai_user_preferences WHERE user_id = ?', [userId], (err, row) => {
           if (err) reject(err);
@@ -271,7 +284,6 @@ async function handleAIChatSend(req, res) {
     // Get or create conversation
     let convId = conversation_id;
     if (!convId) {
-      // Create new conversation with first few words as title
       const titleSource = message || originalFilename || 'New Chat';
       const title = titleSource.substring(0, 50) + (titleSource.length > 50 ? '...' : '');
       convId = await new Promise((resolve, reject) => {
@@ -287,18 +299,13 @@ async function handleAIChatSend(req, res) {
       });
     }
 
-    // Build the user message content (include attachment description for AI context)
+    // Build the user message content
     let userContent = message || '';
-    let attachmentContext = '';
-    if (attachmentUrl) {
-      const typeLabel = attachmentType === 'image' ? 'image' : attachmentType === 'video' ? 'video' : 'file';
-      attachmentContext = `[User attached a ${typeLabel}: ${originalFilename}]`;
-      if (!userContent) {
-        userContent = attachmentContext;
-      }
+    if (attachmentUrl && !userContent) {
+      userContent = `[Uploaded ${attachmentType}: ${originalFilename}]`;
     }
 
-    // Save user message to DB (with attachment info)
+    // Save user message to DB
     await new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
@@ -323,22 +330,85 @@ async function handleAIChatSend(req, res) {
       );
     });
 
-    // Enrich history with attachment context for the AI
+    // Build enriched history  
     const enrichedHistory = history.map(msg => {
       let content = msg.content;
-      if (msg.attachment_url && msg.role === 'user') {
+      if (msg.attachment_url && msg.role === 'user' && msg !== history[history.length - 1]) {
         const typeLabel = msg.attachment_type === 'image' ? 'image' : msg.attachment_type === 'video' ? 'video' : 'file';
-        content = `${content}\n[Attached ${typeLabel}: ${msg.original_filename}]`;
+        content = `${content}\n[Previously attached ${typeLabel}: ${msg.original_filename}]`;
       }
       return { role: msg.role, content };
     });
 
-    // Emit typing indicator via Socket.IO
+    // Emit typing indicator
     const io = req.app.get('io');
     io.to(`user-${userId}`).emit('ai:typing', { conversation_id: convId, model: selectedModel });
 
-    // Call AI provider
-    const aiResponse = await aiProvider.chat(selectedModel, enrichedHistory);
+    let aiResponse;
+
+    // ========== VISION: Image analysis via multimodal models ==========
+    if (fileAnalysis?.requiresVision && fileAnalysis?.base64) {
+      console.log('[AI Chat] Routing to vision model for image analysis...');
+      
+      // Build the prompt for image analysis
+      const lastMsg = enrichedHistory[enrichedHistory.length - 1];
+      if (lastMsg) {
+        // Remove the [Uploaded image: ...] placeholder, keep user's actual question
+        lastMsg.content = (message || 'Describe this image in detail. What do you see?').trim();
+      }
+
+      try {
+        aiResponse = await aiProvider.chatWithVision(
+          selectedModel,
+          enrichedHistory,
+          { base64: fileAnalysis.base64, mimeType: fileAnalysis.mimeType },
+          { temperature: 0.7 }
+        );
+      } catch (visionErr) {
+        console.error('[AI Chat] Vision failed:', visionErr.message);
+        // Fallback: send as text-only with description
+        const fallbackContent = `${message || 'Describe this image.'}\n\n[User uploaded an image: ${originalFilename}. Vision analysis is not available — please inform the user that image analysis requires a vision-capable AI model like Gemini or GPT-4o.]`;
+        enrichedHistory[enrichedHistory.length - 1].content = fallbackContent;
+        aiResponse = await aiProvider.chat(selectedModel, enrichedHistory);
+      }
+    }
+    // ========== DOCUMENT: PDF, DOCX, text files ==========
+    else if (fileAnalysis?.canAnalyze && fileAnalysis?.extractedText) {
+      console.log(`[AI Chat] Injecting extracted ${fileAnalysis.type} content (${fileAnalysis.extractedText.length} chars)...`);
+      
+      // Inject the extracted document content into the conversation
+      const docContext = `--- DOCUMENT CONTENT (${originalFilename}) ---\n${fileAnalysis.extractedText}\n--- END OF DOCUMENT ---`;
+      
+      const userPrompt = message || `Please analyze this ${fileAnalysis.type === 'pdf' ? 'PDF document' : fileAnalysis.type === 'docx' ? 'Word document' : 'file'} and provide a summary.`;
+      
+      // Add a system-level instruction so the AI knows it CAN read the document
+      enrichedHistory.unshift({
+        role: 'system',
+        content: `The user has uploaded a file named "${originalFilename}". The full text content of this file has been extracted and is included below in the user's message between "--- DOCUMENT CONTENT ---" markers. You HAVE access to read this document. Analyze and respond based on its actual contents. Do NOT say you cannot read or access the file — the text is right there in the conversation.`
+      });
+      
+      // Replace the last message with document context + user prompt
+      enrichedHistory[enrichedHistory.length - 1].content = `${userPrompt}\n\n${docContext}`;
+      
+      // Add file metadata hint
+      if (fileAnalysis.summary) {
+        enrichedHistory[enrichedHistory.length - 1].content += `\n\n[${fileAnalysis.summary}]`;
+      }
+      
+      aiResponse = await aiProvider.chat(selectedModel, enrichedHistory);
+    }
+    // ========== NO FILE or unanalyzable file — standard text chat ==========
+    else {
+      // Add plain attachment context if file present but not analyzable
+      if (attachmentUrl && !fileAnalysis?.canAnalyze) {
+        const lastMsg = enrichedHistory[enrichedHistory.length - 1];
+        if (lastMsg) {
+          lastMsg.content += `\n[User attached a ${attachmentType}: ${originalFilename}]`;
+        }
+      }
+      
+      aiResponse = await aiProvider.chat(selectedModel, enrichedHistory);
+    }
 
     // Save AI response to DB
     await new Promise((resolve, reject) => {
@@ -356,7 +426,7 @@ async function handleAIChatSend(req, res) {
       [selectedModel, convId]
     );
 
-    // Emit response via Socket.IO for real-time feel
+    // Emit response via Socket.IO
     io.to(`user-${userId}`).emit('ai:response', {
       conversation_id: convId,
       content: aiResponse.content,
@@ -384,7 +454,6 @@ async function handleAIChatSend(req, res) {
   } catch (error) {
     console.error('AI chat error:', error.message);
     
-    // Emit error via socket
     const io = req.app.get('io');
     io.to(`user-${userId}`).emit('ai:error', { 
       error: error.message,

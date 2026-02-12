@@ -207,7 +207,7 @@
               <path d="M13 2v7h7" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
             Document
-            <input type="file" accept=".pdf,.doc,.docx,.txt" onchange="sendFile(this.files[0])" style="display: none;">
+            <input type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.js,.ts,.py,.java,.cpp,.c,.html,.css,.sql,.sh,.xlsx,.xls,.pptx,.ppt" onchange="sendFile(this.files[0])" style="display: none;">
           </label>
           <button class="ig-attach-option" onclick="openGifPicker()">
             <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2">
@@ -4462,11 +4462,11 @@
             </div>
             <h2 style="color: var(--ig-primary-text); margin-bottom: 8px; font-size: 20px;">Innovate AI</h2>
             <p style="color: var(--ig-secondary-text); font-size: 14px; max-width: 350px; line-height: 1.5; margin-bottom: 16px;">
-              Your AI assistant with <strong>voice chat</strong>, <strong>image generation</strong>, <strong>video creation</strong>, and smart multi-model routing. <span style="color: #44b700; font-weight: 600;">No setup needed!</span>
+              Your AI assistant with <strong>vision</strong>, <strong>document analysis</strong>, <strong>voice chat</strong>, <strong>image &amp; video generation</strong>, and smart multi-model routing. <span style="color: #44b700; font-weight: 600;">No setup needed!</span>
             </p>
             
             <!-- AI Capabilities Cards -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 380px; margin-bottom: 20px; width: 100%;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; max-width: 420px; margin-bottom: 20px; width: 100%;">
               <div onclick="sendAISuggestion('Generate image of a sunset over mountains')" class="ai-capability-card" style="cursor: pointer;">
                 <span style="font-size: 24px;">🎨</span>
                 <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Text to Image</div>
@@ -4482,6 +4482,16 @@
                 <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Voice Chat</div>
                 <div style="font-size: 10px; color: var(--ig-secondary-text);">Talk with AI</div>
               </div>
+              <div onclick="document.getElementById('aiImageInput')?.click()" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">👁️</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Vision</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Analyze images</div>
+              </div>
+              <div onclick="document.getElementById('aiDocumentInput')?.click()" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">📄</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Documents</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Read PDFs & files</div>
+              </div>
               <div onclick="sendAISuggestion('Help me debug my code')" class="ai-capability-card" style="cursor: pointer;">
                 <span style="font-size: 24px;">💻</span>
                 <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Code & Chat</div>
@@ -4489,12 +4499,12 @@
               </div>
             </div>
             
-            <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 380px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 420px;">
               <button onclick="sendAISuggestion('/imagine a cyberpunk city at night with neon lights')" class="ai-suggestion-btn">🎨 Generate cyberpunk city</button>
+              <button onclick="document.getElementById('aiImageInput')?.click()" class="ai-suggestion-btn" style="border-color: #e91e63; color: #e91e63;">👁️ Upload image to analyze</button>
+              <button onclick="document.getElementById('aiDocumentInput')?.click()" class="ai-suggestion-btn" style="border-color: #ff9800; color: #ff9800;">📄 Upload PDF / document</button>
               <button onclick="sendAISuggestion('Explain quantum computing simply')" class="ai-suggestion-btn">🔬 Explain quantum computing</button>
-              <button onclick="sendAISuggestion('Write a creative short story')" class="ai-suggestion-btn">📝 Write a short story</button>
               <button onclick="sendAISuggestion('/video ocean waves crashing on a tropical beach')" class="ai-suggestion-btn">🎬 Ocean waves video</button>
-              <button onclick="sendAISuggestion('Give me a workout plan')" class="ai-suggestion-btn">💪 Workout plan</button>
               <button onclick="startAIVoiceChat()" class="ai-suggestion-btn" style="border-color: #667eea; color: #667eea;">🎙️ Start voice chat</button>
             </div>
           </div>
@@ -4598,14 +4608,22 @@
       } else {
         // AI response
         const model = aiModels.find(m => m.id === modelId);
-        const providerStyle = AI_PROVIDER_STYLES[model?.provider] || { icon: '🤖', color: '#667eea', label: 'AI' };
+        // Special labels for media generators
+        const mediaGenerators = {
+          'image-generator': { icon: '🎨', color: '#e91e63', name: 'Image Generator' },
+          'video-generator': { icon: '🎬', color: '#9c27b0', name: 'Video Generator' }
+        };
+        const mediaGen = mediaGenerators[modelId];
+        const providerStyle = mediaGen || AI_PROVIDER_STYLES[model?.provider] || { icon: '🤖', color: '#667eea', label: 'AI' };
+        const displayName = mediaGen ? mediaGen.name : (model?.name || modelId);
         
         messageEl.className = 'ig-message ig-message-received';
         messageEl.style.maxWidth = '85%';
         messageEl.innerHTML = `
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px;">
-            <span style="font-weight: 600; color: ${providerStyle.color};">${providerStyle.icon} ${model?.name || modelId}</span>
+            <span style="font-weight: 600; color: ${providerStyle.color};">${providerStyle.icon} ${displayName}</span>
           </div>
+          ${attachmentHtml}
           <div class="ai-response-content" style="word-break: break-word; line-height: 1.6; font-size: 14px;">${renderAIMarkdown(content)}</div>
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
             <span class="ig-message-time" style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span>
@@ -4974,7 +4992,7 @@
             <img src="${url}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">Image ready to send</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">Image — AI will analyze visually</div>
             </div>
             <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
           </div>
@@ -4991,12 +5009,23 @@
           </div>
         `;
       } else {
+        // Determine file icon and description
+        const ext = (filename || file.name || '').split('.').pop().toLowerCase();
+        let fileIcon = '📎';
+        let fileDesc = 'File ready to send';
+        if (ext === 'pdf') { fileIcon = '📄'; fileDesc = 'PDF — AI will read and analyze'; }
+        else if (['doc', 'docx'].includes(ext)) { fileIcon = '📝'; fileDesc = 'Document — AI will read and analyze'; }
+        else if (['xls', 'xlsx', 'csv'].includes(ext)) { fileIcon = '📊'; fileDesc = 'Spreadsheet — AI will analyze data'; }
+        else if (['ppt', 'pptx'].includes(ext)) { fileIcon = '📑'; fileDesc = 'Presentation ready to send'; }
+        else if (['js', 'ts', 'py', 'java', 'cpp', 'c', 'html', 'css', 'sql', 'sh', 'json', 'xml', 'yaml', 'yml'].includes(ext)) { fileIcon = '💻'; fileDesc = 'Code file — AI will analyze'; }
+        else if (['txt', 'md'].includes(ext)) { fileIcon = '📃'; fileDesc = 'Text file — AI will read and analyze'; }
+        
         previewHtml = `
           <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
-            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">📎</div>
+            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">${fileIcon}</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">File ready to send</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">${fileDesc}</div>
             </div>
             <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
           </div>
@@ -5462,7 +5491,7 @@
       if (!message) return { type: null, prompt: '' };
       const lower = message.toLowerCase().trim();
       
-      // Image generation patterns
+      // Image generation patterns — explicit (mentions 'image', 'picture', etc.)
       const imagePatterns = [
         /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
         /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s*:?\s+(.+)/i,
@@ -5475,7 +5504,7 @@
         if (m) return { type: 'image', prompt: m[1].trim() };
       }
       
-      // Video generation patterns
+      // Video generation patterns — explicit (mentions 'video', 'clip', etc.)
       const videoPatterns = [
         /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
         /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s*:?\s+(.+)/i,
@@ -5496,6 +5525,30 @@
         ];
         for (const p of i2vPatterns) {
           if (p.test(lower)) return { type: 'image-to-video', prompt: message };
+        }
+      }
+      
+      // Trailing media keyword — "X image", "X picture", "X photo"
+      const trailingImageMatch = message.match(/^(.+)\s+(?:image|picture|photo|illustration|artwork|art|pic)\s*$/i);
+      if (trailingImageMatch) {
+        return { type: 'image', prompt: trailingImageMatch[1].trim() };
+      }
+      const trailingVideoMatch = message.match(/^(.+)\s+(?:video|clip|animation)\s*$/i);
+      if (trailingVideoMatch) {
+        return { type: 'video', prompt: trailingVideoMatch[1].trim() };
+      }
+      
+      // Implicit image generation — "generate a [subject]" without specifying media type
+      // If user says "generate/create/draw/paint X" and X is NOT a question or known non-image word, treat as image
+      const implicitImagePattern = /^(?:generate|create|draw|paint|design|render|sketch|make me)\s+(?:an?\s+)?(.+)/i;
+      const implicitMatch = message.match(implicitImagePattern);
+      if (implicitMatch) {
+        const subject = implicitMatch[1].trim().toLowerCase();
+        // Exclude if it looks like a text/code generation request
+        const textKeywords = ['code', 'function', 'script', 'program', 'list', 'essay', 'email', 'letter', 'paragraph', 'story', 'poem', 'summary', 'table', 'report', 'plan', 'idea', 'name', 'title', 'password', 'response', 'answer', 'text', 'message', 'json', 'html', 'css', 'sql', 'api', 'query'];
+        const isTextRequest = textKeywords.some(kw => subject.startsWith(kw + ' ') || subject === kw);
+        if (!isTextRequest) {
+          return { type: 'image', prompt: implicitMatch[1].trim() };
         }
       }
       

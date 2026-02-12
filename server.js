@@ -82,7 +82,13 @@ app.use(cookieParser());
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public'), {
   maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
-  etag: true
+  etag: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+    }
+  }
 }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0

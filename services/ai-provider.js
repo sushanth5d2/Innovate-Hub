@@ -7,6 +7,26 @@
 
 const axios = require('axios');
 
+// ===================== Provider Failure Cache =====================
+// Skip providers that failed recently to avoid wasting time on retries
+const providerFailureCache = new Map(); // key: 'provider:modelId' → timestamp of failure
+const FAILURE_COOLDOWN_MS = 2 * 60 * 1000; // Skip failed providers for 2 minutes
+
+function isProviderCoolingDown(provider, modelId) {
+  const key = `${provider}:${modelId}`;
+  const failedAt = providerFailureCache.get(key);
+  if (!failedAt) return false;
+  if (Date.now() - failedAt > FAILURE_COOLDOWN_MS) {
+    providerFailureCache.delete(key);
+    return false;
+  }
+  return true;
+}
+
+function markProviderFailed(provider, modelId) {
+  providerFailureCache.set(`${provider}:${modelId}`, Date.now());
+}
+
 // ===================== INNOVATE AI - Custom Smart Engine =====================
 // The platform's own AI that intelligently routes to the best available provider.
 // No separate API key needed — it uses whatever keys the user has configured.
@@ -15,8 +35,12 @@ const axios = require('axios');
 const INNOVATE_AI_PROVIDER_PRIORITY = [
   // Free/fast providers first
   { provider: 'groq', modelId: 'llama-3.3-70b-versatile', envKey: 'GROQ_API_KEY' },
+  { provider: 'groq', modelId: 'meta-llama/llama-4-scout-17b-16e-instruct', envKey: 'GROQ_API_KEY' },
+  // FREE zero-config — ALWAYS available, no API key needed
+  { provider: 'pollinations', modelId: 'pollinations-openai', envKey: '_ALWAYS_AVAILABLE_' },
+  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'groq', modelId: 'mixtral-8x7b-32768', envKey: 'GROQ_API_KEY' },
+  { provider: 'groq', modelId: 'qwen/qwen3-32b', envKey: 'GROQ_API_KEY' },
   { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
   { provider: 'cohere', modelId: 'command-r-plus', envKey: 'COHERE_API_KEY' },
   { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.1-8b-instruct:free', envKey: 'OPENROUTER_API_KEY' },
@@ -356,6 +380,17 @@ const AI_MODELS = {
     description: 'Advanced reasoning model',
     maxTokens: 4096,
     envKey: 'DEEPSEEK_API_KEY'
+  },
+
+  // Pollinations - FREE, no API key needed, always available
+  'pollinations-openai': {
+    provider: 'pollinations',
+    name: 'Pollinations AI',
+    description: 'FREE - Always available, no API key needed',
+    maxTokens: 4096,
+    envKey: '_ALWAYS_AVAILABLE_',
+    free: true,
+    noKeyRequired: true
   }
 };
 
@@ -438,8 +473,29 @@ const PROVIDER_CONFIGS = {
       'HTTP-Referer': 'https://innovate-hub.app',
       'X-Title': 'Innovate Hub AI Chat'
     })
+  },
+  pollinations: {
+    baseUrl: 'https://text.pollinations.ai/openai',
+    headers: () => ({
+      'Content-Type': 'application/json'
+    })
   }
 };
+
+// Vision-capable model priority (for image analysis)
+const INNOVATE_AI_VISION_PRIORITY = [
+  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.0-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'groq', modelId: 'meta-llama/llama-4-scout-17b-16e-instruct', envKey: 'GROQ_API_KEY' },
+  { provider: 'groq', modelId: 'meta-llama/llama-4-maverick-17b-128e-instruct', envKey: 'GROQ_API_KEY' },
+  { provider: 'openai', modelId: 'gpt-4o', envKey: 'OPENAI_API_KEY' },
+  { provider: 'openai', modelId: 'gpt-4o-mini', envKey: 'OPENAI_API_KEY' },
+  { provider: 'anthropic', modelId: 'claude-sonnet-4-20250514', envKey: 'ANTHROPIC_API_KEY' },
+  { provider: 'anthropic', modelId: 'claude-3-5-sonnet-20241022', envKey: 'ANTHROPIC_API_KEY' },
+  // FREE zero-config vision fallback - no API key needed
+  { provider: 'pollinations', modelId: 'pollinations-openai', envKey: '_ALWAYS_AVAILABLE_' },
+];
 
 const SYSTEM_PROMPT = INNOVATE_AI_SYSTEM_PROMPT;
 
@@ -447,10 +503,7 @@ const SYSTEM_PROMPT = INNOVATE_AI_SYSTEM_PROMPT;
  * Check if the Innovate AI meta-provider has any available backend
  */
 function isInnovateAIAvailable() {
-  return INNOVATE_AI_PROVIDER_PRIORITY.some(p => {
-    if (p.provider === 'ollama') return process.env.OLLAMA_ENABLED === 'true';
-    return !!process.env[p.envKey];
-  });
+  return true; // Always available — Pollinations works without any API key
 }
 
 /**
@@ -458,13 +511,15 @@ function isInnovateAIAvailable() {
  */
 function getInnovateAIBackend() {
   for (const p of INNOVATE_AI_PROVIDER_PRIORITY) {
+    if (p.provider === 'pollinations') return p; // Always available
     if (p.provider === 'ollama') {
       if (process.env.OLLAMA_ENABLED === 'true') return p;
     } else {
       if (process.env[p.envKey]) return p;
     }
   }
-  return null;
+  // Should never reach here since pollinations is always available
+  return INNOVATE_AI_PROVIDER_PRIORITY[INNOVATE_AI_PROVIDER_PRIORITY.length - 1];
 }
 
 /**
@@ -476,6 +531,8 @@ function getAvailableModels() {
     let isAvailable;
     if (config.provider === 'innovate') {
       isAvailable = isInnovateAIAvailable();
+    } else if (config.provider === 'pollinations') {
+      isAvailable = true; // Always available
     } else if (config.provider === 'ollama') {
       isAvailable = process.env.OLLAMA_ENABLED === 'true';
     } else {
@@ -503,6 +560,8 @@ function getAllModels() {
     let isAvailable;
     if (config.provider === 'innovate') {
       isAvailable = isInnovateAIAvailable();
+    } else if (config.provider === 'pollinations') {
+      isAvailable = true; // Always available
     } else if (config.provider === 'ollama') {
       isAvailable = process.env.OLLAMA_ENABLED === 'true';
     } else {
@@ -536,9 +595,9 @@ async function chat(modelId, messages, options = {}) {
 
   // Innovate AI uses smart routing — no separate API key check
   if (modelConfig.provider === 'innovate') {
-    if (!isInnovateAIAvailable()) {
-      throw new Error('No AI providers configured. Add at least one API key (e.g., GROQ_API_KEY) to your .env file.');
-    }
+    // Always available — Pollinations fallback ensures Innovate AI always works
+  } else if (modelConfig.provider === 'pollinations') {
+    // Always available — no API key needed
   } else if (modelConfig.provider === 'ollama') {
     if (process.env.OLLAMA_ENABLED !== 'true') {
       throw new Error('Ollama is not enabled. Set OLLAMA_ENABLED=true in .env and ensure Ollama is running locally.');
@@ -580,6 +639,8 @@ async function chat(modelId, messages, options = {}) {
         return await callMistral(modelId, apiKey, messages, temperature, maxTokens);
       case 'openrouter':
         return await callOpenRouter(modelId, apiKey, messages, temperature, maxTokens);
+      case 'pollinations':
+        return await callPollinationsWithPrompt(messages, temperature, maxTokens, INNOVATE_AI_SYSTEM_PROMPT);
       default:
         throw new Error(`Unsupported provider: ${modelConfig.provider}`);
     }
@@ -623,7 +684,7 @@ CODER MODE ACTIVE: You are now in expert programmer mode. Focus on writing clean
 async function callInnovateAI(modelId, messages, temperature, maxTokens) {
   const backend = getInnovateAIBackend();
   if (!backend) {
-    throw new Error('No AI providers available. Configure at least one API key in .env');
+    throw new Error('No AI providers available');
   }
 
   // Select system prompt based on model variant
@@ -642,17 +703,26 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
   // Try providers in priority order with fallback
   const triedProviders = [];
   for (const candidate of INNOVATE_AI_PROVIDER_PRIORITY) {
-    const isAvailable = candidate.provider === 'ollama' 
-      ? process.env.OLLAMA_ENABLED === 'true'
-      : !!process.env[candidate.envKey];
+    // Skip providers that recently failed (cooldown period)
+    if (isProviderCoolingDown(candidate.provider, candidate.modelId)) {
+      console.log(`Innovate AI: Skipping ${candidate.provider}/${candidate.modelId} (cooling down after recent failure)`);
+      continue;
+    }
+
+    // Check availability
+    const isAvailable = candidate.provider === 'pollinations' 
+      ? true  // Always available, no API key needed
+      : candidate.provider === 'ollama' 
+        ? process.env.OLLAMA_ENABLED === 'true'
+        : !!process.env[candidate.envKey];
     
     if (!isAvailable) continue;
 
     try {
       const targetModel = AI_MODELS[candidate.modelId];
-      if (!targetModel) continue;
+      if (!targetModel && candidate.provider !== 'pollinations') continue;
 
-      const apiKey = process.env[targetModel.envKey] || '';
+      const apiKey = targetModel ? (process.env[targetModel.envKey] || '') : '';
 
       let result;
       switch (candidate.provider) {
@@ -689,6 +759,9 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
         case 'ollama':
           result = await callOllamaWithPrompt(candidate.modelId, innovateMessages, temperature, maxTokens, systemPrompt);
           break;
+        case 'pollinations':
+          result = await callPollinationsWithPrompt(innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
         default:
           continue;
       }
@@ -700,6 +773,7 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
 
     } catch (err) {
       console.log(`Innovate AI: ${candidate.provider}/${candidate.modelId} failed: ${err.message}, trying next...`);
+      markProviderFailed(candidate.provider, candidate.modelId);
       triedProviders.push(candidate.provider);
       continue;
     }
@@ -726,7 +800,7 @@ function makeOpenAICompatibleCall(baseUrl, headersFactory) {
     };
     const response = await axios.post(baseUrl, payload, {
       headers: headersFactory(apiKey),
-      timeout: 60000
+      timeout: 15000
     });
     return {
       content: response.data.choices[0].message.content,
@@ -759,6 +833,88 @@ const callOpenRouterWithPrompt = makeOpenAICompatibleCall(
   PROVIDER_CONFIGS.openrouter.baseUrl, PROVIDER_CONFIGS.openrouter.headers
 );
 
+/**
+ * Pollinations AI - FREE, no API key needed, always available
+ * Uses OpenAI-compatible format at https://text.pollinations.ai/openai
+ */
+async function callPollinationsWithPrompt(messages, temperature, maxTokens, systemPrompt) {
+  const payload = {
+    model: 'mistral',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages
+    ],
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
+    headers: PROVIDER_CONFIGS.pollinations.headers(),
+    timeout: 30000  // Free tier needs more time
+  });
+
+  return {
+    content: response.data.choices[0].message.content,
+    model: 'pollinations-openai',
+    tokens: {
+      prompt: response.data.usage?.prompt_tokens || 0,
+      completion: response.data.usage?.completion_tokens || 0,
+      total: response.data.usage?.total_tokens || 0
+    }
+  };
+}
+
+/**
+ * Pollinations Vision - FREE, no API key needed
+ * Sends image in OpenAI vision format
+ */
+async function callPollinationsVision(messages, imageData, temperature, maxTokens, systemPrompt) {
+  const apiMessages = [{ role: 'system', content: systemPrompt }];
+  
+  for (const msg of messages.slice(0, -1)) {
+    apiMessages.push({ role: msg.role, content: msg.content });
+  }
+  
+  const lastMsg = messages[messages.length - 1];
+  apiMessages.push({
+    role: 'user',
+    content: [
+      {
+        type: 'image_url',
+        image_url: {
+          url: `data:${imageData.mimeType};base64,${imageData.base64}`
+        }
+      },
+      {
+        type: 'text',
+        text: lastMsg?.content || 'Describe this image in detail.'
+      }
+    ]
+  });
+
+  const payload = {
+    model: 'mistral',
+    messages: apiMessages,
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
+    headers: PROVIDER_CONFIGS.pollinations.headers(),
+    timeout: 90000  // Vision may take longer on free tier
+  });
+
+  return {
+    content: response.data.choices[0].message.content,
+    model: 'pollinations-openai',
+    tokens: {
+      prompt: response.data.usage?.prompt_tokens || 0,
+      completion: response.data.usage?.completion_tokens || 0,
+      total: response.data.usage?.total_tokens || 0
+    }
+  };
+}
+
 async function callHuggingFaceWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
   const modelPath = modelId.replace('huggingface/', '');
   const url = PROVIDER_CONFIGS.huggingface.baseUrl(modelPath);
@@ -768,7 +924,7 @@ async function callHuggingFaceWithPrompt(modelId, apiKey, messages, temperature,
     temperature, max_tokens: maxTokens, stream: false
   };
   const response = await axios.post(url, payload, {
-    headers: PROVIDER_CONFIGS.huggingface.headers(apiKey), timeout: 120000
+    headers: PROVIDER_CONFIGS.huggingface.headers(apiKey), timeout: 20000
   });
   return {
     content: response.data.choices[0].message.content,
@@ -789,7 +945,7 @@ async function callGeminiWithPrompt(modelId, apiKey, messages, temperature, maxT
     generationConfig: { temperature, maxOutputTokens: maxTokens, topP: 0.95 }
   };
   const response = await axios.post(url, payload, {
-    headers: PROVIDER_CONFIGS.google.headers(), timeout: 60000
+    headers: PROVIDER_CONFIGS.google.headers(), timeout: 15000
   });
   const candidate = response.data.candidates?.[0];
   if (!candidate || !candidate.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
@@ -808,7 +964,7 @@ async function callAnthropicWithPrompt(modelId, apiKey, messages, temperature, m
     temperature, max_tokens: maxTokens
   };
   const response = await axios.post(config.baseUrl, payload, {
-    headers: config.headers(apiKey), timeout: 60000
+    headers: config.headers(apiKey), timeout: 15000
   });
   return {
     content: response.data.content[0].text,
@@ -825,7 +981,7 @@ async function callCohereWithPrompt(modelId, apiKey, messages, temperature, maxT
     temperature, max_tokens: maxTokens
   };
   const response = await axios.post(config.baseUrl, payload, {
-    headers: config.headers(apiKey), timeout: 60000
+    headers: config.headers(apiKey), timeout: 15000
   });
   const content = response.data.message?.content?.[0]?.text || response.data.text || response.data.message?.content || '';
   return {
@@ -868,7 +1024,7 @@ async function callOpenAI(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -905,7 +1061,7 @@ async function callGemini(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(url, payload, {
     headers: PROVIDER_CONFIGS.google.headers(),
-    timeout: 60000
+    timeout: 15000
   });
 
   const candidate = response.data.candidates?.[0];
@@ -938,7 +1094,7 @@ async function callXAI(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -967,7 +1123,7 @@ async function callAnthropic(modelId, apiKey, messages, temperature, maxTokens) 
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -995,7 +1151,7 @@ async function callDeepSeek(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -1025,7 +1181,7 @@ async function callGroq(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -1124,7 +1280,7 @@ async function callCohere(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   // Cohere v2 chat API
@@ -1157,7 +1313,7 @@ async function callMistral(modelId, apiKey, messages, temperature, maxTokens) {
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -1188,7 +1344,7 @@ async function callOpenRouter(modelId, apiKey, messages, temperature, maxTokens)
 
   const response = await axios.post(config.baseUrl, payload, {
     headers: config.headers(apiKey),
-    timeout: 60000
+    timeout: 15000
   });
 
   return {
@@ -1202,9 +1358,248 @@ async function callOpenRouter(modelId, apiKey, messages, temperature, maxTokens)
   };
 }
 
+/**
+ * Chat with vision (image analysis) support
+ * Routes to vision-capable models (Gemini, GPT-4o, Groq Vision, Claude)
+ * @param {string} modelId - Requested model ID
+ * @param {Array} messages - Conversation history [{role, content}]
+ * @param {Object} imageData - { base64, mimeType } of the image to analyze
+ * @param {Object} options - Additional options
+ */
+async function chatWithVision(modelId, messages, imageData, options = {}) {
+  const systemPrompt = options.systemPrompt || INNOVATE_AI_SYSTEM_PROMPT;
+  const temperature = options.temperature ?? 0.7;
+  const maxTokens = options.maxTokens ?? 4096;
+
+  // Build the list of vision providers to try
+  const triedProviders = [];
+  
+  for (const candidate of INNOVATE_AI_VISION_PRIORITY) {
+    // Pollinations is always available, others need API keys
+    const isAvailable = candidate.provider === 'pollinations' 
+      ? true 
+      : !!process.env[candidate.envKey];
+    if (!isAvailable) continue;
+    
+    const apiKey = candidate.provider === 'pollinations' ? '' : process.env[candidate.envKey];
+    
+    try {
+      let result;
+      
+      if (candidate.provider === 'google') {
+        result = await callGeminiVision(candidate.modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt);
+      } else if (candidate.provider === 'groq') {
+        result = await callOpenAICompatibleVision(
+          candidate.modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt,
+          PROVIDER_CONFIGS.groq.baseUrl, PROVIDER_CONFIGS.groq.headers
+        );
+      } else if (candidate.provider === 'openai') {
+        result = await callOpenAICompatibleVision(
+          candidate.modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt,
+          PROVIDER_CONFIGS.openai.baseUrl, PROVIDER_CONFIGS.openai.headers
+        );
+      } else if (candidate.provider === 'anthropic') {
+        result = await callAnthropicVision(candidate.modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt);
+      } else if (candidate.provider === 'pollinations') {
+        result = await callPollinationsVision(messages, imageData, temperature, maxTokens, systemPrompt);
+      }
+      
+      if (result) {
+        // Wrap as Innovate AI if using innovate model
+        if (modelId.startsWith('innovate-ai')) {
+          result.model = modelId;
+          result.backed_by = candidate.modelId;
+        }
+        console.log(`[Vision] Success via ${candidate.provider}/${candidate.modelId}`);
+        return result;
+      }
+    } catch (err) {
+      const detail = err.response?.data?.error?.message || err.response?.data?.error || err.response?.status || '';
+      console.log(`[Vision] ${candidate.provider}/${candidate.modelId} failed: ${err.message} | Detail: ${JSON.stringify(detail).substring(0, 200)}`);
+      triedProviders.push(`${candidate.provider}/${candidate.modelId}`);
+      continue;
+    }
+  }
+
+  throw new Error(`Vision analysis failed. Tried: ${triedProviders.join(', ') || 'none configured'}.`);
+}
+
+/**
+ * Google Gemini Vision - Send image for analysis
+ */
+async function callGeminiVision(modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt) {
+  const url = `${PROVIDER_CONFIGS.google.baseUrl(modelId)}?key=${apiKey}`;
+  
+  // Build Gemini multimodal content
+  const contents = [];
+  
+  // Add conversation history (text only) 
+  for (const msg of messages.slice(0, -1)) {
+    contents.push({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    });
+  }
+  
+  // Last message includes the image
+  const lastMsg = messages[messages.length - 1];
+  const lastParts = [];
+  
+  // Add image data
+  lastParts.push({
+    inline_data: {
+      mime_type: imageData.mimeType,
+      data: imageData.base64
+    }
+  });
+  
+  // Add text prompt
+  if (lastMsg?.content) {
+    lastParts.push({ text: lastMsg.content });
+  }
+  
+  contents.push({
+    role: 'user',
+    parts: lastParts
+  });
+
+  const payload = {
+    contents,
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { temperature, maxOutputTokens: maxTokens, topP: 0.95 }
+  };
+
+  const response = await axios.post(url, payload, {
+    headers: PROVIDER_CONFIGS.google.headers(),
+    timeout: 15000
+  });
+
+  const candidate = response.data.candidates?.[0];
+  if (!candidate || !candidate.content?.parts?.[0]?.text) {
+    throw new Error('No response from Gemini Vision');
+  }
+
+  return {
+    content: candidate.content.parts[0].text,
+    model: modelId,
+    tokens: {
+      prompt: response.data.usageMetadata?.promptTokenCount,
+      completion: response.data.usageMetadata?.candidatesTokenCount,
+      total: response.data.usageMetadata?.totalTokenCount
+    }
+  };
+}
+
+/**
+ * OpenAI-compatible Vision (GPT-4o, Groq Llama Vision) 
+ */
+async function callOpenAICompatibleVision(modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt, baseUrl, headersFactory) {
+  // Build messages with image in the last user message
+  const apiMessages = [{ role: 'system', content: systemPrompt }];
+  
+  for (const msg of messages.slice(0, -1)) {
+    apiMessages.push({ role: msg.role, content: msg.content });
+  }
+  
+  // Last message with image
+  const lastMsg = messages[messages.length - 1];
+  apiMessages.push({
+    role: 'user',
+    content: [
+      {
+        type: 'image_url',
+        image_url: {
+          url: `data:${imageData.mimeType};base64,${imageData.base64}`
+        }
+      },
+      {
+        type: 'text',
+        text: lastMsg?.content || 'Describe this image in detail.'
+      }
+    ]
+  });
+
+  const payload = {
+    model: modelId,
+    messages: apiMessages,
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  const response = await axios.post(baseUrl, payload, {
+    headers: headersFactory(apiKey),
+    timeout: 15000
+  });
+
+  return {
+    content: response.data.choices[0].message.content,
+    model: modelId,
+    tokens: {
+      prompt: response.data.usage?.prompt_tokens,
+      completion: response.data.usage?.completion_tokens,
+      total: response.data.usage?.total_tokens
+    }
+  };
+}
+
+/**
+ * Anthropic Claude Vision
+ */
+async function callAnthropicVision(modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt) {
+  const config = PROVIDER_CONFIGS.anthropic;
+  
+  const apiMessages = [];
+  for (const msg of messages.slice(0, -1)) {
+    apiMessages.push({ role: msg.role, content: msg.content });
+  }
+  
+  const lastMsg = messages[messages.length - 1];
+  apiMessages.push({
+    role: 'user',
+    content: [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: imageData.mimeType,
+          data: imageData.base64
+        }
+      },
+      {
+        type: 'text',
+        text: lastMsg?.content || 'Describe this image in detail.'
+      }
+    ]
+  });
+
+  const payload = {
+    model: modelId,
+    system: systemPrompt,
+    messages: apiMessages,
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  const response = await axios.post(config.baseUrl, payload, {
+    headers: config.headers(apiKey),
+    timeout: 15000
+  });
+
+  return {
+    content: response.data.content[0].text,
+    model: modelId,
+    tokens: {
+      prompt: response.data.usage?.input_tokens,
+      completion: response.data.usage?.output_tokens,
+      total: (response.data.usage?.input_tokens || 0) + (response.data.usage?.output_tokens || 0)
+    }
+  };
+}
+
 module.exports = {
   AI_MODELS,
   getAvailableModels,
   getAllModels,
-  chat
+  chat,
+  chatWithVision
 };

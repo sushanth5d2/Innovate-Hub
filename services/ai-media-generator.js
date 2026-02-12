@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execSync, exec } = require('child_process');
+const sharp = require('sharp');
 
 // Ensure output directories
 const OUTPUT_DIR = path.resolve(__dirname, '../uploads/ai-generated');
@@ -34,7 +35,7 @@ console.log(`[AI Media] ffmpeg available: ${FFMPEG_AVAILABLE}`);
  * Generate image from text prompt using best available provider
  */
 async function generateImage(prompt, options = {}) {
-  const { width = 1024, height = 1024, style } = options;
+  const { width = 1280, height = 1280, style } = options;
   
   const errors = [];
 
@@ -71,24 +72,45 @@ async function generateImage(prompt, options = {}) {
 /**
  * Pollinations.ai — Completely free, no API key
  */
-async function generateImagePollinations(prompt, width = 1024, height = 1024, style, seed) {
-  const encodedPrompt = encodeURIComponent(prompt);
+async function generateImagePollinations(prompt, width = 1280, height = 1280, style, seed) {
+  // Enhance prompt for higher quality output
+  const qualityPrefix = 'ultra high resolution, highly detailed, sharp focus, professional quality, 8k, ';
+  const enhancedPrompt = qualityPrefix + prompt;
+  const encodedPrompt = encodeURIComponent(enhancedPrompt);
   const styleParam = style ? `&style=${encodeURIComponent(style)}` : '';
   const useSeed = seed !== undefined ? seed : Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${useSeed}&nologo=true${styleParam}`;
+  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${useSeed}&nologo=true&enhance=true&model=flux-realism${styleParam}`;
 
-  console.log('Generating image via Pollinations.ai...');
+  console.log(`Generating HD image via Pollinations.ai (${width}x${height})...`);
   
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
-    timeout: 60000,
+    timeout: 90000,
     maxRedirects: 5,
     validateStatus: (status) => status < 400
   });
 
+  // Upscale to requested resolution with sharp (Pollinations may return lower res)
   const filename = `ai-img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`;
   const filepath = path.join(OUTPUT_DIR, 'images', filename);
-  fs.writeFileSync(filepath, response.data);
+
+  const metadata = await sharp(response.data).metadata();
+  const actualW = metadata.width || 768;
+  const actualH = metadata.height || 768;
+
+  if (actualW < width || actualH < height) {
+    console.log(`Upscaling from ${actualW}x${actualH} to ${width}x${height}...`);
+    await sharp(response.data)
+      .resize(width, height, {
+        kernel: sharp.kernel.lanczos3,
+        fit: 'cover'
+      })
+      .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.5 })
+      .png({ quality: 95, compressionLevel: 6 })
+      .toFile(filepath);
+  } else {
+    fs.writeFileSync(filepath, response.data);
+  }
 
   return {
     url: `/uploads/ai-generated/images/${filename}`,
@@ -399,7 +421,7 @@ function detectGenerationIntent(message) {
   if (!message) return { type: null, prompt: '' };
   const lower = message.toLowerCase().trim();
 
-  // Image generation patterns
+  // Image generation patterns — explicit
   const imagePatterns = [
     /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
     /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s*:?\s+(.+)/i,
@@ -413,7 +435,7 @@ function detectGenerationIntent(message) {
     if (match) return { type: 'image', prompt: match[1].trim() };
   }
 
-  // Video generation patterns
+  // Video generation patterns — explicit
   const videoPatterns = [
     /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
     /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s*:?\s+(.+)/i,
@@ -435,6 +457,28 @@ function detectGenerationIntent(message) {
 
   for (const pattern of i2vPatterns) {
     if (pattern.test(lower)) return { type: 'image-to-video', prompt: message };
+  }
+
+  // Trailing media keyword — "X image", "X picture"
+  const trailingImageMatch = message.match(/^(.+)\s+(?:image|picture|photo|illustration|artwork|art|pic)\s*$/i);
+  if (trailingImageMatch) {
+    return { type: 'image', prompt: trailingImageMatch[1].trim() };
+  }
+  const trailingVideoMatch = message.match(/^(.+)\s+(?:video|clip|animation)\s*$/i);
+  if (trailingVideoMatch) {
+    return { type: 'video', prompt: trailingVideoMatch[1].trim() };
+  }
+
+  // Implicit image generation — "generate a [subject]" without specifying media type
+  const implicitImagePattern = /^(?:generate|create|draw|paint|design|render|sketch|make me)\s+(?:an?\s+)?(.+)/i;
+  const implicitMatch = message.match(implicitImagePattern);
+  if (implicitMatch) {
+    const subject = implicitMatch[1].trim().toLowerCase();
+    const textKeywords = ['code', 'function', 'script', 'program', 'list', 'essay', 'email', 'letter', 'paragraph', 'story', 'poem', 'summary', 'table', 'report', 'plan', 'idea', 'name', 'title', 'password', 'response', 'answer', 'text', 'message', 'json', 'html', 'css', 'sql', 'api', 'query'];
+    const isTextRequest = textKeywords.some(kw => subject.startsWith(kw + ' ') || subject === kw);
+    if (!isTextRequest) {
+      return { type: 'image', prompt: implicitMatch[1].trim() };
+    }
   }
 
   return { type: null, prompt: '' };

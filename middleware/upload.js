@@ -54,13 +54,13 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|mp4|mov|webm|m4a|mp3|wav/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp|bmp|svg|pdf|doc|docx|txt|md|csv|json|xml|yaml|yml|js|ts|py|java|cpp|c|html|css|sql|sh|mp4|mov|webm|m4a|mp3|wav|xlsx|xls|pptx|ppt/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   
   // Check MIME types more comprehensively
   const allowedMimeTypes = [
     // Images
-    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml',
     // Videos
     'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
     // Audio
@@ -69,14 +69,19 @@ const fileFilter = (req, file, cb) => {
     'application/pdf',
     'application/msword', // .doc
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-    'text/plain', // .txt
     'application/vnd.ms-excel', // .xls
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-powerpoint', // .ppt
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    // Text and code
+    'text/plain', 'text/csv', 'text/markdown', 'text/html', 'text/css', 'text/xml',
+    'text/javascript', 'text/x-python', 'text/x-java-source', 'text/x-c',
+    'application/json', 'application/javascript', 'application/xml', 'application/x-yaml'
   ];
   
-  const mimetypeValid = allowedMimeTypes.includes(file.mimetype);
+  const mimetypeValid = allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('text/');
 
-  if ((mimetypeValid || extname) && extname) {
+  if (mimetypeValid || extname) {
     return cb(null, true);
   } else {
     console.log('Rejected file:', file.originalname, 'MIME:', file.mimetype);
