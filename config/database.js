@@ -1600,6 +1600,23 @@ const migrateDatabase = () => {
         UNIQUE(group_id, user_id)
       )
     `);
+
+    // AI chat messages: add attachment columns
+    db.run(`ALTER TABLE ai_chat_messages ADD COLUMN attachment_url TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding attachment_url column to ai_chat_messages:', err);
+      }
+    });
+    db.run(`ALTER TABLE ai_chat_messages ADD COLUMN attachment_type TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding attachment_type column to ai_chat_messages:', err);
+      }
+    });
+    db.run(`ALTER TABLE ai_chat_messages ADD COLUMN original_filename TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        console.error('Error adding original_filename column to ai_chat_messages:', err);
+      }
+    });
   });
 };
 

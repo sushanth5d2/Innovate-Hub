@@ -3078,6 +3078,12 @@
     document.addEventListener('DOMContentLoaded', function() {
       console.log('Messages page initializing...');
       
+      // Preload speech synthesis voices (some browsers need early call)
+      if ('speechSynthesis' in window) {
+        speechSynthesis.getVoices();
+        speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+      }
+      
       // Initialize Socket.IO first
       const socket = InnovateAPI.getSocket();
       if (!socket) {
@@ -4126,13 +4132,14 @@
     
     let aiChatActive = false;
     let aiConversationId = null;
-    let aiSelectedModel = 'llama-3.3-70b-versatile';
+    let aiSelectedModel = 'innovate-ai';
     let aiModels = [];
     let aiIsLoading = false;
     let aiConversations = [];
 
     // Provider colors and icons
     const AI_PROVIDER_STYLES = {
+      innovate:    { color: '#667eea', icon: '💡', label: 'Innovate AI', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
       groq:        { color: '#f55036', icon: '🚀', label: 'Groq (FREE)' },
       google:      { color: '#4285f4', icon: '✨', label: 'Google Gemini (FREE)' },
       huggingface: { color: '#ffbd45', icon: '🤗', label: 'HuggingFace (FREE)' },
@@ -4161,7 +4168,7 @@
     async function loadAIPreferences() {
       try {
         const data = await InnovateAPI.apiRequest('/ai-chat/preferences');
-        aiSelectedModel = data.preferred_model || 'llama-3.3-70b-versatile';
+        aiSelectedModel = data.preferred_model || 'innovate-ai';
       } catch (error) {
         console.log('Using default AI model');
       }
@@ -4196,6 +4203,9 @@
       chatUsernameEl.innerHTML = `
         <span>Innovate AI</span>
         <span style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 9px; padding: 1px 6px; border-radius: 10px; font-weight: 600; margin-left: 6px;">AI</span>
+        <span style="background: rgba(102,126,234,0.15); color: #667eea; font-size: 8px; padding: 1px 5px; border-radius: 8px; font-weight: 600; margin-left: 2px;">Voice</span>
+        <span style="background: rgba(102,126,234,0.15); color: #667eea; font-size: 8px; padding: 1px 5px; border-radius: 8px; font-weight: 600; margin-left: 2px;">Image</span>
+        <span style="background: rgba(102,126,234,0.15); color: #667eea; font-size: 8px; padding: 1px 5px; border-radius: 8px; font-weight: 600; margin-left: 2px;">Video</span>
       `;
       chatUsernameEl.style.cursor = 'default';
       chatUsernameEl.onclick = null;
@@ -4205,8 +4215,8 @@
       chatActions.innerHTML = `
         <div id="aiModelSelector" style="position: relative;">
           <button onclick="toggleModelSelector()" id="modelSelectorBtn" style="display: flex; align-items: center; gap: 6px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 20px; padding: 6px 12px; color: var(--ig-primary-text); cursor: pointer; font-size: 12px; white-space: nowrap;">
-            <span id="currentModelIcon">🤖</span>
-            <span id="currentModelName">Llama 3.3 70B</span>
+            <span id="currentModelIcon">💡</span>
+            <span id="currentModelName">Innovate AI</span>
             <svg fill="currentColor" height="10" width="10" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
           </button>
           <div id="modelDropdown" style="display: none; position: absolute; right: 0; top: 42px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 1000; min-width: 280px; max-height: 400px; overflow-y: auto;">
@@ -4215,10 +4225,26 @@
         <button onclick="showAIConversations()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px;" title="Chat History">
           <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
+        <button id="aiVoiceChatBtn" onclick="aiVoiceMode ? stopAIVoiceChat() : startAIVoiceChat()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px; border-radius: 50%; transition: all 0.3s;" title="Voice Chat">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
         <button onclick="startNewAIChat()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px;" title="New Chat">
           <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       `;
+      
+      // Add voice pulse animation style
+      if (!document.getElementById('ai-voice-styles')) {
+        const styleEl = document.createElement('style');
+        styleEl.id = 'ai-voice-styles';
+        styleEl.textContent = `
+          @keyframes aiVoicePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(102,126,234,0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(102,126,234,0); }
+          }
+        `;
+        document.head.appendChild(styleEl);
+      }
 
       // Update chat status
       const chatStatus = document.getElementById('chatStatus');
@@ -4251,10 +4277,20 @@
       const model = aiModels.find(m => m.id === aiSelectedModel);
       const iconEl = document.getElementById('currentModelIcon');
       const nameEl = document.getElementById('currentModelName');
+      const btnEl = document.getElementById('modelSelectorBtn');
       if (model && iconEl && nameEl) {
-        const providerStyle = AI_PROVIDER_STYLES[model.provider] || { icon: '🤖', label: model.provider };
-        iconEl.textContent = providerStyle.icon;
-        nameEl.textContent = model.name;
+        if (model.custom) {
+          // Innovate AI gets special gradient styling
+          const modeIcons = { 'innovate-ai': '💡', 'innovate-ai-creative': '🎨', 'innovate-ai-coder': '💻' };
+          iconEl.textContent = modeIcons[model.id] || '💡';
+          nameEl.textContent = model.name;
+          if (btnEl) btnEl.style.borderImage = 'linear-gradient(135deg, #667eea, #764ba2) 1';
+        } else {
+          const providerStyle = AI_PROVIDER_STYLES[model.provider] || { icon: '🤖', label: model.provider };
+          iconEl.textContent = providerStyle.icon;
+          nameEl.textContent = model.name;
+          if (btnEl) btnEl.style.borderImage = '';
+        }
       }
     }
 
@@ -4280,9 +4316,13 @@
       const dropdown = document.getElementById('modelDropdown');
       if (!dropdown) return;
 
-      // Group by provider
+      // Separate Innovate AI models from others
+      const innovateModels = aiModels.filter(m => m.custom);
+      const otherModels = aiModels.filter(m => !m.custom);
+
+      // Group others by provider
       const providers = {};
-      aiModels.forEach(m => {
+      otherModels.forEach(m => {
         if (!providers[m.provider]) providers[m.provider] = [];
         providers[m.provider].push(m);
       });
@@ -4294,10 +4334,45 @@
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
       });
 
+      // Build dropdown HTML
       let html = `<div style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border);">
         <div style="font-weight: 700; font-size: 14px; color: var(--ig-primary-text);">Choose AI Model</div>
-        <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">Free open-source models listed first</div>
+        <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">Innovate AI auto-picks the best provider</div>
       </div>`;
+
+      // ===== INNOVATE AI Section - Featured at top =====
+      html += `<div style="padding: 10px 16px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); border-bottom: 1px solid var(--ig-border);">
+        <span style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✦ Innovate AI — Our Custom Models</span>
+      </div>`;
+      
+      innovateModels.forEach(m => {
+        const isSelected = m.id === aiSelectedModel;
+        const isAvailable = m.available;
+        const modeIcons = { 'innovate-ai': '💡', 'innovate-ai-creative': '🎨', 'innovate-ai-coder': '💻' };
+        const modeIcon = modeIcons[m.id] || '💡';
+
+        html += `
+          <button onclick="selectAIModel('${m.id}')" 
+            style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}; cursor: ${isAvailable ? 'pointer' : 'not-allowed'}; color: var(--ig-primary-text); text-align: left; opacity: ${isAvailable ? 1 : 0.4}; transition: background 0.15s;"
+            onmouseover="this.style.background='linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.05))'"
+            onmouseout="this.style.background='${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}'"
+            ${isAvailable ? '' : 'disabled'}>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">${modeIcon}</div>
+            <div style="flex: 1;">
+              <div style="font-size: 13px; font-weight: ${isSelected ? '700' : '500'}; display: flex; align-items: center; flex-wrap: wrap;">
+                ${m.name}
+                <span style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; font-size: 8px; padding: 1px 6px; border-radius: 6px; font-weight: 700; margin-left: 6px;">CUSTOM</span>
+              </div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">${m.description}</div>
+            </div>
+            ${isSelected ? '<svg fill="#667eea" height="18" viewBox="0 0 24 24" width="18"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : ''}
+            ${!isAvailable ? '<span style="font-size: 9px; background: var(--ig-secondary-background); padding: 2px 6px; border-radius: 8px; color: var(--ig-secondary-text);">Add Key</span>' : ''}
+          </button>
+        `;
+      });
+
+      // ===== Other Providers Section =====
+      html += `<div style="padding: 10px 16px 4px; font-size: 10px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 1px; border-top: 2px solid var(--ig-border); margin-top: 4px;">🔧 Direct Provider Models</div>`;
 
       let addedPremiumHeader = false;
       for (const [provider, models] of sortedProviders) {
@@ -4386,16 +4461,41 @@
               <svg fill="white" height="40" viewBox="0 0 24 24" width="40"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
             </div>
             <h2 style="color: var(--ig-primary-text); margin-bottom: 8px; font-size: 20px;">Innovate AI</h2>
-            <p style="color: var(--ig-secondary-text); font-size: 14px; max-width: 350px; line-height: 1.5; margin-bottom: 24px;">
-              Your multi-model AI assistant. Chat with Llama, Gemini, Mistral, Claude and 30+ models. Switch models anytime using the selector above. <span style="color: #44b700; font-weight: 600;">FREE models available!</span>
+            <p style="color: var(--ig-secondary-text); font-size: 14px; max-width: 350px; line-height: 1.5; margin-bottom: 16px;">
+              Your AI assistant with <strong>voice chat</strong>, <strong>image generation</strong>, <strong>video creation</strong>, and smart multi-model routing. <span style="color: #44b700; font-weight: 600;">No setup needed!</span>
             </p>
+            
+            <!-- AI Capabilities Cards -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 380px; margin-bottom: 20px; width: 100%;">
+              <div onclick="sendAISuggestion('Generate image of a sunset over mountains')" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">🎨</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Text to Image</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Generate any image</div>
+              </div>
+              <div onclick="sendAISuggestion('Generate video of a rocket launching into space')" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">🎬</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Text to Video</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Create short clips</div>
+              </div>
+              <div onclick="startAIVoiceChat()" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">🎙️</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Voice Chat</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Talk with AI</div>
+              </div>
+              <div onclick="sendAISuggestion('Help me debug my code')" class="ai-capability-card" style="cursor: pointer;">
+                <span style="font-size: 24px;">💻</span>
+                <div style="font-size: 12px; font-weight: 600; color: var(--ig-primary-text);">Code & Chat</div>
+                <div style="font-size: 10px; color: var(--ig-secondary-text);">Ask anything</div>
+              </div>
+            </div>
+            
             <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 380px;">
+              <button onclick="sendAISuggestion('/imagine a cyberpunk city at night with neon lights')" class="ai-suggestion-btn">🎨 Generate cyberpunk city</button>
               <button onclick="sendAISuggestion('Explain quantum computing simply')" class="ai-suggestion-btn">🔬 Explain quantum computing</button>
               <button onclick="sendAISuggestion('Write a creative short story')" class="ai-suggestion-btn">📝 Write a short story</button>
-              <button onclick="sendAISuggestion('Help me debug my code')" class="ai-suggestion-btn">💻 Help debug code</button>
+              <button onclick="sendAISuggestion('/video ocean waves crashing on a tropical beach')" class="ai-suggestion-btn">🎬 Ocean waves video</button>
               <button onclick="sendAISuggestion('Give me a workout plan')" class="ai-suggestion-btn">💪 Workout plan</button>
-              <button onclick="sendAISuggestion('Summarize the latest tech trends')" class="ai-suggestion-btn">📊 Tech trends</button>
-              <button onclick="sendAISuggestion('Help me plan a trip to Japan')" class="ai-suggestion-btn">✈️ Plan a trip</button>
+              <button onclick="startAIVoiceChat()" class="ai-suggestion-btn" style="border-color: #667eea; color: #667eea;">🎙️ Start voice chat</button>
             </div>
           </div>
           <style>
@@ -4413,6 +4513,19 @@
               background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
               border-color: #667eea;
             }
+            .ai-capability-card {
+              background: var(--ig-secondary-background);
+              border: 1px solid var(--ig-border);
+              border-radius: 14px;
+              padding: 14px 10px;
+              text-align: center;
+              transition: all 0.2s;
+            }
+            .ai-capability-card:hover {
+              border-color: #667eea;
+              transform: translateY(-2px);
+              box-shadow: 0 4px 12px rgba(102,126,234,0.2);
+            }
           </style>
         `;
         return;
@@ -4429,7 +4542,12 @@
         }
 
         data.messages.forEach(msg => {
-          appendAIMessage(msg.role, msg.content, msg.model_id, msg.created_at);
+          const msgAttachment = msg.attachment_url ? {
+            url: msg.attachment_url,
+            type: msg.attachment_type || 'file',
+            filename: msg.original_filename || 'Attachment'
+          } : null;
+          appendAIMessage(msg.role, msg.content, msg.model_id, msg.created_at, msgAttachment);
         });
 
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -4440,14 +4558,39 @@
     }
 
     // Append a message to the AI chat
-    function appendAIMessage(role, content, modelId, timestamp) {
+    function appendAIMessage(role, content, modelId, timestamp, attachment) {
       const messagesContainer = document.getElementById('chatMessages');
       const messageEl = document.createElement('div');
+      
+      // Build attachment HTML
+      let attachmentHtml = '';
+      if (attachment) {
+        if (attachment.type === 'image') {
+          attachmentHtml = `<div style="margin-bottom: 8px; border-radius: 12px; overflow: hidden; max-width: 300px;">
+            <img src="${attachment.url}" alt="${escapeHtml(attachment.filename || 'Image')}" style="width: 100%; display: block; border-radius: 12px; cursor: pointer;" onclick="window.open('${attachment.url}', '_blank')">
+            <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px; padding: 0 4px;">${escapeHtml(attachment.filename || '')}</div>
+          </div>`;
+        } else if (attachment.type === 'video') {
+          attachmentHtml = `<div style="margin-bottom: 8px; border-radius: 12px; overflow: hidden; max-width: 300px;">
+            <video src="${attachment.url}" controls style="width: 100%; display: block; border-radius: 12px;"></video>
+            <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px; padding: 0 4px;">${escapeHtml(attachment.filename || '')}</div>
+          </div>`;
+        } else {
+          attachmentHtml = `<div style="margin-bottom: 8px; padding: 10px 14px; background: var(--ig-secondary-background); border-radius: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="window.open('${attachment.url}', '_blank')">
+            <span style="font-size: 24px;">📎</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">${escapeHtml(attachment.filename || 'File')}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">Tap to open</div>
+            </div>
+          </div>`;
+        }
+      }
       
       if (role === 'user') {
         messageEl.className = 'ig-message ig-message-sent';
         messageEl.innerHTML = `
-          <div style="word-break: break-word; white-space: pre-wrap;">${escapeHtml(content)}</div>
+          ${attachmentHtml}
+          ${content ? `<div style="word-break: break-word; white-space: pre-wrap;">${escapeHtml(content)}</div>` : ''}
           <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
             <span style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span>
           </div>
@@ -4469,6 +4612,10 @@
             <button onclick="copyAIResponse(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Copy response">
               <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
               Copy
+            </button>
+            <button onclick="speakAIResponseFromBtn(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Listen">
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              Listen
             </button>
           </div>
         `;
@@ -4508,6 +4655,12 @@
       
       // Numbered lists
       html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left: 20px; position: relative; margin: 2px 0;"><span style="position: absolute; left: 0; font-weight: 600;">$1.</span> $2</div>');
+      
+      // Markdown links [text](url)
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #3897f0; text-decoration: none; word-break: break-all;">$1</a>');
+      
+      // Plain URLs (not already inside an <a> tag)
+      html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<,)&]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #3897f0; text-decoration: none; word-break: break-all;">$2</a>');
       
       // Line breaks
       html = html.replace(/\n/g, '<br>');
@@ -4588,7 +4741,11 @@
 
       const input = document.getElementById('messageInput');
       const content = input.value.trim();
-      if (!content || aiIsLoading) return;
+      
+      // Check for pending AI attachment
+      const pendingFile = window.aiPendingFile || null;
+      
+      if ((!content && !pendingFile) || aiIsLoading) return;
 
       aiIsLoading = true;
       input.value = '';
@@ -4601,25 +4758,143 @@
       if (voiceBtn) voiceBtn.style.display = 'inline-flex';
       if (moreBtn) moreBtn.style.display = 'inline-flex';
 
-      // Append user message to UI
-      appendAIMessage('user', content, null, null);
+      // Clear attachment preview
+      if (pendingFile) {
+        document.getElementById('messagePreviewContainer').innerHTML = '';
+        window.aiPendingFile = null;
+      }
 
-      // Show typing indicator
+      // Build attachment info for display
+      let attachmentInfo = null;
+      if (pendingFile) {
+        attachmentInfo = {
+          url: URL.createObjectURL(pendingFile),
+          type: pendingFile.type.startsWith('image/') ? 'image' : pendingFile.type.startsWith('video/') ? 'video' : 'file',
+          filename: pendingFile.name
+        };
+      }
+
+      // Append user message to UI (with attachment)
+      appendAIMessage('user', content, null, null, attachmentInfo);
+
+      // Check for media generation intent
+      const genIntent = detectGenerationIntent(content, !!pendingFile);
+      
+      if (genIntent.type === 'image') {
+        // Handle text-to-image generation
+        showAIGeneratingIndicator('image');
+        try {
+          const result = await InnovateAPI.apiRequest('/ai-chat/generate-image', {
+            method: 'POST',
+            body: JSON.stringify({
+              prompt: genIntent.prompt,
+              conversation_id: aiConversationId
+            })
+          });
+          removeAITypingIndicator();
+          if (result.conversation_id) aiConversationId = result.conversation_id;
+          appendAIMessage('assistant', `Here's the generated image for: "${genIntent.prompt}"`, 'image-generator', null, {
+            url: result.image.url,
+            type: 'image',
+            filename: `generated-image.png`
+          });
+          // Speak if voice mode is on
+          if (aiVoiceMode) speakAIResponse(`Here's the generated image for ${genIntent.prompt}`);
+        } catch (err) {
+          removeAITypingIndicator();
+          appendAIMessage('assistant', `Sorry, image generation failed: ${err.message}`, 'image-generator', null);
+        }
+        aiIsLoading = false;
+        return;
+      }
+
+      if (genIntent.type === 'video') {
+        // Handle text-to-video generation
+        showAIGeneratingIndicator('video');
+        try {
+          const result = await InnovateAPI.apiRequest('/ai-chat/generate-video', {
+            method: 'POST',
+            body: JSON.stringify({
+              prompt: genIntent.prompt,
+              conversation_id: aiConversationId
+            })
+          });
+          removeAITypingIndicator();
+          if (result.conversation_id) aiConversationId = result.conversation_id;
+          appendAIMessage('assistant', `Here's the generated video for: "${genIntent.prompt}"`, 'video-generator', null, {
+            url: result.video.url,
+            type: 'video',
+            filename: `generated-video.mp4`
+          });
+          if (aiVoiceMode) speakAIResponse(`Here's the generated video for ${genIntent.prompt}`);
+        } catch (err) {
+          removeAITypingIndicator();
+          appendAIMessage('assistant', `Sorry, video generation failed: ${err.message}`, 'video-generator', null);
+        }
+        aiIsLoading = false;
+        return;
+      }
+
+      if (genIntent.type === 'image-to-video' && pendingFile) {
+        // Handle image-to-video
+        showAIGeneratingIndicator('video');
+        try {
+          const formData = new FormData();
+          formData.append('file', pendingFile);
+          if (content) formData.append('prompt', content);
+          if (aiConversationId) formData.append('conversation_id', aiConversationId);
+
+          const result = await InnovateAPI.apiRequest('/ai-chat/image-to-video', {
+            method: 'POST',
+            body: formData
+          });
+          removeAITypingIndicator();
+          if (result.conversation_id) aiConversationId = result.conversation_id;
+          appendAIMessage('assistant', 'Here\'s the animated video from your image!', 'video-generator', null, {
+            url: result.video.url,
+            type: 'video',
+            filename: 'animated-video.mp4'
+          });
+          if (aiVoiceMode) speakAIResponse('Here is the animated video from your image!');
+        } catch (err) {
+          removeAITypingIndicator();
+          appendAIMessage('assistant', `Sorry, image-to-video conversion failed: ${err.message}`, 'video-generator', null);
+        }
+        aiIsLoading = false;
+        return;
+      }
+
+      // Regular AI chat — show typing indicator
       showAITypingIndicator();
 
       try {
-        const payload = {
-          message: content,
-          model_id: aiSelectedModel
-        };
-        if (aiConversationId) {
-          payload.conversation_id = aiConversationId;
-        }
+        let data;
+        if (pendingFile) {
+          // Use FormData for file upload
+          const formData = new FormData();
+          formData.append('file', pendingFile);
+          if (content) formData.append('message', content);
+          formData.append('model_id', aiSelectedModel);
+          if (aiConversationId) formData.append('conversation_id', aiConversationId);
 
-        const data = await InnovateAPI.apiRequest('/ai-chat/send', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
+          data = await InnovateAPI.apiRequest('/ai-chat/send', {
+            method: 'POST',
+            body: formData
+          });
+        } else {
+          // JSON text-only
+          const payload = {
+            message: content,
+            model_id: aiSelectedModel
+          };
+          if (aiConversationId) {
+            payload.conversation_id = aiConversationId;
+          }
+          data = await InnovateAPI.apiRequest('/ai-chat/send', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+        }
 
         // Get conversation ID from response
         if (data.conversation_id) {
@@ -4629,6 +4904,11 @@
         // Remove typing indicator and show response
         removeAITypingIndicator();
         appendAIMessage('assistant', data.response.content, data.response.model, null);
+        
+        // Speak if voice mode is active
+        if (aiVoiceMode) {
+          speakAIResponse(data.response.content);
+        }
 
       } catch (error) {
         removeAITypingIndicator();
@@ -4672,6 +4952,86 @@
 
       aiIsLoading = false;
     };
+
+    // Override sendFile for AI chat
+    const originalSendFile = sendFile;
+    sendFile = async function(file, filename) {
+      if (!aiChatActive) {
+        return originalSendFile(file, filename);
+      }
+      
+      // Store the file as pending attachment for AI chat
+      window.aiPendingFile = file;
+      
+      // Show preview in message input area
+      const previewContainer = document.getElementById('messagePreviewContainer');
+      let previewHtml = '';
+      
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        previewHtml = `
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
+            <img src="${url}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">Image ready to send</div>
+            </div>
+            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
+          </div>
+        `;
+      } else if (file.type.startsWith('video/')) {
+        previewHtml = `
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
+            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">🎬</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">Video ready to send</div>
+            </div>
+            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
+          </div>
+        `;
+      } else {
+        previewHtml = `
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
+            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">📎</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">File ready to send</div>
+            </div>
+            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
+          </div>
+        `;
+      }
+      
+      previewContainer.innerHTML = previewHtml;
+      
+      // Show send button
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.style.display = 'inline-flex';
+      const voiceBtn = document.getElementById('voiceBtn');
+      const moreBtn = document.getElementById('moreBtn');
+      if (voiceBtn) voiceBtn.style.display = 'none';
+      if (moreBtn) moreBtn.style.display = 'none';
+      
+      // Focus input for optional caption
+      document.getElementById('messageInput').focus();
+    };
+
+    // Clear pending AI file
+    function clearAIPendingFile() {
+      window.aiPendingFile = null;
+      document.getElementById('messagePreviewContainer').innerHTML = '';
+      
+      const sendBtn = document.getElementById('sendBtn');
+      const input = document.getElementById('messageInput');
+      if (!input.value.trim()) {
+        if (sendBtn) sendBtn.style.display = 'none';
+        const voiceBtn = document.getElementById('voiceBtn');
+        const moreBtn = document.getElementById('moreBtn');
+        if (voiceBtn) voiceBtn.style.display = 'inline-flex';
+        if (moreBtn) moreBtn.style.display = 'inline-flex';
+      }
+    }
 
     // Start a new AI chat
     function startNewAIChat() {
@@ -4764,6 +5124,10 @@
         aiChatActive = false;
         currentContactId = null;
         
+        // Stop voice chat if active
+        if (aiVoiceMode) stopAIVoiceChat();
+        if (aiSpeechSynthesis && aiSpeechSynthesis.speaking) aiSpeechSynthesis.cancel();
+        
         // Restore original chat actions buttons
         const chatActions = document.querySelector('.ig-chat-actions');
         if (chatActions) {
@@ -4810,6 +5174,365 @@
       };
     }
 
+    // =====================================================
+    // VOICE ASSISTANT - Speech-to-Text & Text-to-Speech
+    // =====================================================
+    
+    let aiVoiceMode = false;
+    let aiSpeechRecognition = null;
+    let aiIsListening = false;
+    let aiSpeechSynthesis = window.speechSynthesis;
+    let aiCurrentUtterance = null;
+    let aiVoiceLanguage = 'en-US';
+    
+    // Initialize Speech Recognition
+    function initSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.warn('Speech recognition not supported');
+        return null;
+      }
+      
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = aiVoiceLanguage;
+      recognition.maxAlternatives = 1;
+      
+      recognition.onstart = () => {
+        aiIsListening = true;
+        updateVoiceBtnState(true);
+      };
+      
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        const input = document.getElementById('messageInput');
+        if (finalTranscript) {
+          input.value = finalTranscript;
+          // Auto-send when we get final result in voice mode
+          if (aiVoiceMode) {
+            setTimeout(() => sendMessage(), 200);
+          }
+        } else if (interimTranscript) {
+          input.value = interimTranscript;
+          input.placeholder = 'Listening...';
+        }
+        
+        // Show send button
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn && input.value.trim()) {
+          sendBtn.style.display = 'inline-flex';
+        }
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        aiIsListening = false;
+        updateVoiceBtnState(false);
+        
+        if (event.error === 'not-allowed') {
+          InnovateAPI.showAlert('Microphone access denied. Please enable in browser settings.', 'error');
+        } else if (event.error !== 'aborted') {
+          InnovateAPI.showAlert(`Voice error: ${event.error}`, 'error');
+        }
+      };
+      
+      recognition.onend = () => {
+        aiIsListening = false;
+        updateVoiceBtnState(false);
+        document.getElementById('messageInput').placeholder = 'Message...';
+        
+        // In voice mode, restart listening after AI response finishes speaking
+        // (handled in speakAIResponse onend callback)
+      };
+      
+      return recognition;
+    }
+    
+    // Update the voice button appearance
+    function updateVoiceBtnState(listening) {
+      const voiceBtn = document.getElementById('aiVoiceChatBtn');
+      if (!voiceBtn) return;
+      
+      if (listening) {
+        voiceBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        voiceBtn.style.color = 'white';
+        voiceBtn.style.animation = 'aiVoicePulse 1.5s ease-in-out infinite';
+        voiceBtn.title = 'Listening... (click to stop)';
+      } else {
+        voiceBtn.style.background = '';
+        voiceBtn.style.color = '';
+        voiceBtn.style.animation = '';
+        voiceBtn.title = 'Voice input';
+      }
+    }
+    
+    // Toggle voice input (one-shot: press to speak, auto-sends)
+    function toggleAIVoiceInput() {
+      if (!aiSpeechRecognition) {
+        aiSpeechRecognition = initSpeechRecognition();
+        if (!aiSpeechRecognition) {
+          InnovateAPI.showAlert('Voice input not supported in this browser', 'error');
+          return;
+        }
+      }
+      
+      if (aiIsListening) {
+        aiSpeechRecognition.stop();
+      } else {
+        // Stop any ongoing TTS
+        if (aiSpeechSynthesis.speaking) {
+          aiSpeechSynthesis.cancel();
+        }
+        
+        document.getElementById('messageInput').placeholder = 'Listening...';
+        try {
+          aiSpeechRecognition.start();
+        } catch (e) {
+          // Already started, ignore
+        }
+      }
+    }
+    
+    // Start full voice chat mode (continuous conversation)
+    function startAIVoiceChat() {
+      aiVoiceMode = true;
+      
+      if (!aiSpeechRecognition) {
+        aiSpeechRecognition = initSpeechRecognition();
+        if (!aiSpeechRecognition) {
+          InnovateAPI.showAlert('Voice chat not supported in this browser', 'error');
+          aiVoiceMode = false;
+          return;
+        }
+      }
+      
+      // Open AI chat if not already active
+      if (!aiChatActive) {
+        openAIChat().then(() => {
+          showVoiceChatUI();
+        });
+      } else {
+        showVoiceChatUI();
+      }
+    }
+    
+    // Show voice chat overlay UI
+    function showVoiceChatUI() {
+      InnovateAPI.showAlert('Voice chat activated! Tap the mic to speak.', 'success');
+      
+      // Update the voice chat button
+      const voiceBtn = document.getElementById('aiVoiceChatBtn');
+      if (voiceBtn) {
+        voiceBtn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        voiceBtn.style.color = 'white';
+        voiceBtn.innerHTML = `<svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+      }
+      
+      // Start listening
+      toggleAIVoiceInput();
+    }
+    
+    // Stop voice chat mode
+    function stopAIVoiceChat() {
+      aiVoiceMode = false;
+      
+      if (aiIsListening && aiSpeechRecognition) {
+        aiSpeechRecognition.stop();
+      }
+      if (aiSpeechSynthesis.speaking) {
+        aiSpeechSynthesis.cancel();
+      }
+      
+      const voiceBtn = document.getElementById('aiVoiceChatBtn');
+      if (voiceBtn) {
+        voiceBtn.style.background = '';
+        voiceBtn.style.color = '';
+        voiceBtn.innerHTML = `<svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+      }
+      
+      InnovateAPI.showAlert('Voice chat deactivated', 'info');
+    }
+    
+    // Text-to-Speech: Speak AI response
+    function speakAIResponse(text) {
+      if (!aiSpeechSynthesis) return;
+      
+      // Stop current speech
+      if (aiSpeechSynthesis.speaking) {
+        aiSpeechSynthesis.cancel();
+      }
+      
+      // Clean text for speech (remove markdown, code blocks, etc)
+      let cleanText = text
+        .replace(/```[\s\S]*?```/g, 'code block omitted')
+        .replace(/`[^`]+`/g, (m) => m.replace(/`/g, ''))
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/#{1,3}\s/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+        .replace(/\n+/g, '. ')
+        .trim();
+      
+      // Limit length for TTS
+      if (cleanText.length > 1000) {
+        cleanText = cleanText.substring(0, 1000) + '... I\'ve shortened the response for speaking.';
+      }
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = aiVoiceLanguage;
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      // Pick a good voice
+      const voices = aiSpeechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) 
+        || voices.find(v => v.lang.startsWith('en') && !v.name.includes('Zira'))
+        || voices[0];
+      if (preferredVoice) utterance.voice = preferredVoice;
+      
+      utterance.onend = () => {
+        aiCurrentUtterance = null;
+        // In voice mode, restart listening after AI finishes speaking
+        if (aiVoiceMode && aiChatActive && !aiIsLoading) {
+          setTimeout(() => {
+            if (aiVoiceMode && !aiIsListening) {
+              try { aiSpeechRecognition.start(); } catch(e) {}
+            }
+          }, 500);
+        }
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('TTS error:', event.error);
+        aiCurrentUtterance = null;
+      };
+      
+      aiCurrentUtterance = utterance;
+      aiSpeechSynthesis.speak(utterance);
+    }
+    
+    // Speak from button click on a message
+    function speakAIResponseFromBtn(btn) {
+      const contentEl = btn.closest('.ig-message').querySelector('.ai-response-content');
+      if (contentEl) {
+        if (aiSpeechSynthesis.speaking) {
+          aiSpeechSynthesis.cancel();
+          btn.innerHTML = `<svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Listen`;
+          btn.style.color = 'var(--ig-secondary-text)';
+          return;
+        }
+        
+        btn.innerHTML = `<svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="#667eea" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop`;
+        btn.style.color = '#667eea';
+        
+        const text = contentEl.textContent;
+        speakAIResponse(text);
+        
+        // Reset button after speaking
+        const checkSpeech = setInterval(() => {
+          if (!aiSpeechSynthesis.speaking) {
+            clearInterval(checkSpeech);
+            btn.innerHTML = `<svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Listen`;
+            btn.style.color = 'var(--ig-secondary-text)';
+          }
+        }, 200);
+      }
+    }
+    
+    
+    // =====================================================
+    // MEDIA GENERATION - Intent detection & UI helpers
+    // =====================================================
+    
+    // Detect if message is a generation command (client-side)
+    function detectGenerationIntent(message, hasAttachment) {
+      if (!message) return { type: null, prompt: '' };
+      const lower = message.toLowerCase().trim();
+      
+      // Image generation patterns
+      const imagePatterns = [
+        /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
+        /^(?:generate|create|make|draw|paint|design|produce|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration|artwork|art|painting|drawing)\s*:?\s+(.+)/i,
+        /^\/imagine\s+(.+)/i,
+        /^\/img\s+(.+)/i
+      ];
+      
+      for (const p of imagePatterns) {
+        const m = message.match(p);
+        if (m) return { type: 'image', prompt: m[1].trim() };
+      }
+      
+      // Video generation patterns
+      const videoPatterns = [
+        /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s+(?:of|about|showing|depicting|with|for)\s+(.+)/i,
+        /^(?:generate|create|make|produce|render)\s+(?:an?\s+)?(?:video|clip|animation|motion)\s*:?\s+(.+)/i,
+        /^\/video\s+(.+)/i
+      ];
+      
+      for (const p of videoPatterns) {
+        const m = message.match(p);
+        if (m) return { type: 'video', prompt: m[1].trim() };
+      }
+      
+      // Image-to-video patterns (requires attachment)
+      if (hasAttachment) {
+        const i2vPatterns = [
+          /^(?:animate|convert|turn|transform|make)\s+(?:this|the|my)?\s*(?:image|picture|photo)?\s*(?:into|to|into a)?\s*(?:video|animation|motion|gif)/i,
+          /^\/animate/i,
+          /^\/i2v/i
+        ];
+        for (const p of i2vPatterns) {
+          if (p.test(lower)) return { type: 'image-to-video', prompt: message };
+        }
+      }
+      
+      return { type: null, prompt: '' };
+    }
+    
+    // Show generation progress indicator (different from typing)
+    function showAIGeneratingIndicator(type) {
+      const messagesContainer = document.getElementById('chatMessages');
+      document.getElementById('ai-typing-indicator')?.remove();
+      
+      const label = type === 'image' ? 'Generating image' : 'Generating video';
+      const icon = type === 'image' ? '🎨' : '🎬';
+      
+      const typingEl = document.createElement('div');
+      typingEl.id = 'ai-typing-indicator';
+      typingEl.className = 'ig-message ig-message-received';
+      typingEl.style.maxWidth = '280px';
+      typingEl.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">${icon}</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">${label}...</div>
+            <div style="font-size: 11px; color: var(--ig-secondary-text);">This may take 10-60 seconds</div>
+          </div>
+          <div style="display: flex; gap: 3px;">
+            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out infinite;"></div>
+            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.2s infinite;"></div>
+            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.4s infinite;"></div>
+          </div>
+        </div>
+      `;
+      messagesContainer.appendChild(typingEl);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+
     // Setup AI Socket.IO listeners
     function setupAISocketListeners() {
       const socket = InnovateAPI.getSocket();
@@ -4831,6 +5554,25 @@
         removeAITypingIndicator();
       });
     }
+
+    // Override voice recording for AI chat (use STT instead of audio recording)
+    const originalStartVoiceRecording = startVoiceRecording;
+    startVoiceRecording = function() {
+      if (aiChatActive) {
+        toggleAIVoiceInput();
+        return;
+      }
+      return originalStartVoiceRecording();
+    };
+    
+    const originalStopVoiceRecording = stopVoiceRecording;
+    stopVoiceRecording = function() {
+      if (aiChatActive) {
+        // In AI mode, voice input auto-stops (SpeechRecognition.continuous = false)
+        return;
+      }
+      return originalStopVoiceRecording();
+    };
 
     // Initialize AI chat on page load
     async function initAIChat() {

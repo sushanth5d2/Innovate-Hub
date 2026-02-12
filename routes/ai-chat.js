@@ -8,6 +8,8 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
 const aiProvider = require('../services/ai-provider');
+const upload = require('../middleware/upload');
+const aiMedia = require('../services/ai-media-generator');
 
 // ==================== Models & Config ====================
 
@@ -43,7 +45,7 @@ router.get('/preferences', authMiddleware, (req, res) => {
       }
       
       res.json({
-        preferred_model: row?.preferred_model || 'llama-3.3-70b-versatile',
+        preferred_model: row?.preferred_model || 'innovate-ai',
         system_prompt: row?.system_prompt || null,
         temperature: row?.temperature ?? 0.7
       });
@@ -128,7 +130,7 @@ router.post('/conversations', authMiddleware, (req, res) => {
   db.run(
     `INSERT INTO ai_conversations (user_id, title, model_id, created_at, updated_at)
      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-    [userId, title || 'New Chat', model_id || 'llama-3.3-70b-versatile'],
+    [userId, title || 'New Chat', model_id || 'innovate-ai'],
     function(err) {
       if (err) {
         console.error('Error creating AI conversation:', err);
@@ -137,7 +139,7 @@ router.post('/conversations', authMiddleware, (req, res) => {
       res.json({ 
         id: this.lastID,
         title: title || 'New Chat',
-        model_id: model_id || 'llama-3.3-70b-versatile'
+        model_id: model_id || 'innovate-ai'
       });
     }
   );
@@ -189,7 +191,7 @@ router.get('/conversations/:id/messages', authMiddleware, (req, res) => {
       }
 
       db.all(
-        `SELECT id, role, content, model_id, tokens_used, created_at
+        `SELECT id, role, content, model_id, tokens_used, attachment_url, attachment_type, original_filename, created_at
          FROM ai_chat_messages
          WHERE conversation_id = ?
          ORDER BY created_at ASC`,
@@ -209,15 +211,47 @@ router.get('/conversations/:id/messages', authMiddleware, (req, res) => {
 /**
  * POST /api/ai-chat/send
  * Send a message to the AI and get a response
- * Body: { message, model_id?, conversation_id? }
+ * Supports file uploads (image, video, document) via multipart form data
+ * Body: { message, model_id?, conversation_id? } OR FormData with file + message
  */
-router.post('/send', authMiddleware, async (req, res) => {
+router.post('/send', authMiddleware, (req, res, next) => {
+  // Handle optional file upload
+  upload.fields([
+    { name: 'file', maxCount: 1 }
+  ])(req, res, (err) => {
+    if (err) {
+      console.error('AI chat upload error:', err.message);
+      return res.status(400).json({ error: err.message });
+    }
+    handleAIChatSend(req, res);
+  });
+});
+
+async function handleAIChatSend(req, res) {
   const db = getDb();
   const userId = req.user.userId;
   const { message, model_id, conversation_id } = req.body;
 
-  if (!message || !message.trim()) {
-    return res.status(400).json({ error: 'Message is required' });
+  // Check for uploaded file
+  let attachmentUrl = null;
+  let attachmentType = null;
+  let originalFilename = null;
+  if (req.files?.file) {
+    const file = req.files.file[0];
+    originalFilename = file.originalname;
+    console.log('AI Chat - File uploaded:', originalFilename, 'MIME:', file.mimetype);
+    attachmentUrl = file.mimetype.startsWith('image/')
+      ? `/uploads/images/${file.filename}`
+      : file.mimetype.startsWith('video/')
+        ? `/uploads/files/${file.filename}`
+        : `/uploads/files/${file.filename}`;
+    attachmentType = file.mimetype.startsWith('image/') ? 'image'
+      : file.mimetype.startsWith('video/') ? 'video' : 'file';
+  }
+
+  // Allow sending with just a file (no text message required)
+  if ((!message || !message.trim()) && !attachmentUrl) {
+    return res.status(400).json({ error: 'Message or attachment is required' });
   }
 
   try {
@@ -231,14 +265,15 @@ router.post('/send', authMiddleware, async (req, res) => {
           else resolve(row);
         });
       });
-      selectedModel = pref?.preferred_model || 'llama-3.3-70b-versatile';
+      selectedModel = pref?.preferred_model || 'innovate-ai';
     }
 
     // Get or create conversation
     let convId = conversation_id;
     if (!convId) {
       // Create new conversation with first few words as title
-      const title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+      const titleSource = message || originalFilename || 'New Chat';
+      const title = titleSource.substring(0, 50) + (titleSource.length > 50 ? '...' : '');
       convId = await new Promise((resolve, reject) => {
         db.run(
           `INSERT INTO ai_conversations (user_id, title, model_id, created_at, updated_at)
@@ -252,12 +287,23 @@ router.post('/send', authMiddleware, async (req, res) => {
       });
     }
 
-    // Save user message to DB
+    // Build the user message content (include attachment description for AI context)
+    let userContent = message || '';
+    let attachmentContext = '';
+    if (attachmentUrl) {
+      const typeLabel = attachmentType === 'image' ? 'image' : attachmentType === 'video' ? 'video' : 'file';
+      attachmentContext = `[User attached a ${typeLabel}: ${originalFilename}]`;
+      if (!userContent) {
+        userContent = attachmentContext;
+      }
+    }
+
+    // Save user message to DB (with attachment info)
     await new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, created_at)
-         VALUES (?, 'user', ?, ?, CURRENT_TIMESTAMP)`,
-        [convId, message, selectedModel],
+        `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
+         VALUES (?, 'user', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [convId, userContent, selectedModel, attachmentUrl, attachmentType, originalFilename],
         (err) => { if (err) reject(err); else resolve(); }
       );
     });
@@ -265,7 +311,7 @@ router.post('/send', authMiddleware, async (req, res) => {
     // Load conversation history for context (last 20 messages)
     const history = await new Promise((resolve, reject) => {
       db.all(
-        `SELECT role, content FROM ai_chat_messages
+        `SELECT role, content, attachment_url, attachment_type, original_filename FROM ai_chat_messages
          WHERE conversation_id = ?
          ORDER BY created_at ASC
          LIMIT 20`,
@@ -277,12 +323,22 @@ router.post('/send', authMiddleware, async (req, res) => {
       );
     });
 
+    // Enrich history with attachment context for the AI
+    const enrichedHistory = history.map(msg => {
+      let content = msg.content;
+      if (msg.attachment_url && msg.role === 'user') {
+        const typeLabel = msg.attachment_type === 'image' ? 'image' : msg.attachment_type === 'video' ? 'video' : 'file';
+        content = `${content}\n[Attached ${typeLabel}: ${msg.original_filename}]`;
+      }
+      return { role: msg.role, content };
+    });
+
     // Emit typing indicator via Socket.IO
     const io = req.app.get('io');
     io.to(`user-${userId}`).emit('ai:typing', { conversation_id: convId, model: selectedModel });
 
     // Call AI provider
-    const aiResponse = await aiProvider.chat(selectedModel, history);
+    const aiResponse = await aiProvider.chat(selectedModel, enrichedHistory);
 
     // Save AI response to DB
     await new Promise((resolve, reject) => {
@@ -312,6 +368,11 @@ router.post('/send', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       conversation_id: convId,
+      attachment: attachmentUrl ? {
+        url: attachmentUrl,
+        type: attachmentType,
+        filename: originalFilename
+      } : null,
       response: {
         content: aiResponse.content,
         model: selectedModel,
@@ -335,7 +396,7 @@ router.post('/send', authMiddleware, async (req, res) => {
       model: model_id
     });
   }
-});
+}
 
 /**
  * POST /api/ai-chat/quick
@@ -350,7 +411,7 @@ router.post('/quick', authMiddleware, async (req, res) => {
   }
 
   try {
-    const selectedModel = model_id || 'llama-3.3-70b-versatile';
+    const selectedModel = model_id || 'innovate-ai';
     const aiResponse = await aiProvider.chat(selectedModel, [
       { role: 'user', content: message }
     ]);
@@ -366,5 +427,179 @@ router.post('/quick', authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to get AI response' });
   }
 });
+
+// ==================== AI Media Generation ====================
+
+/**
+ * GET /api/ai-chat/capabilities
+ * Get available AI generation capabilities
+ */
+router.get('/capabilities', authMiddleware, (req, res) => {
+  res.json(aiMedia.getCapabilities());
+});
+
+/**
+ * POST /api/ai-chat/generate-image
+ * Generate an image from a text prompt
+ * Body: { prompt, width?, height?, style?, conversation_id? }
+ */
+router.post('/generate-image', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { prompt, width, height, style, conversation_id } = req.body;
+
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  try {
+    // Generate the image
+    const result = await aiMedia.generateImage(prompt, { width, height, style });
+
+    // Save to conversation if provided
+    let convId = conversation_id;
+    if (convId) {
+      // Save user prompt message
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, created_at)
+           VALUES (?, 'user', ?, 'image-generator', CURRENT_TIMESTAMP)`,
+          [convId, `Generate image: ${prompt}`],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      // Save generated image as assistant message
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
+           VALUES (?, 'assistant', ?, 'image-generator', ?, 'image', ?, CURRENT_TIMESTAMP)`,
+          [convId, `Here's the generated image for: "${prompt}"`, result.url, `generated-${Date.now()}.png`],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      db.run('UPDATE ai_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [convId]);
+    }
+
+    res.json({
+      success: true,
+      image: result,
+      conversation_id: convId
+    });
+
+  } catch (error) {
+    console.error('Image generation error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to generate image' });
+  }
+});
+
+/**
+ * POST /api/ai-chat/generate-video
+ * Generate a video from a text prompt
+ * Body: { prompt, conversation_id? }
+ */
+router.post('/generate-video', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { prompt, conversation_id } = req.body;
+
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  try {
+    const result = await aiMedia.generateVideo(prompt);
+
+    let convId = conversation_id;
+    if (convId) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, created_at)
+           VALUES (?, 'user', ?, 'video-generator', CURRENT_TIMESTAMP)`,
+          [convId, `Generate video: ${prompt}`],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
+           VALUES (?, 'assistant', ?, 'video-generator', ?, 'video', ?, CURRENT_TIMESTAMP)`,
+          [convId, `Here's the generated video for: "${prompt}"`, result.url, `generated-${Date.now()}.mp4`],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      db.run('UPDATE ai_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [convId]);
+    }
+
+    res.json({ success: true, video: result, conversation_id: convId });
+
+  } catch (error) {
+    console.error('Video generation error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to generate video' });
+  }
+});
+
+/**
+ * POST /api/ai-chat/image-to-video
+ * Animate an image into a video
+ * Body (FormData): file (image), prompt?, conversation_id?
+ */
+router.post('/image-to-video', authMiddleware, (req, res, next) => {
+  upload.fields([{ name: 'file', maxCount: 1 }])(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    handleImageToVideo(req, res);
+  });
+});
+
+async function handleImageToVideo(req, res) {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { prompt, conversation_id } = req.body;
+
+  if (!req.files?.file) {
+    return res.status(400).json({ error: 'Image file is required' });
+  }
+
+  const file = req.files.file[0];
+  const imagePath = file.mimetype.startsWith('image/')
+    ? `/uploads/images/${file.filename}`
+    : `/uploads/files/${file.filename}`;
+
+  try {
+    const result = await aiMedia.imageToVideo(imagePath, prompt);
+
+    let convId = conversation_id;
+    if (convId) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
+           VALUES (?, 'user', ?, 'video-generator', ?, 'image', ?, CURRENT_TIMESTAMP)`,
+          [convId, prompt || 'Animate this image into a video', imagePath, file.originalname],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, attachment_url, attachment_type, original_filename, created_at)
+           VALUES (?, 'assistant', ?, 'video-generator', ?, 'video', ?, CURRENT_TIMESTAMP)`,
+          [convId, 'Here\'s the animated video from your image!', result.url, `animated-${Date.now()}.mp4`],
+          (err) => { if (err) reject(err); else resolve(); }
+        );
+      });
+
+      db.run('UPDATE ai_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [convId]);
+    }
+
+    res.json({ success: true, video: result, conversation_id: convId });
+
+  } catch (error) {
+    console.error('Image-to-video error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to convert image to video' });
+  }
+}
 
 module.exports = router;

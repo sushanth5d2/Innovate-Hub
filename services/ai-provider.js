@@ -1,14 +1,91 @@
 /**
  * AI Provider Service - Unified interface for multiple AI models
- * Supports: OpenAI, Google Gemini, xAI Grok, Anthropic Claude, DeepSeek,
- *           Groq (FREE), HuggingFace (FREE), Ollama (LOCAL/FREE),
- *           Cohere (FREE tier), Mistral (FREE tier), OpenRouter (FREE models)
+ * Supports: Innovate AI (custom smart router), OpenAI, Google Gemini, xAI Grok, 
+ *           Anthropic Claude, DeepSeek, Groq (FREE), HuggingFace (FREE), 
+ *           Ollama (LOCAL/FREE), Cohere (FREE tier), Mistral (FREE tier), OpenRouter (FREE models)
  */
 
 const axios = require('axios');
 
+// ===================== INNOVATE AI - Custom Smart Engine =====================
+// The platform's own AI that intelligently routes to the best available provider.
+// No separate API key needed — it uses whatever keys the user has configured.
+// Priority: Groq (fastest free) → Google Gemini → Mistral → Cohere → OpenRouter → HuggingFace → OpenAI → etc.
+
+const INNOVATE_AI_PROVIDER_PRIORITY = [
+  // Free/fast providers first
+  { provider: 'groq', modelId: 'llama-3.3-70b-versatile', envKey: 'GROQ_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'groq', modelId: 'mixtral-8x7b-32768', envKey: 'GROQ_API_KEY' },
+  { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
+  { provider: 'cohere', modelId: 'command-r-plus', envKey: 'COHERE_API_KEY' },
+  { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.1-8b-instruct:free', envKey: 'OPENROUTER_API_KEY' },
+  { provider: 'huggingface', modelId: 'mistralai/Mistral-7B-Instruct-v0.3', envKey: 'HUGGINGFACE_API_KEY' },
+  // Premium fallbacks
+  { provider: 'openai', modelId: 'gpt-4o-mini', envKey: 'OPENAI_API_KEY' },
+  { provider: 'anthropic', modelId: 'claude-3-haiku-20240307', envKey: 'ANTHROPIC_API_KEY' },
+  { provider: 'deepseek', modelId: 'deepseek-chat', envKey: 'DEEPSEEK_API_KEY' },
+  { provider: 'xai', modelId: 'grok-2', envKey: 'XAI_API_KEY' },
+  // Local fallback
+  { provider: 'ollama', modelId: 'ollama/llama3.2', envKey: 'OLLAMA_ENABLED' },
+];
+
+const INNOVATE_AI_SYSTEM_PROMPT = `You are Innovate AI, the custom built-in AI assistant of the Innovate Hub social platform. 
+
+Your personality:
+- Friendly, approachable, and slightly witty
+- You speak like a knowledgeable friend, not a corporate bot
+- You're proud to be Innovate Hub's own AI
+- You use emojis sparingly but naturally
+- You give concise, well-structured answers
+- You format code, lists, and complex info with markdown
+
+Your capabilities:
+- General knowledge and conversation
+- Code help (write, debug, explain in any language)
+- Creative writing (stories, poems, scripts)
+- Analysis and summarization
+- Math, science, and education
+- Travel, fitness, cooking, and lifestyle advice
+- Tech trends and news discussions
+
+Rules:
+- Never reveal which underlying model you're running on
+- Always identify yourself as "Innovate AI" if asked who you are
+- Keep responses focused and avoid unnecessary padding
+- If you're unsure, say so honestly
+- Be inclusive and respectful`;
+
 // Available AI models configuration
 const AI_MODELS = {
+  // ==================== INNOVATE AI - Platform's Custom Model ====================
+  'innovate-ai': {
+    provider: 'innovate',
+    name: 'Innovate AI',
+    description: 'Our custom AI — smart, fast, and always available',
+    maxTokens: 4096,
+    envKey: '_INNOVATE_AI_AUTO_',
+    free: true,
+    custom: true
+  },
+  'innovate-ai-creative': {
+    provider: 'innovate',
+    name: 'Innovate AI Creative',
+    description: 'Tuned for stories, ideas, and creative writing',
+    maxTokens: 4096,
+    envKey: '_INNOVATE_AI_AUTO_',
+    free: true,
+    custom: true
+  },
+  'innovate-ai-coder': {
+    provider: 'innovate',
+    name: 'Innovate AI Coder',
+    description: 'Optimized for code generation and debugging',
+    maxTokens: 4096,
+    envKey: '_INNOVATE_AI_AUTO_',
+    free: true,
+    custom: true
+  },
   // ==================== FREE / OPEN-SOURCE MODELS ====================
 
   // Groq - FREE, super fast inference for open-source models
@@ -364,7 +441,31 @@ const PROVIDER_CONFIGS = {
   }
 };
 
-const SYSTEM_PROMPT = `You are Innovate AI, a helpful and intelligent assistant integrated into the Innovate Hub social platform. You are friendly, concise, and knowledgeable. You help users with questions, creative tasks, coding, analysis, and general conversation. Keep responses well-formatted and clear. Use markdown formatting when helpful. Be conversational but accurate.`;
+const SYSTEM_PROMPT = INNOVATE_AI_SYSTEM_PROMPT;
+
+/**
+ * Check if the Innovate AI meta-provider has any available backend
+ */
+function isInnovateAIAvailable() {
+  return INNOVATE_AI_PROVIDER_PRIORITY.some(p => {
+    if (p.provider === 'ollama') return process.env.OLLAMA_ENABLED === 'true';
+    return !!process.env[p.envKey];
+  });
+}
+
+/**
+ * Get the best available backend for Innovate AI
+ */
+function getInnovateAIBackend() {
+  for (const p of INNOVATE_AI_PROVIDER_PRIORITY) {
+    if (p.provider === 'ollama') {
+      if (process.env.OLLAMA_ENABLED === 'true') return p;
+    } else {
+      if (process.env[p.envKey]) return p;
+    }
+  }
+  return null;
+}
 
 /**
  * Get list of available models (that have API keys configured)
@@ -372,9 +473,14 @@ const SYSTEM_PROMPT = `You are Innovate AI, a helpful and intelligent assistant 
 function getAvailableModels() {
   const models = [];
   for (const [id, config] of Object.entries(AI_MODELS)) {
-    const isAvailable = config.provider === 'ollama' 
-      ? (process.env.OLLAMA_ENABLED === 'true')
-      : !!process.env[config.envKey];
+    let isAvailable;
+    if (config.provider === 'innovate') {
+      isAvailable = isInnovateAIAvailable();
+    } else if (config.provider === 'ollama') {
+      isAvailable = process.env.OLLAMA_ENABLED === 'true';
+    } else {
+      isAvailable = !!process.env[config.envKey];
+    }
     models.push({
       id,
       name: config.name,
@@ -382,7 +488,8 @@ function getAvailableModels() {
       description: config.description,
       available: isAvailable,
       free: config.free || false,
-      local: config.local || false
+      local: config.local || false,
+      custom: config.custom || false
     });
   }
   return models;
@@ -393,9 +500,14 @@ function getAvailableModels() {
  */
 function getAllModels() {
   return Object.entries(AI_MODELS).map(([id, config]) => {
-    const isAvailable = config.provider === 'ollama'
-      ? (process.env.OLLAMA_ENABLED === 'true')
-      : !!process.env[config.envKey];
+    let isAvailable;
+    if (config.provider === 'innovate') {
+      isAvailable = isInnovateAIAvailable();
+    } else if (config.provider === 'ollama') {
+      isAvailable = process.env.OLLAMA_ENABLED === 'true';
+    } else {
+      isAvailable = !!process.env[config.envKey];
+    }
     return {
       id,
       name: config.name,
@@ -403,7 +515,8 @@ function getAllModels() {
       description: config.description,
       available: isAvailable,
       free: config.free || false,
-      local: config.local || false
+      local: config.local || false,
+      custom: config.custom || false
     };
   });
 }
@@ -421,8 +534,12 @@ async function chat(modelId, messages, options = {}) {
     throw new Error(`Unknown model: ${modelId}. Available: ${Object.keys(AI_MODELS).join(', ')}`);
   }
 
-  // Ollama uses a different availability check
-  if (modelConfig.provider === 'ollama') {
+  // Innovate AI uses smart routing — no separate API key check
+  if (modelConfig.provider === 'innovate') {
+    if (!isInnovateAIAvailable()) {
+      throw new Error('No AI providers configured. Add at least one API key (e.g., GROQ_API_KEY) to your .env file.');
+    }
+  } else if (modelConfig.provider === 'ollama') {
     if (process.env.OLLAMA_ENABLED !== 'true') {
       throw new Error('Ollama is not enabled. Set OLLAMA_ENABLED=true in .env and ensure Ollama is running locally.');
     }
@@ -439,6 +556,8 @@ async function chat(modelId, messages, options = {}) {
 
   try {
     switch (modelConfig.provider) {
+      case 'innovate':
+        return await callInnovateAI(modelId, messages, temperature, maxTokens);
       case 'openai':
         return await callOpenAI(modelId, apiKey, messages, temperature, maxTokens);
       case 'google':
@@ -486,7 +605,254 @@ async function chat(modelId, messages, options = {}) {
   }
 }
 
+// ===================== INNOVATE AI - Smart Router Engine =====================
+
+const INNOVATE_CREATIVE_PROMPT = `${INNOVATE_AI_SYSTEM_PROMPT}
+
+CREATIVE MODE ACTIVE: You are now in creative writing mode. Be more expressive, imaginative, and artistic. Use vivid descriptions, metaphors, and engaging narratives. Let your creativity flow freely while maintaining quality and coherence.`;
+
+const INNOVATE_CODER_PROMPT = `${INNOVATE_AI_SYSTEM_PROMPT}
+
+CODER MODE ACTIVE: You are now in expert programmer mode. Focus on writing clean, efficient, well-commented code. Always explain your approach. Follow best practices and design patterns. Include error handling. Use proper formatting with code blocks and language tags.`;
+
+/**
+ * Innovate AI - Routes to the best available provider automatically.
+ * Supports 3 modes: default, creative, coder — each with tailored system prompts.
+ * Falls back through providers in priority order if one fails.
+ */
+async function callInnovateAI(modelId, messages, temperature, maxTokens) {
+  const backend = getInnovateAIBackend();
+  if (!backend) {
+    throw new Error('No AI providers available. Configure at least one API key in .env');
+  }
+
+  // Select system prompt based on model variant
+  let systemPrompt = INNOVATE_AI_SYSTEM_PROMPT;
+  if (modelId === 'innovate-ai-creative') {
+    systemPrompt = INNOVATE_CREATIVE_PROMPT;
+    temperature = Math.max(temperature, 0.9); // Higher creativity
+  } else if (modelId === 'innovate-ai-coder') {
+    systemPrompt = INNOVATE_CODER_PROMPT;
+    temperature = Math.min(temperature, 0.3); // More precise
+  }
+
+  // Override messages with Innovate AI system prompt
+  const innovateMessages = messages.map(m => ({ ...m }));
+
+  // Try providers in priority order with fallback
+  const triedProviders = [];
+  for (const candidate of INNOVATE_AI_PROVIDER_PRIORITY) {
+    const isAvailable = candidate.provider === 'ollama' 
+      ? process.env.OLLAMA_ENABLED === 'true'
+      : !!process.env[candidate.envKey];
+    
+    if (!isAvailable) continue;
+
+    try {
+      const targetModel = AI_MODELS[candidate.modelId];
+      if (!targetModel) continue;
+
+      const apiKey = process.env[targetModel.envKey] || '';
+
+      let result;
+      switch (candidate.provider) {
+        case 'groq':
+          result = await callGroqWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'google':
+          result = await callGeminiWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'openai':
+          result = await callOpenAIWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'mistral':
+          result = await callMistralWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'cohere':
+          result = await callCohereWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'openrouter':
+          result = await callOpenRouterWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'huggingface':
+          result = await callHuggingFaceWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'anthropic':
+          result = await callAnthropicWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'deepseek':
+          result = await callDeepSeekWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'xai':
+          result = await callXAIWithPrompt(candidate.modelId, apiKey, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'ollama':
+          result = await callOllamaWithPrompt(candidate.modelId, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        default:
+          continue;
+      }
+
+      // Override model name in response to show "Innovate AI"
+      result.model = modelId;
+      result.backed_by = candidate.modelId;
+      return result;
+
+    } catch (err) {
+      console.log(`Innovate AI: ${candidate.provider}/${candidate.modelId} failed: ${err.message}, trying next...`);
+      triedProviders.push(candidate.provider);
+      continue;
+    }
+  }
+
+  throw new Error(`All AI providers failed. Tried: ${triedProviders.join(', ') || 'none available'}. Check your API keys in .env`);
+}
+
 // ===================== Provider-specific implementations =====================
+// Each provider has a base function + a WithPrompt variant for Innovate AI routing
+
+// Helper to create WithPrompt variants for OpenAI-compatible APIs
+function makeOpenAICompatibleCall(baseUrl, headersFactory) {
+  return async function(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
+    const actualModel = modelId.replace('openrouter/', '');
+    const payload = {
+      model: actualModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages
+      ],
+      temperature,
+      max_tokens: maxTokens
+    };
+    const response = await axios.post(baseUrl, payload, {
+      headers: headersFactory(apiKey),
+      timeout: 60000
+    });
+    return {
+      content: response.data.choices[0].message.content,
+      model: modelId,
+      tokens: {
+        prompt: response.data.usage?.prompt_tokens,
+        completion: response.data.usage?.completion_tokens,
+        total: response.data.usage?.total_tokens
+      }
+    };
+  };
+}
+
+const callOpenAIWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.openai.baseUrl, PROVIDER_CONFIGS.openai.headers
+);
+const callGroqWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.groq.baseUrl, PROVIDER_CONFIGS.groq.headers
+);
+const callMistralWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.mistral.baseUrl, PROVIDER_CONFIGS.mistral.headers
+);
+const callXAIWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.xai.baseUrl, PROVIDER_CONFIGS.xai.headers
+);
+const callDeepSeekWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.deepseek.baseUrl, PROVIDER_CONFIGS.deepseek.headers
+);
+const callOpenRouterWithPrompt = makeOpenAICompatibleCall(
+  PROVIDER_CONFIGS.openrouter.baseUrl, PROVIDER_CONFIGS.openrouter.headers
+);
+
+async function callHuggingFaceWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
+  const modelPath = modelId.replace('huggingface/', '');
+  const url = PROVIDER_CONFIGS.huggingface.baseUrl(modelPath);
+  const payload = {
+    model: modelPath,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    temperature, max_tokens: maxTokens, stream: false
+  };
+  const response = await axios.post(url, payload, {
+    headers: PROVIDER_CONFIGS.huggingface.headers(apiKey), timeout: 120000
+  });
+  return {
+    content: response.data.choices[0].message.content,
+    model: modelId,
+    tokens: { prompt: response.data.usage?.prompt_tokens, completion: response.data.usage?.completion_tokens, total: response.data.usage?.total_tokens }
+  };
+}
+
+async function callGeminiWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
+  const url = `${PROVIDER_CONFIGS.google.baseUrl(modelId)}?key=${apiKey}`;
+  const contents = messages.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
+  const payload = {
+    contents,
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { temperature, maxOutputTokens: maxTokens, topP: 0.95 }
+  };
+  const response = await axios.post(url, payload, {
+    headers: PROVIDER_CONFIGS.google.headers(), timeout: 60000
+  });
+  const candidate = response.data.candidates?.[0];
+  if (!candidate || !candidate.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
+  return {
+    content: candidate.content.parts[0].text,
+    model: modelId,
+    tokens: { prompt: response.data.usageMetadata?.promptTokenCount, completion: response.data.usageMetadata?.candidatesTokenCount, total: response.data.usageMetadata?.totalTokenCount }
+  };
+}
+
+async function callAnthropicWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
+  const config = PROVIDER_CONFIGS.anthropic;
+  const payload = {
+    model: modelId, system: systemPrompt,
+    messages: messages.map(msg => ({ role: msg.role, content: msg.content })),
+    temperature, max_tokens: maxTokens
+  };
+  const response = await axios.post(config.baseUrl, payload, {
+    headers: config.headers(apiKey), timeout: 60000
+  });
+  return {
+    content: response.data.content[0].text,
+    model: modelId,
+    tokens: { prompt: response.data.usage?.input_tokens, completion: response.data.usage?.output_tokens, total: (response.data.usage?.input_tokens || 0) + (response.data.usage?.output_tokens || 0) }
+  };
+}
+
+async function callCohereWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
+  const config = PROVIDER_CONFIGS.cohere;
+  const payload = {
+    model: modelId,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages.map(msg => ({ role: msg.role === 'assistant' ? 'assistant' : 'user', content: msg.content }))],
+    temperature, max_tokens: maxTokens
+  };
+  const response = await axios.post(config.baseUrl, payload, {
+    headers: config.headers(apiKey), timeout: 60000
+  });
+  const content = response.data.message?.content?.[0]?.text || response.data.text || response.data.message?.content || '';
+  return {
+    content, model: modelId,
+    tokens: { prompt: response.data.usage?.tokens?.input_tokens || 0, completion: response.data.usage?.tokens?.output_tokens || 0, total: (response.data.usage?.tokens?.input_tokens || 0) + (response.data.usage?.tokens?.output_tokens || 0) }
+  };
+}
+
+async function callOllamaWithPrompt(modelId, messages, temperature, maxTokens, systemPrompt) {
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  const modelName = modelId.replace('ollama/', '');
+  const payload = {
+    model: modelName,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    stream: false, options: { temperature, num_predict: maxTokens }
+  };
+  const response = await axios.post(`${baseUrl}/api/chat`, payload, {
+    headers: { 'Content-Type': 'application/json' }, timeout: 120000
+  });
+  return {
+    content: response.data.message?.content || response.data.response,
+    model: modelId,
+    tokens: { prompt: response.data.prompt_eval_count || 0, completion: response.data.eval_count || 0, total: (response.data.prompt_eval_count || 0) + (response.data.eval_count || 0) }
+  };
+}
+
+// ===================== Standard provider calls (used when user picks a specific model) =====================
 
 async function callOpenAI(modelId, apiKey, messages, temperature, maxTokens) {
   const config = PROVIDER_CONFIGS.openai;
