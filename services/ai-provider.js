@@ -773,7 +773,11 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
 
     } catch (err) {
       console.log(`Innovate AI: ${candidate.provider}/${candidate.modelId} failed: ${err.message}, trying next...`);
-      markProviderFailed(candidate.provider, candidate.modelId);
+      // Don't cooldown Pollinations — it's the free-tier fallback and only zero-config provider
+      // Empty responses and rate limits are transient, not permanent failures
+      if (candidate.provider !== 'pollinations') {
+        markProviderFailed(candidate.provider, candidate.modelId);
+      }
       triedProviders.push(candidate.provider);
       continue;
     }
@@ -838,30 +842,83 @@ const callOpenRouterWithPrompt = makeOpenAICompatibleCall(
  * Uses OpenAI-compatible format at https://text.pollinations.ai/openai
  */
 async function callPollinationsWithPrompt(messages, temperature, maxTokens, systemPrompt) {
-  const payload = {
-    model: 'mistral',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ],
-    temperature,
-    max_tokens: maxTokens
-  };
+  const MAX_RETRIES = 2;
+  let lastError = null;
 
-  const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
-    headers: PROVIDER_CONFIGS.pollinations.headers(),
-    timeout: 30000  // Free tier needs more time
-  });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const payload = {
+        model: 'mistral',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+        ],
+        temperature,
+        max_tokens: maxTokens,
+        seed: Math.floor(Math.random() * 1000000) + attempt,  // Random seed to bypass Pollinations cache
+        cache: false  // Disable Pollinations response caching
+      };
 
-  return {
-    content: response.data.choices[0].message.content,
-    model: 'pollinations-openai',
-    tokens: {
-      prompt: response.data.usage?.prompt_tokens || 0,
-      completion: response.data.usage?.completion_tokens || 0,
-      total: response.data.usage?.total_tokens || 0
+      console.log(`[Pollinations] Attempt ${attempt}/${MAX_RETRIES} - ${messages.length} messages, seed: ${payload.seed}`);
+
+      const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
+        headers: PROVIDER_CONFIGS.pollinations.headers(),
+        timeout: 30000
+      });
+
+      // Extract content from various response formats
+      let content = '';
+      if (response.data?.choices?.[0]?.message?.content) {
+        content = response.data.choices[0].message.content;
+      } else if (typeof response.data === 'string' && response.data.trim()) {
+        content = response.data;
+      } else {
+        console.warn(`[Pollinations] Unexpected response format:`, JSON.stringify(response.data).substring(0, 300));
+      }
+
+      if (content && content.trim()) {
+        console.log(`[Pollinations] Success on attempt ${attempt}, content length: ${content.length}`);
+        return {
+          content: content.trim(),
+          model: 'pollinations-openai',
+          tokens: {
+            prompt: response.data?.usage?.prompt_tokens || 0,
+            completion: response.data?.usage?.completion_tokens || 0,
+            total: response.data?.usage?.total_tokens || 0
+          }
+        };
+      }
+
+      // Empty response — log and retry after delay
+      console.warn(`[Pollinations] Attempt ${attempt}/${MAX_RETRIES}: empty response body`);
+      lastError = new Error('Empty response from Pollinations');
+      
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
+
+    } catch (err) {
+      console.warn(`[Pollinations] Attempt ${attempt}/${MAX_RETRIES} error: ${err.message}`);
+      lastError = err;
+      
+      // Don't retry on hard network errors
+      if (err.code === 'ECONNABORTED' || err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+        break;
+      }
+      
+      // For 429 rate limit, wait longer before retry
+      if (err.response?.status === 429) {
+        if (attempt < MAX_RETRIES) {
+          console.log('[Pollinations] Rate limited, waiting 5s before retry...');
+          await new Promise(r => setTimeout(r, 5000));
+        }
+      } else if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+      }
     }
-  };
+  }
+
+  throw lastError || new Error('Pollinations failed after retries');
 }
 
 /**
@@ -896,23 +953,53 @@ async function callPollinationsVision(messages, imageData, temperature, maxToken
     model: 'mistral',
     messages: apiMessages,
     temperature,
-    max_tokens: maxTokens
+    max_tokens: maxTokens,
+    seed: Math.floor(Math.random() * 1000000),
+    cache: false
   };
 
-  const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
-    headers: PROVIDER_CONFIGS.pollinations.headers(),
-    timeout: 90000  // Vision may take longer on free tier
-  });
+  const MAX_RETRIES = 2;
+  let lastError = null;
 
-  return {
-    content: response.data.choices[0].message.content,
-    model: 'pollinations-openai',
-    tokens: {
-      prompt: response.data.usage?.prompt_tokens || 0,
-      completion: response.data.usage?.completion_tokens || 0,
-      total: response.data.usage?.total_tokens || 0
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await axios.post(PROVIDER_CONFIGS.pollinations.baseUrl, payload, {
+        headers: PROVIDER_CONFIGS.pollinations.headers(),
+        timeout: 90000
+      });
+
+      let content = '';
+      if (response.data?.choices?.[0]?.message?.content) {
+        content = response.data.choices[0].message.content;
+      } else if (typeof response.data === 'string' && response.data.trim()) {
+        content = response.data;
+      }
+
+      if (content && content.trim()) {
+        return {
+          content: content.trim(),
+          model: 'pollinations-openai',
+          tokens: {
+            prompt: response.data?.usage?.prompt_tokens || 0,
+            completion: response.data?.usage?.completion_tokens || 0,
+            total: response.data?.usage?.total_tokens || 0
+          }
+        };
+      }
+
+      console.warn(`Pollinations Vision attempt ${attempt}/${MAX_RETRIES}: empty response`);
+      lastError = new Error('Vision AI returned an empty response');
+      if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
+
+    } catch (err) {
+      console.warn(`Pollinations Vision attempt ${attempt}/${MAX_RETRIES} error: ${err.message}`);
+      lastError = err;
+      if (err.code === 'ECONNABORTED' || err.code === 'ENOTFOUND') break;
+      if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
     }
-  };
+  }
+
+  throw lastError || new Error('Vision failed after retries');
 }
 
 async function callHuggingFaceWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {

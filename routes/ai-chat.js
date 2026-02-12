@@ -330,8 +330,18 @@ async function handleAIChatSend(req, res) {
       );
     });
 
-    // Build enriched history  
-    const enrichedHistory = history.map(msg => {
+    // Build enriched history (filter out empty assistant messages to avoid poisoning context)
+    const enrichedHistory = history
+      .filter(msg => {
+        // Remove empty/fallback assistant messages from history
+        if (msg.role === 'assistant' && (!msg.content || !msg.content.trim() || 
+            msg.content === 'Sorry, I received an empty response. Please try again.' ||
+            msg.content === 'Sorry, I got a blank response. Please resend your message. 🔄')) {
+          return false;
+        }
+        return true;
+      })
+      .map(msg => {
       let content = msg.content;
       if (msg.attachment_url && msg.role === 'user' && msg !== history[history.length - 1]) {
         const typeLabel = msg.attachment_type === 'image' ? 'image' : msg.attachment_type === 'video' ? 'video' : 'file';
@@ -411,11 +421,12 @@ async function handleAIChatSend(req, res) {
     }
 
     // Save AI response to DB
+    const responseContent = aiResponse.content || 'Sorry, I received an empty response. Please try again.';
     await new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO ai_chat_messages (conversation_id, role, content, model_id, tokens_used, created_at)
          VALUES (?, 'assistant', ?, ?, ?, CURRENT_TIMESTAMP)`,
-        [convId, aiResponse.content, selectedModel, aiResponse.tokens?.total || 0],
+        [convId, responseContent, selectedModel, aiResponse.tokens?.total || 0],
         (err) => { if (err) reject(err); else resolve(); }
       );
     });
@@ -429,7 +440,7 @@ async function handleAIChatSend(req, res) {
     // Emit response via Socket.IO
     io.to(`user-${userId}`).emit('ai:response', {
       conversation_id: convId,
-      content: aiResponse.content,
+      content: responseContent,
       model: selectedModel,
       model_name: aiProvider.AI_MODELS[selectedModel]?.name || selectedModel,
       tokens: aiResponse.tokens
@@ -444,7 +455,7 @@ async function handleAIChatSend(req, res) {
         filename: originalFilename
       } : null,
       response: {
-        content: aiResponse.content,
+        content: responseContent,
         model: selectedModel,
         model_name: aiProvider.AI_MODELS[selectedModel]?.name || selectedModel,
         tokens: aiResponse.tokens
