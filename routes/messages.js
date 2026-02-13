@@ -180,6 +180,7 @@ router.post('/send', authMiddleware, (req, res, next) => {
         // Emit socket event
         const io = req.app.get('io');
         io.to(`user_${receiver_id}`).emit('new_message', messageData);
+        io.to(`user_${senderId}`).emit('new_message', { ...messageData, is_own: true });
 
         // Create notification
         db.run(
