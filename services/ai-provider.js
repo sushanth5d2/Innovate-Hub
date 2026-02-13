@@ -2,10 +2,193 @@
  * AI Provider Service - Unified interface for multiple AI models
  * Supports: Innovate AI (custom smart router), OpenAI, Google Gemini, xAI Grok, 
  *           Anthropic Claude, DeepSeek, Groq (FREE), HuggingFace (FREE), 
- *           Ollama (LOCAL/FREE), Cohere (FREE tier), Mistral (FREE tier), OpenRouter (FREE models)
+ *           Ollama (LOCAL/FREE), LM Studio (LOCAL), GPT4All (LOCAL), Jan.ai (LOCAL),
+ *           KoboldCPP (LOCAL), Cohere (FREE tier), Mistral (FREE tier), OpenRouter (FREE models)
  */
 
 const axios = require('axios');
+
+// ===================== Local AI Auto-Detection =====================
+// Automatically detect local AI services — no env config needed
+
+// Ollama (localhost:11434)
+let ollamaAutoDetected = false;
+let ollamaAvailableModels = [];
+
+// LM Studio (localhost:1234) - OpenAI-compatible
+let lmStudioDetected = false;
+let lmStudioModels = [];
+
+// GPT4All (localhost:4891) - OpenAI-compatible
+let gpt4allDetected = false;
+let gpt4allModels = [];
+
+// Jan.ai (localhost:1337) - OpenAI-compatible
+let janDetected = false;
+let janModels = [];
+
+// KoboldCPP (localhost:5001) - OpenAI-compatible
+let koboldDetected = false;
+let koboldModels = [];
+
+// Pollinations AI (remote, free, no key needed)
+let pollinationsAvailable = true; // Assume available initially
+
+async function detectOllama() {
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  try {
+    const response = await axios.get(`${baseUrl}/api/tags`, { timeout: 3000 });
+    const models = response.data?.models || [];
+    if (models.length > 0) {
+      ollamaAutoDetected = true;
+      ollamaAvailableModels = models.map(m => m.name);
+      console.log(`[Ollama] Auto-detected with ${models.length} models: ${ollamaAvailableModels.join(', ')}`);
+      // Dynamically register any Ollama models not already in AI_MODELS
+      registerDynamicOllamaModels(ollamaAvailableModels);
+    }
+  } catch {
+    ollamaAutoDetected = false;
+    ollamaAvailableModels = [];
+  }
+}
+
+/**
+ * Dynamically register Ollama models that aren't hardcoded in AI_MODELS.
+ * This ensures any model pulled via `ollama pull <model>` automatically
+ * appears in the dropdown without needing code changes.
+ */
+function registerDynamicOllamaModels(modelNames) {
+  for (const fullName of modelNames) {
+    // Normalize: 'codellama:latest' -> 'codellama', 'qwen2.5:0.5b' stays as-is
+    const baseName = fullName.replace(':latest', '');
+    const modelId = `ollama/${baseName}`;
+
+    // Skip if already defined
+    if (AI_MODELS[modelId]) continue;
+
+    // Generate a friendly display name from the model name
+    const displayName = baseName
+      .split(/[-_:/]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+    AI_MODELS[modelId] = {
+      provider: 'ollama',
+      name: `${displayName} (Local)`,
+      description: 'FREE LOCAL - Auto-detected Ollama model',
+      maxTokens: 4096,
+      envKey: '_AUTO_DETECT_',
+      free: true,
+      local: true
+    };
+
+    console.log(`[Ollama] Registered new model: ${modelId} → ${displayName}`);
+  }
+}
+
+/**
+ * Detect OpenAI-compatible local AI services (LM Studio, GPT4All, Jan.ai, KoboldCPP)
+ * All expose /v1/models endpoint
+ */
+async function detectLocalAIService(name, baseUrl, timeout = 3000) {
+  try {
+    const response = await axios.get(`${baseUrl}/v1/models`, { timeout });
+    const models = response.data?.data || [];
+    const modelIds = models.map(m => m.id || m.name || 'default');
+    if (modelIds.length > 0 || response.status === 200) {
+      return { detected: true, models: modelIds.length > 0 ? modelIds : ['default'] };
+    }
+  } catch {
+    // Some services don't have /v1/models, try a lightweight health check
+    try {
+      const healthResp = await axios.get(baseUrl, { timeout: 2000 });
+      if (healthResp.status === 200) {
+        return { detected: true, models: ['default'] };
+      }
+    } catch { /* not running */ }
+  }
+  return { detected: false, models: [] };
+}
+
+/**
+ * Check if Pollinations AI is reachable
+ */
+async function detectPollinationsHealth() {
+  try {
+    const resp = await axios.get('https://text.pollinations.ai/openai/models', { timeout: 5000 });
+    return resp.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+async function detectAllLocalServices() {
+  // Detect Ollama (has its own API format)
+  await detectOllama();
+
+  // Detect OpenAI-compatible local services in parallel
+  const lmStudioUrl = process.env.LM_STUDIO_URL || 'http://localhost:1234';
+  const gpt4allUrl = process.env.GPT4ALL_URL || 'http://localhost:4891';
+  const janUrl = process.env.JAN_AI_URL || 'http://localhost:1337';
+  const koboldUrl = process.env.KOBOLDCPP_URL || 'http://localhost:5001';
+
+  const [lmResult, gpt4allResult, janResult, koboldResult, pollinationsResult] = await Promise.allSettled([
+    detectLocalAIService('LM Studio', lmStudioUrl),
+    detectLocalAIService('GPT4All', gpt4allUrl),
+    detectLocalAIService('Jan.ai', janUrl),
+    detectLocalAIService('KoboldCPP', koboldUrl),
+    detectPollinationsHealth(),
+  ]);
+
+  const prev = { lmStudioDetected, gpt4allDetected, janDetected, koboldDetected };
+
+  if (lmResult.status === 'fulfilled') {
+    lmStudioDetected = lmResult.value.detected;
+    lmStudioModels = lmResult.value.models;
+  } else { lmStudioDetected = false; lmStudioModels = []; }
+
+  if (gpt4allResult.status === 'fulfilled') {
+    gpt4allDetected = gpt4allResult.value.detected;
+    gpt4allModels = gpt4allResult.value.models;
+  } else { gpt4allDetected = false; gpt4allModels = []; }
+
+  if (janResult.status === 'fulfilled') {
+    janDetected = janResult.value.detected;
+    janModels = janResult.value.models;
+  } else { janDetected = false; janModels = []; }
+
+  if (koboldResult.status === 'fulfilled') {
+    koboldDetected = koboldResult.value.detected;
+    koboldModels = koboldResult.value.models;
+  } else { koboldDetected = false; koboldModels = []; }
+
+  // Log newly detected services
+  if (lmStudioDetected && !prev.lmStudioDetected) console.log(`[LM Studio] Auto-detected with models: ${lmStudioModels.join(', ')}`);
+  if (gpt4allDetected && !prev.gpt4allDetected) console.log(`[GPT4All] Auto-detected with models: ${gpt4allModels.join(', ')}`);
+  if (janDetected && !prev.janDetected) console.log(`[Jan.ai] Auto-detected with models: ${janModels.join(', ')}`);
+  if (koboldDetected && !prev.koboldDetected) console.log(`[KoboldCPP] Auto-detected with models: ${koboldModels.join(', ')}`);
+
+  // Log services that went offline
+  if (!lmStudioDetected && prev.lmStudioDetected) console.log('[LM Studio] No longer detected');
+  if (!gpt4allDetected && prev.gpt4allDetected) console.log('[GPT4All] No longer detected');
+  if (!janDetected && prev.janDetected) console.log('[Jan.ai] No longer detected');
+  if (!koboldDetected && prev.koboldDetected) console.log('[KoboldCPP] No longer detected');
+
+  // Update Pollinations status
+  const prevPollinations = pollinationsAvailable;
+  if (pollinationsResult.status === 'fulfilled') {
+    pollinationsAvailable = pollinationsResult.value;
+  } else {
+    pollinationsAvailable = false;
+  }
+  if (pollinationsAvailable && !prevPollinations) console.log('[Pollinations] Back online');
+  if (!pollinationsAvailable && prevPollinations) console.log('[Pollinations] Offline — hiding from model list');
+}
+
+// Run auto-detection on startup
+detectAllLocalServices();
+// Re-check periodically (every 60 seconds)
+setInterval(detectAllLocalServices, 60000);
 
 // ===================== Provider Failure Cache =====================
 // Skip providers that failed recently to avoid wasting time on retries
@@ -38,8 +221,16 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
   { provider: 'groq', modelId: 'meta-llama/llama-4-scout-17b-16e-instruct', envKey: 'GROQ_API_KEY' },
   // FREE zero-config — ALWAYS available, no API key needed
   { provider: 'pollinations', modelId: 'pollinations-openai', envKey: '_ALWAYS_AVAILABLE_' },
-  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  // Ollama LOCAL — auto-detected, no config needed
+  { provider: 'ollama', modelId: 'ollama/qwen2.5:0.5b', envKey: '_AUTO_DETECT_' },
+  { provider: 'ollama', modelId: 'ollama/tinyllama', envKey: '_AUTO_DETECT_' },
+  // LM Studio / GPT4All / Jan.ai / KoboldCPP — auto-detected local services
+  { provider: 'lmstudio', modelId: 'lmstudio/default', envKey: '_AUTO_DETECT_' },
+  { provider: 'gpt4all', modelId: 'gpt4all/default', envKey: '_AUTO_DETECT_' },
+  { provider: 'jan', modelId: 'jan/default', envKey: '_AUTO_DETECT_' },
+  { provider: 'koboldcpp', modelId: 'koboldcpp/default', envKey: '_AUTO_DETECT_' },
   { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-1.5-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'groq', modelId: 'qwen/qwen3-32b', envKey: 'GROQ_API_KEY' },
   { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
   { provider: 'cohere', modelId: 'command-r-plus', envKey: 'COHERE_API_KEY' },
@@ -52,6 +243,8 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
   { provider: 'xai', modelId: 'grok-2', envKey: 'XAI_API_KEY' },
   // Local fallback
   { provider: 'ollama', modelId: 'ollama/llama3.2', envKey: 'OLLAMA_ENABLED' },
+  // Built-in fallback — always works, no external service needed
+  { provider: 'builtin', modelId: 'builtin-fallback', envKey: '_ALWAYS_AVAILABLE_' },
 ];
 
 const INNOVATE_AI_SYSTEM_PROMPT = `You are Innovate AI, the custom built-in AI assistant of the Innovate Hub social platform. 
@@ -176,6 +369,24 @@ const AI_MODELS = {
     free: true,
     local: true
   },
+  'ollama/qwen2.5:0.5b': {
+    provider: 'ollama',
+    name: 'Qwen 2.5 (Local)',
+    description: 'FREE LOCAL - Fast, compact model',
+    maxTokens: 2048,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
+  'ollama/tinyllama': {
+    provider: 'ollama',
+    name: 'TinyLlama (Local)',
+    description: 'FREE LOCAL - Ultra-fast tiny model',
+    maxTokens: 2048,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
   'ollama/mistral': {
     provider: 'ollama',
     name: 'Mistral (Local)',
@@ -202,6 +413,61 @@ const AI_MODELS = {
     envKey: 'OLLAMA_ENABLED',
     free: true,
     local: true
+  },
+
+  // LM Studio - LOCAL, OpenAI-compatible (localhost:1234)
+  'lmstudio/default': {
+    provider: 'lmstudio',
+    name: 'LM Studio',
+    description: 'FREE LOCAL - Auto-detected LM Studio model',
+    maxTokens: 4096,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
+
+  // GPT4All - LOCAL, OpenAI-compatible (localhost:4891)
+  'gpt4all/default': {
+    provider: 'gpt4all',
+    name: 'GPT4All',
+    description: 'FREE LOCAL - Auto-detected GPT4All model',
+    maxTokens: 4096,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
+
+  // Jan.ai - LOCAL, OpenAI-compatible (localhost:1337)
+  'jan/default': {
+    provider: 'jan',
+    name: 'Jan.ai',
+    description: 'FREE LOCAL - Auto-detected Jan.ai model',
+    maxTokens: 4096,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
+
+  // KoboldCPP - LOCAL, OpenAI-compatible (localhost:5001)
+  'koboldcpp/default': {
+    provider: 'koboldcpp',
+    name: 'KoboldCPP',
+    description: 'FREE LOCAL - Auto-detected KoboldCPP model',
+    maxTokens: 4096,
+    envKey: '_AUTO_DETECT_',
+    free: true,
+    local: true
+  },
+
+  // Built-in fallback - always works, no external service needed
+  'builtin-fallback': {
+    provider: 'builtin',
+    name: 'Innovate AI (Built-in)',
+    description: 'Built-in fallback - always available',
+    maxTokens: 2048,
+    envKey: '_ALWAYS_AVAILABLE_',
+    free: true,
+    custom: true
   },
 
   // Cohere - FREE tier (1000 req/month)
@@ -310,7 +576,7 @@ const AI_MODELS = {
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-  'gemini-1.5-pro': {
+  'gemini-1.5-pro-latest': {
     provider: 'google',
     name: 'Gemini 1.5 Pro',
     description: 'FREE tier - 1M context window',
@@ -318,7 +584,7 @@ const AI_MODELS = {
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-  'gemini-1.5-flash': {
+  'gemini-1.5-flash-latest': {
     provider: 'google',
     name: 'Gemini 1.5 Flash',
     description: 'FREE tier - Fast and versatile',
@@ -484,9 +750,9 @@ const PROVIDER_CONFIGS = {
 
 // Vision-capable model priority (for image analysis)
 const INNOVATE_AI_VISION_PRIORITY = [
-  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.0-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-1.5-pro-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-1.5-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'groq', modelId: 'meta-llama/llama-4-scout-17b-16e-instruct', envKey: 'GROQ_API_KEY' },
   { provider: 'groq', modelId: 'meta-llama/llama-4-maverick-17b-128e-instruct', envKey: 'GROQ_API_KEY' },
   { provider: 'openai', modelId: 'gpt-4o', envKey: 'OPENAI_API_KEY' },
@@ -503,7 +769,7 @@ const SYSTEM_PROMPT = INNOVATE_AI_SYSTEM_PROMPT;
  * Check if the Innovate AI meta-provider has any available backend
  */
 function isInnovateAIAvailable() {
-  return true; // Always available — Pollinations works without any API key
+  return true; // Built-in fallback is always available even if Pollinations is down
 }
 
 /**
@@ -511,20 +777,46 @@ function isInnovateAIAvailable() {
  */
 function getInnovateAIBackend() {
   for (const p of INNOVATE_AI_PROVIDER_PRIORITY) {
-    if (p.provider === 'pollinations') return p; // Always available
+    if (p.provider === 'pollinations') {
+      if (pollinationsAvailable) return p;
+      continue; // Skip if Pollinations is down
+    }
+    if (p.provider === 'builtin') return p; // Always available
     if (p.provider === 'ollama') {
-      if (process.env.OLLAMA_ENABLED === 'true') return p;
+      if (ollamaAutoDetected || process.env.OLLAMA_ENABLED === 'true') return p;
+    } else if (LOCAL_AI_PROVIDERS.includes(p.provider)) {
+      if (isLocalProviderDetected(p.provider)) return p;
     } else {
       if (process.env[p.envKey]) return p;
     }
   }
-  // Should never reach here since pollinations is always available
+  // Built-in fallback is always available
   return INNOVATE_AI_PROVIDER_PRIORITY[INNOVATE_AI_PROVIDER_PRIORITY.length - 1];
 }
 
 /**
  * Get list of available models (that have API keys configured)
  */
+function isOllamaModelInstalled(modelId) {
+  const modelName = modelId.replace('ollama/', '');
+  return ollamaAvailableModels.some(m => m === modelName || m.startsWith(modelName + ':') || modelName.startsWith(m.split(':')[0]));
+}
+
+/**
+ * Check if a local AI provider is detected and running
+ */
+function isLocalProviderDetected(provider) {
+  switch (provider) {
+    case 'lmstudio': return lmStudioDetected;
+    case 'gpt4all': return gpt4allDetected;
+    case 'jan': return janDetected;
+    case 'koboldcpp': return koboldDetected;
+    default: return false;
+  }
+}
+
+const LOCAL_AI_PROVIDERS = ['lmstudio', 'gpt4all', 'jan', 'koboldcpp'];
+
 function getAvailableModels() {
   const models = [];
   for (const [id, config] of Object.entries(AI_MODELS)) {
@@ -532,9 +824,14 @@ function getAvailableModels() {
     if (config.provider === 'innovate') {
       isAvailable = isInnovateAIAvailable();
     } else if (config.provider === 'pollinations') {
-      isAvailable = true; // Always available
+      isAvailable = pollinationsAvailable;
+    } else if (config.provider === 'builtin') {
+      isAvailable = true;
     } else if (config.provider === 'ollama') {
-      isAvailable = process.env.OLLAMA_ENABLED === 'true';
+      // Only mark as available if the model is actually installed in Ollama
+      isAvailable = (ollamaAutoDetected || process.env.OLLAMA_ENABLED === 'true') && isOllamaModelInstalled(id);
+    } else if (LOCAL_AI_PROVIDERS.includes(config.provider)) {
+      isAvailable = isLocalProviderDetected(config.provider);
     } else {
       isAvailable = !!process.env[config.envKey];
     }
@@ -561,9 +858,14 @@ function getAllModels() {
     if (config.provider === 'innovate') {
       isAvailable = isInnovateAIAvailable();
     } else if (config.provider === 'pollinations') {
-      isAvailable = true; // Always available
+      isAvailable = pollinationsAvailable;
+    } else if (config.provider === 'builtin') {
+      isAvailable = true;
     } else if (config.provider === 'ollama') {
-      isAvailable = process.env.OLLAMA_ENABLED === 'true';
+      // Only mark as available if the model is actually installed in Ollama
+      isAvailable = (ollamaAutoDetected || process.env.OLLAMA_ENABLED === 'true') && isOllamaModelInstalled(id);
+    } else if (LOCAL_AI_PROVIDERS.includes(config.provider)) {
+      isAvailable = isLocalProviderDetected(config.provider);
     } else {
       isAvailable = !!process.env[config.envKey];
     }
@@ -595,12 +897,21 @@ async function chat(modelId, messages, options = {}) {
 
   // Innovate AI uses smart routing — no separate API key check
   if (modelConfig.provider === 'innovate') {
-    // Always available — Pollinations fallback ensures Innovate AI always works
-  } else if (modelConfig.provider === 'pollinations') {
+    // Always available — smart routing with built-in fallback ensures Innovate AI always works
+  } else if (modelConfig.provider === 'pollinations' || modelConfig.provider === 'builtin') {
     // Always available — no API key needed
   } else if (modelConfig.provider === 'ollama') {
-    if (process.env.OLLAMA_ENABLED !== 'true') {
+    if (!ollamaAutoDetected && process.env.OLLAMA_ENABLED !== 'true') {
       throw new Error('Ollama is not enabled. Set OLLAMA_ENABLED=true in .env and ensure Ollama is running locally.');
+    }
+    const ollamaModelName = modelId.replace('ollama/', '');
+    if (!isOllamaModelInstalled(modelId)) {
+      throw new Error(`Model '${ollamaModelName}' is not installed in Ollama. Run: ollama pull ${ollamaModelName}`);
+    }
+  } else if (LOCAL_AI_PROVIDERS.includes(modelConfig.provider)) {
+    if (!isLocalProviderDetected(modelConfig.provider)) {
+      const serviceNames = { lmstudio: 'LM Studio', gpt4all: 'GPT4All', jan: 'Jan.ai', koboldcpp: 'KoboldCPP' };
+      throw new Error(`${serviceNames[modelConfig.provider]} is not running. Start it locally to use this model.`);
     }
   } else {
     const apiKey = process.env[modelConfig.envKey];
@@ -633,6 +944,11 @@ async function chat(modelId, messages, options = {}) {
         return await callHuggingFace(modelId, apiKey, messages, temperature, maxTokens);
       case 'ollama':
         return await callOllama(modelId, messages, temperature, maxTokens);
+      case 'lmstudio':
+      case 'gpt4all':
+      case 'jan':
+      case 'koboldcpp':
+        return await callLocalAIService(modelConfig.provider, modelId, messages, temperature, maxTokens);
       case 'cohere':
         return await callCohere(modelId, apiKey, messages, temperature, maxTokens);
       case 'mistral':
@@ -641,6 +957,8 @@ async function chat(modelId, messages, options = {}) {
         return await callOpenRouter(modelId, apiKey, messages, temperature, maxTokens);
       case 'pollinations':
         return await callPollinationsWithPrompt(messages, temperature, maxTokens, INNOVATE_AI_SYSTEM_PROMPT);
+      case 'builtin':
+        return await callBuiltinFallback(messages, INNOVATE_AI_SYSTEM_PROMPT);
       default:
         throw new Error(`Unsupported provider: ${modelConfig.provider}`);
     }
@@ -710,17 +1028,21 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
     }
 
     // Check availability
-    const isAvailable = candidate.provider === 'pollinations' 
-      ? true  // Always available, no API key needed
-      : candidate.provider === 'ollama' 
-        ? process.env.OLLAMA_ENABLED === 'true'
-        : !!process.env[candidate.envKey];
+    const isAvailable = candidate.provider === 'builtin'
+      ? true  // Built-in always available
+      : candidate.provider === 'pollinations'
+        ? pollinationsAvailable
+        : candidate.provider === 'ollama' 
+          ? (ollamaAutoDetected || process.env.OLLAMA_ENABLED === 'true')
+          : LOCAL_AI_PROVIDERS.includes(candidate.provider)
+            ? isLocalProviderDetected(candidate.provider)
+            : !!process.env[candidate.envKey];
     
     if (!isAvailable) continue;
 
     try {
       const targetModel = AI_MODELS[candidate.modelId];
-      if (!targetModel && candidate.provider !== 'pollinations') continue;
+      if (!targetModel && candidate.provider !== 'pollinations' && candidate.provider !== 'builtin') continue;
 
       const apiKey = targetModel ? (process.env[targetModel.envKey] || '') : '';
 
@@ -759,8 +1081,17 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
         case 'ollama':
           result = await callOllamaWithPrompt(candidate.modelId, innovateMessages, temperature, maxTokens, systemPrompt);
           break;
+        case 'lmstudio':
+        case 'gpt4all':
+        case 'jan':
+        case 'koboldcpp':
+          result = await callLocalAIServiceWithPrompt(candidate.provider, candidate.modelId, innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
         case 'pollinations':
           result = await callPollinationsWithPrompt(innovateMessages, temperature, maxTokens, systemPrompt);
+          break;
+        case 'builtin':
+          result = await callBuiltinFallback(innovateMessages, systemPrompt);
           break;
         default:
           continue;
@@ -919,6 +1250,145 @@ async function callPollinationsWithPrompt(messages, temperature, maxTokens, syst
   }
 
   throw lastError || new Error('Pollinations failed after retries');
+}
+
+/**
+ * Built-in Fallback AI — Always works, no external service needed
+ * Uses Ollama if available, otherwise provides intelligent template responses
+ */
+async function callBuiltinFallback(messages, systemPrompt) {
+  // First try: use Ollama if auto-detected
+  if (ollamaAutoDetected && ollamaAvailableModels.length > 0) {
+    try {
+      const preferredModels = ['qwen2.5:0.5b', 'tinyllama', 'llama3.2', 'mistral', 'phi3', 'gemma2'];
+      let modelToUse = ollamaAvailableModels[0]; // Default to first available
+      for (const pref of preferredModels) {
+        if (ollamaAvailableModels.some(m => m.includes(pref))) {
+          modelToUse = ollamaAvailableModels.find(m => m.includes(pref));
+          break;
+        }
+      }
+      console.log(`[Built-in Fallback] Using Ollama model: ${modelToUse}`);
+      return await callOllamaWithPrompt(`ollama/${modelToUse}`, messages, 0.7, 2048, systemPrompt);
+    } catch (err) {
+      console.log(`[Built-in Fallback] Ollama failed: ${err.message}, trying other local services...`);
+    }
+  }
+
+  // Second try: use any detected local AI service (LM Studio, GPT4All, Jan.ai, KoboldCPP)
+  for (const provider of LOCAL_AI_PROVIDERS) {
+    if (isLocalProviderDetected(provider)) {
+      try {
+        const serviceNames = { lmstudio: 'LM Studio', gpt4all: 'GPT4All', jan: 'Jan.ai', koboldcpp: 'KoboldCPP' };
+        console.log(`[Built-in Fallback] Using ${serviceNames[provider]}`);
+        return await callLocalAIServiceWithPrompt(provider, `${provider}/default`, messages, 0.7, 2048, systemPrompt);
+      } catch (err) {
+        console.log(`[Built-in Fallback] ${provider} failed: ${err.message}, trying next...`);
+      }
+    }
+  }
+
+  // Last resort: generate intelligent response from templates
+  const lastMessage = messages[messages.length - 1]?.content || '';
+  const response = generateBuiltinResponse(lastMessage);
+  
+  return {
+    content: response,
+    model: 'builtin-fallback',
+    tokens: { prompt: 0, completion: 0, total: 0 }
+  };
+}
+
+/**
+ * Generate an intelligent template-based response
+ * Handles common queries with helpful answers
+ */
+function generateBuiltinResponse(userMessage) {
+  const msg = userMessage.toLowerCase().trim();
+  
+  // Greeting patterns
+  if (msg.match(/^(hi+|hey+|hello+|hola|sup|yo|what'?s? ?up|howdy|good ?(morning|afternoon|evening|night)|greetings)/i)) {
+    const greetings = [
+      "Hey there! 👋 I'm Innovate AI, your built-in assistant. How can I help you today?",
+      "Hello! 😊 Welcome to Innovate AI. I'm here to help — ask me anything!",
+      "Hi! 👋 I'm Innovate AI. What would you like to know or talk about?",
+      "Hey! Great to see you! I'm Innovate AI — your personal assistant on Innovate Hub. What can I do for you?",
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+
+  // Who are you / about
+  if (msg.match(/who ?are ?you|what ?are ?you|about ?you|your ?name|introduce/i)) {
+    return "I'm **Innovate AI** 💡 — the built-in AI assistant of the Innovate Hub social platform!\n\nI can help you with:\n• 💬 General conversations and questions\n• 💻 Coding help and debugging\n• 🎨 Creative writing and ideas\n• 📚 Learning and explanations\n• 🎨 Image generation (/imagine prompt)\n• 🎬 Video generation (/video prompt)\n\nI use smart multi-model routing to give you the best responses. No API keys needed!";
+  }
+
+  // Help / what can you do
+  if (msg.match(/help|what can you|capabilities|features|what do you|how to use/i)) {
+    return "Here's what I can do for you! 🚀\n\n**Chat & Knowledge:**\n• Answer questions on any topic\n• Help with coding, math, science\n• Creative writing & brainstorming\n\n**Media Generation:**\n• 🎨 `/imagine [description]` — Generate images\n• 🎬 `/video [description]` — Create short video clips\n\n**Document Analysis:**\n• Upload PDFs, docs, images for analysis\n• Vision-powered image understanding\n\n**Voice:**\n• 🎙️ Voice chat — talk naturally with AI\n\nJust type your question or use the quick action buttons!";
+  }
+
+  // Coding questions
+  if (msg.match(/code|programming|javascript|python|html|css|debug|error|function|variable|api|react|node|java|sql|git/i)) {
+    return "I'd love to help with your coding question! 💻\n\nI'm currently running in built-in fallback mode with limited capabilities. For the best coding assistance, I recommend:\n\n1. **Try again in a moment** — my AI providers may come back online\n2. **Check your message** — be specific about what language, framework, and error you're seeing\n3. **Share code snippets** — paste your code and I'll analyze it when my full AI is available\n\nIn the meantime, here are some general coding tips:\n• Break problems into smaller pieces\n• Use console.log/print to debug\n• Read error messages carefully — they often point to the exact issue\n• Check documentation for the libraries you're using\n\nFeel free to ask again and I'll do my best to help! 🚀";
+  }
+
+  // Math
+  if (msg.match(/(\d+\s*[\+\-\*\/\%]\s*\d+)|calculate|math|equation|solve/i)) {
+    // Try to evaluate simple math
+    const mathMatch = msg.match(/(\d+(?:\.\d+)?)\s*([\+\-\*\/\%])\s*(\d+(?:\.\d+)?)/);
+    if (mathMatch) {
+      const a = parseFloat(mathMatch[1]);
+      const op = mathMatch[2];
+      const b = parseFloat(mathMatch[3]);
+      let result;
+      switch(op) {
+        case '+': result = a + b; break;
+        case '-': result = a - b; break;
+        case '*': result = a * b; break;
+        case '/': result = b !== 0 ? a / b : 'undefined (division by zero)'; break;
+        case '%': result = a % b; break;
+      }
+      return `**${a} ${op} ${b} = ${result}** ✨\n\nNeed help with more complex math? Just ask!`;
+    }
+    return "I can help with math! Please share the specific equation or problem you'd like me to solve. For complex calculations, my full AI engine will provide detailed step-by-step solutions.";
+  }
+
+  // Jokes / fun
+  if (msg.match(/joke|funny|laugh|humor|tell me a/i)) {
+    const jokes = [
+      "Why do programmers prefer dark mode? Because light attracts bugs! 🐛😄",
+      "Why did the developer go broke? Because he used up all his cache! 💸😂",
+      "What's a programmer's favorite hangout place? Foo Bar! 🍸😄",
+      "Why do Java developers wear glasses? Because they don't C#! 👓😂",
+      "What did the HTML say to the CSS? 'You make me look good!' 💅✨",
+      "Why was the JavaScript developer sad? Because he didn't Node how to Express himself! 😢😄",
+    ];
+    return jokes[Math.floor(Math.random() * jokes.length)];
+  }
+
+  // Thanks / bye
+  if (msg.match(/^(thanks?|thank you|thx|ty|bye|goodbye|see ya|later|good ?bye)/i)) {
+    const responses = [
+      "You're welcome! 😊 Feel free to come back anytime!",
+      "Happy to help! 👋 See you around on Innovate Hub!",
+      "Anytime! Don't hesitate to ask if you need anything else! 🌟",
+      "Glad I could help! Have a great day! ✨",
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+
+  // Weather, time, etc
+  if (msg.match(/weather|time|date|today/i)) {
+    const now = new Date();
+    return `The current date and time is: **${now.toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}**\n\nFor weather information, I'd need access to a weather API. You can check weather at [weather.com](https://weather.com) or ask me when my full AI capabilities are available! 🌤️`;
+  }
+
+  // Default — intelligent fallback
+  const defaults = [
+    `Great question! 🤔 I'm Innovate AI running in built-in mode right now.\n\nI received your message: *"${userMessage.substring(0, 100)}${userMessage.length > 100 ? '...' : ''}"*\n\nWhile my external AI providers are reconnecting, here's what I can tell you:\n• I'm still here and listening! 💡\n• Try asking me basic questions, math, jokes, or coding tips\n• My full AI capabilities will be back shortly\n• You can also try switching models using the dropdown above\n\nPlease try again in a moment — I'll give you a much more helpful answer! 🚀`,
+    `Thanks for your message! 💬 I'm currently using my built-in response system while my AI providers reconnect.\n\nYour question about *"${userMessage.substring(0, 80)}${userMessage.length > 80 ? '...' : ''}"* is a great one! I'll be able to provide a comprehensive answer once my full AI is back online.\n\n**In the meantime:**\n• Try simple questions — I can handle greetings, math, jokes, and basic help\n• Check back in a minute for full AI responses\n• Try the model switcher above for other providers\n\nI appreciate your patience! 🙏`,
+  ];
+  return defaults[Math.floor(Math.random() * defaults.length)];
 }
 
 /**
@@ -1092,6 +1562,89 @@ async function callOllamaWithPrompt(modelId, messages, temperature, maxTokens, s
     content: response.data.message?.content || response.data.response,
     model: modelId,
     tokens: { prompt: response.data.prompt_eval_count || 0, completion: response.data.eval_count || 0, total: (response.data.prompt_eval_count || 0) + (response.data.eval_count || 0) }
+  };
+}
+
+// ===================== Local AI Service Calls (LM Studio, GPT4All, Jan.ai, KoboldCPP) =====================
+// All use OpenAI-compatible /v1/chat/completions API
+
+const LOCAL_SERVICE_URLS = {
+  lmstudio: () => process.env.LM_STUDIO_URL || 'http://localhost:1234',
+  gpt4all: () => process.env.GPT4ALL_URL || 'http://localhost:4891',
+  jan: () => process.env.JAN_AI_URL || 'http://localhost:1337',
+  koboldcpp: () => process.env.KOBOLDCPP_URL || 'http://localhost:5001',
+};
+
+function getLocalModelName(provider, modelId) {
+  // Strip provider prefix: 'lmstudio/default' -> 'default', 'jan/mistral' -> 'mistral'
+  const name = modelId.replace(`${provider}/`, '');
+  // For auto-detected services, use the first available model or 'default'
+  if (name === 'default') {
+    switch (provider) {
+      case 'lmstudio': return lmStudioModels[0] || 'default';
+      case 'gpt4all': return gpt4allModels[0] || 'default';
+      case 'jan': return janModels[0] || 'default';
+      case 'koboldcpp': return koboldModels[0] || 'default';
+    }
+  }
+  return name;
+}
+
+async function callLocalAIService(provider, modelId, messages, temperature, maxTokens) {
+  const baseUrl = LOCAL_SERVICE_URLS[provider]();
+  const modelName = getLocalModelName(provider, modelId);
+  const payload = {
+    model: modelName,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...messages
+    ],
+    temperature,
+    max_tokens: maxTokens,
+    stream: false
+  };
+  const response = await axios.post(`${baseUrl}/v1/chat/completions`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 120000
+  });
+  const choice = response.data.choices?.[0];
+  return {
+    content: choice?.message?.content || '',
+    model: modelId,
+    tokens: {
+      prompt: response.data.usage?.prompt_tokens || 0,
+      completion: response.data.usage?.completion_tokens || 0,
+      total: response.data.usage?.total_tokens || 0
+    }
+  };
+}
+
+async function callLocalAIServiceWithPrompt(provider, modelId, messages, temperature, maxTokens, systemPrompt) {
+  const baseUrl = LOCAL_SERVICE_URLS[provider]();
+  const modelName = getLocalModelName(provider, modelId);
+  const payload = {
+    model: modelName,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages
+    ],
+    temperature,
+    max_tokens: maxTokens,
+    stream: false
+  };
+  const response = await axios.post(`${baseUrl}/v1/chat/completions`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 120000
+  });
+  const choice = response.data.choices?.[0];
+  return {
+    content: choice?.message?.content || '',
+    model: modelId,
+    tokens: {
+      prompt: response.data.usage?.prompt_tokens || 0,
+      completion: response.data.usage?.completion_tokens || 0,
+      total: response.data.usage?.total_tokens || 0
+    }
   };
 }
 

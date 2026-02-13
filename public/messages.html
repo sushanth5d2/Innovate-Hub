@@ -13,7 +13,7 @@
       <a href="/home" class="ig-logo">Innovate</a>
       
       <div class="ig-search-box">
-        <input type="text" class="ig-search-input" placeholder="Search messages" id="searchMessages">
+        <input type="text" class="ig-search-input" placeholder="Search messages" id="searchMessagesTop">
       </div>
       
       <div class="ig-nav-icons">
@@ -72,7 +72,7 @@
           <path d="M19 10.5A8.5 8.5 0 1 1 10.5 2a8.5 8.5 0 0 1 8.5 8.5Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
           <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="16.511" x2="22" y1="16.511" y2="22"></line>
         </svg>
-        <input type="text" placeholder="Ask Meta AI or search" id="searchMessages" style="background: none; border: none; outline: none; color: var(--ig-primary-text); flex: 1; font-size: 14px;">
+        <input type="text" placeholder="Ask Meta AI or search" id="searchMessagesSidebar" style="background: none; border: none; outline: none; color: var(--ig-primary-text); flex: 1; font-size: 14px;">
       </div>
 
       <!-- Messages/Requests Tabs -->
@@ -160,7 +160,7 @@
           </svg>
         </button>
         
-        <input type="text" class="ig-chat-input" placeholder="Message..." id="messageInput" onkeypress="handleMessageKeyPress(event)">
+        <textarea class="ig-chat-input" placeholder="Message..." id="messageInput" rows="1" onkeydown="handleMessageKeyPress(event)"></textarea>
         
         <label class="ig-input-action-btn" title="Gallery">
           <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
@@ -168,7 +168,7 @@
             <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle>
             <path d="M21 15l-5-5L5 21" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
-          <input type="file" accept="image/*" onchange="previewFileBeforeSend(this.files[0]); this.value='';" style="display: none;">
+          <input type="file" accept="image/*" multiple onchange="previewFilesBeforeSend(this.files); this.value='';" style="display: none;">
         </label>
         
         <button class="ig-input-action-btn" onclick="openEmojiPicker()" title="Emoji" id="emojiBtn">
@@ -199,7 +199,7 @@
               <rect x="1" y="5" width="15" height="14" rx="2" ry="2" stroke-linecap="round" stroke-linejoin="round"></rect>
             </svg>
             Video
-            <input type="file" accept="video/*" onchange="previewFileBeforeSend(this.files[0]); this.value='';" style="display: none;">
+            <input type="file" accept="video/*" multiple onchange="previewFilesBeforeSend(this.files); this.value='';" style="display: none;">
           </label>
           <label class="ig-attach-option">
             <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2">
@@ -207,7 +207,7 @@
               <path d="M13 2v7h7" stroke-linecap="round" stroke-linejoin="round"></path>
             </svg>
             Document
-            <input type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.js,.ts,.py,.java,.cpp,.c,.html,.css,.sql,.sh,.xlsx,.xls,.pptx,.ppt" onchange="previewFileBeforeSend(this.files[0]); this.value='';" style="display: none;">
+            <input type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.js,.ts,.py,.java,.cpp,.c,.html,.css,.sql,.sh,.xlsx,.xls,.pptx,.ppt" multiple onchange="previewFilesBeforeSend(this.files); this.value='';" style="display: none;">
           </label>
           <button class="ig-attach-option" onclick="closeAttachMenu(); openGifPicker()">
             <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2">
@@ -676,22 +676,11 @@
     }
 
     // Render conversations
-    function renderConversations(convos) {
+    function renderConversations(convos, { hideAI = false } = {}) {
       const list = document.getElementById('conversationsList');
       list.innerHTML = '';
 
-      if (convos.length === 0) {
-        list.innerHTML = `
-          <div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">
-            <div style="font-size: 24px; margin-bottom: 8px;">📨</div>
-            <div>No messages yet</div>
-            <div style="font-size: 12px; margin-top: 4px;">Start a conversation</div>
-          </div>
-        `;
-        return;
-      }
-
-      // AI Assistant entry at top
+      // AI Assistant entry at top - always shown unless explicitly hidden
       const aiEl = document.createElement('div');
       aiEl.className = `ig-conversation ${currentContactId === 'ai-assistant' ? 'active' : ''}`;
       aiEl.id = 'ai-assistant-conversation';
@@ -711,7 +700,21 @@
         </div>
       `;
       aiEl.onclick = () => openAIChat();
-      list.appendChild(aiEl);
+      if (!hideAI) {
+        list.appendChild(aiEl);
+      }
+
+      if (convos.length === 0 && !hideAI) {
+        const emptyEl = document.createElement('div');
+        emptyEl.style.cssText = 'text-align: center; padding: 30px 20px; color: var(--ig-secondary-text);';
+        emptyEl.innerHTML = `
+          <div style="font-size: 20px; margin-bottom: 6px;">📨</div>
+          <div style="font-size: 13px;">No other messages yet</div>
+          <div style="font-size: 12px; margin-top: 4px;">Start a conversation</div>
+        `;
+        list.appendChild(emptyEl);
+        return;
+      }
 
       convos.forEach(conv => {
         const convEl = document.createElement('div');
@@ -1453,20 +1456,22 @@
       const input = document.getElementById('messageInput');
       const content = input.value.trim();
       
-      // Check if there's a pending file to send (DM/Group file preview)
-      if (window.dmPendingFile && !aiChatActive) {
-        const pendingFile = window.dmPendingFile;
-        const pendingName = window.dmPendingFilename;
+      // Check if there are pending files to send (DM/Group file preview)
+      if (window.dmPendingFiles && window.dmPendingFiles.length > 0 && !aiChatActive) {
+        const filesToSend = [...window.dmPendingFiles];
         
         // Clear preview first
         clearDMPendingFile();
         
-        // Send the file
-        await sendFile(pendingFile, pendingName);
+        // Send each file as a separate message
+        for (const item of filesToSend) {
+          await sendFile(item.file, item.filename);
+        }
         
         // If there's also text content, send it as a separate message
         if (content) {
           input.value = '';
+          input.style.height = 'auto';
           const textPayload = currentGroupId 
             ? { content, type: 'text' }
             : { receiver_id: currentContactId, content };
@@ -1526,6 +1531,7 @@
           delete input.dataset.newFileType;
           delete window.editingNewFile;
           input.value = '';
+          input.style.height = 'auto';
           input.placeholder = 'Message...';
           
           // Clear preview container
@@ -1592,6 +1598,7 @@
         
         // Clear input
         input.value = '';
+        input.style.height = 'auto';
         
         // Add message to UI
         const messagesContainer = document.getElementById('chatMessages');
@@ -1975,7 +1982,7 @@
 
     // Search messages
     let searchTimeout;
-    document.getElementById('searchMessages').addEventListener('input', async (e) => {
+    function handleMessageSearch(e) {
       const query = e.target.value.trim();
       
       if (!query) {
@@ -1984,10 +1991,17 @@
       }
       
       const queryLower = query.toLowerCase();
+      const aiMatch = 'innovate ai'.includes(queryLower) || 'ai assistant'.includes(queryLower) || 'ai'.includes(queryLower);
       const filtered = conversations.filter(conv => 
         conv.username.toLowerCase().includes(queryLower) ||
         (conv.last_message && conv.last_message.toLowerCase().includes(queryLower))
       );
+      
+      // If AI matches the search, show it along with filtered results
+      if (aiMatch) {
+        renderConversations(filtered);
+        return;
+      }
       
       // If no conversations match, search for users
       if (filtered.length === 0 && query.length >= 2) {
@@ -2030,9 +2044,25 @@
           }
         }, 300);
       } else {
-        renderConversations(filtered);
+        renderConversations(filtered, { hideAI: true });
       }
-    });
+    }
+
+    // Bind search to both top nav and sidebar search inputs
+    const searchTop = document.getElementById('searchMessagesTop');
+    const searchSidebar = document.getElementById('searchMessagesSidebar');
+    if (searchTop) {
+      searchTop.addEventListener('input', (e) => {
+        if (searchSidebar) searchSidebar.value = e.target.value;
+        handleMessageSearch(e);
+      });
+    }
+    if (searchSidebar) {
+      searchSidebar.addEventListener('input', (e) => {
+        if (searchTop) searchTop.value = e.target.value;
+        handleMessageSearch(e);
+      });
+    }
 
     // Setup Socket.IO Event Listeners
     function setupSocketListeners() {
@@ -2620,90 +2650,113 @@
     }
     
     // --- File preview before sending (DM/Group) ---
-    window.dmPendingFile = null;
-    window.dmPendingFilename = null;
+    window.dmPendingFiles = []; // Array of {file, filename}
     
+    // Legacy single-file entry point (e.g. camera capture)
     function previewFileBeforeSend(file, filename) {
       if (!file) return;
+      previewFilesBeforeSend([file], filename);
+    }
+
+    // Multi-file entry point — accumulates with previous selection
+    function previewFilesBeforeSend(files, singleFilename) {
+      if (!files || files.length === 0) return;
       
       // Close attachment menu
       closeAttachMenu();
       
       // If AI chat is active, delegate to the AI file handler
       if (typeof aiChatActive !== 'undefined' && aiChatActive) {
-        sendFile(file, filename);
+        handleAIPendingFiles(files, singleFilename);
         return;
       }
       
-      // Store as pending
-      window.dmPendingFile = file;
-      window.dmPendingFilename = filename || file.name;
-      
-      const previewContainer = document.getElementById('messagePreviewContainer');
-      const fname = filename || file.name || 'file';
-      let previewHtml = '';
-      
-      if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        previewHtml = `
-          <div id="dmFilePreview" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px; border: 1px solid var(--ig-border);">
-            <img src="${url}" style="width: 52px; height: 52px; border-radius: 8px; object-fit: cover;">
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(fname)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">📷 Image ready to send</div>
-            </div>
-            <button onclick="clearDMPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;" title="Remove">✕</button>
-          </div>
-        `;
-      } else if (file.type.startsWith('video/')) {
-        previewHtml = `
-          <div id="dmFilePreview" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px; border: 1px solid var(--ig-border);">
-            <div style="width: 52px; height: 52px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 28px;">🎬</div>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(fname)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">🎬 Video ready to send</div>
-            </div>
-            <button onclick="clearDMPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;" title="Remove">✕</button>
-          </div>
-        `;
-      } else {
-        const ext = fname.split('.').pop().toLowerCase();
-        let fileIcon = '📎';
-        let fileDesc = 'File ready to send';
-        if (ext === 'pdf') { fileIcon = '📄'; fileDesc = 'PDF document'; }
-        else if (['doc', 'docx'].includes(ext)) { fileIcon = '📝'; fileDesc = 'Word document'; }
-        else if (['xls', 'xlsx', 'csv'].includes(ext)) { fileIcon = '📊'; fileDesc = 'Spreadsheet'; }
-        else if (['ppt', 'pptx'].includes(ext)) { fileIcon = '📑'; fileDesc = 'Presentation'; }
-        else if (['js', 'ts', 'py', 'java', 'cpp', 'c', 'html', 'css', 'sql', 'sh', 'json', 'xml', 'yaml', 'yml'].includes(ext)) { fileIcon = '💻'; fileDesc = 'Code file'; }
-        else if (['txt', 'md'].includes(ext)) { fileIcon = '📃'; fileDesc = 'Text file'; }
-        
-        previewHtml = `
-          <div id="dmFilePreview" style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px; border: 1px solid var(--ig-border);">
-            <div style="width: 52px; height: 52px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 28px;">${fileIcon}</div>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(fname)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">${fileDesc}</div>
-            </div>
-            <button onclick="clearDMPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;" title="Remove">✕</button>
-          </div>
-        `;
+      // Accumulate: add new files to existing selection
+      if (!window.dmPendingFiles) window.dmPendingFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        window.dmPendingFiles.push({ file: f, filename: (files.length === 1 && singleFilename) ? singleFilename : f.name });
       }
       
-      previewContainer.innerHTML = previewHtml;
+      renderDMFilePreview();
       
       // Show send button, hide voice btn
       const sendBtn = document.getElementById('sendBtn');
       if (sendBtn) sendBtn.style.display = 'inline-flex';
       const voiceBtn = document.getElementById('voiceBtn');
       if (voiceBtn) voiceBtn.style.display = 'none';
+      const moreBtn = document.getElementById('moreBtn');
+      if (moreBtn) moreBtn.style.display = 'none';
       
-      // Focus input for optional caption/message
       document.getElementById('messageInput').focus();
     }
     
+    function getFileIconInfo(file, fname) {
+      if (file.type.startsWith('image/')) return { icon: '📷', desc: 'Image', isImage: true };
+      if (file.type.startsWith('video/')) return { icon: '🎬', desc: 'Video', isImage: false };
+      const ext = (fname || '').split('.').pop().toLowerCase();
+      if (ext === 'pdf') return { icon: '📄', desc: 'PDF', isImage: false };
+      if (['doc', 'docx'].includes(ext)) return { icon: '📝', desc: 'Document', isImage: false };
+      if (['xls', 'xlsx', 'csv'].includes(ext)) return { icon: '📊', desc: 'Spreadsheet', isImage: false };
+      if (['ppt', 'pptx'].includes(ext)) return { icon: '📑', desc: 'Presentation', isImage: false };
+      if (['js','ts','py','java','cpp','c','html','css','sql','sh','json','xml','yaml','yml'].includes(ext)) return { icon: '💻', desc: 'Code', isImage: false };
+      if (['txt','md'].includes(ext)) return { icon: '📃', desc: 'Text', isImage: false };
+      return { icon: '📎', desc: 'File', isImage: false };
+    }
+    
+    function renderDMFilePreview() {
+      const previewContainer = document.getElementById('messagePreviewContainer');
+      if (window.dmPendingFiles.length === 0) {
+        previewContainer.innerHTML = '';
+        return;
+      }
+      
+      const count = window.dmPendingFiles.length;
+      let html = `<div id="dmFilePreview" style="margin: 8px 12px;">`;
+      
+      // Header with count and clear-all
+      html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 6px; font-size: 12px; color: var(--ig-secondary-text);">
+        <span>${count} file${count > 1 ? 's' : ''} selected</span>
+        <button onclick="clearDMPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='var(--ig-hover-overlay)'" onmouseout="this.style.background='none'">Clear all</button>
+      </div>`;
+      
+      // Thumbnails grid
+      html += `<div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 4px 8px; max-height: 180px; overflow-y: auto; scrollbar-width: none;">`;
+      
+      window.dmPendingFiles.forEach((item, idx) => {
+        const info = getFileIconInfo(item.file, item.filename);
+        if (info.isImage) {
+          const url = URL.createObjectURL(item.file);
+          html += `
+            <div style="position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--ig-border); flex-shrink: 0;">
+              <img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">
+              <button onclick="removeDMPendingFile(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); border: none; color: white; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✕</button>
+            </div>`;
+        } else {
+          html += `
+            <div style="position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+              <div style="font-size: 24px;">${info.icon}</div>
+              <div style="font-size: 9px; color: var(--ig-secondary-text); margin-top: 2px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;">${escapeHtml(item.filename)}</div>
+              <button onclick="removeDMPendingFile(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); border: none; color: white; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✕</button>
+            </div>`;
+        }
+      });
+      
+      html += `</div></div>`;
+      previewContainer.innerHTML = html;
+    }
+    
+    function removeDMPendingFile(index) {
+      window.dmPendingFiles.splice(index, 1);
+      if (window.dmPendingFiles.length === 0) {
+        clearDMPendingFile();
+      } else {
+        renderDMFilePreview();
+      }
+    }
+    
     function clearDMPendingFile() {
-      window.dmPendingFile = null;
-      window.dmPendingFilename = null;
+      window.dmPendingFiles = [];
       
       const preview = document.getElementById('dmFilePreview');
       if (preview) preview.remove();
@@ -2714,6 +2767,8 @@
         if (sendBtn) sendBtn.style.display = 'none';
         const voiceBtn = document.getElementById('voiceBtn');
         if (voiceBtn) voiceBtn.style.display = 'inline-flex';
+        const moreBtn = document.getElementById('moreBtn');
+        if (moreBtn) moreBtn.style.display = 'inline-flex';
       }
     }
     
@@ -3212,7 +3267,16 @@
     // Update send button visibility based on input
     const messageInput = document.getElementById('messageInput');
     if (messageInput) {
+      // Auto-grow textarea
+      function autoGrowTextarea() {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 150) + 'px';
+      }
+
       messageInput.addEventListener('input', (e) => {
+        // Auto-grow on input
+        autoGrowTextarea();
+
         const hasText = e.target.value.trim();
         const isEditing = e.target.dataset.editingMessageId;
         const hasAttachmentChange = e.target.dataset.attachmentAction && e.target.dataset.attachmentAction !== 'keep';
@@ -3220,8 +3284,8 @@
         const voiceBtn = document.getElementById('voiceBtn');
         const moreBtn = document.getElementById('moreBtn');
         
-        // Show send button if: has text, is editing, has attachment changes, or has pending file
-        if (hasText || isEditing || hasAttachmentChange || window.dmPendingFile) {
+        // Show send button if: has text, is editing, has attachment changes, or has pending files
+        if (hasText || isEditing || hasAttachmentChange || (window.dmPendingFiles && window.dmPendingFiles.length > 0)) {
           if (sendBtn) sendBtn.style.display = 'inline-flex';
           if (voiceBtn) voiceBtn.style.display = 'none';
           if (moreBtn) moreBtn.style.display = 'none';
@@ -3230,6 +3294,11 @@
           if (voiceBtn) voiceBtn.style.display = 'inline-flex';
           if (moreBtn) moreBtn.style.display = 'inline-flex';
         }
+      });
+
+      // Also auto-grow on paste
+      messageInput.addEventListener('paste', () => {
+        setTimeout(autoGrowTextarea, 0);
       });
     }
 
@@ -3884,6 +3953,7 @@
       // Clear edit mode if active
       delete input.dataset.editingMessageId;
       input.value = '';
+      input.style.height = 'auto';
       
       // Store reply message ID
       input.dataset.replyToMessageId = selectedMessageId;
@@ -4185,6 +4255,7 @@
         input.value = selectedMessageContent;
       } else {
         input.value = '';
+        input.style.height = 'auto';
       }
       
       input.dataset.editingMessageId = selectedMessageId;
@@ -4385,6 +4456,7 @@
       delete input.dataset.newFileType;
       delete window.editingNewFile;
       input.value = '';
+      input.style.height = 'auto';
       previewContainer.innerHTML = '';
       
       // Reset button visibility
@@ -4535,7 +4607,7 @@
             <span id="currentModelName">Innovate AI</span>
             <svg fill="currentColor" height="10" width="10" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
           </button>
-          <div id="modelDropdown" style="display: none; position: absolute; right: 0; top: 42px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 1000; min-width: 280px; max-height: 400px; overflow-y: auto;">
+          <div id="modelDropdown" style="display: none; position: absolute; right: 0; top: 42px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 1000; min-width: 280px; max-height: 400px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;">
           </div>
         </div>
         <button onclick="showAIConversations()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px;" title="Chat History">
@@ -4557,6 +4629,23 @@
           @keyframes aiVoicePulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(102,126,234,0.4); }
             50% { box-shadow: 0 0 0 12px rgba(102,126,234,0); }
+          }
+          #modelDropdown::-webkit-scrollbar {
+            width: 4px;
+          }
+          #modelDropdown::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          #modelDropdown::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+          }
+          #modelDropdown::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.25);
+          }
+          #modelDropdown {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.15) transparent;
           }
         `;
         document.head.appendChild(styleEl);
@@ -4632,9 +4721,12 @@
       const dropdown = document.getElementById('modelDropdown');
       if (!dropdown) return;
 
+      // Only show AVAILABLE models — hide unavailable ones entirely
+      const availableModels = aiModels.filter(m => m.available);
+
       // Separate Innovate AI models from others
-      const innovateModels = aiModels.filter(m => m.custom);
-      const otherModels = aiModels.filter(m => !m.custom);
+      const innovateModels = availableModels.filter(m => m.custom);
+      const otherModels = availableModels.filter(m => !m.custom);
 
       // Group others by provider
       const providers = {};
@@ -4669,10 +4761,9 @@
 
         html += `
           <button onclick="selectAIModel('${m.id}')" 
-            style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}; cursor: ${isAvailable ? 'pointer' : 'not-allowed'}; color: var(--ig-primary-text); text-align: left; opacity: ${isAvailable ? 1 : 0.4}; transition: background 0.15s;"
+            style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}; cursor: pointer; color: var(--ig-primary-text); text-align: left; transition: background 0.15s;"
             onmouseover="this.style.background='linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.05))'"
-            onmouseout="this.style.background='${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}'"
-            ${isAvailable ? '' : 'disabled'}>
+            onmouseout="this.style.background='${isSelected ? 'linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.1))' : 'transparent'}'">
             <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">${modeIcon}</div>
             <div style="flex: 1;">
               <div style="font-size: 13px; font-weight: ${isSelected ? '700' : '500'}; display: flex; align-items: center; flex-wrap: wrap;">
@@ -4682,12 +4773,12 @@
               <div style="font-size: 11px; color: var(--ig-secondary-text);">${m.description}</div>
             </div>
             ${isSelected ? '<svg fill="#667eea" height="18" viewBox="0 0 24 24" width="18"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : ''}
-            ${!isAvailable ? '<span style="font-size: 9px; background: var(--ig-secondary-background); padding: 2px 6px; border-radius: 8px; color: var(--ig-secondary-text);">Add Key</span>' : ''}
-          </button>
+            </button>
         `;
       });
 
-      // ===== Other Providers Section =====
+      // ===== Other Providers Section (only if there are available models) =====
+      if (sortedProviders.length > 0) {
       html += `<div style="padding: 10px 16px 4px; font-size: 10px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 1px; border-top: 2px solid var(--ig-border); margin-top: 4px;">🔧 Direct Provider Models</div>`;
 
       let addedPremiumHeader = false;
@@ -4712,24 +4803,26 @@
           
           html += `
             <button onclick="selectAIModel('${m.id}')" 
-              style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}; cursor: ${isAvailable ? 'pointer' : 'not-allowed'}; color: var(--ig-primary-text); text-align: left; opacity: ${isAvailable ? 1 : 0.4}; transition: background 0.15s;"
+              style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}; cursor: pointer; color: var(--ig-primary-text); text-align: left; transition: background 0.15s;"
               onmouseover="this.style.background='var(--ig-secondary-background)'"
-              onmouseout="this.style.background='${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}'"
-              ${isAvailable ? '' : 'disabled'}>
+              onmouseout="this.style.background='${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}'">
               <div style="flex: 1;">
                 <div style="font-size: 13px; font-weight: ${isSelected ? '600' : '400'}; display: flex; align-items: center; flex-wrap: wrap;">${m.name}${freeBadge}${localBadge}</div>
                 <div style="font-size: 11px; color: var(--ig-secondary-text);">${m.description}</div>
               </div>
               ${isSelected ? '<svg fill="#667eea" height="18" viewBox="0 0 24 24" width="18"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : ''}
-              ${!isAvailable ? '<span style="font-size: 9px; background: var(--ig-secondary-background); padding: 2px 6px; border-radius: 8px; color: var(--ig-secondary-text);">Add Key</span>' : ''}
             </button>
           `;
         });
       }
 
-      html += `<div style="padding: 10px 16px; border-top: 1px solid var(--ig-border); font-size: 11px; color: var(--ig-secondary-text);">
-        Uncomment API keys in .env file to enable models
-      </div>`;
+      } // end if sortedProviders.length > 0
+
+      if (availableModels.length === 0) {
+        html += `<div style="padding: 20px 16px; text-align: center; color: var(--ig-secondary-text); font-size: 13px;">
+          No models available.<br><span style="font-size: 11px;">Add API keys in .env or start a local AI service.</span>
+        </div>`;
+      }
 
       dropdown.innerHTML = html;
     }
@@ -4772,7 +4865,7 @@
       if (!aiConversationId) {
         // Show welcome screen
         messagesContainer.innerHTML = `
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; height: 100%; text-align: center;">
+          <div data-ai-welcome style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
             <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
               <svg fill="white" height="40" viewBox="0 0 24 24" width="40"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
             </div>
@@ -4886,6 +4979,13 @@
     // Append a message to the AI chat
     function appendAIMessage(role, content, modelId, timestamp, attachment) {
       const messagesContainer = document.getElementById('chatMessages');
+      
+      // Clear welcome screen when first message is sent
+      const welcomeScreen = messagesContainer.querySelector('[data-ai-welcome]');
+      if (welcomeScreen) {
+        welcomeScreen.remove();
+      }
+
       const messageEl = document.createElement('div');
       
       // Build attachment HTML
@@ -4914,13 +5014,8 @@
       
       if (role === 'user') {
         messageEl.className = 'ig-message ig-message-sent';
-        messageEl.innerHTML = `
-          ${attachmentHtml}
-          ${content ? `<div style="word-break: break-word; white-space: pre-wrap;">${escapeHtml(content)}</div>` : ''}
-          <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
-            <span style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span>
-          </div>
-        `;
+        messageEl.style.whiteSpace = 'normal';
+        messageEl.innerHTML = `${attachmentHtml}${content ? `<div style="word-break: break-word; white-space: pre-wrap; overflow-wrap: anywhere;">${escapeHtml(content)}</div>` : ''}<div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;"><span style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span></div>`;
       } else {
         // AI response
         const model = aiModels.find(m => m.id === modelId);
@@ -4935,24 +5030,10 @@
         
         messageEl.className = 'ig-message ig-message-received';
         messageEl.style.maxWidth = '85%';
-        messageEl.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px;">
-            <span style="font-weight: 600; color: ${providerStyle.color};">${providerStyle.icon} ${displayName}</span>
-          </div>
-          ${attachmentHtml}
-          <div class="ai-response-content" style="word-break: break-word; line-height: 1.6; font-size: 14px;">${renderAIMarkdown(content)}</div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-            <span class="ig-message-time" style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span>
-            <button onclick="copyAIResponse(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Copy response">
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copy
-            </button>
-            <button onclick="speakAIResponseFromBtn(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Listen">
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-              Listen
-            </button>
-          </div>
-        `;
+        messageEl.style.borderRadius = '18px';
+        messageEl.style.padding = '10px 14px';
+        messageEl.style.whiteSpace = 'normal';
+        messageEl.innerHTML = `<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 11px;"><span style="font-weight: 600; color: ${providerStyle.color};">${providerStyle.icon} ${displayName}</span></div>${attachmentHtml}<div class="ai-response-content" style="word-break: break-word; line-height: 1.5; font-size: 14px;">${renderAIMarkdown(content)}</div><div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;"><span class="ig-message-time" style="font-size: 11px;">${timestamp ? formatMessageTime(timestamp) : 'Just now'}</span><button onclick="copyAIResponse(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Copy response"><svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy</button><button onclick="speakAIResponseFromBtn(this)" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 2px; font-size: 11px; display: flex; align-items: center; gap: 3px;" title="Listen"><svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Listen</button></div>`;
       }
 
       messagesContainer.appendChild(messageEl);
@@ -4965,8 +5046,23 @@
       let html = escapeHtml(text);
       
       // Code blocks (```...```)
+      let codeBlockId = 0;
       html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-        return `<pre style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 8px 0; font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.5;"><code>${code.trim()}</code></pre>`;
+        const id = `code-block-${Date.now()}-${codeBlockId++}`;
+        const langLabel = lang ? `<span style="font-size: 11px; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 0.5px;">${lang}</span>` : '';
+        const trimmedCode = code.trim();
+        // Store raw code as base64 in data attribute to preserve exact formatting
+        const rawCodeB64 = btoa(unescape(encodeURIComponent(trimmedCode)));
+        return `<div style="position: relative; margin: 8px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--ig-border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--ig-border);">
+            ${langLabel}
+            <button onclick="copyCodeBlock('${id}')" id="btn-${id}" style="display: flex; align-items: center; gap: 4px; background: none; border: 1px solid var(--ig-border); border-radius: 6px; padding: 3px 10px; color: var(--ig-secondary-text); cursor: pointer; font-size: 11px; transition: all 0.2s;" onmouseover="this.style.background='var(--ig-secondary-background)';this.style.color='var(--ig-primary-text)'" onmouseout="this.style.background='none';this.style.color='var(--ig-secondary-text)'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre id="${id}" data-raw-code="${rawCodeB64}" style="background: var(--ig-secondary-background); padding: 12px; overflow-x: auto; margin: 0; font-family: 'Fira Code', monospace; font-size: 13px; line-height: 1.5;"><code>${trimmedCode}</code></pre>
+        </div>`;
       });
       
       // Inline code (`...`)
@@ -5009,6 +5105,33 @@
       return div.innerHTML;
     }
 
+    // Copy code block content
+    function copyCodeBlock(id) {
+      const codeEl = document.getElementById(id);
+      if (!codeEl) return;
+      // Read from base64-encoded raw code to preserve exact formatting
+      let text;
+      const rawB64 = codeEl.getAttribute('data-raw-code');
+      if (rawB64) {
+        try { text = decodeURIComponent(escape(atob(rawB64))); } catch(e) { text = codeEl.innerText; }
+      } else {
+        text = codeEl.innerText;
+      }
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('btn-' + id);
+        if (btn) {
+          btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00c853" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Copied!`;
+          btn.style.color = '#00c853';
+          btn.style.borderColor = '#00c853';
+          setTimeout(() => {
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy`;
+            btn.style.color = '';
+            btn.style.borderColor = '';
+          }, 2000);
+        }
+      });
+    }
+
     // Copy AI response
     function copyAIResponse(btn) {
       const contentEl = btn.closest('.ig-message').querySelector('.ai-response-content');
@@ -5041,22 +5164,8 @@
       typingEl.id = 'ai-typing-indicator';
       typingEl.className = 'ig-message ig-message-received';
       typingEl.style.maxWidth = '200px';
-      typingEl.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <div style="display: flex; gap: 4px;">
-            <div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out infinite;"></div>
-            <div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.2s infinite;"></div>
-            <div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.4s infinite;"></div>
-          </div>
-          <span style="font-size: 11px; color: var(--ig-secondary-text);">Thinking...</span>
-        </div>
-        <style>
-          @keyframes aiTypingBounce {
-            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-            30% { transform: translateY(-8px); opacity: 1; }
-          }
-        </style>
-      `;
+      typingEl.style.whiteSpace = 'normal';
+      typingEl.innerHTML = `<div style="display: flex; align-items: center; gap: 6px;"><div style="display: flex; gap: 4px;"><div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out infinite;"></div><div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.2s infinite;"></div><div class="ai-typing-dot" style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.4s infinite;"></div></div><span style="font-size: 11px; color: var(--ig-secondary-text);">Thinking...</span></div><style>@keyframes aiTypingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-8px); opacity: 1; } }</style>`;
       messagesContainer.appendChild(typingEl);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
@@ -5083,6 +5192,7 @@
 
       aiIsLoading = true;
       input.value = '';
+      input.style.height = 'auto';
 
       // Hide send button
       const sendBtn = document.getElementById('sendBtn');
@@ -5096,6 +5206,7 @@
       if (pendingFile) {
         document.getElementById('messagePreviewContainer').innerHTML = '';
         window.aiPendingFile = null;
+        window.aiPendingFiles = [];
       }
 
       // Build attachment info for display
@@ -5107,6 +5218,10 @@
           filename: pendingFile.name
         };
       }
+
+      // Clear welcome screen before showing messages
+      const welcomeEl = document.getElementById('chatMessages').querySelector('[data-ai-welcome]');
+      if (welcomeEl) welcomeEl.remove();
 
       // Append user message to UI (with attachment)
       appendAIMessage('user', content, null, null, attachmentInfo);
@@ -5301,6 +5416,9 @@
         }
         
         const messagesContainer = document.getElementById('chatMessages');
+        // Ensure welcome screen is cleared
+        const leftoverWelcome = messagesContainer.querySelector('[data-ai-welcome]');
+        if (leftoverWelcome) leftoverWelcome.remove();
         const errorEl = document.createElement('div');
         errorEl.className = 'ig-message ig-message-received';
         errorEl.innerHTML = `
@@ -5322,62 +5440,24 @@
       if (!aiChatActive) {
         return originalSendFile(file, filename);
       }
+      // Single file from legacy path — delegate to multi handler
+      handleAIPendingFiles([file], filename);
+    };
+
+    // Handle multiple AI pending files — overrides previous selection
+    function handleAIPendingFiles(files, singleFilename) {
+      if (!files || files.length === 0) return;
       
-      // Store the file as pending attachment for AI chat
-      window.aiPendingFile = file;
-      
-      // Show preview in message input area
-      const previewContainer = document.getElementById('messagePreviewContainer');
-      let previewHtml = '';
-      
-      if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        previewHtml = `
-          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
-            <img src="${url}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;">
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">Image — AI will analyze visually</div>
-            </div>
-            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
-          </div>
-        `;
-      } else if (file.type.startsWith('video/')) {
-        previewHtml = `
-          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
-            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">🎬</div>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">Video ready to send</div>
-            </div>
-            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
-          </div>
-        `;
-      } else {
-        // Determine file icon and description
-        const ext = (filename || file.name || '').split('.').pop().toLowerCase();
-        let fileIcon = '📎';
-        let fileDesc = 'File ready to send';
-        if (ext === 'pdf') { fileIcon = '📄'; fileDesc = 'PDF — AI will read and analyze'; }
-        else if (['doc', 'docx'].includes(ext)) { fileIcon = '📝'; fileDesc = 'Document — AI will read and analyze'; }
-        else if (['xls', 'xlsx', 'csv'].includes(ext)) { fileIcon = '📊'; fileDesc = 'Spreadsheet — AI will analyze data'; }
-        else if (['ppt', 'pptx'].includes(ext)) { fileIcon = '📑'; fileDesc = 'Presentation ready to send'; }
-        else if (['js', 'ts', 'py', 'java', 'cpp', 'c', 'html', 'css', 'sql', 'sh', 'json', 'xml', 'yaml', 'yml'].includes(ext)) { fileIcon = '💻'; fileDesc = 'Code file — AI will analyze'; }
-        else if (['txt', 'md'].includes(ext)) { fileIcon = '📃'; fileDesc = 'Text file — AI will read and analyze'; }
-        
-        previewHtml = `
-          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--ig-secondary-background); border-radius: 12px; margin: 8px 12px;">
-            <div style="width: 48px; height: 48px; border-radius: 8px; background: var(--ig-hover); display: flex; align-items: center; justify-content: center; font-size: 24px;">${fileIcon}</div>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(filename || file.name)}</div>
-              <div style="font-size: 11px; color: var(--ig-secondary-text);">${fileDesc}</div>
-            </div>
-            <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 4px; font-size: 18px;">✕</button>
-          </div>
-        `;
+      // Accumulate: add new files to existing selection
+      if (!window.aiPendingFiles) window.aiPendingFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        window.aiPendingFiles.push({ file: f, filename: (files.length === 1 && singleFilename) ? singleFilename : f.name });
       }
+      // Keep first file as aiPendingFile for backward compat with AI send
+      window.aiPendingFile = window.aiPendingFiles[0].file;
       
-      previewContainer.innerHTML = previewHtml;
+      renderAIFilePreview();
       
       // Show send button
       const sendBtn = document.getElementById('sendBtn');
@@ -5387,13 +5467,63 @@
       if (voiceBtn) voiceBtn.style.display = 'none';
       if (moreBtn) moreBtn.style.display = 'none';
       
-      // Focus input for optional caption
       document.getElementById('messageInput').focus();
-    };
+    }
+    
+    function renderAIFilePreview() {
+      const previewContainer = document.getElementById('messagePreviewContainer');
+      if (!window.aiPendingFiles || window.aiPendingFiles.length === 0) {
+        previewContainer.innerHTML = '';
+        return;
+      }
+      
+      const count = window.aiPendingFiles.length;
+      let html = `<div id="aiFilePreview" style="margin: 8px 12px;">`;
+      
+      html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 6px; font-size: 12px; color: var(--ig-secondary-text);">
+        <span>${count} file${count > 1 ? 's' : ''} — AI will analyze</span>
+        <button onclick="clearAIPendingFile()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='var(--ig-hover-overlay)'" onmouseout="this.style.background='none'">Clear all</button>
+      </div>`;
+      
+      html += `<div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 4px 8px; max-height: 180px; overflow-y: auto; scrollbar-width: none;">`;
+      
+      window.aiPendingFiles.forEach((item, idx) => {
+        const info = getFileIconInfo(item.file, item.filename);
+        if (info.isImage) {
+          const url = URL.createObjectURL(item.file);
+          html += `
+            <div style="position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--ig-border); flex-shrink: 0;">
+              <img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">
+              <button onclick="removeAIPendingFile(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); border: none; color: white; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✕</button>
+            </div>`;
+        } else {
+          html += `
+            <div style="position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+              <div style="font-size: 24px;">${info.icon}</div>
+              <div style="font-size: 9px; color: var(--ig-secondary-text); margin-top: 2px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;">${escapeHtml(item.filename)}</div>
+              <button onclick="removeAIPendingFile(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); border: none; color: white; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;">✕</button>
+            </div>`;
+        }
+      });
+      
+      html += `</div></div>`;
+      previewContainer.innerHTML = html;
+    }
+    
+    function removeAIPendingFile(index) {
+      window.aiPendingFiles.splice(index, 1);
+      if (window.aiPendingFiles.length === 0) {
+        clearAIPendingFile();
+      } else {
+        window.aiPendingFile = window.aiPendingFiles[0].file;
+        renderAIFilePreview();
+      }
+    }
 
-    // Clear pending AI file
+    // Clear pending AI files
     function clearAIPendingFile() {
       window.aiPendingFile = null;
+      window.aiPendingFiles = [];
       document.getElementById('messagePreviewContainer').innerHTML = '';
       
       const sendBtn = document.getElementById('sendBtn');
@@ -5912,20 +6042,8 @@
       typingEl.id = 'ai-typing-indicator';
       typingEl.className = 'ig-message ig-message-received';
       typingEl.style.maxWidth = '280px';
-      typingEl.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 24px;">${icon}</span>
-          <div>
-            <div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">${label}...</div>
-            <div style="font-size: 11px; color: var(--ig-secondary-text);">This may take 10-60 seconds</div>
-          </div>
-          <div style="display: flex; gap: 3px;">
-            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out infinite;"></div>
-            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.2s infinite;"></div>
-            <div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.4s infinite;"></div>
-          </div>
-        </div>
-      `;
+      typingEl.style.whiteSpace = 'normal';
+      typingEl.innerHTML = `<div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 24px;">${icon}</span><div><div style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">${label}...</div><div style="font-size: 11px; color: var(--ig-secondary-text);">This may take 10-60 seconds</div></div><div style="display: flex; gap: 3px;"><div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out infinite;"></div><div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.2s infinite;"></div><div style="width: 6px; height: 6px; background: #667eea; border-radius: 50%; animation: aiTypingBounce 1.4s ease-in-out 0.4s infinite;"></div></div></div>`;
       messagesContainer.appendChild(typingEl);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
