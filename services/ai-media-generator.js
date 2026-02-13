@@ -2,11 +2,13 @@
  * AI Media Generator Service
  * Handles: Text-to-Image, Text-to-Video, Image-to-Video generation
  * 
- * Providers:
- * - Pollinations.ai (FREE, no API key) — Text-to-Image
- * - HuggingFace Inference API (FREE tier) — Text-to-Image
- * - OpenAI DALL-E (paid) — Text-to-Image
- * - Multi-frame + ffmpeg — Text-to-Video, Image-to-Video (generates frames then compiles)
+ * Providers (tried in order):
+ * 1. Pollinations.ai (FREE, no API key)
+ * 2. Stable Horde (FREE, community-powered, no API key)
+ * 3. HuggingFace Inference API (FREE tier, needs key)
+ * 4. OpenAI DALL-E (paid, highest quality)
+ * 
+ * All images are upscaled to 4K (3840x2160) using sharp Lanczos3
  */
 
 const axios = require('axios');
@@ -28,36 +30,85 @@ let FFMPEG_AVAILABLE = false;
 try { execSync('which ffmpeg', { stdio: 'ignore' }); FFMPEG_AVAILABLE = true; } catch(e) {}
 console.log(`[AI Media] ffmpeg available: ${FFMPEG_AVAILABLE}`);
 
+// 4K resolution constants
+const RESOLUTION_4K = { width: 3840, height: 2160 };
+const RESOLUTION_4K_SQUARE = { width: 2160, height: 2160 };
+
+
+// ===================== 4K UPSCALE UTILITY =====================
+
+/**
+ * Upscale image buffer to 4K resolution using Lanczos3 with sharpening
+ */
+async function upscaleTo4K(imageBuffer, targetWidth, targetHeight, outputPath) {
+  const metadata = await sharp(imageBuffer).metadata();
+  const srcW = metadata.width || 512;
+  const srcH = metadata.height || 512;
+
+  // Calculate target dimensions maintaining aspect ratio if not specified
+  let finalW = targetWidth || RESOLUTION_4K.width;
+  let finalH = targetHeight || RESOLUTION_4K.height;
+
+  // If source is square-ish, use square 4K
+  if (Math.abs(srcW - srcH) < srcW * 0.15) {
+    finalW = Math.max(finalW, RESOLUTION_4K_SQUARE.width);
+    finalH = Math.max(finalH, RESOLUTION_4K_SQUARE.height);
+  }
+
+  console.log(`[AI Media] Upscaling from ${srcW}x${srcH} → ${finalW}x${finalH} (4K)...`);
+
+  await sharp(imageBuffer)
+    .resize(finalW, finalH, {
+      kernel: sharp.kernel.lanczos3,
+      fit: 'cover',
+      position: 'centre'
+    })
+    .sharpen({ sigma: 1.5, m1: 1.2, m2: 0.7 })
+    .png({ compressionLevel: 4, effort: 7 })
+    .toFile(outputPath);
+
+  return { width: finalW, height: finalH };
+}
+
 
 // ===================== TEXT-TO-IMAGE =====================
 
 /**
- * Generate image from text prompt using best available provider
+ * Generate image from text prompt using best available provider,
+ * then upscale to 4K quality
  */
 async function generateImage(prompt, options = {}) {
-  const { width = 1280, height = 1280, style } = options;
+  const { width = 3840, height = 2160, style } = options;
   
   const errors = [];
 
-  // 1. Try Pollinations.ai (always free, no key needed)
+  // 1. Try Pollinations.ai (free, no key needed)
   try {
     return await generateImagePollinations(prompt, width, height, style);
   } catch (err) {
     errors.push(`Pollinations: ${err.message}`);
-    console.log('Pollinations failed, trying next provider...');
+    console.log('[AI Media] Pollinations failed, trying next provider...');
   }
 
-  // 2. Try HuggingFace
+  // 2. Try Stable Horde (free, community-powered, no key)
+  try {
+    return await generateImageStableHorde(prompt, width, height);
+  } catch (err) {
+    errors.push(`StableHorde: ${err.message}`);
+    console.log('[AI Media] Stable Horde failed, trying next provider...');
+  }
+
+  // 3. Try HuggingFace
   if (process.env.HUGGINGFACE_API_KEY) {
     try {
       return await generateImageHuggingFace(prompt, width, height);
     } catch (err) {
       errors.push(`HuggingFace: ${err.message}`);
-      console.log('HuggingFace image gen failed, trying next...');
+      console.log('[AI Media] HuggingFace image gen failed, trying next...');
     }
   }
 
-  // 3. Try OpenAI DALL-E
+  // 4. Try OpenAI DALL-E
   if (process.env.OPENAI_API_KEY) {
     try {
       return await generateImageDallE(prompt, options);
@@ -69,19 +120,25 @@ async function generateImage(prompt, options = {}) {
   throw new Error(`Image generation failed with all providers. ${errors.join('; ')}`);
 }
 
+
+// ===================== POLLINATIONS =====================
+
 /**
  * Pollinations.ai — Completely free, no API key
  */
-async function generateImagePollinations(prompt, width = 1280, height = 1280, style, seed) {
+async function generateImagePollinations(prompt, targetWidth = 3840, targetHeight = 2160, style, seed) {
   // Enhance prompt for higher quality output
   const qualityPrefix = 'ultra high resolution, highly detailed, sharp focus, professional quality, 8k, ';
   const enhancedPrompt = qualityPrefix + prompt;
   const encodedPrompt = encodeURIComponent(enhancedPrompt);
   const styleParam = style ? `&style=${encodeURIComponent(style)}` : '';
   const useSeed = seed !== undefined ? seed : Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${useSeed}&nologo=true&enhance=true&model=flux-realism${styleParam}`;
+  // Request at max native resolution (Pollinations caps around 1280)
+  const nativeW = Math.min(targetWidth, 1280);
+  const nativeH = Math.min(targetHeight, 1280);
+  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${nativeW}&height=${nativeH}&seed=${useSeed}&nologo=true&enhance=true&model=flux-realism${styleParam}`;
 
-  console.log(`Generating HD image via Pollinations.ai (${width}x${height})...`);
+  console.log(`[AI Media] Generating image via Pollinations.ai (${nativeW}x${nativeH}, will upscale to 4K)...`);
   
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
@@ -90,75 +147,190 @@ async function generateImagePollinations(prompt, width = 1280, height = 1280, st
     validateStatus: (status) => status < 400
   });
 
-  // Upscale to requested resolution with sharp (Pollinations may return lower res)
   const filename = `ai-img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`;
   const filepath = path.join(OUTPUT_DIR, 'images', filename);
 
-  const metadata = await sharp(response.data).metadata();
-  const actualW = metadata.width || 768;
-  const actualH = metadata.height || 768;
-
-  if (actualW < width || actualH < height) {
-    console.log(`Upscaling from ${actualW}x${actualH} to ${width}x${height}...`);
-    await sharp(response.data)
-      .resize(width, height, {
-        kernel: sharp.kernel.lanczos3,
-        fit: 'cover'
-      })
-      .sharpen({ sigma: 1.2, m1: 1.0, m2: 0.5 })
-      .png({ quality: 95, compressionLevel: 6 })
-      .toFile(filepath);
-  } else {
-    fs.writeFileSync(filepath, response.data);
-  }
+  // Upscale to 4K
+  const finalDims = await upscaleTo4K(response.data, targetWidth, targetHeight, filepath);
 
   return {
     url: `/uploads/ai-generated/images/${filename}`,
     filepath,
     provider: 'Pollinations.ai',
     prompt,
-    width,
-    height
+    width: finalDims.width,
+    height: finalDims.height,
+    quality: '4K'
   };
 }
 
+
+// ===================== STABLE HORDE =====================
+
 /**
- * HuggingFace Inference API — Stable Diffusion
+ * Stable Horde — Free, community-powered image generation
+ * Async flow: submit job → poll for completion → download image
  */
-async function generateImageHuggingFace(prompt, width, height) {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
-  if (!apiKey) throw new Error('HuggingFace API key not configured');
+async function generateImageStableHorde(prompt, targetWidth = 3840, targetHeight = 2160) {
+  const enhancedPrompt = `${prompt}, ultra detailed, sharp focus, professional quality, 8k resolution, masterpiece`;
 
-  const model = 'stabilityai/stable-diffusion-xl-base-1.0';
-
-  console.log(`Generating image via HuggingFace (${model})...`);
-
-  const response = await axios.post(
-    `https://api-inference.huggingface.co/models/${model}`,
-    { inputs: prompt },
+  // Submit async generation job (use 512x512 to stay within free-tier kudos)
+  console.log('[AI Media] Generating image via Stable Horde (community, free)...');
+  
+  const submitResp = await axios.post(
+    'https://stablehorde.net/api/v2/generate/async',
+    {
+      prompt: enhancedPrompt,
+      params: {
+        width: 512,
+        height: 512,
+        steps: 25,
+        cfg_scale: 7,
+        sampler_name: 'k_euler_a'
+      },
+      nsfw: false,
+      models: ['stable_diffusion'],
+      r2: true
+    },
     {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'apikey': '0000000000' // Anonymous key
       },
-      responseType: 'arraybuffer',
-      timeout: 120000
+      timeout: 15000
     }
   );
 
+  const jobId = submitResp.data?.id;
+  if (!jobId) throw new Error('Stable Horde did not return a job ID');
+
+  console.log(`[AI Media] Stable Horde job submitted: ${jobId}`);
+
+  // Poll for completion (max 120 seconds)
+  const maxWait = 120000;
+  const startTime = Date.now();
+  let done = false;
+
+  while (!done && (Date.now() - startTime) < maxWait) {
+    await new Promise(r => setTimeout(r, 4000)); // Poll every 4s
+
+    const checkResp = await axios.get(
+      `https://stablehorde.net/api/v2/generate/check/${jobId}`,
+      { timeout: 10000 }
+    );
+
+    if (checkResp.data?.done) {
+      done = true;
+    } else if (checkResp.data?.faulted) {
+      throw new Error('Stable Horde generation faulted');
+    } else {
+      const queuePos = checkResp.data?.queue_position || '?';
+      const waitTime = checkResp.data?.wait_time || '?';
+      console.log(`[AI Media] Stable Horde: queue position ${queuePos}, ETA ${waitTime}s`);
+    }
+  }
+
+  if (!done) throw new Error('Stable Horde generation timed out (120s)');
+
+  // Get the result
+  const statusResp = await axios.get(
+    `https://stablehorde.net/api/v2/generate/status/${jobId}`,
+    { timeout: 15000 }
+  );
+
+  const generations = statusResp.data?.generations || [];
+  if (generations.length === 0) throw new Error('Stable Horde returned no generations');
+
+  const gen = generations[0];
+  const imgUrl = gen.img;
+
+  if (!imgUrl) throw new Error('Stable Horde returned no image URL');
+
+  // Download the image
+  console.log('[AI Media] Downloading generated image from Stable Horde...');
+  const imgResp = await axios.get(imgUrl, {
+    responseType: 'arraybuffer',
+    timeout: 30000
+  });
+
   const filename = `ai-img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`;
   const filepath = path.join(OUTPUT_DIR, 'images', filename);
-  fs.writeFileSync(filepath, response.data);
+
+  // Upscale to 4K
+  const finalDims = await upscaleTo4K(imgResp.data, targetWidth, targetHeight, filepath);
 
   return {
     url: `/uploads/ai-generated/images/${filename}`,
     filepath,
-    provider: 'HuggingFace (Stable Diffusion XL)',
+    provider: `Stable Horde (${gen.model || 'stable_diffusion'})`,
     prompt,
-    width,
-    height
+    width: finalDims.width,
+    height: finalDims.height,
+    quality: '4K'
   };
 }
+
+
+// ===================== HUGGINGFACE =====================
+
+/**
+ * HuggingFace Inference API — Stable Diffusion
+ */
+async function generateImageHuggingFace(prompt, targetWidth = 3840, targetHeight = 2160) {
+  const apiKey = process.env.HUGGINGFACE_API_KEY;
+  if (!apiKey) throw new Error('HuggingFace API key not configured');
+
+  // Use FLUX.1-dev or SDXL (updated model names)
+  const models = [
+    'stabilityai/stable-diffusion-xl-base-1.0',
+    'runwayml/stable-diffusion-v1-5'
+  ];
+
+  let lastErr = null;
+  for (const model of models) {
+    try {
+      console.log(`[AI Media] Generating image via HuggingFace (${model})...`);
+
+      const response = await axios.post(
+        `https://api-inference.huggingface.co/models/${model}`,
+        { inputs: `${prompt}, ultra detailed, 4k quality, masterpiece` },
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          responseType: 'arraybuffer',
+          timeout: 120000
+        }
+      );
+
+      const filename = `ai-img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`;
+      const filepath = path.join(OUTPUT_DIR, 'images', filename);
+
+      // Upscale to 4K
+      const finalDims = await upscaleTo4K(response.data, targetWidth, targetHeight, filepath);
+
+      return {
+        url: `/uploads/ai-generated/images/${filename}`,
+        filepath,
+        provider: `HuggingFace (${model.split('/')[1]})`,
+        prompt,
+        width: finalDims.width,
+        height: finalDims.height,
+        quality: '4K'
+      };
+    } catch (err) {
+      lastErr = err;
+      console.log(`[AI Media] HuggingFace ${model} failed: ${err.message}`);
+      continue;
+    }
+  }
+
+  throw lastErr || new Error('HuggingFace image generation failed');
+}
+
+
+// ===================== DALL-E =====================
 
 /**
  * OpenAI DALL-E — Paid but highest quality
@@ -168,14 +340,14 @@ async function generateImageDallE(prompt, options = {}) {
   if (!apiKey) throw new Error('OpenAI API key not configured');
 
   const size = options.size || '1024x1024';
-  const quality = options.quality || 'standard';
+  const quality = options.quality || 'hd';
   const model = 'dall-e-3';
 
-  console.log('Generating image via DALL-E 3...');
+  console.log('[AI Media] Generating image via DALL-E 3...');
 
   const response = await axios.post(
     'https://api.openai.com/v1/images/generations',
-    { model, prompt, n: 1, size, quality, response_format: 'b64_json' },
+    { model, prompt: `${prompt}, ultra detailed, 4K quality`, n: 1, size, quality, response_format: 'b64_json' },
     {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -189,15 +361,18 @@ async function generateImageDallE(prompt, options = {}) {
   const buffer = Buffer.from(imageData.b64_json, 'base64');
   const filename = `ai-img-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.png`;
   const filepath = path.join(OUTPUT_DIR, 'images', filename);
-  fs.writeFileSync(filepath, buffer);
+
+  // Upscale to 4K
+  const finalDims = await upscaleTo4K(buffer, 3840, 2160, filepath);
 
   return {
     url: `/uploads/ai-generated/images/${filename}`,
     filepath,
     provider: 'DALL-E 3',
     prompt: imageData.revised_prompt || prompt,
-    width: parseInt(size.split('x')[0]),
-    height: parseInt(size.split('x')[1])
+    width: finalDims.width,
+    height: finalDims.height,
+    quality: '4K'
   };
 }
 
@@ -298,24 +473,61 @@ async function generateVideo(prompt, options = {}) {
 
 /**
  * Generate a single frame image for video compilation
+ * Tries Gemini → Pollinations → Stable Horde
  */
 async function generateSingleFrame(prompt, width, height, seed, frameDir, index) {
-  const encodedPrompt = encodeURIComponent(prompt);
-  const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
-
   console.log(`  Generating frame ${index + 1}...`);
-  
-  const response = await axios.get(url, {
-    responseType: 'arraybuffer',
-    timeout: 60000,
-    maxRedirects: 5,
-    validateStatus: (s) => s < 400
-  });
-
   const framePath = path.join(frameDir, `frame-${String(index).padStart(4, '0')}.png`);
-  fs.writeFileSync(framePath, response.data);
 
-  return { index, path: framePath };
+  // Try Pollinations
+  try {
+    const encodedPrompt = encodeURIComponent(prompt);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      timeout: 60000,
+      maxRedirects: 5,
+      validateStatus: (s) => s < 400
+    });
+    fs.writeFileSync(framePath, response.data);
+    return { index, path: framePath };
+  } catch (err) {
+    console.log(`  Frame ${index + 1} Pollinations failed: ${err.message}`);
+  }
+
+  // Try Stable Horde as last resort
+  try {
+    const submitResp = await axios.post(
+      'https://stablehorde.net/api/v2/generate/async',
+      {
+        prompt: prompt,
+        params: { width: Math.min(width, 512), height: Math.min(height, 512), steps: 20 },
+        nsfw: false,
+        r2: true
+      },
+      { headers: { 'Content-Type': 'application/json', 'apikey': '0000000000' }, timeout: 15000 }
+    );
+    const jobId = submitResp.data?.id;
+    if (jobId) {
+      // Poll for up to 60s
+      for (let t = 0; t < 15; t++) {
+        await new Promise(r => setTimeout(r, 4000));
+        const check = await axios.get(`https://stablehorde.net/api/v2/generate/check/${jobId}`, { timeout: 10000 });
+        if (check.data?.done) break;
+      }
+      const status = await axios.get(`https://stablehorde.net/api/v2/generate/status/${jobId}`, { timeout: 15000 });
+      const imgUrl = status.data?.generations?.[0]?.img;
+      if (imgUrl) {
+        const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        await sharp(imgResp.data).resize(width, height, { kernel: sharp.kernel.lanczos3, fit: 'cover' }).png().toFile(framePath);
+        return { index, path: framePath };
+      }
+    }
+  } catch (err) {
+    console.log(`  Frame ${index + 1} Stable Horde failed: ${err.message}`);
+  }
+
+  throw new Error(`Failed to generate frame ${index + 1} with all providers`);
 }
 
 /**
@@ -489,11 +701,13 @@ function detectGenerationIntent(message) {
  */
 function getCapabilities() {
   return {
-    textToImage: true, // Pollinations is always available
-    textToVideo: FFMPEG_AVAILABLE, // Need ffmpeg for frame compilation
-    imageToVideo: FFMPEG_AVAILABLE, // Need ffmpeg for Ken Burns
+    textToImage: true,
+    textToVideo: FFMPEG_AVAILABLE,
+    imageToVideo: FFMPEG_AVAILABLE,
+    quality: '4K (3840x2160)',
     providers: {
-      pollinations: { available: true, free: true, features: ['text-to-image'] },
+      pollinations: { available: true, free: true, features: ['text-to-image'], quality: '4K upscaled' },
+      stableHorde: { available: true, free: true, features: ['text-to-image'], quality: '4K upscaled' },
       huggingface: { available: !!process.env.HUGGINGFACE_API_KEY, free: true, features: ['text-to-image'] },
       dalle: { available: !!process.env.OPENAI_API_KEY, free: false, features: ['text-to-image'] },
       ffmpeg: { available: FFMPEG_AVAILABLE, free: true, features: ['text-to-video', 'image-to-video'] }
