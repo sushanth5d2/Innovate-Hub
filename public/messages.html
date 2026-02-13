@@ -4500,7 +4500,7 @@
       huggingface: { color: '#ffbd45', icon: '🤗', label: 'HuggingFace (FREE)' },
       cohere:      { color: '#39594d', icon: '🌊', label: 'Cohere (FREE)' },
       mistral:     { color: '#ff7000', icon: '🌬️', label: 'Mistral (FREE)' },
-      openrouter:  { color: '#6366f1', icon: '🔀', label: 'OpenRouter (FREE)' },
+      openrouter:  { color: '#6366f1', icon: '🔀', label: 'OpenRouter' },
       ollama:      { color: '#ffffff', icon: '🏠', label: 'Ollama (LOCAL)' },
       openai:      { color: '#10a37f', icon: '🤖', label: 'OpenAI' },
       xai:         { color: '#1da1f2', icon: '⚡', label: 'xAI' },
@@ -4695,12 +4695,24 @@
     });
 
     // Render the model dropdown with provider groups
-    function renderModelDropdown() {
+    function renderModelDropdown(filterText = '') {
       const dropdown = document.getElementById('modelDropdown');
       if (!dropdown) return;
 
+      const filter = filterText.toLowerCase().trim();
+
       // Only show AVAILABLE models — hide unavailable ones entirely
-      const availableModels = aiModels.filter(m => m.available);
+      let availableModels = aiModels.filter(m => m.available);
+
+      // Apply search filter
+      if (filter) {
+        availableModels = availableModels.filter(m => 
+          m.name.toLowerCase().includes(filter) || 
+          m.id.toLowerCase().includes(filter) ||
+          m.provider.toLowerCase().includes(filter) ||
+          (m.description || '').toLowerCase().includes(filter)
+        );
+      }
 
       // Separate Innovate AI models from others
       const innovateModels = availableModels.filter(m => m.custom);
@@ -4720,10 +4732,14 @@
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
       });
 
-      // Build dropdown HTML
+      // Build dropdown HTML - Search bar at top
       let html = `<div style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border);">
         <div style="font-weight: 700; font-size: 14px; color: var(--ig-primary-text);">Choose AI Model</div>
         <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 2px;">Innovate AI auto-picks the best provider</div>
+        <input type="text" id="modelSearchInput" placeholder="Search models..." value="${filterText}" 
+          oninput="renderModelDropdown(this.value)"
+          style="width: 100%; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--ig-border); border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 13px; outline: none; box-sizing: border-box;"
+          onclick="event.stopPropagation()">
       </div>`;
 
       // ===== INNOVATE AI Section - Featured at top =====
@@ -4769,40 +4785,76 @@
           html += `<div style="padding: 10px 16px 4px; font-size: 10px; font-weight: 700; color: var(--ig-secondary-text); text-transform: uppercase; letter-spacing: 1px; border-top: 2px solid var(--ig-border); margin-top: 4px;">💎 Premium Models</div>`;
         }
 
-        html += `<div style="padding: 8px 16px 4px; font-size: 11px; font-weight: 600; color: ${style.color}; text-transform: uppercase; letter-spacing: 0.5px;">
-          ${style.icon} ${style.label}
-        </div>`;
-
-        models.forEach(m => {
-          const isSelected = m.id === aiSelectedModel;
-          const isAvailable = m.available;
-          const freeBadge = m.free ? '<span style="background: #00c853; color: white; font-size: 8px; padding: 1px 5px; border-radius: 6px; font-weight: 700; margin-left: 4px;">FREE</span>' : '';
-          const localBadge = m.local ? '<span style="background: #ff9800; color: white; font-size: 8px; padding: 1px 5px; border-radius: 6px; font-weight: 700; margin-left: 4px;">LOCAL</span>' : '';
+        const sortedModels = models.sort((a, b) => a.name.localeCompare(b.name));
+        const isLargeProvider = sortedModels.length > 8;
+        const expandKey = `_${provider}Expanded`;
+        const isExpanded = filter || window[expandKey];
+        
+        // Provider header with count
+        if (isLargeProvider && !filter) {
+          html += `<div onclick="window.${expandKey}=!window.${expandKey}; renderModelDropdown(document.getElementById('modelSearchInput')?.value||'')" 
+            style="padding: 8px 16px 4px; font-size: 11px; font-weight: 600; color: ${style.color}; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none;">
+            ${isExpanded ? '▾' : '▸'} ${style.icon} ${style.label} <span style="font-size: 10px; color: var(--ig-secondary-text); font-weight: 400; text-transform: none;">(${sortedModels.length} models${!isExpanded ? ' — tap to expand' : ''})</span>
+          </div>`;
           
-          html += `
-            <button onclick="selectAIModel('${m.id}')" 
-              style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border: none; background: ${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}; cursor: pointer; color: var(--ig-primary-text); text-align: left; transition: background 0.15s;"
-              onmouseover="this.style.background='var(--ig-secondary-background)'"
-              onmouseout="this.style.background='${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}'">
-              <div style="flex: 1;">
-                <div style="font-size: 13px; font-weight: ${isSelected ? '600' : '400'}; display: flex; align-items: center; flex-wrap: wrap;">${m.name}${freeBadge}${localBadge}</div>
-                <div style="font-size: 11px; color: var(--ig-secondary-text);">${m.description}</div>
-              </div>
-              ${isSelected ? '<svg fill="#667eea" height="18" viewBox="0 0 24 24" width="18"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : ''}
-            </button>
-          `;
-        });
+          if (isExpanded) {
+            sortedModels.forEach(m => { html += renderModelButton(m); });
+          } else {
+            // Show first 3 models as preview
+            sortedModels.slice(0, 3).forEach(m => { html += renderModelButton(m); });
+            if (sortedModels.length > 3) {
+              html += `<div onclick="window.${expandKey}=true; renderModelDropdown(document.getElementById('modelSearchInput')?.value||'')" 
+                style="padding: 6px 16px; font-size: 11px; color: ${style.color}; cursor: pointer; text-align: center; opacity: 0.8;">
+                + ${sortedModels.length - 3} more models...
+              </div>`;
+            }
+          }
+        } else {
+          // Small providers or during search: show all
+          html += `<div style="padding: 8px 16px 4px; font-size: 11px; font-weight: 600; color: ${style.color}; text-transform: uppercase; letter-spacing: 0.5px;">
+            ${style.icon} ${style.label}${sortedModels.length > 3 ? ` <span style="font-size: 10px; color: var(--ig-secondary-text); font-weight: 400; text-transform: none;">(${sortedModels.length})</span>` : ''}
+          </div>`;
+
+          sortedModels.forEach(m => { html += renderModelButton(m); });
+        }
       }
 
       } // end if sortedProviders.length > 0
 
       if (availableModels.length === 0) {
         html += `<div style="padding: 20px 16px; text-align: center; color: var(--ig-secondary-text); font-size: 13px;">
-          No models available.<br><span style="font-size: 11px;">Add API keys in .env or start a local AI service.</span>
+          ${filter ? 'No models match your search.' : 'No models available.<br><span style="font-size: 11px;">Add API keys in .env or start a local AI service.</span>'}
         </div>`;
       }
 
       dropdown.innerHTML = html;
+      
+      // Re-focus search input after re-render
+      const searchInput = document.getElementById('modelSearchInput');
+      if (searchInput && filter) {
+        searchInput.focus();
+        searchInput.setSelectionRange(filter.length, filter.length);
+      }
+    }
+
+    // Helper: render a single model button
+    function renderModelButton(m) {
+      const isSelected = m.id === aiSelectedModel;
+      const freeBadge = m.free ? '<span style="background: #00c853; color: white; font-size: 8px; padding: 1px 5px; border-radius: 6px; font-weight: 700; margin-left: 4px;">FREE</span>' : '';
+      const localBadge = m.local ? '<span style="background: #ff9800; color: white; font-size: 8px; padding: 1px 5px; border-radius: 6px; font-weight: 700; margin-left: 4px;">LOCAL</span>' : '';
+      
+      return `
+        <button onclick="selectAIModel('${m.id}')" 
+          style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 16px; border: none; background: ${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}; cursor: pointer; color: var(--ig-primary-text); text-align: left; transition: background 0.15s;"
+          onmouseover="this.style.background='var(--ig-secondary-background)'"
+          onmouseout="this.style.background='${isSelected ? 'var(--ig-secondary-background)' : 'transparent'}'">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13px; font-weight: ${isSelected ? '600' : '400'}; display: flex; align-items: center; flex-wrap: wrap;">${m.name}${freeBadge}${localBadge}</div>
+            <div style="font-size: 10px; color: var(--ig-secondary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.description}</div>
+          </div>
+          ${isSelected ? '<svg fill="#667eea" height="16" viewBox="0 0 24 24" width="16" style="flex-shrink:0;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>' : ''}
+        </button>
+      `;
     }
 
     // Select an AI model

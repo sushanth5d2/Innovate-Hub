@@ -122,6 +122,210 @@ async function detectPollinationsHealth() {
   }
 }
 
+// ===================== OpenRouter Dynamic Model Fetching =====================
+let openRouterModelsFetched = false;
+
+/**
+ * Fetch all available FREE models from OpenRouter API and register them dynamically.
+ * Only registers free models (ending in :free).
+ */
+async function fetchOpenRouterModels() {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return;
+
+  try {
+    const resp = await axios.get('https://openrouter.ai/api/v1/models', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      timeout: 10000
+    });
+
+    const models = resp.data?.data || [];
+    if (models.length === 0) return;
+
+    // Remove any existing dynamically-added OpenRouter models
+    for (const key of Object.keys(AI_MODELS)) {
+      if (key.startsWith('openrouter/') && AI_MODELS[key]._dynamic) {
+        delete AI_MODELS[key];
+      }
+    }
+
+    let freeCount = 0;
+
+    for (const m of models) {
+      const isFree = m.id.endsWith(':free');
+      if (!isFree) continue; // Only register FREE models
+
+      const modelId = `openrouter/${m.id}`;
+      const contextLen = m.context_length || 4096;
+      const maxOut = Math.min(m.top_provider?.max_completion_tokens || 4096, 4096);
+
+      // Skip if already hardcoded
+      if (AI_MODELS[modelId] && !AI_MODELS[modelId]._dynamic) continue;
+
+      AI_MODELS[modelId] = {
+        provider: 'openrouter',
+        name: m.name || m.id,
+        description: `FREE - ${contextLen > 100000 ? Math.round(contextLen / 1000) + 'K context' : contextLen + ' context'} via OpenRouter`,
+        maxTokens: maxOut,
+        envKey: 'OPENROUTER_API_KEY',
+        free: true,
+        _dynamic: true
+      };
+
+      freeCount++;
+    }
+
+    if (!openRouterModelsFetched) {
+      console.log(`[OpenRouter] Loaded ${freeCount} free models`);
+      openRouterModelsFetched = true;
+    }
+  } catch (err) {
+    if (!openRouterModelsFetched) {
+      console.log(`[OpenRouter] Failed to fetch models: ${err.message}`);
+    }
+  }
+}
+
+// ===================== Groq Dynamic Model Fetching =====================
+let groqModelsFetched = false;
+
+/**
+ * Fetch all available models from Groq API and register them dynamically.
+ * All Groq models are FREE.
+ */
+async function fetchGroqModels() {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return;
+
+  try {
+    const resp = await axios.get('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      timeout: 10000
+    });
+
+    const models = resp.data?.data || [];
+    if (models.length === 0) return;
+
+    // Remove existing dynamically-added Groq models
+    for (const key of Object.keys(AI_MODELS)) {
+      if (AI_MODELS[key]?.provider === 'groq' && AI_MODELS[key]._dynamic) {
+        delete AI_MODELS[key];
+      }
+    }
+
+    // Skip non-chat models (whisper = audio transcription, guard/safeguard = safety, embed = embeddings)
+    const skipPatterns = ['whisper', 'guard', 'safeguard', 'embed'];
+    let count = 0;
+
+    for (const m of models) {
+      const modelId = m.id;
+      if (skipPatterns.some(p => modelId.toLowerCase().includes(p))) continue;
+
+      // Skip if already hardcoded
+      if (AI_MODELS[modelId] && !AI_MODELS[modelId]._dynamic) continue;
+
+      // Generate a friendly name from model ID
+      const name = modelId
+        .replace(/^(meta-llama|canopylabs|moonshotai|openai|qwen)\//i, '')
+        .replace(/-instruct$/i, '')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      AI_MODELS[modelId] = {
+        provider: 'groq',
+        name: name,
+        description: 'FREE - Ultra-fast via Groq',
+        maxTokens: 4096,
+        envKey: 'GROQ_API_KEY',
+        free: true,
+        _dynamic: true
+      };
+      count++;
+    }
+
+    if (!groqModelsFetched) {
+      console.log(`[Groq] Loaded ${count} free models`);
+      groqModelsFetched = true;
+    }
+  } catch (err) {
+    if (!groqModelsFetched) {
+      console.log(`[Groq] Failed to fetch models: ${err.message}`);
+    }
+  }
+}
+
+// ===================== Mistral Dynamic Model Fetching =====================
+let mistralModelsFetched = false;
+
+/**
+ * Fetch all available chat-capable models from Mistral API and register them dynamically.
+ * All Mistral models are on the FREE tier.
+ */
+async function fetchMistralModels() {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) return;
+
+  try {
+    const resp = await axios.get('https://api.mistral.ai/v1/models', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      timeout: 10000
+    });
+
+    const models = resp.data?.data || [];
+    if (models.length === 0) return;
+
+    // Remove existing dynamically-added Mistral models
+    for (const key of Object.keys(AI_MODELS)) {
+      if (AI_MODELS[key]?.provider === 'mistral' && AI_MODELS[key]._dynamic) {
+        delete AI_MODELS[key];
+      }
+    }
+
+    // Only include chat-capable models, skip embed/moderation/ocr/transcribe
+    const skipPatterns = ['embed', 'moderation', 'ocr', 'transcribe'];
+    let count = 0;
+
+    for (const m of models) {
+      const modelId = m.id;
+      const caps = m.capabilities || {};
+      
+      // Skip non-chat models
+      if (caps.completion_chat === false) continue;
+      if (skipPatterns.some(p => modelId.toLowerCase().includes(p))) continue;
+      // Skip duplicate -latest aliases (keep versioned ones + latest)
+      // Actually keep all - let user choose
+
+      // Skip if already hardcoded
+      if (AI_MODELS[modelId] && !AI_MODELS[modelId]._dynamic) continue;
+
+      const name = modelId
+        .replace(/-latest$/i, '')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      AI_MODELS[modelId] = {
+        provider: 'mistral',
+        name: name,
+        description: 'FREE tier - Mistral AI',
+        maxTokens: 4096,
+        envKey: 'MISTRAL_API_KEY',
+        free: true,
+        _dynamic: true
+      };
+      count++;
+    }
+
+    if (!mistralModelsFetched) {
+      console.log(`[Mistral] Loaded ${count} free models`);
+      mistralModelsFetched = true;
+    }
+  } catch (err) {
+    if (!mistralModelsFetched) {
+      console.log(`[Mistral] Failed to fetch models: ${err.message}`);
+    }
+  }
+}
+
 async function detectAllLocalServices() {
   // Detect Ollama (has its own API format)
   await detectOllama();
@@ -190,6 +394,18 @@ detectAllLocalServices();
 // Re-check periodically (every 60 seconds)
 setInterval(detectAllLocalServices, 60000);
 
+// Fetch OpenRouter models on startup and refresh every 5 minutes
+fetchOpenRouterModels();
+setInterval(fetchOpenRouterModels, 5 * 60 * 1000);
+
+// Fetch Groq models on startup and refresh every 5 minutes
+fetchGroqModels();
+setInterval(fetchGroqModels, 5 * 60 * 1000);
+
+// Fetch Mistral models on startup and refresh every 5 minutes
+fetchMistralModels();
+setInterval(fetchMistralModels, 5 * 60 * 1000);
+
 // ===================== Provider Failure Cache =====================
 // Skip providers that failed recently to avoid wasting time on retries
 const providerFailureCache = new Map(); // key: 'provider:modelId' → timestamp of failure
@@ -234,7 +450,7 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
   { provider: 'groq', modelId: 'qwen/qwen3-32b', envKey: 'GROQ_API_KEY' },
   { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
   { provider: 'cohere', modelId: 'command-r-plus', envKey: 'COHERE_API_KEY' },
-  { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.1-8b-instruct:free', envKey: 'OPENROUTER_API_KEY' },
+  { provider: 'openrouter', modelId: 'openrouter/meta-llama/llama-3.3-70b-instruct:free', envKey: 'OPENROUTER_API_KEY' },
   { provider: 'huggingface', modelId: 'mistralai/Mistral-7B-Instruct-v0.3', envKey: 'HUGGINGFACE_API_KEY' },
   // Premium fallbacks
   { provider: 'openai', modelId: 'gpt-4o-mini', envKey: 'OPENAI_API_KEY' },
@@ -305,40 +521,8 @@ const AI_MODELS = {
   },
   // ==================== FREE / OPEN-SOURCE MODELS ====================
 
-  // Groq - FREE, super fast inference for open-source models
-  // Sign up: https://console.groq.com (instant, free)
-  'llama-3.3-70b-versatile': {
-    provider: 'groq',
-    name: 'Llama 3.3 70B',
-    description: 'FREE - Meta\'s best open model via Groq',
-    maxTokens: 4096,
-    envKey: 'GROQ_API_KEY',
-    free: true
-  },
-  'llama-3.1-8b-instant': {
-    provider: 'groq',
-    name: 'Llama 3.1 8B',
-    description: 'FREE - Ultra-fast small Llama model',
-    maxTokens: 4096,
-    envKey: 'GROQ_API_KEY',
-    free: true
-  },
-  'mixtral-8x7b-32768': {
-    provider: 'groq',
-    name: 'Mixtral 8x7B',
-    description: 'FREE - Mistral\'s MoE model via Groq',
-    maxTokens: 4096,
-    envKey: 'GROQ_API_KEY',
-    free: true
-  },
-  'gemma2-9b-it': {
-    provider: 'groq',
-    name: 'Gemma 2 9B',
-    description: 'FREE - Google\'s open model via Groq',
-    maxTokens: 4096,
-    envKey: 'GROQ_API_KEY',
-    free: true
-  },
+  // Groq models are loaded dynamically from the API at startup
+  // See fetchGroqModels() — loads all available chat models automatically
 
   // HuggingFace - FREE inference API
   // Sign up: https://huggingface.co/settings/tokens (free)
@@ -489,51 +673,11 @@ const AI_MODELS = {
     free: true
   },
 
-  // Mistral AI - FREE tier available
-  // Sign up: https://console.mistral.ai (free tier)
-  'mistral-small-latest': {
-    provider: 'mistral',
-    name: 'Mistral Small',
-    description: 'FREE tier - Fast and efficient',
-    maxTokens: 4096,
-    envKey: 'MISTRAL_API_KEY',
-    free: true
-  },
-  'mistral-large-latest': {
-    provider: 'mistral',
-    name: 'Mistral Large',
-    description: 'FREE tier - Most capable Mistral',
-    maxTokens: 4096,
-    envKey: 'MISTRAL_API_KEY',
-    free: true
-  },
+  // Mistral models are loaded dynamically from the API at startup
+  // See fetchMistralModels() — loads all available chat models automatically
 
-  // OpenRouter - aggregator, some free models
-  // Sign up: https://openrouter.ai/keys (free)
-  'openrouter/google/gemma-2-9b-it:free': {
-    provider: 'openrouter',
-    name: 'Gemma 2 9B (Free)',
-    description: 'FREE - Via OpenRouter',
-    maxTokens: 4096,
-    envKey: 'OPENROUTER_API_KEY',
-    free: true
-  },
-  'openrouter/meta-llama/llama-3.1-8b-instruct:free': {
-    provider: 'openrouter',
-    name: 'Llama 3.1 8B (Free)',
-    description: 'FREE - Via OpenRouter',
-    maxTokens: 4096,
-    envKey: 'OPENROUTER_API_KEY',
-    free: true
-  },
-  'openrouter/qwen/qwen-2.5-7b-instruct:free': {
-    provider: 'openrouter',
-    name: 'Qwen 2.5 7B (Free)',
-    description: 'FREE - Alibaba model via OpenRouter',
-    maxTokens: 4096,
-    envKey: 'OPENROUTER_API_KEY',
-    free: true
-  },
+  // OpenRouter models are loaded dynamically from the API at startup
+  // See fetchOpenRouterModels() — loads all free + paid models automatically
 
   // ==================== PREMIUM MODELS (Paid API keys) ====================
 
@@ -890,9 +1034,24 @@ function getAllModels() {
  * @returns {Promise<{content: string, model: string, tokens: object}>}
  */
 async function chat(modelId, messages, options = {}) {
-  const modelConfig = AI_MODELS[modelId];
+  let modelConfig = AI_MODELS[modelId];
+  
+  // If model not found but starts with 'openrouter/', create a dynamic config for it
+  // This handles cases where the model was selected from the dynamic list
+  if (!modelConfig && modelId.startsWith('openrouter/')) {
+    modelConfig = {
+      provider: 'openrouter',
+      name: modelId.replace('openrouter/', ''),
+      description: 'Via OpenRouter',
+      maxTokens: 4096,
+      envKey: 'OPENROUTER_API_KEY',
+      free: modelId.endsWith(':free')
+    };
+    AI_MODELS[modelId] = modelConfig;
+  }
+  
   if (!modelConfig) {
-    throw new Error(`Unknown model: ${modelId}. Available: ${Object.keys(AI_MODELS).join(', ')}`);
+    throw new Error(`Unknown model: ${modelId}`);
   }
 
   // Innovate AI uses smart routing — no separate API key check
@@ -973,9 +1132,17 @@ async function chat(modelId, messages, options = {}) {
         throw new Error(`Authentication failed for ${modelConfig.name}. Check your API key.`);
       }
       if (status === 429) {
-        throw new Error(`Rate limit exceeded for ${modelConfig.name}. Your API key has hit its usage limit. Try a free model like Groq Llama 3.3.`);
+        const isFreeModel = modelConfig.free;
+        throw new Error(isFreeModel 
+          ? `${modelConfig.name} is temporarily busy (free tier rate limit). Try another free model or wait a moment.`
+          : `Rate limit exceeded for ${modelConfig.name}. Your API key has hit its usage limit.`);
       }
       if (status === 400) {
+        // Check for OpenRouter provider-level errors
+        const providerErr = data?.error?.metadata?.raw || '';
+        if (providerErr && modelConfig.provider === 'openrouter') {
+          throw new Error(`${modelConfig.name}: Provider error. Try a different model.`);
+        }
         throw new Error(`Invalid request to ${modelConfig.name}: ${errMsg}`);
       }
       throw new Error(`${modelConfig.name} API error (${status}): ${errMsg}`);
@@ -1969,7 +2136,7 @@ async function callMistral(modelId, apiKey, messages, temperature, maxTokens) {
 
 async function callOpenRouter(modelId, apiKey, messages, temperature, maxTokens) {
   const config = PROVIDER_CONFIGS.openrouter;
-  // Extract actual model path: 'openrouter/google/gemma-2-9b-it:free' -> 'google/gemma-2-9b-it:free'
+  // Extract actual model path: 'openrouter/google/gemma-3-4b-it:free' -> 'google/gemma-3-4b-it:free'
   const modelPath = modelId.replace('openrouter/', '');
   
   const payload = {
@@ -1982,20 +2149,50 @@ async function callOpenRouter(modelId, apiKey, messages, temperature, maxTokens)
     max_tokens: maxTokens
   };
 
-  const response = await axios.post(config.baseUrl, payload, {
-    headers: config.headers(apiKey),
-    timeout: 15000
-  });
+  try {
+    const response = await axios.post(config.baseUrl, payload, {
+      headers: config.headers(apiKey),
+      timeout: 30000
+    });
 
-  return {
-    content: response.data.choices[0].message.content,
-    model: modelId,
-    tokens: {
-      prompt: response.data.usage?.prompt_tokens,
-      completion: response.data.usage?.completion_tokens,
-      total: response.data.usage?.total_tokens
+    return {
+      content: response.data.choices[0].message.content,
+      model: modelId,
+      tokens: {
+        prompt: response.data.usage?.prompt_tokens,
+        completion: response.data.usage?.completion_tokens,
+        total: response.data.usage?.total_tokens
+      }
+    };
+  } catch (err) {
+    // Some models (e.g. Gemma) don't support system prompts — retry without it
+    const errMsg = err.response?.data?.error?.message || err.response?.data?.error?.metadata?.raw || '';
+    if (err.response?.status === 400 && (errMsg.includes('Developer instruction') || errMsg.includes('system') || errMsg.includes('not enabled'))) {
+      console.log(`[OpenRouter] ${modelPath} doesn't support system prompts, retrying without...`);
+      // Prepend system prompt as first user message instead
+      const fallbackMessages = [
+        { role: 'user', content: SYSTEM_PROMPT + '\n\nPlease follow the above instructions. Now respond to the conversation below.' },
+        ...messages
+      ];
+      payload.messages = fallbackMessages;
+      
+      const response = await axios.post(config.baseUrl, payload, {
+        headers: config.headers(apiKey),
+        timeout: 30000
+      });
+
+      return {
+        content: response.data.choices[0].message.content,
+        model: modelId,
+        tokens: {
+          prompt: response.data.usage?.prompt_tokens,
+          completion: response.data.usage?.completion_tokens,
+          total: response.data.usage?.total_tokens
+        }
+      };
     }
-  };
+    throw err; // Re-throw if it's not a system prompt issue
+  }
 }
 
 /**
