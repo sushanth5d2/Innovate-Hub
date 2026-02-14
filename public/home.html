@@ -118,230 +118,1012 @@
     }
   </script>
 
-  <!-- Create Post Modal -->
-  <div id="createPostModal" class="ig-modal-overlay" style="display: none;" onclick="closeCreatePostModal(event)">
-    <div class="ig-modal" onclick="event.stopPropagation()" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
-      <div class="ig-modal-item" style="font-weight: 600; padding: 20px; border-bottom: 1px solid var(--ig-border);">
-        Create new post
+  <!-- Create Post Modal - Instagram Style -->
+  <div id="createPostModal" class="cp-overlay" style="display: none;" onclick="closeCreatePostModal(event)">
+    <div class="cp-container" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="cp-header">
+        <button class="cp-header-btn" onclick="closeCreatePostModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h2 class="cp-header-title">Create new post</h2>
+        <button class="cp-share-btn" onclick="submitPost()" id="cpShareBtn">Share</button>
       </div>
-      <div style="padding: 20px;">
-        <!-- Content -->
-        <textarea id="postContent" class="ig-chat-input" placeholder="Write a caption... Use #hashtags for trending topics" rows="4" style="width: 100%; border-radius: 8px; resize: vertical;"></textarea>
-        
+
+      <!-- Body -->
+      <div class="cp-body">
+        <!-- User Info Row -->
+        <div class="cp-user-row">
+          <img id="cpUserAvatar" src="" alt="" class="cp-avatar">
+          <span class="cp-username" id="cpUsername"></span>
+        </div>
+
+        <!-- Caption -->
+        <div class="cp-caption-wrap">
+          <textarea id="postContent" class="cp-caption" placeholder="Write a caption..." rows="4" oninput="onCaptionInput(this)"></textarea>
+          <div class="cp-char-count"><span id="cpCharCount">0</span> / 2,200</div>
+        </div>
+
+        <!-- Hashtag Suggestions -->
+        <div id="hashtagSuggestions" class="cp-hashtag-suggestions" style="display: none;">
+          <div class="cp-hashtag-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+            <span>Suggested Hashtags</span>
+          </div>
+          <div id="hashtagList" class="cp-hashtag-list"></div>
+        </div>
+
+        <!-- Trending Hashtags -->
+        <div id="trendingHashtags" class="cp-trending-section">
+          <div class="cp-trending-header" onclick="toggleTrendingHashtags()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span>Trending</span>
+            <svg class="cp-trending-chevron" id="trendingChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div id="trendingList" class="cp-trending-list" style="display: none;"></div>
+        </div>
+
         <!-- Media Preview -->
-        <div id="imagePreview" style="margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px;"></div>
-        
+        <div id="imagePreview" class="cp-media-grid"></div>
+
         <!-- Files Preview -->
-        <div id="postFilesList" style="margin-top: 8px;"></div>
-        
-        <!-- Upload Options -->
-        <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">
-          <label class="upload-btn">
+        <div id="postFilesList" class="cp-files-list"></div>
+
+        <!-- Media Upload Drop Zone -->
+        <div id="cpDropZone" class="cp-drop-zone" style="display: none;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <p>Drag photos and videos here</p>
+        </div>
+
+        <!-- Upload Toolbar -->
+        <div class="cp-toolbar">
+          <label class="cp-tool-btn" title="Photos & Videos">
             <input type="file" id="postImages" accept="image/*,video/*" multiple style="display: none;">
-            📷 Photos/Videos
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="cp-tool-label">Photo/Video</span>
           </label>
-          <label class="upload-btn">
-            <input type="file" id="postFiles" accept=".pdf,.doc,.docx,.txt,.zip" multiple style="display: none;">
-            📎 Files
+          <label class="cp-tool-btn" title="Attach Files">
+            <input type="file" id="postFiles" accept=".pdf,.doc,.docx,.txt,.zip,.xls,.xlsx,.ppt,.pptx" multiple style="display: none;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+            <span class="cp-tool-label">Files</span>
           </label>
-          <button class="upload-btn" onclick="togglePollCreation()">📊 Poll</button>
-          <button class="upload-btn" onclick="toggleSchedule()">⏰ Schedule</button>
+          <button class="cp-tool-btn" onclick="togglePollCreation()" title="Create Poll" id="pollToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span class="cp-tool-label">Poll</span>
+          </button>
+          <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Post" id="scheduleToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="cp-tool-label">Schedule</span>
+          </button>
         </div>
-        
-        <!-- Poll Creation -->
-        <div id="pollSection" style="display: none; margin-top: 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;">
-          <input type="text" id="pollQuestion" placeholder="Ask a question..." style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 4px; margin-bottom: 8px;">
-          <div id="pollOptions">
-            <input type="text" class="poll-option" placeholder="Option 1" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 4px; margin-bottom: 8px;">
-            <input type="text" class="poll-option" placeholder="Option 2" style="width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 4px; margin-bottom: 8px;">
+
+        <!-- Poll Creation Section -->
+        <div id="pollSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span>Create Poll</span>
+            <button class="cp-section-close" onclick="togglePollCreation()">×</button>
           </div>
-          <button onclick="addPollOption()" style="padding: 6px 12px; background: var(--ig-blue); color: white; border: none; border-radius: 4px; cursor: pointer;">+ Add Option</button>
-          <div style="margin-top: 8px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
-              <input type="datetime-local" id="pollExpiry" style="flex: 1; padding: 6px; border: 1px solid var(--ig-border); border-radius: 4px;">
-              Poll expiry
-            </label>
+          <input type="text" id="pollQuestion" class="cp-input" placeholder="Ask a question...">
+          <div id="pollOptions" class="cp-poll-options">
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #0095f6;"></span>
+              <input type="text" class="poll-option cp-input" placeholder="Option 1">
+            </div>
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #e1306c;"></span>
+              <input type="text" class="poll-option cp-input" placeholder="Option 2">
+            </div>
+          </div>
+          <button class="cp-add-option-btn" onclick="addPollOption()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add option
+          </button>
+          <div class="cp-poll-expiry">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <input type="datetime-local" id="pollExpiry" class="cp-datetime-input">
+            <span class="cp-expiry-label">Poll ends</span>
           </div>
         </div>
-        
-        <!-- Schedule Post -->
-        <div id="scheduleSection" style="display: none; margin-top: 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;">
-          <label style="display: flex; flex-direction: column; gap: 4px;">
-            <span style="font-size: 14px; font-weight: 500;">Schedule for:</span>
-            <input type="datetime-local" id="scheduleTime" style="padding: 8px; border: 1px solid var(--ig-border); border-radius: 4px;">
+
+        <!-- Schedule Section -->
+        <div id="scheduleSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Schedule Post</span>
+            <button class="cp-section-close" onclick="toggleSchedule()">×</button>
+          </div>
+          <div class="cp-schedule-picker">
+            <input type="datetime-local" id="scheduleTime" class="cp-datetime-input">
+            <p class="cp-schedule-hint">Your post will be published at the scheduled time</p>
+          </div>
+        </div>
+
+        <!-- Advanced Options Accordion -->
+        <div class="cp-advanced-toggle" onclick="toggleAdvancedOptions()">
+          <span>Advanced options</span>
+          <svg id="advancedChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="advancedOptions" class="cp-advanced" style="display: none;">
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              <span>Contact Me Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="enableContact">
+              <span class="cp-switch-slider"></span>
+            </div>
+          </label>
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>I'm Interested Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="enableInterested">
+              <span class="cp-switch-slider"></span>
+            </div>
           </label>
         </div>
-        
-        <!-- Action Buttons -->
-        <div style="margin-top: 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;">
-          <div style="font-size: 14px; font-weight: 500; margin-bottom: 8px;">Enable Actions:</div>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 6px;">
-            <input type="checkbox" id="enableContact" style="width: 18px; height: 18px;">
-            <span>📞 Contact Me Button</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="enableInterested" style="width: 18px; height: 18px;">
-            <span>⭐ I'm Interested Button</span>
-          </label>
-        </div>
-      </div>
-      
-      <div class="ig-modal-item" onclick="submitPost()" style="color: var(--ig-blue); font-weight: 600;">
-        Share
-      </div>
-      <div class="ig-modal-item" onclick="closeCreatePostModal()">
-        Cancel
       </div>
     </div>
   </div>
 
   <style>
-    .upload-btn {
-      padding: 8px 16px;
-      background: var(--ig-secondary-background);
+    /* ===== Create Post Modal - Instagram-Style ===== */
+    .cp-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 10001;
+      display: flex; align-items: center; justify-content: center;
+      animation: cpFadeIn 0.2s ease;
+      padding: 16px;
+    }
+    @keyframes cpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes cpSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    .cp-container {
+      background: var(--ig-primary-background);
+      border-radius: 16px;
+      width: 100%; max-width: 520px; max-height: 90vh;
+      display: flex; flex-direction: column;
+      animation: cpSlideUp 0.3s ease;
+      overflow: hidden;
       border: 1px solid var(--ig-border);
+    }
+
+    /* Header */
+    .cp-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ig-border);
+      min-height: 52px;
+    }
+    .cp-header-btn {
+      background: none; border: none; color: var(--ig-primary-text);
+      cursor: pointer; padding: 4px; display: flex; align-items: center;
+      border-radius: 50%; transition: background 0.2s;
+    }
+    .cp-header-btn:hover { background: var(--ig-hover); }
+    .cp-header-title {
+      font-size: 16px; font-weight: 600; color: var(--ig-primary-text);
+      margin: 0;
+    }
+    .cp-share-btn {
+      background: none; border: none; color: var(--ig-blue);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      padding: 8px 16px; border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .cp-share-btn:hover { background: rgba(0,149,246,0.1); }
+    .cp-share-btn:disabled { opacity: 0.4; cursor: default; }
+    .cp-share-btn.cp-sharing {
+      color: var(--ig-secondary-text);
+      pointer-events: none;
+    }
+
+    /* Body */
+    .cp-body {
+      overflow-y: auto; flex: 1;
+      padding: 0;
+      scrollbar-width: thin;
+    }
+
+    /* User Row */
+    .cp-user-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px 6px;
+    }
+    .cp-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      object-fit: cover; border: 1px solid var(--ig-border);
+    }
+    .cp-username {
+      font-size: 14px; font-weight: 600; color: var(--ig-primary-text);
+    }
+
+    /* Caption */
+    .cp-caption-wrap { padding: 4px 16px 8px; position: relative; }
+    .cp-caption {
+      width: 100%; border: none; outline: none; resize: none;
+      font-size: 15px; line-height: 1.5;
+      color: var(--ig-primary-text);
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 80px;
+    }
+    .cp-caption::placeholder { color: var(--ig-secondary-text); }
+    .cp-char-count {
+      text-align: right; font-size: 12px; color: var(--ig-tertiary-text);
+      padding-top: 4px;
+    }
+
+    /* Hashtag Suggestions */
+    .cp-hashtag-suggestions {
+      padding: 0 16px 8px;
+    }
+    .cp-hashtag-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600; color: var(--ig-secondary-text);
+      margin-bottom: 8px;
+    }
+    .cp-hashtag-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .cp-hashtag-chip {
+      padding: 6px 14px;
+      background: rgba(0,149,246,0.1);
+      color: var(--ig-blue);
+      border: 1px solid rgba(0,149,246,0.2);
+      border-radius: 20px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .cp-hashtag-chip:hover {
+      background: rgba(0,149,246,0.2);
+      border-color: var(--ig-blue);
+      transform: translateY(-1px);
+    }
+    .cp-hashtag-chip.cp-hashtag-added {
+      background: var(--ig-blue);
+      color: white;
+      border-color: var(--ig-blue);
+    }
+
+    /* Trending Section */
+    .cp-trending-section { padding: 0 16px 8px; }
+    .cp-trending-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600; color: var(--ig-secondary-text);
+      cursor: pointer; padding: 6px 0;
+      user-select: none;
+    }
+    .cp-trending-chevron { margin-left: auto; transition: transform 0.3s; }
+    .cp-trending-chevron.cp-open { transform: rotate(180deg); }
+    .cp-trending-list {
+      margin-top: 6px;
+    }
+    .cp-trending-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 14px;
       transition: background 0.2s;
     }
-    .upload-btn:hover {
-      background: var(--ig-hover-overlay);
+    .cp-trending-item:hover { background: var(--ig-hover); }
+    .cp-trending-tag {
+      font-size: 14px; font-weight: 500; color: var(--ig-primary-text);
     }
+    .cp-trending-count {
+      font-size: 12px; color: var(--ig-secondary-text);
+    }
+
+    /* Media Grid */
+    .cp-media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 4px;
+      padding: 0 16px;
+    }
+    .cp-media-grid:empty { display: none; }
     .media-preview-item {
-      position: relative;
-      border-radius: 8px;
-      overflow: hidden;
-      aspect-ratio: 1;
+      position: relative; border-radius: 8px; overflow: hidden;
+      aspect-ratio: 1; background: var(--ig-secondary-background);
     }
-    .media-preview-item img,
-    .media-preview-item video {
+    .media-preview-item img, .media-preview-item video {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .media-preview-remove {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(0,0,0,0.75); color: white;
+      border: none; border-radius: 50%;
+      width: 26px; height: 26px; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .media-preview-remove:hover { background: var(--ig-error); transform: scale(1.1); }
+
+    /* Files List */
+    .cp-files-list { padding: 0 16px; }
+    .cp-files-list:empty { display: none; }
+    .file-preview-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; margin-bottom: 4px;
+      background: var(--ig-secondary-background);
+      border-radius: 10px; border: 1px solid var(--ig-border);
+    }
+    .file-preview-item span:first-child { font-size: 20px; }
+    .file-preview-remove {
+      margin-left: auto; background: none; border: none;
+      color: var(--ig-error); cursor: pointer; font-size: 20px;
+      padding: 2px 6px; border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .file-preview-remove:hover { background: rgba(237,73,86,0.1); }
+
+    /* Drop Zone */
+    .cp-drop-zone {
+      margin: 8px 16px; padding: 32px;
+      border: 2px dashed var(--ig-border); border-radius: 12px;
+      text-align: center; color: var(--ig-secondary-text);
+      transition: all 0.3s;
+    }
+    .cp-drop-zone.cp-drag-over {
+      border-color: var(--ig-blue);
+      background: rgba(0,149,246,0.05);
+    }
+    .cp-drop-zone p { margin-top: 12px; font-size: 14px; }
+
+    /* Toolbar */
+    .cp-toolbar {
+      display: flex; gap: 0; padding: 8px 8px;
+      border-top: 1px solid var(--ig-border);
+      border-bottom: 1px solid var(--ig-border);
+      margin-top: 8px;
+    }
+    .cp-tool-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 4px; background: none; border: none;
+      color: var(--ig-primary-text); cursor: pointer;
+      border-radius: 10px; transition: all 0.2s;
+      font-size: inherit; font-family: inherit;
+    }
+    .cp-tool-btn:hover { background: var(--ig-hover); }
+    .cp-tool-btn.cp-tool-active {
+      color: var(--ig-blue);
+      background: rgba(0,149,246,0.08);
+    }
+    .cp-tool-label { font-size: 11px; color: var(--ig-secondary-text); font-weight: 500; }
+    .cp-tool-btn:hover .cp-tool-label,
+    .cp-tool-btn.cp-tool-active .cp-tool-label { color: var(--ig-blue); }
+
+    /* Sections (Poll, Schedule) */
+    .cp-section {
+      margin: 0 16px 8px; padding: 14px;
+      background: var(--ig-secondary-background);
+      border-radius: 12px; border: 1px solid var(--ig-border);
+    }
+    .cp-section-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 600; color: var(--ig-primary-text);
+      margin-bottom: 12px;
+    }
+    .cp-section-close {
+      margin-left: auto; background: none; border: none;
+      color: var(--ig-secondary-text); cursor: pointer;
+      font-size: 22px; line-height: 1; padding: 0 4px;
+      border-radius: 50%; transition: color 0.2s;
+    }
+    .cp-section-close:hover { color: var(--ig-error); }
+    .cp-input {
+      width: 100%; padding: 10px 12px;
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 8px; color: var(--ig-primary-text);
+      font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .cp-input:focus { border-color: var(--ig-blue); }
+    .cp-input::placeholder { color: var(--ig-tertiary-text); }
+
+    /* Poll Options */
+    .cp-poll-options { margin: 10px 0; }
+    .cp-poll-option-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .cp-poll-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .cp-add-option-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: none;
+      color: var(--ig-blue); font-size: 13px; font-weight: 600;
+      cursor: pointer; padding: 6px 0;
+      transition: opacity 0.2s;
+    }
+    .cp-add-option-btn:hover { opacity: 0.7; }
+    .cp-poll-expiry {
+      display: flex; align-items: center; gap: 8px;
+      padding-top: 10px; margin-top: 10px;
+      border-top: 1px solid var(--ig-border);
+    }
+    .cp-datetime-input {
+      flex: 1; padding: 8px 10px;
+      background: var(--ig-primary-background);
+      border: 1px solid var(--ig-border); border-radius: 8px;
+      color: var(--ig-primary-text); font-size: 13px;
+      outline: none;
+    }
+    .cp-datetime-input:focus { border-color: var(--ig-blue); }
+    .cp-expiry-label { font-size: 13px; color: var(--ig-secondary-text); white-space: nowrap; }
+
+    /* Schedule */
+    .cp-schedule-picker { margin-top: 4px; }
+    .cp-schedule-hint {
+      margin-top: 8px; font-size: 12px; color: var(--ig-secondary-text);
+    }
+
+    /* Advanced Options */
+    .cp-advanced-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; cursor: pointer;
+      color: var(--ig-secondary-text); font-size: 14px;
+      border-top: 1px solid var(--ig-border);
+      user-select: none;
+      transition: color 0.2s;
+    }
+    .cp-advanced-toggle:hover { color: var(--ig-primary-text); }
+    .cp-advanced-toggle svg { transition: transform 0.3s; }
+    .cp-advanced-toggle.cp-open svg { transform: rotate(180deg); }
+
+    .cp-advanced { padding: 0 16px 12px; }
+
+    .cp-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; cursor: pointer;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    .cp-toggle-row:last-child { border-bottom: none; }
+    .cp-toggle-info {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 14px; color: var(--ig-primary-text);
+    }
+
+    /* Toggle Switch */
+    .cp-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .cp-switch input { opacity: 0; width: 0; height: 0; }
+    .cp-switch-slider {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--ig-border); border-radius: 24px;
+      cursor: pointer; transition: all 0.3s;
+    }
+    .cp-switch-slider::before {
+      content: ''; position: absolute;
+      width: 20px; height: 20px; left: 2px; bottom: 2px;
+      background: white; border-radius: 50%;
+      transition: all 0.3s;
+    }
+    .cp-switch input:checked + .cp-switch-slider {
+      background: var(--ig-blue);
+    }
+    .cp-switch input:checked + .cp-switch-slider::before {
+      transform: translateX(20px);
+    }
+
+    /* Responsive */
+    @media (max-width: 540px) {
+      .cp-container { max-width: 100%; max-height: 100vh; border-radius: 0; height: 100%; }
+      .cp-overlay { padding: 0; }
+      .cp-media-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* ===== Story Creation Modal ===== */
+    .story-create-modal {
+      width: 500px;
+      max-width: 95vw;
+      background: var(--ig-primary-background);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .story-create-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    .story-create-close {
+      background: none;
+      border: none;
+      color: var(--ig-primary-text);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+    }
+    .story-create-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--ig-primary-text);
+    }
+    .story-create-share {
+      background: var(--ig-blue);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .story-create-share:hover { opacity: 0.85; }
+    .story-create-share:active { transform: scale(0.97); }
+    .story-create-body { padding: 16px; }
+    .story-create-preview {
+      width: 100%;
+      aspect-ratio: 9/16;
+      max-height: 420px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .story-preview-content {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .story-preview-content img,
+    .story-preview-content video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      border-radius: 0;
     }
-    .media-preview-remove {
+    .story-preview-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,0.8);
       position: absolute;
-      top: 4px;
-      right: 4px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
+      pointer-events: none;
     }
-    .file-preview-item {
+    .story-preview-icon { opacity: 0.7; }
+    .story-preview-hint {
+      font-size: 14px;
+      opacity: 0.8;
+      margin: 0;
+    }
+    .story-create-inputs { display: flex; flex-direction: column; gap: 12px; }
+    .story-create-textarea {
+      width: 100%;
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--ig-primary-text);
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .story-create-textarea:focus { border-color: var(--ig-blue); }
+    .story-create-textarea::placeholder { color: var(--ig-secondary-text); }
+    .story-create-charcount {
+      text-align: right;
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      margin-top: -8px;
+    }
+    .story-create-upload {
+      cursor: pointer;
+      display: block;
+    }
+    .story-upload-btn {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px;
-      background: var(--ig-secondary-background);
-      border-radius: 8px;
-      margin-bottom: 6px;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1.5px dashed var(--ig-border);
+      color: var(--ig-blue);
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
     }
-    .file-preview-remove {
+    .story-upload-btn:hover {
+      border-color: var(--ig-blue);
+      background: rgba(0,149,246,0.05);
+    }
+    .story-upload-hint {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
       margin-left: auto;
-      background: transparent;
-      border: none;
-      color: var(--ig-error);
+      font-weight: 400;
+    }
+    .story-create-colors {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .story-color-label {
+      font-size: 13px;
+      color: var(--ig-secondary-text);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .story-color-options { display: flex; gap: 8px; }
+    .story-color-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid transparent;
       cursor: pointer;
-      font-size: 18px;
+      transition: all 0.2s;
+      padding: 0;
+    }
+    .story-color-btn:hover { transform: scale(1.15); }
+    .story-color-btn.active {
+      border-color: var(--ig-blue);
+      box-shadow: 0 0 0 2px var(--ig-primary-background), 0 0 0 4px var(--ig-blue);
+    }
+
+    /* ===== Post Actions Modal ===== */
+    .post-actions-sheet {
+      width: 400px;
+      max-width: 92vw;
+      background: var(--ig-primary-background);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: slideUp 0.25s ease;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .post-actions-header {
+      text-align: center;
+      padding: 16px 16px 0;
+    }
+    .post-actions-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--ig-border);
+      border-radius: 4px;
+      margin: 0 auto 12px;
+    }
+    .post-actions-list {
+      padding: 4px 0 8px;
+    }
+    .post-action-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: background 0.15s;
+      color: var(--ig-primary-text);
+      font-size: 15px;
+    }
+    .post-action-item:hover {
+      background: var(--ig-hover);
+    }
+    .post-action-item .action-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ig-secondary-background);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .post-action-item .action-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+    .post-action-item.danger {
+      color: #ed4956;
+    }
+    .post-action-item.danger .action-icon {
+      background: rgba(237,73,86,0.1);
+    }
+    .post-actions-cancel {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      text-align: center;
+      border: none;
+      border-top: 1px solid var(--ig-border);
+      background: none;
+      color: var(--ig-primary-text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .post-actions-cancel:hover { background: var(--ig-hover); }
+
+    /* ===== PDF Modal Viewer ===== */
+    .pdf-viewer-modal {
+      width: 92vw;
+      max-width: 1000px;
+      height: 90vh;
+      max-height: 900px;
+      background: var(--ig-primary-background);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .pdf-viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--ig-border);
+      flex-shrink: 0;
+    }
+    .pdf-viewer-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      min-width: 0;
+    }
+    .pdf-viewer-badge {
+      background: #e74c3c;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .pdf-viewer-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 15px;
+    }
+    .pdf-viewer-close {
+      background: var(--ig-secondary-background);
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--ig-primary-text);
+      font-size: 20px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .pdf-viewer-close:hover { background: var(--ig-hover); }
+    .pdf-viewer-body {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+      background: var(--ig-secondary-background);
+    }
+    .pdf-viewer-body canvas {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+    .pdf-viewer-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--ig-border);
+      flex-shrink: 0;
+      background: var(--ig-primary-background);
+    }
+    .pdf-ctrl-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border);
+      color: var(--ig-primary-text);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .pdf-ctrl-btn:hover { background: var(--ig-hover); }
+    .pdf-ctrl-btn:disabled { opacity: 0.3; cursor: default; }
+    .pdf-page-indicator {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ig-primary-text);
+      min-width: 60px;
+      text-align: center;
+    }
+    .pdf-open-btn {
+      margin-left: auto;
+      padding: 8px 20px;
+      background: var(--ig-blue);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .pdf-open-btn:hover { opacity: 0.85; }
+
+    @media (max-width: 540px) {
+      .story-create-modal { max-width: 100%; border-radius: 0; min-height: 100vh; }
+      .story-create-preview { max-height: 350px; }
+      .post-actions-sheet { max-width: 100%; border-radius: 16px 16px 0 0; position: fixed; bottom: 0; left: 0; right: 0; }
+      .pdf-viewer-modal { width: 100%; height: 100%; max-width: 100%; max-height: 100%; border-radius: 0; }
     }
   </style>
 
   <!-- Create Story Modal -->
   <div id="createStoryModal" class="ig-modal-overlay" style="display: none;" onclick="closeCreateStoryModal(event)">
-    <div class="ig-modal" onclick="event.stopPropagation()">
-      <div class="ig-modal-header">Create Story</div>
-      <div style="padding: 20px;">
-        <textarea id="storyContent" class="ig-chat-input" placeholder="What's on your mind?" rows="4" style="width: 100%; border-radius: 8px; resize: vertical;"></textarea>
-        <div id="storyPreview" style="margin-top: 12px; max-height: 300px; overflow: hidden; display: flex; justify-content: center;"></div>
-        <label class="ig-modal-item" style="display: flex; align-items: center; justify-content: center; color: var(--ig-blue); cursor: pointer; margin-top: 12px;">
-          <input type="file" id="storyMedia" accept="image/*,video/*" style="display: none;">
-          Add Photo or Video (Max 120 sec)
-        </label>
+    <div class="story-create-modal" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="story-create-header">
+        <button class="story-create-close" onclick="closeCreateStoryModal()">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+        <span class="story-create-title">Create Story</span>
+        <button class="story-create-share" onclick="submitStory()">Share</button>
       </div>
-      <div class="ig-modal-item" onclick="submitStory()" style="color: var(--ig-blue); font-weight: 600;">
-        Share Story
-      </div>
-      <div class="ig-modal-item" onclick="closeCreateStoryModal()">
-        Cancel
+
+      <!-- Content Area -->
+      <div class="story-create-body">
+        <!-- Preview Area -->
+        <div class="story-create-preview" id="storyPreviewArea">
+          <div id="storyPreview" class="story-preview-content"></div>
+          <div class="story-preview-placeholder" id="storyPlaceholder">
+            <div class="story-preview-icon">
+              <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <p class="story-preview-hint">Add a photo or video to your story</p>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="story-create-inputs">
+          <textarea id="storyContent" class="story-create-textarea" placeholder="Write something..." rows="3" maxlength="500" oninput="updateStoryCharCount()"></textarea>
+          <div class="story-create-charcount"><span id="storyCharCount">0</span>/500</div>
+
+          <!-- Media Upload -->
+          <label class="story-create-upload">
+            <input type="file" id="storyMedia" accept="image/*,video/*" style="display: none;">
+            <div class="story-upload-btn">
+              <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span>Add Photo or Video</span>
+              <span class="story-upload-hint">Max 120 seconds for videos</span>
+            </div>
+          </label>
+
+          <!-- Background Color Picker -->
+          <div class="story-create-colors">
+            <span class="story-color-label">Background</span>
+            <div class="story-color-options">
+              <button class="story-color-btn active" data-bg="linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)" onclick="setStoryBg(this)" style="background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);"></button>
+              <button class="story-color-btn" data-bg="linear-gradient(135deg, #0095f6, #00d4ff)" onclick="setStoryBg(this)" style="background: linear-gradient(135deg, #0095f6, #00d4ff);"></button>
+              <button class="story-color-btn" data-bg="linear-gradient(135deg, #7c3aed, #c084fc)" onclick="setStoryBg(this)" style="background: linear-gradient(135deg, #7c3aed, #c084fc);"></button>
+              <button class="story-color-btn" data-bg="linear-gradient(135deg, #059669, #34d399)" onclick="setStoryBg(this)" style="background: linear-gradient(135deg, #059669, #34d399);"></button>
+              <button class="story-color-btn" data-bg="#262626" onclick="setStoryBg(this)" style="background: #262626;"></button>
+              <button class="story-color-btn" data-bg="#ffffff" onclick="setStoryBg(this)" style="background: #ffffff; border: 1px solid var(--ig-border);"></button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Post Actions Modals -->
   <div id="postActionsModal" class="ig-modal-overlay" style="display: none;" onclick="closePostActionsModal(event)">
-    <div class="ig-modal" onclick="event.stopPropagation()">
-      <div class="ig-modal-header">Post Actions</div>
+    <div class="post-actions-sheet" onclick="event.stopPropagation()">
+      <div class="post-actions-header">
+        <div class="post-actions-handle"></div>
+      </div>
       
       <div id="viewerActions" style="display: none;">
-        <div class="ig-modal-item" onclick="handleInterested()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-          <span>I'm Interested</span>
-        </div>
-        
-        <div class="ig-modal-item" onclick="handleContactMe()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
-          </svg>
-          <span>Contact Me</span>
-        </div>
-        
-        <div class="ig-modal-item" onclick="handleGentleReminder()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-          </svg>
-          <span>Gentle Reminder</span>
-        </div>
-        
-        <div class="ig-modal-item" onclick="handleInstantMeeting()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-          </svg>
-          <span>Instant Meeting</span>
-        </div>
-        
-        <div class="ig-modal-item" onclick="handleReport()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
-          </svg>
-          <span>Report</span>
+        <div class="post-actions-list">
+          <div class="post-action-item" onclick="handleInterested()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
+            <span>I'm Interested</span>
+          </div>
+          
+          <div class="post-action-item" onclick="handleContactMe()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+            </div>
+            <span>Contact Me</span>
+          </div>
+          
+          <div class="post-action-item" onclick="handleGentleReminder()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            </div>
+            <span>Gentle Reminder</span>
+          </div>
+          
+          <div class="post-action-item" onclick="handleInstantMeeting()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+            </div>
+            <span>Instant Meeting</span>
+          </div>
+          
+          <div class="post-action-item danger" onclick="handleReport()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
+            </div>
+            <span>Report</span>
+          </div>
         </div>
       </div>
       
       <div id="ownerActions" style="display: none;">
-        <div class="ig-modal-item" onclick="handleEditPost()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-          </svg>
-          <span>Edit Post</span>
-        </div>
-        
-        <div class="ig-modal-item" onclick="handleArchivePost()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/>
-          </svg>
-          <span>Archive</span>
-        </div>
-        
-        <div class="ig-modal-item danger" onclick="handleDeletePost()">
-          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-          </svg>
-          <span>Delete</span>
+        <div class="post-actions-list">
+          <div class="post-action-item" onclick="handleEditPost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </div>
+            <span>Edit Post</span>
+          </div>
+          
+          <div class="post-action-item" onclick="handleArchivePost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+            </div>
+            <span>Archive</span>
+          </div>
+          
+          <div class="post-action-item danger" onclick="handleDeletePost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </div>
+            <span>Delete</span>
+          </div>
         </div>
       </div>
       
-      <div class="ig-modal-item" onclick="closePostActionsModal()">
-        <span>Cancel</span>
-      </div>
+      <button class="post-actions-cancel" onclick="closePostActionsModal()">Cancel</button>
     </div>
   </div>
 
@@ -394,24 +1176,151 @@
     </div>
   </div>
 
-  <div id="editPostModal" class="ig-modal-overlay" style="display: none;" onclick="closeEditModal(event)">
-    <div class="ig-modal" onclick="event.stopPropagation()">
-      <div class="ig-modal-header">Edit Post</div>
-      <div style="padding: 20px;">
-        <textarea id="editPostContent" class="ig-chat-input" rows="4" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; resize: vertical;"></textarea>
-        
-        <div id="editImagePreview" style="margin-top: 12px;"></div>
-        
-        <label class="ig-button" style="display: inline-block; margin-top: 12px; padding: 8px 16px; background: var(--ig-blue); color: white; border-radius: 8px; cursor: pointer;">
-          <input type="file" id="editPostImages" accept="image/*,video/*" multiple style="display: none;">
-          Add More Media
-        </label>
+  <!-- Edit Post Modal (Instagram-style) -->
+  <div id="editPostModal" class="cp-overlay" style="display: none;" onclick="closeEditModal(event)">
+    <div class="cp-container" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="cp-header">
+        <button class="cp-header-btn" onclick="closeEditModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h2 class="cp-header-title">Edit Post</h2>
+        <button class="cp-share-btn" onclick="submitEditPost()" id="editShareBtn">Save</button>
       </div>
-      <div class="ig-modal-item" onclick="submitEditPost()" style="color: var(--ig-blue); font-weight: 600;">
-        Save Changes
-      </div>
-      <div class="ig-modal-item" onclick="closeEditModal()">
-        Cancel
+
+      <!-- Body -->
+      <div class="cp-body">
+        <!-- User Info Row -->
+        <div class="cp-user-row">
+          <img id="editUserAvatar" src="" alt="" class="cp-avatar">
+          <span class="cp-username" id="editUsername"></span>
+        </div>
+
+        <!-- Caption -->
+        <div class="cp-caption-wrap">
+          <textarea id="editPostContent" class="cp-caption" placeholder="Write a caption..." rows="4" oninput="onEditCaptionInput(this)"></textarea>
+          <div class="cp-char-count"><span id="editCharCount">0</span> / 2,200</div>
+        </div>
+
+        <!-- Hashtag Suggestions (Edit) -->
+        <div id="editHashtagSuggestions" class="cp-hashtag-suggestions" style="display: none;">
+          <div class="cp-hashtag-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+            <span>Suggested Hashtags</span>
+          </div>
+          <div id="editHashtagList" class="cp-hashtag-list"></div>
+        </div>
+
+        <!-- Trending Hashtags (Edit) -->
+        <div id="editTrendingHashtags" class="cp-trending-section">
+          <div class="cp-trending-header" onclick="toggleEditTrendingHashtags()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span>Trending</span>
+            <svg class="cp-trending-chevron" id="editTrendingChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div id="editTrendingList" class="cp-trending-list" style="display: none;"></div>
+        </div>
+
+        <!-- Existing Media Preview -->
+        <div id="editExistingMedia" class="cp-media-grid"></div>
+
+        <!-- New Media Preview -->
+        <div id="editNewMedia" class="cp-media-grid"></div>
+
+        <!-- Existing Files -->
+        <div id="editExistingFiles" class="cp-files-list"></div>
+
+        <!-- Upload Toolbar -->
+        <div class="cp-toolbar">
+          <label class="cp-tool-btn" title="Add Photos & Videos">
+            <input type="file" id="editPostImages" accept="image/*,video/*" multiple style="display: none;" onchange="previewEditMedia(this)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="cp-tool-label">Photo/Video</span>
+          </label>
+          <label class="cp-tool-btn" title="Attach Files">
+            <input type="file" id="editPostFiles" accept=".pdf,.doc,.docx,.txt,.zip,.xls,.xlsx,.ppt,.pptx" multiple style="display: none;" onchange="previewEditFiles(this)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+            <span class="cp-tool-label">Files</span>
+          </label>
+          <button class="cp-tool-btn" onclick="toggleEditPoll()" title="Create Poll" id="editPollToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span class="cp-tool-label">Poll</span>
+          </button>
+          <button class="cp-tool-btn" onclick="toggleEditSchedule()" title="Schedule Post" id="editScheduleToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="cp-tool-label">Schedule</span>
+          </button>
+        </div>
+
+        <!-- Poll Section (Edit) -->
+        <div id="editPollSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span>Create Poll</span>
+            <button class="cp-section-close" onclick="toggleEditPoll()">×</button>
+          </div>
+          <input type="text" id="editPollQuestion" class="cp-input" placeholder="Ask a question...">
+          <div id="editPollOptions" class="cp-poll-options">
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #0095f6;"></span>
+              <input type="text" class="edit-poll-option cp-input" placeholder="Option 1">
+            </div>
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #e1306c;"></span>
+              <input type="text" class="edit-poll-option cp-input" placeholder="Option 2">
+            </div>
+          </div>
+          <button class="cp-add-option-btn" onclick="addEditPollOption()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add option
+          </button>
+          <div class="cp-poll-expiry">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <input type="datetime-local" id="editPollExpiry" class="cp-datetime-input">
+            <span class="cp-expiry-label">Poll ends</span>
+          </div>
+        </div>
+
+        <!-- Schedule Section (Edit) -->
+        <div id="editScheduleSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Schedule Post</span>
+            <button class="cp-section-close" onclick="toggleEditSchedule()">×</button>
+          </div>
+          <div class="cp-schedule-picker">
+            <input type="datetime-local" id="editScheduleTime" class="cp-datetime-input">
+            <p class="cp-schedule-hint">Your post will be published at the scheduled time</p>
+          </div>
+        </div>
+
+        <!-- Advanced Options (Edit) -->
+        <div class="cp-advanced-toggle" onclick="toggleEditAdvancedOptions()">
+          <span>Advanced options</span>
+          <svg id="editAdvancedChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="editAdvancedOptions" class="cp-advanced" style="display: none;">
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              <span>Contact Me Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="editEnableContact">
+              <span class="cp-switch-slider"></span>
+            </div>
+          </label>
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>I'm Interested Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="editEnableInterested">
+              <span class="cp-switch-slider"></span>
+            </div>
+          </label>
+        </div>
       </div>
     </div>
   </div>
@@ -696,12 +1605,337 @@
       }
     }
 
+    let editPostData = null;
+    let editNewImages = [];
+    let editNewFiles = [];
+    let editHasExistingPoll = false;
+
     function handleEditPost() {
       closePostActionsModal();
-      const postEl = document.querySelector(`.ig-post[data-post-id="${currentPostIdForActions}"]`);
-      const content = postEl.querySelector('.ig-caption-text')?.textContent || '';
-      document.getElementById('editPostContent').value = content;
-      document.getElementById('editPostModal').style.display = 'flex';
+      
+      const postId = currentPostIdForActions;
+      editPostData = null;
+      editNewImages = [];
+      editNewFiles = [];
+      editHasExistingPoll = false;
+      
+      InnovateAPI.apiRequest(`/posts/${postId}`).then(response => {
+        const post = response.post || response;
+        editPostData = post;
+        
+        const content = post.content || '';
+        const images = Array.isArray(post.images) ? post.images : (post.images ? JSON.parse(post.images) : []);
+        const files = Array.isArray(post.files) ? post.files : (post.files ? JSON.parse(post.files) : []);
+        
+        // Fill caption
+        document.getElementById('editPostContent').value = content;
+        document.getElementById('editCharCount').textContent = content.length;
+        
+        // Set user info
+        const user = InnovateAPI.getCurrentUser();
+        if (user) {
+          const avatar = document.getElementById('editUserAvatar');
+          const username = document.getElementById('editUsername');
+          if (avatar) avatar.src = user.profile_picture || '/img/default-avatar.png';
+          if (username) username.textContent = user.username || 'You';
+        }
+        
+        // Show existing media
+        const existingMedia = document.getElementById('editExistingMedia');
+        existingMedia.innerHTML = images.map((img, idx) => `
+          <div class="media-preview-item" id="editMedia-${idx}">
+            <img src="${img}" alt="Image ${idx+1}">
+            <button class="media-preview-remove" onclick="removeEditMedia(${idx})" title="Remove">&times;</button>
+          </div>
+        `).join('');
+        
+        // Show existing files
+        const existingFiles = document.getElementById('editExistingFiles');
+        existingFiles.innerHTML = files.map((f, idx) => {
+          const name = f.name || 'File';
+          const size = f.size ? (f.size / 1024).toFixed(1) + ' KB' : '';
+          return `
+            <div class="file-preview-item" id="editFile-${idx}">
+              <span>📄</span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
+                ${size ? `<div style="font-size: 11px; color: var(--ig-secondary-text);">${size}</div>` : ''}
+              </div>
+              <button class="file-preview-remove" onclick="removeEditFile(${idx})" title="Remove">&times;</button>
+            </div>
+          `;
+        }).join('');
+        
+        // Clear new media previews
+        document.getElementById('editNewMedia').innerHTML = '';
+        
+        // Pre-fill poll if exists
+        const pollSection = document.getElementById('editPollSection');
+        const pollBtn = document.getElementById('editPollToggleBtn');
+        if (post.poll) {
+          editHasExistingPoll = true;
+          document.getElementById('editPollQuestion').value = post.poll.question || '';
+          const optionsContainer = document.getElementById('editPollOptions');
+          const options = Array.isArray(post.poll.options) ? post.poll.options : Object.keys(post.poll.options || {});
+          optionsContainer.innerHTML = options.map((opt, i) => `
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: ${pollColors[i % pollColors.length]};"></span>
+              <input type="text" class="edit-poll-option cp-input" placeholder="Option ${i+1}" value="${opt}">
+            </div>
+          `).join('');
+          if (post.poll.expires_at) {
+            const dt = new Date(post.poll.expires_at);
+            document.getElementById('editPollExpiry').value = dt.toISOString().slice(0, 16);
+          }
+          pollSection.style.display = 'block';
+          pollBtn?.classList.add('cp-tool-active');
+        } else {
+          pollSection.style.display = 'none';
+          pollBtn?.classList.remove('cp-tool-active');
+          document.getElementById('editPollQuestion').value = '';
+          document.getElementById('editPollOptions').innerHTML = `
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #0095f6;"></span>
+              <input type="text" class="edit-poll-option cp-input" placeholder="Option 1">
+            </div>
+            <div class="cp-poll-option-row">
+              <span class="cp-poll-dot" style="background: #e1306c;"></span>
+              <input type="text" class="edit-poll-option cp-input" placeholder="Option 2">
+            </div>
+          `;
+          document.getElementById('editPollExpiry').value = '';
+        }
+        
+        // Pre-fill schedule
+        const scheduleSection = document.getElementById('editScheduleSection');
+        const scheduleBtn = document.getElementById('editScheduleToggleBtn');
+        if (post.scheduled_at) {
+          const dt = new Date(post.scheduled_at);
+          document.getElementById('editScheduleTime').value = dt.toISOString().slice(0, 16);
+          scheduleSection.style.display = 'block';
+          scheduleBtn?.classList.add('cp-tool-active');
+        } else {
+          document.getElementById('editScheduleTime').value = '';
+          scheduleSection.style.display = 'none';
+          scheduleBtn?.classList.remove('cp-tool-active');
+        }
+        
+        // Pre-fill advanced options
+        document.getElementById('editEnableContact').checked = !!post.enable_contact;
+        document.getElementById('editEnableInterested').checked = !!post.enable_interested;
+        document.getElementById('editAdvancedOptions').style.display = 'none';
+        
+        // Load trending hashtags for the edit modal
+        loadEditTrendingHashtags();
+        
+        // Show modal
+        document.getElementById('editPostModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('editPostContent')?.focus(), 300);
+      }).catch(err => {
+        // Fallback: just get content from DOM
+        const postEl = document.querySelector(`.ig-post[data-post-id="${postId}"]`);
+        const content = postEl?.querySelector('.ig-caption-text')?.textContent || '';
+        document.getElementById('editPostContent').value = content;
+        document.getElementById('editCharCount').textContent = content.length;
+        
+        const user = InnovateAPI.getCurrentUser();
+        if (user) {
+          document.getElementById('editUserAvatar').src = user.profile_picture || '/img/default-avatar.png';
+          document.getElementById('editUsername').textContent = user.username || 'You';
+        }
+        
+        document.getElementById('editExistingMedia').innerHTML = '';
+        document.getElementById('editExistingFiles').innerHTML = '';
+        document.getElementById('editNewMedia').innerHTML = '';
+        document.getElementById('editPollSection').style.display = 'none';
+        document.getElementById('editScheduleSection').style.display = 'none';
+        document.getElementById('editAdvancedOptions').style.display = 'none';
+        document.getElementById('editPostModal').style.display = 'flex';
+      });
+    }
+    
+    // --- Edit modal toggle functions ---
+    function toggleEditPoll() {
+      const section = document.getElementById('editPollSection');
+      const btn = document.getElementById('editPollToggleBtn');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+      btn?.classList.toggle('cp-tool-active', !isVisible);
+    }
+    
+    function toggleEditSchedule() {
+      const section = document.getElementById('editScheduleSection');
+      const btn = document.getElementById('editScheduleToggleBtn');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+      btn?.classList.toggle('cp-tool-active', !isVisible);
+    }
+    
+    function toggleEditAdvancedOptions() {
+      const section = document.getElementById('editAdvancedOptions');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+    }
+    
+    function addEditPollOption() {
+      const container = document.getElementById('editPollOptions');
+      const optionCount = container.querySelectorAll('.edit-poll-option').length;
+      if (optionCount >= 8) {
+        InnovateAPI.showAlert('Maximum 8 poll options', 'info');
+        return;
+      }
+      const color = pollColors[optionCount % pollColors.length];
+      const row = document.createElement('div');
+      row.className = 'cp-poll-option-row';
+      row.innerHTML = `
+        <span class="cp-poll-dot" style="background: ${color};"></span>
+        <input type="text" class="edit-poll-option cp-input" placeholder="Option ${optionCount + 1}">
+      `;
+      container.appendChild(row);
+    }
+    
+    function onEditCaptionInput(textarea) {
+      document.getElementById('editCharCount').textContent = textarea.value.length;
+      
+      // Hashtag detection
+      const text = textarea.value;
+      const cursorPos = textarea.selectionStart;
+      const beforeCursor = text.substring(0, cursorPos);
+      const hashMatch = beforeCursor.match(/#(\w*)$/);
+      
+      if (hashMatch && hashMatch[1].length >= 1) {
+        showEditHashtagSuggestions(hashMatch[1]);
+      } else {
+        document.getElementById('editHashtagSuggestions').style.display = 'none';
+      }
+    }
+    
+    async function showEditHashtagSuggestions(query) {
+      const suggestionsDiv = document.getElementById('editHashtagSuggestions');
+      const listDiv = document.getElementById('editHashtagList');
+      
+      let suggestions = [];
+      if (trendingHashtagsCache && trendingHashtagsCache.length > 0) {
+        suggestions = trendingHashtagsCache
+          .filter(h => h.tag.toLowerCase().startsWith(query.toLowerCase()))
+          .slice(0, 6);
+      }
+      
+      if (suggestions.length > 0) {
+        listDiv.innerHTML = suggestions.map(h =>
+          `<span class="cp-hashtag-chip" onclick="insertEditHashtag('${h.tag}')">#${h.tag}</span>`
+        ).join('');
+        suggestionsDiv.style.display = 'block';
+      } else {
+        suggestionsDiv.style.display = 'none';
+      }
+    }
+    
+    function insertEditHashtag(tag) {
+      const textarea = document.getElementById('editPostContent');
+      const text = textarea.value;
+      const cursorPos = textarea.selectionStart;
+      const beforeCursor = text.substring(0, cursorPos);
+      const afterCursor = text.substring(cursorPos);
+      const newBefore = beforeCursor.replace(/#\w*$/, '#' + tag + ' ');
+      textarea.value = newBefore + afterCursor;
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+      document.getElementById('editCharCount').textContent = textarea.value.length;
+      document.getElementById('editHashtagSuggestions').style.display = 'none';
+    }
+    
+    function toggleEditTrendingHashtags() {
+      const list = document.getElementById('editTrendingList');
+      const chevron = document.getElementById('editTrendingChevron');
+      if (list.style.display === 'none') {
+        list.style.display = 'block';
+        chevron?.classList.add('cp-open');
+      } else {
+        list.style.display = 'none';
+        chevron?.classList.remove('cp-open');
+      }
+    }
+    
+    async function loadEditTrendingHashtags() {
+      try {
+        const data = await InnovateAPI.apiRequest('/posts/trending-hashtags');
+        if (data && data.hashtags && data.hashtags.length > 0) {
+          const list = document.getElementById('editTrendingList');
+          if (list) {
+            list.innerHTML = data.hashtags.map(h => `
+              <div class="cp-trending-item" onclick="insertEditHashtag('${h.tag}')">
+                <span class="cp-trending-tag">#${h.tag}</span>
+                <span class="cp-trending-count">${h.usage_count || 0} posts</span>
+              </div>
+            `).join('');
+          }
+        }
+      } catch(e) { /* optional */ }
+    }
+    
+    function removeEditMedia(idx) {
+      const el = document.getElementById(`editMedia-${idx}`);
+      if (el) el.remove();
+      if (editPostData && editPostData.images) {
+        editPostData.images[idx] = null;
+      }
+    }
+    
+    function removeEditFile(idx) {
+      const el = document.getElementById(`editFile-${idx}`);
+      if (el) el.remove();
+      if (editPostData && editPostData.files) {
+        editPostData.files[idx] = null;
+      }
+    }
+    
+    function previewEditMedia(input) {
+      const container = document.getElementById('editNewMedia');
+      Array.from(input.files).forEach((file, i) => {
+        editNewImages.push(file);
+        const idx = editNewImages.length - 1;
+        const div = document.createElement('div');
+        div.className = 'media-preview-item';
+        div.id = `editNewMedia-${idx}`;
+        
+        if (file.type.startsWith('video/')) {
+          const video = document.createElement('video');
+          video.src = URL.createObjectURL(file);
+          video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          video.muted = true;
+          div.appendChild(video);
+        } else {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          div.appendChild(img);
+        }
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'media-preview-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = () => { editNewImages[idx] = null; div.remove(); };
+        div.appendChild(removeBtn);
+        container.appendChild(div);
+      });
+    }
+    
+    function previewEditFiles(input) {
+      const container = document.getElementById('editExistingFiles');
+      Array.from(input.files).forEach((file) => {
+        editNewFiles.push(file);
+        const idx = editNewFiles.length - 1;
+        const size = (file.size / 1024).toFixed(1) + ' KB';
+        const div = document.createElement('div');
+        div.className = 'file-preview-item';
+        div.id = `editNewFile-${idx}`;
+        div.innerHTML = `
+          <span>📄</span>
+          <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${file.name}</div><div style="font-size:11px;color:var(--ig-secondary-text);">${size}</div></div>
+          <button class="file-preview-remove" onclick="editNewFiles[${idx}]=null;this.parentElement.remove();" title="Remove">&times;</button>
+        `;
+        container.appendChild(div);
+      });
     }
 
     async function handleArchivePost() {
@@ -798,38 +2032,127 @@
     function closeEditModal(event) {
       if (!event || event.target.id === 'editPostModal') {
         document.getElementById('editPostModal').style.display = 'none';
+        // Reset form
+        document.getElementById('editPostContent').value = '';
+        document.getElementById('editCharCount').textContent = '0';
+        document.getElementById('editExistingMedia').innerHTML = '';
+        document.getElementById('editNewMedia').innerHTML = '';
+        document.getElementById('editExistingFiles').innerHTML = '';
+        const imgInput = document.getElementById('editPostImages');
+        const fileInput = document.getElementById('editPostFiles');
+        if (imgInput) imgInput.value = '';
+        if (fileInput) fileInput.value = '';
+        // Reset poll
+        document.getElementById('editPollSection').style.display = 'none';
+        document.getElementById('editPollToggleBtn')?.classList.remove('cp-tool-active');
+        document.getElementById('editPollQuestion').value = '';
+        document.getElementById('editPollExpiry').value = '';
+        document.getElementById('editPollOptions').innerHTML = `
+          <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background:#0095f6;"></span><input type="text" class="edit-poll-option cp-input" placeholder="Option 1"></div>
+          <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background:#e1306c;"></span><input type="text" class="edit-poll-option cp-input" placeholder="Option 2"></div>
+        `;
+        // Reset schedule
+        document.getElementById('editScheduleSection').style.display = 'none';
+        document.getElementById('editScheduleToggleBtn')?.classList.remove('cp-tool-active');
+        document.getElementById('editScheduleTime').value = '';
+        // Reset advanced
+        document.getElementById('editAdvancedOptions').style.display = 'none';
+        document.getElementById('editEnableContact').checked = false;
+        document.getElementById('editEnableInterested').checked = false;
+        // Reset hashtag suggestions
+        document.getElementById('editHashtagSuggestions').style.display = 'none';
+        
+        editPostData = null;
+        editNewImages = [];
+        editNewFiles = [];
+        editHasExistingPoll = false;
       }
     }
 
-    document.getElementById('editPostImages')?.addEventListener('change', (e) => {
-      const preview = document.getElementById('editImagePreview');
-      preview.innerHTML = '';
-      Array.from(e.target.files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = document.createElement('img');
-          img.src = e.target.result;
-          img.style.cssText = 'max-width: 100%; border-radius: 8px; margin-top: 8px;';
-          preview.appendChild(img);
-        };
-        reader.readAsDataURL(file);
-      });
-    });
-
     async function submitEditPost() {
-      const content = document.getElementById('editPostContent').value;
-      const files = document.getElementById('editPostImages').files;
+      const btn = document.getElementById('editShareBtn');
+      const content = document.getElementById('editPostContent').value.trim();
+      const editPollSection = document.getElementById('editPollSection');
+      const editScheduleTime = document.getElementById('editScheduleTime').value;
+      const enableContact = document.getElementById('editEnableContact').checked;
+      const enableInterested = document.getElementById('editEnableInterested').checked;
+      
+      if (!content && !editNewImages.filter(Boolean).length && 
+          !(editPostData?.images?.filter(Boolean).length)) {
+        InnovateAPI.showAlert('Post must have content or media', 'error');
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.classList.add('cp-sharing');
+      btn.textContent = 'Saving...';
       
       const formData = new FormData();
       formData.append('content', content);
       
-      for (let file of files) {
-        if (file.type.startsWith('image/')) {
-          formData.append('images', file);
-        } else if (file.type.startsWith('video/')) {
+      // Extract hashtags from content
+      const hashtags = content.match(/#[\w]+/g);
+      if (hashtags) {
+        formData.append('hashtags', JSON.stringify(hashtags.map(h => h.substring(1))));
+      }
+      
+      // Send remaining existing images (not removed)
+      if (editPostData && editPostData.images) {
+        const kept = editPostData.images.filter(Boolean);
+        formData.append('existingImages', JSON.stringify(kept));
+      }
+      
+      // Send remaining existing files (not removed)
+      if (editPostData && editPostData.files) {
+        const kept = editPostData.files.filter(Boolean);
+        formData.append('existingFiles', JSON.stringify(kept));
+      }
+      
+      // Append new images
+      editNewImages.filter(Boolean).forEach(file => {
+        if (file.type.startsWith('video/')) {
           formData.append('video', file);
+        } else {
+          formData.append('images', file);
+        }
+      });
+      
+      // Append new files
+      editNewFiles.filter(Boolean).forEach(file => {
+        formData.append('files', file);
+      });
+      
+      // Add poll data if poll section is visible
+      if (editPollSection.style.display !== 'none') {
+        const pollQuestion = document.getElementById('editPollQuestion').value;
+        const pollOptions = Array.from(document.querySelectorAll('#editPollSection .edit-poll-option'))
+          .map(input => input.value)
+          .filter(val => val.trim());
+        const pollExpiry = document.getElementById('editPollExpiry').value;
+        
+        if (pollQuestion && pollOptions.length >= 2) {
+          formData.append('poll_question', pollQuestion);
+          formData.append('poll_options', JSON.stringify(pollOptions));
+          if (pollExpiry) {
+            formData.append('poll_expiry', pollExpiry);
+          }
+        } else if (pollQuestion || pollOptions.length > 0) {
+          btn.disabled = false;
+          btn.classList.remove('cp-sharing');
+          btn.textContent = 'Save';
+          InnovateAPI.showAlert('Poll needs a question and at least 2 options', 'error');
+          return;
         }
       }
+      
+      // Add schedule time
+      if (editScheduleTime) {
+        formData.append('scheduled_at', editScheduleTime);
+      }
+      
+      // Add action buttons
+      formData.append('enable_contact', enableContact ? '1' : '0');
+      formData.append('enable_interested', enableInterested ? '1' : '0');
       
       try {
         await InnovateAPI.apiRequest(`/posts/${currentPostIdForActions}`, {
@@ -842,6 +2165,10 @@
         loadPosts();
       } catch (error) {
         InnovateAPI.showAlert(error.message || 'Failed to update post', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('cp-sharing');
+        btn.textContent = 'Save';
       }
     }
 
@@ -934,13 +2261,14 @@
           
           // Add click handler to open full-screen viewer
           postEl.addEventListener('click', (e) => {
-            // Don't open if clicking buttons or inputs, but allow image clicks
-            if (e.target.closest('button, input, a:not(.ig-post-user), .ig-action-btn, .ig-carousel-btn')) {
-              console.log('Click prevented - interactive element');
+            // Don't open if clicking interactive elements
+            if (e.target.closest('button, input, label, a, .ig-action-btn, .ig-carousel-btn, .ig-carousel-dot, .ig-carousel-prev, .ig-carousel-next, .ig-poll, .poll-option, .ig-post-actions, .ig-post-actions-btns, .ig-add-comment, .ig-post-comments-btn, .ig-pdf-embed, .ig-pdf-ctrl, .ig-attachment-item, .ig-post-menu, [onclick]')) {
               return;
             }
-            console.log('Opening full-screen viewer for post', index);
-            openFullScreenPost(index, data.posts);
+            // Only open for image/video clicks or post header area
+            if (e.target.closest('.ig-post-image, .ig-post-caption, .ig-post-likes')) {
+              openFullScreenPost(index, data.posts);
+            }
           });
         });
       } catch (error) {
@@ -980,10 +2308,10 @@
                 `).join('')}
               </div>
               ${post.images.length > 1 ? `
-                <button class="ig-carousel-btn ig-carousel-prev" onclick="carouselPrev(${post.id})" style="left: 10px;">‹</button>
-                <button class="ig-carousel-btn ig-carousel-next" onclick="carouselNext(${post.id})" style="right: 10px;">›</button>
+                <button class="ig-carousel-btn ig-carousel-prev" onclick="event.stopPropagation(); carouselPrev(${post.id})" style="left: 10px;">‹</button>
+                <button class="ig-carousel-btn ig-carousel-next" onclick="event.stopPropagation(); carouselNext(${post.id})" style="right: 10px;">›</button>
                 <div class="ig-carousel-dots" id="dots-${post.id}">
-                  ${post.images.map((_, idx) => `<span class="ig-carousel-dot ${idx === 0 ? 'active' : ''}" onclick="carouselGoTo(${post.id}, ${idx})"></span>`).join('')}
+                  ${post.images.map((_, idx) => `<span class="ig-carousel-dot ${idx === 0 ? 'active' : ''}" onclick="event.stopPropagation(); carouselGoTo(${post.id}, ${idx})"></span>`).join('')}
                 </div>
               ` : ''}
             </div>
@@ -1067,28 +2395,38 @@
         </button>
         ` : ''}
         
-        ${post.poll ? `
-        <div class="ig-poll" style="margin: 12px 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;">
+        ${post.poll ? (() => {
+          const votesObj = post.poll.votes;
+          const totalVotes = typeof votesObj === 'object' && !Array.isArray(votesObj) ? Object.values(votesObj).reduce((a, b) => a + b, 0) : (Array.isArray(votesObj) ? votesObj.reduce((a, b) => a + b, 0) : 0);
+          const userVoted = post.poll.user_voted || null;
+          return `
+        <div class="ig-poll" style="margin: 12px 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;" onclick="event.stopPropagation()">
           <div style="font-weight: 600; margin-bottom: 12px;">${post.poll.question}</div>
           ${post.poll.options.map((option, idx) => {
-            const votes = post.poll.votes[idx] || 0;
-            const totalVotes = post.poll.votes.reduce((a, b) => a + b, 0);
-            const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+            const voteCount = typeof votesObj === 'object' && !Array.isArray(votesObj) ? (votesObj[option] || 0) : (Array.isArray(votesObj) ? (votesObj[idx] || 0) : 0);
+            const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+            const isSelected = userVoted === option;
             return `
-              <div class="poll-option" style="margin-bottom: 8px; position: relative; overflow: hidden; border-radius: 6px; border: 1px solid var(--ig-border);">
-                <div style="position: absolute; top: 0; left: 0; height: 100%; width: ${percentage}%; background: var(--ig-blue); opacity: 0.2;"></div>
-                <div style="position: relative; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
-                  <span>${option}</span>
-                  <span style="font-weight: 600;">${percentage}%</span>
+              <div class="poll-option${isSelected ? ' poll-voted' : ''}" onclick="event.stopPropagation(); votePoll(${post.id}, ${post.poll.id}, '${option.replace(/'/g, "\\'")}')"
+                style="margin-bottom: 8px; position: relative; overflow: hidden; border-radius: 8px; border: ${isSelected ? '2px solid var(--ig-blue)' : '1px solid var(--ig-border)'}; cursor: pointer; transition: all 0.2s;">
+                <div style="position: absolute; top: 0; left: 0; height: 100%; width: ${percentage}%; background: ${isSelected ? 'var(--ig-blue)' : 'var(--ig-blue)'}; opacity: ${isSelected ? '0.25' : '0.1'}; transition: width 0.5s ease;"></div>
+                <div style="position: relative; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    ${isSelected ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="var(--ig-blue)" stroke="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' : ''}
+                    <span${isSelected ? ' style="font-weight: 600; color: var(--ig-blue);"' : ''}>${option}</span>
+                  </span>
+                  <span style="font-weight: 600; font-size: 14px;${isSelected ? ' color: var(--ig-blue);' : ''}">${percentage}%</span>
                 </div>
               </div>
             `;
           }).join('')}
-          <div style="margin-top: 8px; font-size: 12px; color: var(--ig-secondary-text);">
-            ${post.poll.votes.reduce((a, b) => a + b, 0)} votes
+          <div style="margin-top: 8px; font-size: 12px; color: var(--ig-secondary-text); display: flex; justify-content: space-between;">
+            <span>${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</span>
+            ${userVoted ? '<span style="color: var(--ig-blue);">You voted</span>' : ''}
           </div>
         </div>
-        ` : ''}
+        `;
+        })() : ''}
         
         ${post.enable_contact || post.enable_interested ? `
         <div class="ig-post-actions-btns" style="margin: 0 16px 12px; display: flex; gap: 8px;">
@@ -1211,6 +2549,22 @@
       }
     }
 
+    // Vote on poll
+    async function votePoll(postId, pollId, option) {
+      try {
+        const response = await InnovateAPI.apiRequest(`/posts/${postId}/poll/${pollId}/vote`, {
+          method: 'POST',
+          body: JSON.stringify({ option })
+        });
+        if (response.success) {
+          InnovateAPI.showAlert('Vote recorded!', 'success');
+          loadPosts(); // Refresh to show updated percentages
+        }
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to vote', 'error');
+      }
+    }
+
     // Focus comment input
     function focusComment(postId) {
       document.getElementById(`comment-${postId}`).focus();
@@ -1261,9 +2615,16 @@
       closePostMenu();
     }
 
-    // Create post modal
+    // ========== Create Post Modal (Instagram-Style) ==========
+    let selectedImages = [];
+    let selectedFiles = [];
+    let hashtagDebounceTimer = null;
+    let trendingHashtagsCache = null;
+
     function openCreatePostModal() {
-      document.getElementById('createPostModal').style.display = 'flex';
+      const modal = document.getElementById('createPostModal');
+      modal.style.display = 'flex';
+      
       // Reset all fields
       document.getElementById('postContent').value = '';
       document.getElementById('imagePreview').innerHTML = '';
@@ -1272,37 +2633,312 @@
       document.getElementById('scheduleSection').style.display = 'none';
       document.getElementById('enableContact').checked = false;
       document.getElementById('enableInterested').checked = false;
+      document.getElementById('hashtagSuggestions').style.display = 'none';
+      document.getElementById('cpCharCount').textContent = '0';
+      document.getElementById('cpDropZone').style.display = 'none';
+      selectedImages = [];
+      selectedFiles = [];
+
+      // Reset toggle buttons
+      document.getElementById('pollToggleBtn')?.classList.remove('cp-tool-active');
+      document.getElementById('scheduleToggleBtn')?.classList.remove('cp-tool-active');
+      
+      // Reset advanced options
+      const adv = document.getElementById('advancedOptions');
+      if (adv) adv.style.display = 'none';
+      const advToggle = document.querySelector('.cp-advanced-toggle');
+      if (advToggle) advToggle.classList.remove('cp-open');
+
+      // Reset poll options
+      const pollOpts = document.getElementById('pollOptions');
+      if (pollOpts) {
+        const pollColors = ['#0095f6', '#e1306c', '#833ab4', '#fd1d1d', '#f77737', '#fcaf45'];
+        pollOpts.innerHTML = `
+          <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background: ${pollColors[0]};"></span><input type="text" class="poll-option cp-input" placeholder="Option 1"></div>
+          <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background: ${pollColors[1]};"></span><input type="text" class="poll-option cp-input" placeholder="Option 2"></div>
+        `;
+      }
+      document.getElementById('pollQuestion') && (document.getElementById('pollQuestion').value = '');
+      document.getElementById('pollExpiry') && (document.getElementById('pollExpiry').value = '');
+      document.getElementById('scheduleTime') && (document.getElementById('scheduleTime').value = '');
+
+      // Set user info
+      const user = InnovateAPI.getCurrentUser();
+      if (user) {
+        const avatar = document.getElementById('cpUserAvatar');
+        const username = document.getElementById('cpUsername');
+        if (avatar) avatar.src = user.profile_picture || '/img/default-avatar.png';
+        if (username) username.textContent = user.username || 'You';
+      }
+
+      // Load trending hashtags
+      loadTrendingHashtags();
+
+      // Show drop zone if no media
+      updateDropZoneVisibility();
+
+      // Focus caption after animation
+      setTimeout(() => document.getElementById('postContent')?.focus(), 350);
     }
 
     function closeCreatePostModal(event) {
-      if (!event || event.target.classList.contains('ig-modal-overlay') || event.target.textContent === 'Cancel') {
+      if (!event || event.target.classList.contains('cp-overlay')) {
         document.getElementById('createPostModal').style.display = 'none';
       }
     }
 
+    // Caption input handler with hashtag suggestions
+    function onCaptionInput(textarea) {
+      // Update character count
+      const count = textarea.value.length;
+      document.getElementById('cpCharCount').textContent = count;
+      
+      // Hashtag detection
+      const text = textarea.value;
+      const cursorPos = textarea.selectionStart;
+      const beforeCursor = text.substring(0, cursorPos);
+      const hashMatch = beforeCursor.match(/#(\w*)$/);
+      
+      if (hashMatch && hashMatch[1].length >= 1) {
+        showHashtagSuggestions(hashMatch[1]);
+      } else {
+        // Also suggest hashtags based on content when there's enough text
+        clearTimeout(hashtagDebounceTimer);
+        if (text.length > 15) {
+          hashtagDebounceTimer = setTimeout(() => suggestHashtagsFromContent(text), 800);
+        }
+      }
+    }
+
+    // Load trending hashtags from API
+    async function loadTrendingHashtags() {
+      try {
+        const data = await InnovateAPI.apiRequest('/posts/trending-hashtags');
+        if (data && data.hashtags && data.hashtags.length > 0) {
+          trendingHashtagsCache = data.hashtags;
+          renderTrendingHashtags(data.hashtags);
+        }
+      } catch (e) {
+        // Silently fail - trending hashtags are optional
+        console.log('Trending hashtags not available');
+      }
+    }
+
+    function renderTrendingHashtags(hashtags) {
+      const list = document.getElementById('trendingList');
+      if (!list) return;
+      list.innerHTML = hashtags.map(h => `
+        <div class="cp-trending-item" onclick="insertHashtag('${h.tag}')">
+          <span class="cp-trending-tag">#${h.tag}</span>
+          <span class="cp-trending-count">${h.usage_count || 0} posts</span>
+        </div>
+      `).join('');
+    }
+
+    function toggleTrendingHashtags() {
+      const list = document.getElementById('trendingList');
+      const chevron = document.getElementById('trendingChevron');
+      if (list.style.display === 'none') {
+        list.style.display = 'block';
+        chevron?.classList.add('cp-open');
+      } else {
+        list.style.display = 'none';
+        chevron?.classList.remove('cp-open');
+      }
+    }
+
+    // Show hashtag suggestions when typing #
+    async function showHashtagSuggestions(query) {
+      const suggestionsDiv = document.getElementById('hashtagSuggestions');
+      const listDiv = document.getElementById('hashtagList');
+      
+      // Use a combination of local trending cache and the query
+      let suggestions = [];
+      
+      // Filter from trending cache first
+      if (trendingHashtagsCache) {
+        suggestions = trendingHashtagsCache
+          .filter(h => h.tag.toLowerCase().startsWith(query.toLowerCase()))
+          .map(h => h.tag);
+      }
+      
+      // Add common hashtag suggestions based on the query
+      const commonTags = [
+        'love', 'instagood', 'photooftheday', 'fashion', 'beautiful', 'happy',
+        'cute', 'tbt', 'like4like', 'followme', 'picoftheday', 'follow',
+        'me', 'selfie', 'summer', 'art', 'instadaily', 'friends', 'repost',
+        'nature', 'girl', 'fun', 'style', 'smile', 'food', 'instalike',
+        'family', 'travel', 'fitness', 'igers', 'tagsforlikes', 'life',
+        'music', 'beauty', 'photo', 'amazing', 'animalsofinstagram',
+        'tech', 'coding', 'programming', 'innovation', 'startup', 'design',
+        'motivation', 'inspiration', 'community', 'trending', 'viral',
+        'explore', 'business', 'entrepreneur', 'success', 'mindset'
+      ];
+      
+      const filtered = commonTags
+        .filter(t => t.startsWith(query.toLowerCase()) && !suggestions.includes(t))
+        .slice(0, 8 - suggestions.length);
+      
+      suggestions = [...suggestions, ...filtered].slice(0, 8);
+      
+      if (suggestions.length > 0) {
+        const currentContent = document.getElementById('postContent').value;
+        listDiv.innerHTML = suggestions.map(tag => {
+          const isAdded = currentContent.includes(`#${tag}`);
+          return `<span class="cp-hashtag-chip ${isAdded ? 'cp-hashtag-added' : ''}" onclick="insertHashtag('${tag}')">#${tag}</span>`;
+        }).join('');
+        suggestionsDiv.style.display = 'block';
+      } else {
+        suggestionsDiv.style.display = 'none';
+      }
+    }
+
+    // Suggest hashtags from content using built-in analysis
+    function suggestHashtagsFromContent(content) {
+      const suggestionsDiv = document.getElementById('hashtagSuggestions');
+      const listDiv = document.getElementById('hashtagList');
+      
+      // Simple keyword extraction for hashtag suggestions
+      const words = content.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3);
+      const wordFreq = {};
+      words.forEach(w => { wordFreq[w] = (wordFreq[w] || 0) + 1; });
+      
+      // Topic-based suggestions
+      const topicMap = {
+        'photo|picture|camera|shot|lens': ['photography', 'photooftheday', 'picoftheday'],
+        'food|cook|recipe|eat|meal|restaurant': ['foodie', 'foodphotography', 'instafood'],
+        'travel|trip|vacation|journey|explore': ['travel', 'wanderlust', 'travelgram'],
+        'work|office|job|career|business': ['business', 'entrepreneur', 'worklife'],
+        'code|programming|developer|software|tech': ['coding', 'developer', 'tech'],
+        'fitness|gym|workout|exercise|health': ['fitness', 'gym', 'healthylifestyle'],
+        'music|song|concert|band|singer': ['music', 'musician', 'musiclife'],
+        'art|paint|draw|design|creative': ['art', 'artist', 'creative'],
+        'nature|outdoor|mountain|beach|sunset': ['nature', 'naturephotography', 'outdoors'],
+        'fashion|style|outfit|wear|dress': ['fashion', 'style', 'ootd'],
+        'love|heart|relationship|couple': ['love', 'instagood', 'happy'],
+        'learn|study|education|school|university': ['education', 'learning', 'knowledge']
+      };
+
+      let suggestions = [];
+      const lowerContent = content.toLowerCase();
+      
+      for (const [keywords, tags] of Object.entries(topicMap)) {
+        const regex = new RegExp(keywords);
+        if (regex.test(lowerContent)) {
+          suggestions.push(...tags);
+        }
+      }
+      
+      // Add high-frequency words as potential hashtags
+      const freqWords = Object.entries(wordFreq)
+        .filter(([w, c]) => c >= 1 && w.length > 4)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([w]) => w);
+      suggestions.push(...freqWords);
+
+      // Deduplicate and limit
+      suggestions = [...new Set(suggestions)].slice(0, 8);
+      
+      const currentContent = document.getElementById('postContent').value;
+      // Don't show if already typing hashtags or no suggestions
+      if (suggestions.length === 0 || currentContent.includes('#')) return;
+      
+      listDiv.innerHTML = suggestions.map(tag => {
+        const isAdded = currentContent.includes(`#${tag}`);
+        return `<span class="cp-hashtag-chip ${isAdded ? 'cp-hashtag-added' : ''}" onclick="insertHashtag('${tag}')">#${tag}</span>`;
+      }).join('');
+      suggestionsDiv.style.display = 'block';
+    }
+
+    function insertHashtag(tag) {
+      const textarea = document.getElementById('postContent');
+      let content = textarea.value;
+      
+      // Check if hashtag already exists
+      if (content.includes(`#${tag}`)) {
+        // Remove it
+        content = content.replace(new RegExp(`\\s*#${tag}`, 'g'), '');
+        textarea.value = content.trim();
+      } else {
+        // Check if user is currently typing a hashtag - replace partial
+        const cursorPos = textarea.selectionStart;
+        const beforeCursor = content.substring(0, cursorPos);
+        const afterCursor = content.substring(cursorPos);
+        const hashMatch = beforeCursor.match(/#\w*$/);
+        
+        if (hashMatch) {
+          // Replace the partial hashtag being typed
+          const newBefore = beforeCursor.substring(0, hashMatch.index) + `#${tag} `;
+          textarea.value = newBefore + afterCursor;
+          textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+        } else {
+          // Append hashtag to end
+          const separator = content.endsWith(' ') || content === '' ? '' : ' ';
+          textarea.value = content + separator + `#${tag} `;
+        }
+      }
+      
+      // Update char count
+      document.getElementById('cpCharCount').textContent = textarea.value.length;
+      textarea.focus();
+      
+      // Refresh suggestion chips to show added state
+      onCaptionInput(textarea);
+    }
+
+    // Toggle sections
     function togglePollCreation() {
       const section = document.getElementById('pollSection');
-      section.style.display = section.style.display === 'none' ? 'block' : 'none';
+      const btn = document.getElementById('pollToggleBtn');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+      btn?.classList.toggle('cp-tool-active', !isVisible);
     }
 
     function toggleSchedule() {
       const section = document.getElementById('scheduleSection');
-      section.style.display = section.style.display === 'none' ? 'block' : 'none';
+      const btn = document.getElementById('scheduleToggleBtn');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+      btn?.classList.toggle('cp-tool-active', !isVisible);
     }
+
+    function toggleAdvancedOptions() {
+      const section = document.getElementById('advancedOptions');
+      const toggle = document.querySelector('.cp-advanced-toggle');
+      const isVisible = section.style.display !== 'none';
+      section.style.display = isVisible ? 'none' : 'block';
+      toggle?.classList.toggle('cp-open', !isVisible);
+    }
+
+    const pollColors = ['#0095f6', '#e1306c', '#833ab4', '#fd1d1d', '#f77737', '#fcaf45', '#405de6', '#5851db'];
 
     function addPollOption() {
       const container = document.getElementById('pollOptions');
-      const optionCount = container.querySelectorAll('.poll-option').length + 1;
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'poll-option';
-      input.placeholder = `Option ${optionCount}`;
-      input.style.cssText = 'width: 100%; padding: 8px; border: 1px solid var(--ig-border); border-radius: 4px; margin-bottom: 8px;';
-      container.appendChild(input);
+      const optionCount = container.querySelectorAll('.poll-option').length;
+      if (optionCount >= 8) {
+        InnovateAPI.showAlert('Maximum 8 poll options', 'info');
+        return;
+      }
+      const color = pollColors[optionCount % pollColors.length];
+      const row = document.createElement('div');
+      row.className = 'cp-poll-option-row';
+      row.innerHTML = `
+        <span class="cp-poll-dot" style="background: ${color};"></span>
+        <input type="text" class="poll-option cp-input" placeholder="Option ${optionCount + 1}">
+      `;
+      container.appendChild(row);
     }
 
-    let selectedImages = [];
-    let selectedFiles = [];
+    function updateDropZoneVisibility() {
+      const dropZone = document.getElementById('cpDropZone');
+      const hasMedia = selectedImages.some(f => f !== null);
+      const hasFiles = selectedFiles.some(f => f !== null);
+      if (dropZone) {
+        dropZone.style.display = (hasMedia || hasFiles) ? 'none' : 'block';
+      }
+    }
 
     // Handle image/video upload for posts
     document.getElementById('postImages')?.addEventListener('change', (e) => {
@@ -1310,34 +2946,54 @@
       const files = Array.from(e.target.files);
       
       files.forEach((file) => {
-        const currentIndex = selectedImages.length;
-        selectedImages.push(file);
-        
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const div = document.createElement('div');
-          div.className = 'media-preview-item';
-          div.dataset.index = currentIndex;
-          
-          if (file.type.startsWith('video/')) {
-            div.innerHTML = `
-              <video src="${e.target.result}" controls></video>
-              <button class="media-preview-remove" onclick="removeMedia(${currentIndex})">×</button>
-            `;
-          } else {
-            div.innerHTML = `
-              <img src="${e.target.result}" alt="Preview">
-              <button class="media-preview-remove" onclick="removeMedia(${currentIndex})">×</button>
-            `;
-          }
-          preview.appendChild(div);
-        };
-        reader.readAsDataURL(file);
+        // Video duration check
+        if (file.type.startsWith('video/')) {
+          const tempVideo = document.createElement('video');
+          tempVideo.preload = 'metadata';
+          tempVideo.src = URL.createObjectURL(file);
+          tempVideo.onloadedmetadata = function() {
+            URL.revokeObjectURL(tempVideo.src);
+            if (tempVideo.duration > 120) {
+              InnovateAPI.showAlert(`Video "${file.name}" is longer than 2 minutes. Please use a shorter video.`, 'error');
+              return;
+            }
+            addMediaPreview(file, preview);
+          };
+        } else {
+          addMediaPreview(file, preview);
+        }
       });
-      
-      // Reset input so same files can be selected again if needed
       e.target.value = '';
+      updateDropZoneVisibility();
     });
+
+    function addMediaPreview(file, preview) {
+      const currentIndex = selectedImages.length;
+      selectedImages.push(file);
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const div = document.createElement('div');
+        div.className = 'media-preview-item';
+        div.dataset.index = currentIndex;
+        
+        if (file.type.startsWith('video/')) {
+          div.innerHTML = `
+            <video src="${e.target.result}" muted></video>
+            <div style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.7);color:#fff;font-size:11px;padding:2px 6px;border-radius:4px;">VIDEO</div>
+            <button class="media-preview-remove" onclick="removeMedia(${currentIndex})">×</button>
+          `;
+        } else {
+          div.innerHTML = `
+            <img src="${e.target.result}" alt="Preview">
+            <button class="media-preview-remove" onclick="removeMedia(${currentIndex})">×</button>
+          `;
+        }
+        preview.appendChild(div);
+        updateDropZoneVisibility();
+      };
+      reader.readAsDataURL(file);
+    }
 
     // Handle file upload
     document.getElementById('postFiles')?.addEventListener('change', (e) => {
@@ -1348,84 +3004,75 @@
         const currentIndex = selectedFiles.length;
         selectedFiles.push(file);
         
+        // Determine icon based on file type
+        const ext = file.name.split('.').pop().toLowerCase();
+        const icons = { pdf: '📄', doc: '📝', docx: '📝', txt: '📃', zip: '🗜️', xls: '📊', xlsx: '📊', ppt: '📽️', pptx: '📽️' };
+        const icon = icons[ext] || '📎';
+        
+        const sizeStr = file.size > 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${(file.size / 1024).toFixed(1)} KB`;
+        
         const div = document.createElement('div');
         div.className = 'file-preview-item';
         div.dataset.index = currentIndex;
         div.innerHTML = `
-          <span>📎</span>
-          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
-          <span style="color: var(--ig-secondary-text); font-size: 12px;">${(file.size / 1024).toFixed(1)} KB</span>
+          <span>${icon}</span>
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px;">${file.name}</span>
+          <span style="color: var(--ig-secondary-text); font-size: 12px; white-space: nowrap;">${sizeStr}</span>
           <button class="file-preview-remove" onclick="removeFile(${currentIndex})">×</button>
         `;
         filesList.appendChild(div);
       });
       
-      // Reset input
       e.target.value = '';
+      updateDropZoneVisibility();
     });
 
     function removeMedia(index) {
-      selectedImages[index] = null; // Mark as deleted instead of splicing
+      selectedImages[index] = null;
       const preview = document.getElementById('imagePreview');
       const item = preview.querySelector(`[data-index="${index}"]`);
       if (item) item.remove();
+      updateDropZoneVisibility();
     }
 
     function removeFile(index) {
-      selectedFiles[index] = null; // Mark as deleted instead of splicing
+      selectedFiles[index] = null;
       const filesList = document.getElementById('postFilesList');
       const item = filesList.querySelector(`[data-index="${index}"]`);
       if (item) item.remove();
+      updateDropZoneVisibility();
+    }
+
+    // Drag and drop support
+    const dropZone = document.getElementById('cpDropZone');
+    if (dropZone) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add('cp-drag-over'); });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove('cp-drag-over'); });
+      });
+      dropZone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files);
+        const preview = document.getElementById('imagePreview');
+        files.forEach(file => {
+          if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+            addMediaPreview(file, preview);
+          }
+        });
+      });
     }
 
     // Handle old postImage input for backward compatibility
     document.getElementById('postImage')?.addEventListener('change', (e) => {
       const preview = document.getElementById('imagePreview');
-      const filesList = document.getElementById('postFilesList');
-      preview.innerHTML = '';
-      filesList.innerHTML = '';
-      
       const files = Array.from(e.target.files);
-      
-      files.forEach((file, index) => {
-        // Add to files list
-        const fileItem = document.createElement('div');
-        fileItem.style.cssText = 'padding: 8px; background: var(--ig-hover); border-radius: 4px; margin: 4px 0; display: flex; justify-content: space-between; align-items: center;';
-        fileItem.innerHTML = `
-          <span style="font-size: 14px;">${file.name}</span>
-          <span style="font-size: 12px; color: var(--ig-secondary-text);">${(file.size / 1024).toFixed(2)} KB</span>
-        `;
-        filesList.appendChild(fileItem);
-        
-        // Show preview
-        if (file.type.startsWith('video/')) {
-          const video = document.createElement('video');
-          video.src = URL.createObjectURL(file);
-          video.controls = true;
-          video.style.cssText = 'max-width: 100%; border-radius: 8px; margin-top: 8px;';
-          preview.appendChild(video);
-          
-          // Check duration
-          video.onloadedmetadata = function() {
-            if (video.duration > 120) {
-              alert(`Video "${file.name}" is longer than 120 seconds. Please use a shorter video.`);
-            }
-          };
-        } else {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.style.cssText = 'max-width: 100%; border-radius: 8px; margin-top: 8px;';
-            preview.appendChild(img);
-          };
-          reader.readAsDataURL(file);
-        }
-      });
+      files.forEach(file => addMediaPreview(file, preview));
     });
 
     // Submit post
     async function submitPost() {
+      const shareBtn = document.getElementById('cpShareBtn');
       const content = document.getElementById('postContent').value;
       const pollSection = document.getElementById('pollSection');
       const scheduleTime = document.getElementById('scheduleTime').value;
@@ -1436,9 +3083,14 @@
       const validFiles = selectedFiles.filter(f => f !== null);
       
       if (!content && validImages.length === 0 && validFiles.length === 0) {
-        InnovateAPI.showAlert('Please add content or media', 'error');
+        InnovateAPI.showAlert('Please add content or media to share', 'error');
         return;
       }
+
+      // Disable share button while posting
+      shareBtn.disabled = true;
+      shareBtn.classList.add('cp-sharing');
+      shareBtn.textContent = 'Sharing...';
       
       const formData = new FormData();
       formData.append('content', content);
@@ -1450,7 +3102,7 @@
       }
       
       // Add images and videos
-      selectedImages.filter(file => file !== null).forEach(file => {
+      validImages.forEach(file => {
         if (file.type.startsWith('video/')) {
           formData.append('video', file);
         } else {
@@ -1459,14 +3111,14 @@
       });
       
       // Add files
-      selectedFiles.filter(file => file !== null).forEach(file => {
+      validFiles.forEach(file => {
         formData.append('files', file);
       });
       
       // Add poll if created
       if (pollSection.style.display !== 'none') {
         const pollQuestion = document.getElementById('pollQuestion').value;
-        const pollOptions = Array.from(document.querySelectorAll('.poll-option'))
+        const pollOptions = Array.from(document.querySelectorAll('#pollSection .poll-option'))
           .map(input => input.value)
           .filter(val => val.trim());
         const pollExpiry = document.getElementById('pollExpiry').value;
@@ -1477,6 +3129,12 @@
           if (pollExpiry) {
             formData.append('poll_expiry', pollExpiry);
           }
+        } else if (pollQuestion || pollOptions.length > 0) {
+          shareBtn.disabled = false;
+          shareBtn.classList.remove('cp-sharing');
+          shareBtn.textContent = 'Share';
+          InnovateAPI.showAlert('Poll needs a question and at least 2 options', 'error');
+          return;
         }
       }
       
@@ -1496,19 +3154,24 @@
           headers: {}
         });
         
-        InnovateAPI.showAlert(scheduleTime ? 'Post scheduled!' : 'Post created!', 'success');
-        closeCreatePostModal();
+        InnovateAPI.showAlert(scheduleTime ? 'Post scheduled successfully!' : 'Post shared!', 'success');
+        document.getElementById('createPostModal').style.display = 'none';
         selectedImages = [];
         selectedFiles = [];
         loadPosts();
       } catch (error) {
-        InnovateAPI.showAlert(error.message, 'error');
+        InnovateAPI.showAlert(error.message || 'Failed to create post', 'error');
+      } finally {
+        shareBtn.disabled = false;
+        shareBtn.classList.remove('cp-sharing');
+        shareBtn.textContent = 'Share';
       }
     }
 
     // Story functions
     function openCreateStoryModal() {
       document.getElementById('createStoryModal').style.display = 'flex';
+      updateStoryCharCount();
     }
 
     function closeCreateStoryModal(event) {
@@ -1516,13 +3179,31 @@
         document.getElementById('createStoryModal').style.display = 'none';
         document.getElementById('storyContent').value = '';
         document.getElementById('storyPreview').innerHTML = '';
+        const placeholder = document.getElementById('storyPlaceholder');
+        if (placeholder) placeholder.style.display = 'flex';
+        updateStoryCharCount();
       }
+    }
+
+    function updateStoryCharCount() {
+      const textarea = document.getElementById('storyContent');
+      const counter = document.getElementById('storyCharCount');
+      if (textarea && counter) counter.textContent = textarea.value.length;
+    }
+
+    function setStoryBg(btn) {
+      document.querySelectorAll('.story-color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const bg = btn.getAttribute('data-bg');
+      const preview = document.getElementById('storyPreviewArea');
+      if (preview) preview.style.background = bg;
     }
 
     // Handle story media upload
     document.getElementById('storyMedia')?.addEventListener('change', (e) => {
       const preview = document.getElementById('storyPreview');
       preview.innerHTML = '';
+      const placeholder = document.getElementById('storyPlaceholder');
       
       const file = e.target.files[0];
       if (!file) return;
@@ -1534,24 +3215,26 @@
         video.onloadedmetadata = function() {
           window.URL.revokeObjectURL(video.src);
           if (video.duration > 120) {
-            alert('Video must be 120 seconds or less');
+            InnovateAPI.showAlert('Video must be 120 seconds or less', 'error');
             e.target.value = '';
             return;
           }
           
           video.src = URL.createObjectURL(file);
           video.controls = true;
-          video.style.cssText = 'max-width: 100%; max-height: 280px; border-radius: 8px; object-fit: contain;';
+          video.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
           preview.appendChild(video);
+          if (placeholder) placeholder.style.display = 'none';
         };
         video.src = URL.createObjectURL(file);
       } else {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = (ev) => {
           const img = document.createElement('img');
-          img.src = e.target.result;
-          img.style.cssText = 'max-width: 100%; max-height: 280px; border-radius: 8px; object-fit: contain;';
+          img.src = ev.target.result;
+          img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
           preview.appendChild(img);
+          if (placeholder) placeholder.style.display = 'none';
         };
         reader.readAsDataURL(file);
       }
@@ -2165,15 +3848,24 @@
       const page = await pdf.getPage(pageNumber);
       const ctx = canvas.getContext('2d');
 
-      // Fit page to container width.
+      // Fit page to container width with high DPI support for sharp rendering
       const container = canvas.parentElement;
       const targetWidth = Math.max(320, (container?.clientWidth || 800));
+      const dpr = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale: 1 });
-      const scale = targetWidth / viewport.width;
+      const scale = (targetWidth / viewport.width) * dpr;
       const scaledViewport = page.getViewport({ scale });
 
+      // Set canvas internal resolution to high-DPI
       canvas.width = Math.floor(scaledViewport.width);
       canvas.height = Math.floor(scaledViewport.height);
+      // CSS size stays at logical pixels
+      canvas.style.width = Math.floor(scaledViewport.width / dpr) + 'px';
+      canvas.style.height = Math.floor(scaledViewport.height / dpr) + 'px';
+
+      // Crisp rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
     }
@@ -2247,32 +3939,64 @@
       try {
         const url = embedEl.getAttribute('data-attachment-url') || '';
         const name = embedEl.getAttribute('data-attachment-name') || 'Document';
-        const canvasId = embedEl.getAttribute('data-canvas-id');
-        const canvas = canvasId ? document.getElementById(canvasId) : null;
+        // Find canvas within this embed element to avoid duplicate ID conflicts
+        const canvas = embedEl.querySelector('.ig-pdf-embed-preview canvas');
         if (!url || !canvas) return;
 
         const pdf = await loadPdfDocument(url);
         if (!pdf) return;
 
         const pagesEl = embedEl.querySelector('[data-pdf-pages]');
+        const pageEl = embedEl.querySelector('[data-pdf-page]');
         if (pagesEl) pagesEl.textContent = String(pdf.numPages || 1);
+
+        let currentPage = 1;
 
         // Render the first page as the preview.
         await renderPdfPageToCanvas(pdf, 1, canvas);
 
-        // Controls (prev/next/expand) trigger the full modal, similar to LinkedIn.
-        embedEl.querySelectorAll('[data-pdf-action]').forEach((btn) => {
-          btn.addEventListener('click', (e) => {
+        // Prev/Next buttons navigate inline pages
+        const prevBtn = embedEl.querySelector('[data-pdf-action="prev"]');
+        const nextBtn = embedEl.querySelector('[data-pdf-action="next"]');
+        const expandBtn = embedEl.querySelector('[data-pdf-action="expand"]');
+
+        if (prevBtn) {
+          prevBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentPage > 1) {
+              currentPage--;
+              if (pageEl) pageEl.textContent = String(currentPage);
+              await renderPdfPageToCanvas(pdf, currentPage, canvas);
+            }
+          });
+        }
+
+        if (nextBtn) {
+          nextBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentPage < pdf.numPages) {
+              currentPage++;
+              if (pageEl) pageEl.textContent = String(currentPage);
+              await renderPdfPageToCanvas(pdf, currentPage, canvas);
+            }
+          });
+        }
+
+        if (expandBtn) {
+          expandBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             openPdfModal(url, name);
           });
-        });
+        }
 
         // Clicking the preview opens the modal.
         embedEl.addEventListener('click', (e) => {
           // ignore clicks that originate from a button (already handled)
           if (e.target && e.target.closest && e.target.closest('[data-pdf-action]')) return;
+          e.stopPropagation();
           openPdfModal(url, name);
         });
 
@@ -2320,21 +4044,24 @@
       const safeUrl = escapeHtml(url);
 
       modal.innerHTML = `
-        <div class="ig-modal ig-pdf-modal" style="width: 92vw; max-width: 980px; height: 90vh; max-height: 900px; overflow: hidden; position: relative;">
-          <div class="ig-pdf-modal-header">
-            <div class="ig-pdf-modal-title">${safeTitle}</div>
-            <button type="button" aria-label="Close" class="ig-pdf-modal-close" data-close-modal>×</button>
-          </div>
-          <div class="ig-pdf-modal-body">
-            <div class="ig-pdf-canvas-wrap">
-              <canvas id="igPdfModalCanvas"></canvas>
+        <div class="pdf-viewer-modal" onclick="event.stopPropagation()">
+          <div class="pdf-viewer-header">
+            <div class="pdf-viewer-title">
+              <span class="pdf-viewer-badge">PDF</span>
+              <span class="pdf-viewer-name">${safeTitle}</span>
             </div>
+            <button type="button" aria-label="Close" class="pdf-viewer-close" data-close-modal>
+              <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
           </div>
-          <div class="ig-pdf-modal-controls">
-            <button type="button" class="ig-pdf-ctrl" data-pdf-modal="prev">‹</button>
-            <span class="ig-pdf-page"><span id="igPdfPage">1</span><span class="ig-pdf-sep">/</span><span id="igPdfPages">…</span></span>
-            <button type="button" class="ig-pdf-ctrl" data-pdf-modal="next">›</button>
-            <a class="ig-pdf-open" href="${safeUrl}" target="_blank" rel="noopener">Open</a>
+          <div class="pdf-viewer-body">
+            <canvas id="igPdfModalCanvas"></canvas>
+          </div>
+          <div class="pdf-viewer-controls">
+            <button type="button" class="pdf-ctrl-btn" data-pdf-modal="prev" title="Previous page">‹</button>
+            <span class="pdf-page-indicator"><span id="igPdfPage">1</span> / <span id="igPdfPages">…</span></span>
+            <button type="button" class="pdf-ctrl-btn" data-pdf-modal="next" title="Next page">›</button>
+            <a class="pdf-open-btn" href="${safeUrl}" target="_blank" rel="noopener">Open</a>
           </div>
         </div>
       `;
@@ -2351,12 +4078,13 @@
 
       const onKeyDown = (e) => {
         if (e.key === 'Escape') close();
+        if (e.key === 'ArrowLeft') modal.querySelector('[data-pdf-modal="prev"]')?.click();
+        if (e.key === 'ArrowRight') modal.querySelector('[data-pdf-modal="next"]')?.click();
       };
 
       onResize = () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
-          // render() is defined later; call via window-safe optional.
           modal.__igPdfRender?.().catch(() => {});
         }, 100);
       };
@@ -2370,7 +4098,7 @@
         e.preventDefault();
         close();
       });
-      modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+      modal.querySelector('.pdf-viewer-modal')?.addEventListener('click', (e) => e.stopPropagation());
 
       document.body.appendChild(modal);
 
@@ -2380,7 +4108,7 @@
         pdf = await loadPdfDocument(url);
       } catch (e) {
         console.warn('PDF.js load failed, falling back to iframe', e);
-        const body = modal.querySelector('.ig-pdf-modal-body');
+        const body = modal.querySelector('.pdf-viewer-body');
         if (body) {
           body.innerHTML = `<iframe src="${safeUrl}" title="${safeTitle}" style="width:100%; height:100%; border:0; background: var(--ig-primary-background);"></iframe>`;
         }
@@ -2390,17 +4118,21 @@
       const canvas = modal.querySelector('#igPdfModalCanvas');
       const pageEl = modal.querySelector('#igPdfPage');
       const pagesEl = modal.querySelector('#igPdfPages');
+      const prevBtn = modal.querySelector('[data-pdf-modal="prev"]');
+      const nextBtn = modal.querySelector('[data-pdf-modal="next"]');
       if (pagesEl) pagesEl.textContent = String(pdf.numPages || 1);
 
       let currentPage = 1;
       const render = async () => {
         if (pageEl) pageEl.textContent = String(currentPage);
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = currentPage >= pdf.numPages;
         await renderPdfPageToCanvas(pdf, currentPage, canvas);
       };
       modal.__igPdfRender = render;
       await render();
 
-      modal.querySelector('[data-pdf-modal="prev"]')?.addEventListener('click', async (e) => {
+      prevBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
         if (currentPage > 1) {
           currentPage -= 1;
@@ -2408,7 +4140,7 @@
         }
       });
 
-      modal.querySelector('[data-pdf-modal="next"]')?.addEventListener('click', async (e) => {
+      nextBtn?.addEventListener('click', async (e) => {
         e.preventDefault();
         const max = Number(pdf.numPages || 1);
         if (currentPage < max) {
@@ -2474,7 +4206,7 @@
           } else {
             mediaHtml = `
               <div class="ig-carousel" id="fs-carousel-${post.id}">
-                <div class="ig-carousel-inner" id="fs-carousel-inner-${post.id}">
+                <div class="ig-carousel-inner" id="carousel-inner-fs-carousel-${post.id}">
                   ${post.images.map((img, imgIdx) => `
                     <img src="${img}" alt="Image ${imgIdx+1}" class="ig-fullscreen-image" ondblclick="toggleLikeFullScreen(${post.id})">
                   `).join('')}
@@ -2482,7 +4214,7 @@
                 ${post.images.length > 1 ? `
                   <button class="ig-carousel-btn ig-carousel-prev" onclick="fsCarouselPrev(${post.id}, event)" style="left: 10px;">‹</button>
                   <button class="ig-carousel-btn ig-carousel-next" onclick="fsCarouselNext(${post.id}, event)" style="right: 10px;">›</button>
-                  <div class="ig-carousel-dots" id="fs-dots-${post.id}">
+                  <div class="ig-carousel-dots" id="dots-fs-carousel-${post.id}">
                     ${post.images.map((_, dotIdx) => `<span class="ig-carousel-dot ${dotIdx === 0 ? 'active' : ''}" onclick="fsCarouselGoTo(${post.id}, ${dotIdx}, event)"></span>`).join('')}
                   </div>
                 ` : ''}

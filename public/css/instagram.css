@@ -2280,6 +2280,7 @@ body:has(#fullScreenPostViewer) .ig-bottom-nav {
   width: 100%;
   height: auto;
   display: block;
+  image-rendering: auto;
 }
 
 .ig-pdf-embed-controls {

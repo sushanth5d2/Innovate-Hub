@@ -46,6 +46,33 @@ router.get('/', authMiddleware, (req, res) => {
     posts.forEach(post => {
       // Get poll data if exists
       db.get('SELECT * FROM polls WHERE post_id = ?', [post.id], (err, poll) => {
+        if (poll) {
+          // Check if current user has voted on this poll
+          db.get('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, userId], (err2, userVote) => {
+            const parsedOptions = JSON.parse(poll.options);
+            const processedPost = {
+              ...post,
+              images: post.images ? JSON.parse(post.images) : [],
+              files: post.files ? JSON.parse(post.files) : [],
+              hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+              user_has_liked: post.user_has_liked > 0,
+              is_saved: post.is_saved > 0,
+              poll: {
+                ...poll,
+                options: parsedOptions,
+                votes: JSON.parse(poll.votes),
+                user_voted: userVote ? parsedOptions[userVote.option_index] : null
+              }
+            };
+            processedPosts.push(processedPost);
+            pending--;
+            if (pending === 0) {
+              processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              res.json({ success: true, posts: processedPosts });
+            }
+          });
+          return;
+        }
         const processedPost = {
           ...post,
           images: post.images ? JSON.parse(post.images) : [],
@@ -53,11 +80,7 @@ router.get('/', authMiddleware, (req, res) => {
           hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
           user_has_liked: post.user_has_liked > 0,
           is_saved: post.is_saved > 0,
-          poll: poll ? {
-            ...poll,
-            options: JSON.parse(poll.options),
-            votes: JSON.parse(poll.votes)
-          } : null
+          poll: null
         };
 
         processedPosts.push(processedPost);
@@ -125,6 +148,22 @@ router.post('/stories/:storyId/view', authMiddleware, (req, res) => {
 
     res.json({ success: true });
   });
+});
+
+// Get trending hashtags
+router.get('/trending-hashtags', authMiddleware, (req, res) => {
+  const db = getDb();
+  db.all(
+    'SELECT tag, usage_count FROM hashtags ORDER BY usage_count DESC LIMIT 20',
+    [],
+    (err, hashtags) => {
+      if (err) {
+        console.error('Error fetching trending hashtags:', err);
+        return res.json({ success: true, hashtags: [] });
+      }
+      res.json({ success: true, hashtags: hashtags || [] });
+    }
+  );
 });
 
 // Create post
@@ -224,6 +263,9 @@ router.post('/', authMiddleware, upload.fields([
       if (poll_question && poll_options) {
         try {
           const options = JSON.parse(poll_options);
+          // Store votes as {optionText: 0} object for reliable key lookup
+          const votesObj = {};
+          options.forEach(opt => { votesObj[opt] = 0; });
           db.run(`
             INSERT INTO polls (post_id, question, options, votes, expires_at)
             VALUES (?, ?, ?, ?, ?)
@@ -231,7 +273,7 @@ router.post('/', authMiddleware, upload.fields([
             postId,
             poll_question,
             JSON.stringify(options),
-            JSON.stringify(Array(options.length).fill(0)),
+            JSON.stringify(votesObj),
             poll_expiry || null
           ]);
         } catch (e) {
@@ -298,31 +340,71 @@ router.post('/:postId/poll', authMiddleware, (req, res) => {
   });
 });
 
-// Vote on poll
+// Vote on poll (single vote per user, allows switching)
 router.post('/:postId/poll/:pollId/vote', authMiddleware, (req, res) => {
   const db = getDb();
+  const userId = req.user.userId;
   const { pollId } = req.params;
   const { option } = req.body;
+
+  if (!option) {
+    return res.status(400).json({ error: 'Option is required' });
+  }
 
   db.get('SELECT * FROM polls WHERE id = ?', [pollId], (err, poll) => {
     if (err || !poll) {
       return res.status(404).json({ error: 'Poll not found' });
     }
 
-    const votes = JSON.parse(poll.votes);
-    if (votes[option] !== undefined) {
-      votes[option]++;
+    let votes = JSON.parse(poll.votes);
+    const options = JSON.parse(poll.options);
 
-      db.run('UPDATE polls SET votes = ? WHERE id = ?', [JSON.stringify(votes), pollId], (err) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error voting' });
-        }
-
-        res.json({ success: true, votes });
-      });
-    } else {
-      res.status(400).json({ error: 'Invalid option' });
+    // Migrate legacy array format
+    if (Array.isArray(votes)) {
+      const votesObj = {};
+      options.forEach((opt, idx) => { votesObj[opt] = votes[idx] || 0; });
+      votes = votesObj;
     }
+
+    if (votes[option] === undefined) {
+      return res.status(400).json({ error: 'Invalid option' });
+    }
+
+    const optionIndex = options.indexOf(option);
+
+    // Check if user already voted
+    db.get('SELECT * FROM poll_votes WHERE poll_id = ? AND user_id = ?', [pollId, userId], (err, existingVote) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+
+      if (existingVote) {
+        // User already voted — switch vote
+        const prevOption = options[existingVote.option_index];
+        if (prevOption === option) {
+          return res.json({ success: true, votes, user_voted: option, message: 'Already voted for this option' });
+        }
+        // Decrement old, increment new
+        if (votes[prevOption] !== undefined && votes[prevOption] > 0) votes[prevOption]--;
+        votes[option]++;
+
+        db.run('UPDATE poll_votes SET option_index = ? WHERE poll_id = ? AND user_id = ?', [optionIndex, pollId, userId], (err) => {
+          if (err) return res.status(500).json({ error: 'Error switching vote' });
+          db.run('UPDATE polls SET votes = ? WHERE id = ?', [JSON.stringify(votes), pollId], (err) => {
+            if (err) return res.status(500).json({ error: 'Error updating votes' });
+            res.json({ success: true, votes, user_voted: option });
+          });
+        });
+      } else {
+        // New vote
+        votes[option]++;
+        db.run('INSERT INTO poll_votes (poll_id, user_id, option_index) VALUES (?, ?, ?)', [pollId, userId, optionIndex], (err) => {
+          if (err) return res.status(500).json({ error: 'Error recording vote' });
+          db.run('UPDATE polls SET votes = ? WHERE id = ?', [JSON.stringify(votes), pollId], (err) => {
+            if (err) return res.status(500).json({ error: 'Error updating votes' });
+            res.json({ success: true, votes, user_voted: option });
+          });
+        });
+      }
+    });
   });
 });
 
@@ -387,6 +469,55 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
         });
       });
     }
+  });
+});
+
+// Get a single post by ID
+router.get('/:postId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { postId } = req.params;
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT p.*, u.username, u.profile_picture,
+      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+      (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+      (SELECT COUNT(*) FROM saved_posts WHERE post_id = p.id AND user_id = ?) as is_saved
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.id = ?
+  `;
+
+  db.get(query, [userId, userId, postId], (err, post) => {
+    if (err) {
+      console.error('GET /posts/:postId error:', err.message);
+      return res.status(500).json({ error: 'Database error', detail: err.message });
+    }
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    
+    // Parse JSON fields
+    try { post.images = post.images ? JSON.parse(post.images) : []; } catch(e) { post.images = []; }
+    try { post.files = post.files ? JSON.parse(post.files) : []; } catch(e) { post.files = []; }
+    try { post.hashtags = post.hashtags ? JSON.parse(post.hashtags) : []; } catch(e) { post.hashtags = []; }
+    
+    // Get poll data if exists
+    db.get('SELECT * FROM polls WHERE post_id = ?', [postId], (err2, poll) => {
+      if (poll) {
+        try {
+          post.poll = {
+            id: poll.id,
+            question: poll.question,
+            options: JSON.parse(poll.options),
+            votes: JSON.parse(poll.votes),
+            expires_at: poll.expires_at
+          };
+        } catch(e) { post.poll = null; }
+      } else {
+        post.poll = null;
+      }
+      res.json({ post });
+    });
   });
 });
 
@@ -693,15 +824,28 @@ router.put('/:postId', authMiddleware, upload.fields([
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { content } = req.body;
+  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags } = req.body;
 
   db.get('SELECT * FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, post) => {
     if (err || !post) {
       return res.status(404).json({ error: 'Post not found or unauthorized' });
     }
 
-    let images = post.images ? JSON.parse(post.images) : [];
-    let files = post.files ? JSON.parse(post.files) : [];
+    // Use existingImages/existingFiles from body if provided (for removal support)
+    let images = [];
+    let files = [];
+    
+    if (req.body.existingImages) {
+      try { images = JSON.parse(req.body.existingImages); } catch(e) { images = []; }
+    } else {
+      images = post.images ? JSON.parse(post.images) : [];
+    }
+    
+    if (req.body.existingFiles) {
+      try { files = JSON.parse(req.body.existingFiles); } catch(e) { files = []; }
+    } else {
+      files = post.files ? JSON.parse(post.files) : [];
+    }
 
     if (req.files) {
       if (req.files.images) {
@@ -717,13 +861,80 @@ router.put('/:postId', authMiddleware, upload.fields([
       }
     }
 
+    // Build update query with all fields
+    const updateFields = [
+      'content = ?', 'images = ?', 'files = ?', 'updated_at = CURRENT_TIMESTAMP'
+    ];
+    const updateValues = [content, JSON.stringify(images), JSON.stringify(files)];
+    
+    // Hashtags
+    if (hashtags) {
+      updateFields.push('hashtags = ?');
+      updateValues.push(hashtags);
+    }
+    
+    // Schedule
+    if (scheduled_at !== undefined) {
+      updateFields.push('scheduled_at = ?');
+      updateValues.push(scheduled_at || null);
+    }
+    
+    // Advanced options
+    if (enable_contact !== undefined) {
+      updateFields.push('enable_contact = ?');
+      updateValues.push(enable_contact === '1' || enable_contact === true ? 1 : 0);
+    }
+    if (enable_interested !== undefined) {
+      updateFields.push('enable_interested = ?');
+      updateValues.push(enable_interested === '1' || enable_interested === true ? 1 : 0);
+    }
+    
+    updateValues.push(postId);
+
     db.run(
-      'UPDATE posts SET content = ?, images = ?, files = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [content, JSON.stringify(images), JSON.stringify(files), postId],
+      `UPDATE posts SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues,
       (err) => {
         if (err) {
           return res.status(500).json({ error: 'Error updating post' });
         }
+        
+        // Handle poll update/create
+        if (poll_question && poll_options) {
+          try {
+            const options = JSON.parse(poll_options);
+            if (options.length >= 2) {
+              // Check if poll already exists for this post
+              db.get('SELECT * FROM polls WHERE post_id = ?', [postId], (err, existingPoll) => {
+                if (existingPoll) {
+                  // Update existing poll question, options (keep votes structure)
+                  const oldOptions = JSON.parse(existingPoll.options);
+                  const oldVotes = JSON.parse(existingPoll.votes);
+                  
+                  // Build new votes object, preserving votes for unchanged options
+                  const newVotes = {};
+                  options.forEach(opt => {
+                    newVotes[opt] = oldVotes[opt] || 0;
+                  });
+                  
+                  db.run(
+                    'UPDATE polls SET question = ?, options = ?, votes = ?, expires_at = ? WHERE post_id = ?',
+                    [poll_question, JSON.stringify(options), JSON.stringify(newVotes), poll_expiry || null, postId]
+                  );
+                } else {
+                  // Create new poll
+                  const votes = {};
+                  options.forEach(opt => { votes[opt] = 0; });
+                  db.run(
+                    'INSERT INTO polls (post_id, question, options, votes, expires_at) VALUES (?, ?, ?, ?, ?)',
+                    [postId, poll_question, JSON.stringify(options), JSON.stringify(votes), poll_expiry || null]
+                  );
+                }
+              });
+            }
+          } catch(e) { /* ignore parse errors */ }
+        }
+        
         res.json({ success: true });
       }
     );
