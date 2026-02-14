@@ -113,6 +113,69 @@ app.use('/api/groups', require('./routes/groups'));
 app.use('/api/ai-chat', require('./routes/ai-chat'));
 app.use('/api', require('./routes/community-groups'));
 
+// Link preview endpoint
+app.get('/api/link-preview', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.json({ error: 'URL required' });
+  
+  try {
+    const https = require(url.startsWith('https') ? 'https' : 'http');
+    const fetchUrl = (targetUrl, redirectCount = 0) => new Promise((resolve, reject) => {
+      if (redirectCount > 3) return reject(new Error('Too many redirects'));
+      const mod = targetUrl.startsWith('https') ? require('https') : require('http');
+      const request = mod.get(targetUrl, { 
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InnovateBot/1.0)' },
+        timeout: 5000
+      }, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          return resolve(fetchUrl(response.headers.location, redirectCount + 1));
+        }
+        let data = '';
+        response.setEncoding('utf8');
+        response.on('data', chunk => {
+          data += chunk;
+          if (data.length > 50000) response.destroy(); // limit
+        });
+        response.on('end', () => resolve(data));
+      });
+      request.on('error', reject);
+      request.on('timeout', () => { request.destroy(); reject(new Error('Timeout')); });
+    });
+
+    const html = await fetchUrl(url);
+    
+    const getMetaContent = (html, property) => {
+      const patterns = [
+        new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i'),
+        new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*property=["']${property}["']`, 'i'),
+        new RegExp(`<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i'),
+        new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*name=["']${property}["']`, 'i'),
+      ];
+      for (const p of patterns) {
+        const m = html.match(p);
+        if (m) return m[1];
+      }
+      return null;
+    };
+
+    const title = getMetaContent(html, 'og:title') || getMetaContent(html, 'twitter:title') || (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || '';
+    const description = getMetaContent(html, 'og:description') || getMetaContent(html, 'twitter:description') || getMetaContent(html, 'description') || '';
+    let image = getMetaContent(html, 'og:image') || getMetaContent(html, 'twitter:image') || '';
+    
+    // Make relative image URLs absolute
+    if (image && !image.startsWith('http')) {
+      try {
+        const urlObj = new URL(url);
+        image = image.startsWith('/') ? `${urlObj.protocol}//${urlObj.host}${image}` : `${urlObj.protocol}//${urlObj.host}/${image}`;
+      } catch(_) {}
+    }
+
+    res.json({ title: title.trim(), description: description.trim(), image });
+  } catch (e) {
+    res.json({ error: 'Failed to fetch preview' });
+  }
+});
+
 // Serve HTML pages
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

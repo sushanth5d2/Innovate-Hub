@@ -267,6 +267,189 @@ router.post('/:groupId/messages/:messageId/pin', (req, res) => {
 
 module.exports = router;
 
+// Get group info with members
+router.get('/:groupId/info', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const userId = req.user.userId || req.user.id;
+
+  db.get(
+    `SELECT g.id, g.name, g.creator_id, g.created_at, g.description,
+            (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
+     FROM group_conversations g
+     WHERE g.id = ?`,
+    [groupId],
+    (err, group) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!group) return res.status(404).json({ error: 'Group not found' });
+
+      // Get members with user info
+      db.all(
+        `SELECT gm.user_id, gm.role, gm.joined_at, u.username, u.profile_picture, u.bio
+         FROM group_members gm
+         INNER JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = ?
+         ORDER BY gm.role ASC, gm.joined_at ASC`,
+        [groupId],
+        (err2, members) => {
+          if (err2) members = [];
+          group.members = members;
+          res.json({ success: true, group });
+        }
+      );
+    }
+  );
+});
+
+// Update group description
+router.put('/:groupId/description', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const userId = req.user.userId || req.user.id;
+  const { description } = req.body || {};
+
+  // Check if description column exists, add it if not
+  db.run(`ALTER TABLE group_conversations ADD COLUMN description TEXT DEFAULT ''`, (alterErr) => {
+    // Ignore error if column already exists
+    db.run(
+      `UPDATE group_conversations SET description = ? WHERE id = ?`,
+      [description || '', groupId],
+      (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to update description' });
+        res.json({ success: true });
+      }
+    );
+  });
+});
+
+// Search group messages
+router.get('/:groupId/search', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const q = req.query.q || '';
+
+  if (!q) return res.json({ messages: [] });
+
+  db.all(
+    `SELECT gm.id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.created_at
+     FROM group_messages gm
+     INNER JOIN users u ON u.id = gm.sender_id
+     WHERE gm.group_id = ? AND gm.content LIKE ?
+     ORDER BY gm.created_at DESC
+     LIMIT 50`,
+    [groupId, `%${q}%`],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Search failed' });
+      res.json({ success: true, messages: rows });
+    }
+  );
+});
+
+// Get group media
+router.get('/:groupId/media', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+
+  db.all(
+    `SELECT id, sender_id, content, type, created_at
+     FROM group_messages
+     WHERE group_id = ? AND type IN ('image', 'video', 'file', 'document')
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    [groupId],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch media' });
+      
+      // Also get messages containing URLs for links tab
+      db.all(
+        `SELECT id, sender_id, content, 'link' as type, created_at
+         FROM group_messages
+         WHERE group_id = ? AND type = 'text' AND content LIKE '%http%'
+         ORDER BY created_at DESC
+         LIMIT 50`,
+        [groupId],
+        (err2, linkRows) => {
+          const allMedia = [...(rows || []), ...(linkRows || [])];
+          res.json({ success: true, media: allMedia });
+        }
+      );
+    }
+  );
+});
+
+// Get starred messages in group
+router.get('/:groupId/starred', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const userId = req.user.userId || req.user.id;
+
+  db.all(
+    `SELECT gm.id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.created_at
+     FROM group_messages gm
+     INNER JOIN users u ON u.id = gm.sender_id
+     WHERE gm.group_id = ? AND gm.is_pinned = 1
+     ORDER BY gm.created_at DESC`,
+    [groupId],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch starred messages' });
+      res.json({ success: true, messages: rows });
+    }
+  );
+});
+
+// Clear group chat
+router.post('/:groupId/clear', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const userId = req.user.userId || req.user.id;
+
+  // Check membership
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, userId],
+    (err, member) => {
+      if (!member) return res.status(403).json({ error: 'Not a group member' });
+      
+      db.run(
+        `DELETE FROM group_messages WHERE group_id = ?`,
+        [groupId],
+        (err) => {
+          if (err) return res.status(500).json({ error: 'Failed to clear chat' });
+          res.json({ success: true });
+        }
+      );
+    }
+  );
+});
+
+// Leave group
+router.post('/:groupId/leave', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const userId = req.user.userId || req.user.id;
+
+  db.run(
+    `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, userId],
+    (err) => {
+      if (err) return res.status(500).json({ error: 'Failed to leave group' });
+      
+      // Check if group is now empty, delete if so
+      db.get(
+        `SELECT COUNT(*) as count FROM group_members WHERE group_id = ?`,
+        [groupId],
+        (err2, row) => {
+          if (row && row.count === 0) {
+            db.run(`DELETE FROM group_conversations WHERE id = ?`, [groupId]);
+          }
+        }
+      );
+      
+      res.json({ success: true });
+    }
+  );
+});
+
 // Delete a group (creator or admin only)
 router.delete('/:groupId', (req, res) => {
   const db = getDb();

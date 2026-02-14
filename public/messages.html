@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Messages • Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body class="ig-messages-page">
   <!-- Top Navigation (hidden on mobile for messages page) -->
@@ -104,12 +107,6 @@
           </div>
         </div>
         <div class="ig-chat-actions">
-          <button class="ig-chat-action-btn" title="Details">
-            <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"></circle>
-              <path d="M12 16v-4M12 8h.01" stroke-linecap="round" stroke-linejoin="round"></path>
-            </svg>
-          </button>
           <button class="ig-chat-action-btn" onclick="startVoiceCall()" title="Voice Call">
             <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -455,6 +452,415 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Contact Info Panel -->
+  <div id="contactInfoPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 99999; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeContactInfo()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">Contact Info</span>
+    </div>
+
+    <!-- Profile Section -->
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 30px 20px 20px;">
+      <img id="contactInfoAvatar" src="" alt="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--ig-border); margin-bottom: 16px;">
+      <div id="contactInfoName" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;"></div>
+      <div id="contactInfoBio" style="font-size: 14px; color: var(--ig-secondary-text); text-align: center; max-width: 280px; margin-bottom: 8px;"></div>
+    </div>
+
+    <!-- Action Buttons Row -->
+    <div style="display: flex; justify-content: center; gap: 12px; padding: 0 20px 20px;">
+      <button onclick="startVoiceCall()" style="flex: 1; max-width: 100px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        <span style="font-size: 12px;">Audio</span>
+      </button>
+      <button onclick="startVideoCall()" style="flex: 1; max-width: 100px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+        <span style="font-size: 12px;">Video</span>
+      </button>
+      <button onclick="contactInfoSearchMessages()" style="flex: 1; max-width: 100px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span style="font-size: 12px;">Search</span>
+      </button>
+    </div>
+
+    <!-- View Profile -->
+    <div style="padding: 0 16px 8px;">
+      <div onclick="viewContactProfile()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"></circle><path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2"></path></svg>
+        <span style="font-weight: 500;">View Profile</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Media, Links and Docs -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openMediaLinksDocsPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+        <span style="font-weight: 500;">Media, links and docs</span>
+        <span id="contactInfoMediaCount" style="margin-left: auto; color: var(--ig-secondary-text); font-size: 14px;">0</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Starred Messages -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openStarredMessagesPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+        <span style="font-weight: 500;">Starred messages</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div style="padding: 4px 16px;">
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px;">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span style="font-weight: 500;">Notifications</span>
+        <label style="margin-left: auto; position: relative; display: inline-block; width: 44px; height: 24px;">
+          <input type="checkbox" id="contactInfoMuteToggle" onchange="toggleChatNotifications(this.checked)" style="opacity: 0; width: 0; height: 0;">
+          <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; border-radius: 24px; transition: 0.3s;" id="muteToggleSlider"></span>
+          <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; pointer-events: none;" id="muteToggleKnob"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Disappearing Messages -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openDisappearingSettings()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+        <div style="flex: 1;">
+          <div style="font-weight: 500;">Disappearing messages</div>
+          <div id="contactInfoDisappearingStatus" style="font-size: 12px; color: var(--ig-secondary-text);">Off</div>
+        </div>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Create Group -->
+    <div style="padding: 12px 16px 4px;">
+      <div onclick="createGroupWithContact()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span id="contactInfoCreateGroupText" style="font-weight: 500;">Create group with user</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div style="padding: 12px 16px;">
+      <div style="background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;">
+        <div onclick="clearChatFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span style="color: #ed4956; font-weight: 500;">Clear chat</span>
+        </div>
+        <div onclick="deleteChatFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path></svg>
+          <span style="color: #ed4956; font-weight: 500;">Delete chat</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Block & Report -->
+    <div style="padding: 4px 16px 30px;">
+      <div style="background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;">
+        <div onclick="blockUserFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+          <span id="contactInfoBlockText" style="color: #ed4956; font-weight: 500;">Block user</span>
+        </div>
+        <div onclick="reportUserFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span id="contactInfoReportText" style="color: #ed4956; font-weight: 500;">Report user</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Media/Links/Docs Sub-Panel -->
+  <div id="mediaLinksDocsPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('mediaLinksDocsPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">Media, links and docs</span>
+    </div>
+    <!-- Tabs -->
+    <div style="display: flex; border-bottom: 1px solid var(--ig-border);">
+      <button class="media-tab active" onclick="switchMediaTab('media')" id="mediaTabBtn" style="flex: 1; padding: 12px; background: none; border: none; color: var(--ig-primary-text); font-weight: 600; cursor: pointer; border-bottom: 2px solid var(--ig-blue);">Media</button>
+      <button class="media-tab" onclick="switchMediaTab('links')" id="linksTabBtn" style="flex: 1; padding: 12px; background: none; border: none; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">Links</button>
+      <button class="media-tab" onclick="switchMediaTab('docs')" id="docsTabBtn" style="flex: 1; padding: 12px; background: none; border: none; color: var(--ig-secondary-text); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;">Docs</button>
+    </div>
+    <div id="mediaContent" style="padding: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;"></div>
+    <div id="linksContent" style="padding: 12px; display: none;"></div>
+    <div id="docsContent" style="padding: 12px; display: none;"></div>
+  </div>
+
+  <!-- Starred Messages Sub-Panel -->
+  <div id="starredMessagesPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('starredMessagesPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">Starred messages</span>
+    </div>
+    <div id="starredMessagesList" style="padding: 12px;"></div>
+  </div>
+
+  <!-- Search Messages Sub-Panel -->
+  <div id="searchMessagesPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('searchMessagesPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <input type="text" id="searchInChatInput" placeholder="Search in chat..." style="flex: 1; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); outline: none; font-size: 14px;" oninput="searchInChatDebounced()">
+    </div>
+    <div id="searchInChatResults" style="padding: 12px;"></div>
+  </div>
+
+  <!-- Disappearing Messages Settings Panel -->
+  <div id="disappearingSettingsPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('disappearingSettingsPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">Disappearing messages</span>
+    </div>
+    <div style="padding: 16px;">
+      <p style="color: var(--ig-secondary-text); font-size: 13px; margin-bottom: 20px;">When enabled, new messages sent in this chat will disappear after the selected duration or after being read.</p>
+      <div id="disappearingOptions" style="display: flex; flex-direction: column; gap: 4px;">
+        <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
+          <input type="radio" name="disappearingMode" value="off" checked style="accent-color: #00a884; width: 18px; height: 18px;">
+          <span style="font-weight: 500;">Off</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
+          <input type="radio" name="disappearingMode" value="on_read" style="accent-color: #00a884; width: 18px; height: 18px;">
+          <div>
+            <div style="font-weight: 500;">Disappear after read</div>
+            <div style="font-size: 12px; color: var(--ig-secondary-text);">Messages disappear once seen by the recipient</div>
+          </div>
+        </label>
+        <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
+          <input type="radio" name="disappearingMode" value="timer_24h" style="accent-color: #00a884; width: 18px; height: 18px;">
+          <span style="font-weight: 500;">24 hours</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
+          <input type="radio" name="disappearingMode" value="timer_7d" style="accent-color: #00a884; width: 18px; height: 18px;">
+          <span style="font-weight: 500;">7 days</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
+          <input type="radio" name="disappearingMode" value="timer_90d" style="accent-color: #00a884; width: 18px; height: 18px;">
+          <span style="font-weight: 500;">90 days</span>
+        </label>
+      </div>
+      <button onclick="saveDisappearingSettings()" style="width: 100%; margin-top: 20px; padding: 14px; background: #00a884; color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer;">Save</button>
+    </div>
+  </div>
+
+  <!-- Create Group With Contact Panel -->
+  <div id="createGroupWithPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('createGroupWithPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">New Group</span>
+    </div>
+    <div style="padding: 16px;">
+      <input type="text" id="createGroupName" placeholder="Group name..." style="width: 100%; padding: 12px 16px; border: 1px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 12px; box-sizing: border-box;">
+      <!-- Pre-selected contact -->
+      <div id="createGroupSelected" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;"></div>
+      <input type="text" id="createGroupSearch" placeholder="Search users to add..." style="width: 100%; padding: 12px 16px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 12px; box-sizing: border-box;" oninput="searchUsersForGroup()">
+      <div id="createGroupResults" style="display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto;"></div>
+      <button onclick="submitCreateGroupWithContact()" style="width: 100%; margin-top: 16px; padding: 14px; background: #00a884; color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer;">Create Group</button>
+    </div>
+  </div>
+
+  <!-- Report User Modal -->
+  <div id="reportUserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200000; display: none; align-items: center; justify-content: center;">
+    <div style="background: var(--ig-primary-background); border-radius: 16px; padding: 24px; max-width: 380px; width: 90%; margin: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+      <h3 style="margin: 0 0 16px; font-size: 18px;">Report User</h3>
+      <p style="color: var(--ig-secondary-text); font-size: 13px; margin-bottom: 16px;">Why are you reporting this user?</p>
+      <div id="reportReasons" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+        <label style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; cursor: pointer;">
+          <input type="radio" name="reportReason" value="spam" style="accent-color: #ed4956;"> Spam
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; cursor: pointer;">
+          <input type="radio" name="reportReason" value="harassment" style="accent-color: #ed4956;"> Harassment
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; cursor: pointer;">
+          <input type="radio" name="reportReason" value="inappropriate" style="accent-color: #ed4956;"> Inappropriate content
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; cursor: pointer;">
+          <input type="radio" name="reportReason" value="fake_account" style="accent-color: #ed4956;"> Fake account
+        </label>
+        <label style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; cursor: pointer;">
+          <input type="radio" name="reportReason" value="other" style="accent-color: #ed4956;"> Other
+        </label>
+      </div>
+      <textarea id="reportDetails" placeholder="Additional details (optional)..." rows="3" style="width: 100%; padding: 12px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: none; margin-bottom: 16px; box-sizing: border-box;"></textarea>
+      <div style="display: flex; gap: 12px;">
+        <button onclick="closeReportModal()" style="flex: 1; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 10px; color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">Cancel</button>
+        <button onclick="submitReport()" style="flex: 1; padding: 12px; background: #ed4956; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600;">Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group Info Panel -->
+  <div id="groupInfoPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 99999; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <!-- Header -->
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeGroupInfo()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+      </button>
+      <span style="font-weight: 600; font-size: 18px;">Group Info</span>
+    </div>
+
+    <!-- Group Profile Section -->
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 30px 20px 20px;">
+      <div id="groupInfoAvatarWrapper" style="position: relative; margin-bottom: 16px;">
+        <img id="groupInfoAvatar" src="/images/default-avatar.svg" alt="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--ig-border);">
+      </div>
+      <div id="groupInfoName" style="font-size: 22px; font-weight: 700; margin-bottom: 4px;"></div>
+      <div id="groupInfoMemberCount" style="font-size: 14px; color: var(--ig-secondary-text);">Group</div>
+    </div>
+
+    <!-- Action Buttons Row -->
+    <div style="display: flex; justify-content: center; gap: 12px; padding: 0 20px 20px;">
+      <button onclick="startVoiceCall()" style="flex: 1; max-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        <span style="font-size: 12px;">Audio</span>
+      </button>
+      <button onclick="startVideoCall()" style="flex: 1; max-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+        <span style="font-size: 12px;">Video</span>
+      </button>
+      <button onclick="groupInfoAddMember()" style="flex: 1; max-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+        <span style="font-size: 12px;">Add</span>
+      </button>
+      <button onclick="groupInfoSearchMessages()" style="flex: 1; max-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; color: #00a884; cursor: pointer;">
+        <svg fill="none" height="22" viewBox="0 0 24 24" width="22" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span style="font-size: 12px;">Search</span>
+      </button>
+    </div>
+
+    <!-- Group Description -->
+    <div style="padding: 0 16px 8px;">
+      <div style="background: var(--ig-secondary-background); border-radius: 12px; padding: 14px 16px;">
+        <div style="font-size: 12px; color: var(--ig-secondary-text); margin-bottom: 6px;">Add group description</div>
+        <div id="groupInfoDescription" style="font-size: 14px; color: var(--ig-primary-text); cursor: pointer;" onclick="editGroupDescription()">Tap to add group description</div>
+      </div>
+    </div>
+
+    <!-- Media, Links and Docs -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openGroupMediaPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+        <span style="font-weight: 500;">Media, links and docs</span>
+        <span id="groupInfoMediaCount" style="margin-left: auto; color: var(--ig-secondary-text); font-size: 14px;">0</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Starred Messages -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openGroupStarredPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+        <span style="font-weight: 500;">Starred messages</span>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div style="padding: 4px 16px;">
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px;">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <span style="font-weight: 500;">Notifications</span>
+        <label style="margin-left: auto; position: relative; display: inline-block; width: 44px; height: 24px;">
+          <input type="checkbox" id="groupInfoMuteToggle" onchange="toggleGroupNotifications(this.checked)" checked style="opacity: 0; width: 0; height: 0;">
+          <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #00a884; border-radius: 24px; transition: 0.3s;" id="groupMuteToggleSlider"></span>
+          <span style="position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s; pointer-events: none; transform: translateX(20px);" id="groupMuteToggleKnob"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Disappearing Messages -->
+    <div style="padding: 4px 16px;">
+      <div onclick="openGroupDisappearingSettings()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+        <div style="flex: 1;">
+          <div style="font-weight: 500;">Disappearing messages</div>
+          <div id="groupInfoDisappearingStatus" style="font-size: 12px; color: var(--ig-secondary-text);">Off</div>
+        </div>
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="var(--ig-secondary-text)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- Members Section -->
+    <div style="padding: 12px 16px 4px;">
+      <div style="font-size: 14px; color: var(--ig-secondary-text); margin-bottom: 8px; font-weight: 500;" id="groupInfoMembersLabel">Members</div>
+      
+      <!-- Add Members Button -->
+      <div onclick="groupInfoAddMember()" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--ig-secondary-background); border-radius: 12px 12px 0 0; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center;">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="white" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+        <span style="font-weight: 500;">Add members</span>
+      </div>
+
+      <!-- Invite via Link -->
+      <div onclick="inviteViaLink()" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--ig-secondary-background); border-radius: 0 0 12px 12px; cursor: pointer; margin-bottom: 8px;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center;">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        </div>
+        <span style="font-weight: 500;">Invite via link</span>
+      </div>
+
+      <!-- Members List -->
+      <div id="groupInfoMembersList" style="display: flex; flex-direction: column; background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;"></div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div style="padding: 12px 16px;">
+      <div style="background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;">
+        <div onclick="clearGroupChat()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span style="color: #ed4956; font-weight: 500;">Clear chat</span>
+        </div>
+        <div onclick="exitGroup()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span style="color: #ed4956; font-weight: 500;">Exit group</span>
+        </div>
+        <div onclick="reportGroup()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <span style="color: #ed4956; font-weight: 500;">Report group</span>
+        </div>
+      </div>
+    </div>
+    <div style="height: 30px;"></div>
+  </div>
+
+  <!-- Group Add Member Modal -->
+  <div id="groupAddMemberModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200000; align-items: center; justify-content: center;">
+    <div style="background: var(--ig-primary-background); border-radius: 16px; padding: 24px; max-width: 380px; width: 90%; margin: auto; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+      <h3 style="margin: 0 0 16px; font-size: 18px;">Add Members</h3>
+      <input type="text" id="groupAddMemberSearch" placeholder="Search users..." style="width: 100%; padding: 12px 16px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; margin-bottom: 12px; box-sizing: border-box;" oninput="searchUsersForGroupAdd()">
+      <div id="groupAddMemberResults" style="display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; margin-bottom: 16px;"></div>
+      <div style="display: flex; gap: 12px;">
+        <button onclick="closeGroupAddMemberModal()" style="flex: 1; padding: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 10px; color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group Search Messages Panel -->
+  <div id="groupSearchMessagesPanel" style="display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 420px; background: var(--ig-primary-background); z-index: 100000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.3); transition: transform 0.3s ease; transform: translateX(100%);">
+    <div style="position: sticky; top: 0; z-index: 2; background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); padding: 16px; display: flex; align-items: center; gap: 12px;">
+      <button onclick="closeSubPanel('groupSearchMessagesPanel')" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 4px;">
+        <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <input type="text" id="groupSearchInChatInput" placeholder="Search in group chat..." style="flex: 1; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); outline: none; font-size: 14px;" oninput="searchInGroupChatDebounced()">
+    </div>
+    <div id="groupSearchInChatResults" style="padding: 12px;"></div>
   </div>
 
   <!-- Bottom Navigation -->
@@ -806,9 +1212,6 @@
         const chatActions = document.querySelector('.ig-chat-actions');
         if (chatActions) {
           chatActions.innerHTML = `
-            <button class="ig-chat-action-btn" title="Details">
-              <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"></circle><path d="M12 16v-4M12 8h.01" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-            </button>
             <button class="ig-chat-action-btn" onclick="startVoiceCall()" title="Voice Call">
               <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
             </button>
@@ -853,14 +1256,14 @@
       // Reset chat status (clear AI status text)
       const chatStatusEl = document.getElementById('chatStatus');
       if (chatStatusEl) { chatStatusEl.textContent = ''; chatStatusEl.style.color = ''; }
-      // Make avatar and username clickable to open profile
+      // Make avatar and username clickable to open contact info panel
       if (chatAvatarEl) {
         chatAvatarEl.style.cursor = 'pointer';
-        chatAvatarEl.onclick = () => window.location.href = `/profile/${currentContactId}`;
+        chatAvatarEl.onclick = () => openContactInfo();
       }
       if (chatUsernameEl) {
         chatUsernameEl.style.cursor = 'pointer';
-        chatUsernameEl.onclick = () => window.location.href = `/profile/${currentContactId}`;
+        chatUsernameEl.onclick = () => openContactInfo();
       }
       
       // Mark conversation as active
@@ -1206,10 +1609,17 @@
             textWrapper.style.cssText = 'display: inline-block; width: 100%;';
             
             const textContent = document.createElement('div');
-            textContent.textContent = msg.content || '';
+            const msgText = msg.content || '';
+            textContent.innerHTML = linkifyText(msgText);
             
             textWrapper.appendChild(textContent);
             messageEl.appendChild(textWrapper);
+
+            // Add link preview if message contains URL
+            const firstUrl = extractFirstUrl(msgText);
+            if (firstUrl) {
+              createLinkPreview(firstUrl, messageEl);
+            }
             
             // Add pin indicator if message is pinned
             if (msg.is_pinned) {
@@ -1308,9 +1718,6 @@
         const chatActions = document.querySelector('.ig-chat-actions');
         if (chatActions) {
           chatActions.innerHTML = `
-            <button class="ig-chat-action-btn" title="Details">
-              <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"></circle><path d="M12 16v-4M12 8h.01" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-            </button>
             <button class="ig-chat-action-btn" onclick="startVoiceCall()" title="Voice Call">
               <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
             </button>
@@ -1340,14 +1747,16 @@
       if (chatAvatarEl) {
         chatAvatarEl.src = '/images/default-avatar.svg';
         chatAvatarEl.style.display = 'block';
-        chatAvatarEl.style.cursor = 'default';
+        chatAvatarEl.style.cursor = 'pointer';
+        chatAvatarEl.onclick = () => openGroupInfo();
       }
       if (chatAvatarIcon) chatAvatarIcon.style.display = 'none';
       if (chatAvatarContainer) chatAvatarContainer.style.background = 'transparent';
       
       if (chatUsernameEl) {
         chatUsernameEl.textContent = groupName;
-        chatUsernameEl.style.cursor = 'default';
+        chatUsernameEl.style.cursor = 'pointer';
+        chatUsernameEl.onclick = () => openGroupInfo();
       }
 
       document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
@@ -1400,7 +1809,14 @@
 
           const messageEl = document.createElement('div');
           messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-          messageEl.textContent = msg.content || '';
+          const grpMsgText = msg.content || '';
+          messageEl.innerHTML = linkifyText(grpMsgText);
+
+          // Add link preview if message contains URL
+          const grpFirstUrl = extractFirstUrl(grpMsgText);
+          if (grpFirstUrl) {
+            createLinkPreview(grpFirstUrl, messageEl);
+          }
 
           const timeEl = document.createElement('div');
           timeEl.className = 'ig-message-time';
@@ -1625,10 +2041,16 @@
         textWrapper.style.cssText = 'display: inline-block; width: 100%;';
         
         const textContent = document.createElement('div');
-        textContent.textContent = content;
+        textContent.innerHTML = linkifyText(content);
         
         textWrapper.appendChild(textContent);
         messageEl.appendChild(textWrapper);
+
+        // Add link preview for sent messages
+        const sentUrl = extractFirstUrl(content);
+        if (sentUrl) {
+          createLinkPreview(sentUrl, messageEl);
+        }
         
         // Add message status (delivered)
         const statusEl = document.createElement('div');
@@ -1956,6 +2378,86 @@
         }
         return date.toLocaleDateString('en-US', { ...tzOptions, month: 'short', day: 'numeric' });
       }
+    }
+
+    // ========================
+    // LINKIFY & LINK PREVIEW
+    // ========================
+    const URL_REGEX = /(https?:\/\/[^\s<>"')\]]+)/gi;
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function linkifyText(text) {
+      if (!text) return '';
+      const escaped = escapeHtml(text);
+      return escaped.replace(URL_REGEX, (url) => {
+        let displayUrl = url.replace(/^https?:\/\/(www\.)?/, '');
+        if (displayUrl.length > 45) displayUrl = displayUrl.substring(0, 42) + '...';
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #00a884; text-decoration: underline; word-break: break-all;" onclick="event.stopPropagation();">${displayUrl}</a>`;
+      });
+    }
+
+    function hasUrl(text) {
+      return URL_REGEX.test(text);
+    }
+
+    function extractFirstUrl(text) {
+      URL_REGEX.lastIndex = 0;
+      const match = URL_REGEX.exec(text);
+      return match ? match[1] : null;
+    }
+
+    function createLinkPreview(url, container) {
+      const previewEl = document.createElement('div');
+      previewEl.style.cssText = 'margin-top: 8px; border: 1px solid var(--ig-border); border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--ig-secondary-background);';
+      previewEl.innerHTML = `<div style="padding: 10px 12px; display: flex; align-items: center; gap: 8px;">
+        <div style="width: 14px; height: 14px; border: 2px solid var(--ig-secondary-text); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="font-size: 12px; color: var(--ig-secondary-text);">Loading preview...</span>
+      </div>`;
+      previewEl.onclick = (e) => { e.stopPropagation(); window.open(url, '_blank'); };
+      container.appendChild(previewEl);
+
+      fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.error || (!data.title && !data.description && !data.image)) {
+            // Show simple URL preview
+            let domain = '';
+            try { domain = new URL(url).hostname; } catch(_) { domain = url; }
+            previewEl.innerHTML = `
+              <div style="padding: 10px 12px;">
+                <div style="font-size: 11px; color: var(--ig-secondary-text); text-transform: uppercase; margin-bottom: 2px;">🔗 ${escapeHtml(domain)}</div>
+                <div style="font-size: 13px; color: var(--ig-primary-text); word-break: break-all;">${escapeHtml(url.length > 60 ? url.substring(0, 57) + '...' : url)}</div>
+              </div>`;
+            return;
+          }
+          let html = '';
+          if (data.image) {
+            html += `<div style="width: 100%; max-height: 160px; overflow: hidden; background: #000;">
+              <img src="${escapeHtml(data.image)}" alt="" style="width: 100%; height: 100%; max-height: 160px; object-fit: cover;" onerror="this.parentElement.style.display='none'">
+            </div>`;
+          }
+          let domain = '';
+          try { domain = new URL(url).hostname; } catch(_) { domain = url; }
+          html += `<div style="padding: 10px 12px;">
+            <div style="font-size: 11px; color: var(--ig-secondary-text); text-transform: uppercase; margin-bottom: 4px;">${escapeHtml(domain)}</div>`;
+          if (data.title) html += `<div style="font-size: 14px; font-weight: 600; color: var(--ig-primary-text); margin-bottom: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(data.title)}</div>`;
+          if (data.description) html += `<div style="font-size: 12px; color: var(--ig-secondary-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(data.description)}</div>`;
+          html += `</div>`;
+          previewEl.innerHTML = html;
+        })
+        .catch(() => {
+          let domain = '';
+          try { domain = new URL(url).hostname; } catch(_) { domain = url; }
+          previewEl.innerHTML = `
+            <div style="padding: 10px 12px;">
+              <div style="font-size: 11px; color: var(--ig-secondary-text);">🔗 ${escapeHtml(domain)}</div>
+            </div>`;
+        });
     }
 
     // Search messages
@@ -6179,6 +6681,914 @@
 
     // Call init
     initAIChat();
+
+    // ========================
+    // CONTACT INFO PANEL
+    // ========================
+
+    let contactInfoData = null;
+
+    async function openContactInfo() {
+      if (!currentContactId || currentContactId === 'ai-assistant') return;
+
+      const panel = document.getElementById('contactInfoPanel');
+      panel.style.display = 'block';
+      // Trigger slide-in animation
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          panel.style.transform = 'translateX(0)';
+        });
+      });
+
+      // Load contact info
+      try {
+        const data = await InnovateAPI.apiRequest(`/users/${currentContactId}`);
+        contactInfoData = data.user;
+        const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        document.getElementById('contactInfoAvatar').src = avatar;
+        document.getElementById('contactInfoName').textContent = data.user.username || '';
+        document.getElementById('contactInfoBio').textContent = data.user.bio || '';
+        document.getElementById('contactInfoCreateGroupText').textContent = `Create group with ${data.user.username}`;
+        document.getElementById('contactInfoBlockText').textContent = `Block ${data.user.username}`;
+        document.getElementById('contactInfoReportText').textContent = `Report ${data.user.username}`;
+      } catch (e) {
+        console.error('Error loading contact info:', e);
+      }
+
+      // Load media count
+      try {
+        const mediaData = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/media`);
+        document.getElementById('contactInfoMediaCount').textContent = (mediaData.media || []).length;
+      } catch (e) { /* ignore */ }
+
+      // Load notification status
+      try {
+        const muteData = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/mute`);
+        const toggle = document.getElementById('contactInfoMuteToggle');
+        toggle.checked = !muteData.muted;
+        updateMuteToggleUI(!muteData.muted);
+      } catch (e) { /* default to on */ }
+
+      // Load disappearing status
+      try {
+        const dData = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/disappearing`);
+        const statusEl = document.getElementById('contactInfoDisappearingStatus');
+        if (dData.mode === 'off') statusEl.textContent = 'Off';
+        else if (dData.mode === 'on_read') statusEl.textContent = 'Disappear after read';
+        else if (dData.mode === 'timer') {
+          const d = dData.duration;
+          if (d === 86400) statusEl.textContent = '24 hours';
+          else if (d === 604800) statusEl.textContent = '7 days';
+          else if (d === 7776000) statusEl.textContent = '90 days';
+          else statusEl.textContent = `${d} seconds`;
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function closeContactInfo() {
+      const panel = document.getElementById('contactInfoPanel');
+      panel.style.transform = 'translateX(100%)';
+      setTimeout(() => { panel.style.display = 'none'; }, 300);
+    }
+
+    function updateMuteToggleUI(isOn) {
+      const slider = document.getElementById('muteToggleSlider');
+      const knob = document.getElementById('muteToggleKnob');
+      if (isOn) {
+        slider.style.backgroundColor = '#00a884';
+        knob.style.transform = 'translateX(20px)';
+      } else {
+        slider.style.backgroundColor = '#555';
+        knob.style.transform = 'translateX(0)';
+      }
+    }
+
+    // ========================
+    // VIEW PROFILE
+    // ========================
+    function viewContactProfile() {
+      if (currentContactId) {
+        window.location.href = `/profile/${currentContactId}`;
+      }
+    }
+
+    // ========================
+    // SEARCH IN CHAT
+    // ========================
+    function contactInfoSearchMessages() {
+      closeContactInfo();
+      openSubPanel('searchMessagesPanel');
+      setTimeout(() => document.getElementById('searchInChatInput').focus(), 400);
+    }
+
+    const searchInChatDebounced = InnovateAPI.debounce(async () => {
+      const q = document.getElementById('searchInChatInput').value.trim();
+      const container = document.getElementById('searchInChatResults');
+      if (!q) { container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Type to search messages</div>'; return; }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/search?q=${encodeURIComponent(q)}`);
+        const msgs = data.messages || [];
+        if (msgs.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No messages found</div>';
+          return;
+        }
+        container.innerHTML = msgs.map(m => `
+          <div onclick="jumpToMessage(${m.id})" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; background: var(--ig-secondary-background); margin-bottom: 6px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">${m.sender_username || 'User'}</div>
+              <div style="font-size: 14px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${highlightSearchTerm(m.content || '', q)}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px;">${formatTime(m.created_at)}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = '<div style="color: var(--ig-secondary-text); text-align: center; padding: 20px;">Search failed</div>';
+      }
+    }, 300);
+
+    function highlightSearchTerm(text, term) {
+      if (!term) return text;
+      const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      return text.replace(regex, '<mark style="background: rgba(0, 149, 246, 0.3); color: inherit; padding: 0 2px; border-radius: 2px;">$1</mark>');
+    }
+
+    function jumpToMessage(messageId) {
+      closeSubPanel('searchMessagesPanel');
+      const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageEl) {
+        messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const originalBg = messageEl.style.backgroundColor;
+        messageEl.style.backgroundColor = 'rgba(0, 149, 246, 0.3)';
+        messageEl.style.transition = 'background-color 0.3s';
+        setTimeout(() => { messageEl.style.backgroundColor = originalBg; }, 2000);
+      }
+    }
+
+    // ========================
+    // MEDIA, LINKS AND DOCS
+    // ========================
+    async function openMediaLinksDocsPanel() {
+      closeContactInfo();
+      openSubPanel('mediaLinksDocsPanel');
+      switchMediaTab('media');
+    }
+
+    async function switchMediaTab(tab) {
+      document.querySelectorAll('.media-tab').forEach(t => {
+        t.style.color = 'var(--ig-secondary-text)';
+        t.style.borderBottom = '2px solid transparent';
+        t.classList.remove('active');
+      });
+      const activeBtn = document.getElementById(tab + 'TabBtn');
+      if (activeBtn) {
+        activeBtn.style.color = 'var(--ig-primary-text)';
+        activeBtn.style.borderBottom = '2px solid var(--ig-blue)';
+        activeBtn.classList.add('active');
+      }
+
+      document.getElementById('mediaContent').style.display = tab === 'media' ? 'grid' : 'none';
+      document.getElementById('linksContent').style.display = tab === 'links' ? 'block' : 'none';
+      document.getElementById('docsContent').style.display = tab === 'docs' ? 'block' : 'none';
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/media`);
+        const media = data.media || [];
+
+        if (tab === 'media') {
+          const mediaItems = media.filter(m => m.type === 'image' || m.type === 'video' || m.type === 'gif');
+          const container = document.getElementById('mediaContent');
+          if (mediaItems.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--ig-secondary-text);">No media shared</div>';
+          } else {
+            container.innerHTML = mediaItems.map(m => {
+              if (m.type === 'video') {
+                return `<div style="aspect-ratio: 1; overflow: hidden; border-radius: 4px; position: relative; cursor: pointer;" onclick="openMediaPreview('${m.content}', 'video')">
+                  <video src="${m.content}" style="width: 100%; height: 100%; object-fit: cover;"></video>
+                  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.5); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                    <svg fill="white" height="16" viewBox="0 0 24 24" width="16"><path d="M8 5v14l11-7z"/></svg>
+                  </div>
+                </div>`;
+              }
+              return `<div style="aspect-ratio: 1; overflow: hidden; border-radius: 4px; cursor: pointer;" onclick="openMediaPreview('${m.content}', '${m.type}')">
+                <img src="${m.content}" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>`;
+            }).join('');
+          }
+        } else if (tab === 'links') {
+          // Extract links from text messages
+          const linkRegex = /(https?:\/\/[^\s]+)/g;
+          const allMessages = media.concat([]); // We need text messages with links
+          const linksContainer = document.getElementById('linksContent');
+          // Fetch all messages for links
+          try {
+            const allData = await InnovateAPI.apiRequest(`/messages/${currentContactId}`);
+            const links = [];
+            (allData.messages || []).forEach(m => {
+              if (m.content) {
+                const found = m.content.match(linkRegex);
+                if (found) found.forEach(l => links.push({ url: l, sender: m.sender_username, time: m.created_at }));
+              }
+            });
+            if (links.length === 0) {
+              linksContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No links shared</div>';
+            } else {
+              linksContainer.innerHTML = links.map(l => `
+                <a href="${l.url}" target="_blank" rel="noopener" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; margin-bottom: 6px; text-decoration: none; color: var(--ig-primary-text);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                  <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="var(--ig-blue)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                  <div style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ig-blue); font-size: 14px;">${l.url}</div>
+                </a>
+              `).join('');
+            }
+          } catch (e) {
+            linksContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Could not load links</div>';
+          }
+        } else if (tab === 'docs') {
+          const docItems = media.filter(m => m.type === 'file');
+          const container = document.getElementById('docsContent');
+          if (docItems.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No documents shared</div>';
+          } else {
+            container.innerHTML = docItems.map(m => `
+              <a href="${m.content}" download="${m.original_filename || 'file'}" style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 10px; margin-bottom: 6px; text-decoration: none; color: var(--ig-primary-text);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><path d="M13 2v7h7"></path></svg>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.original_filename || 'Document'}</div>
+                  <div style="font-size: 12px; color: var(--ig-secondary-text);">${formatTime(m.created_at)}</div>
+                </div>
+              </a>
+            `).join('');
+          }
+        }
+      } catch (e) {
+        console.error('Error loading media:', e);
+      }
+    }
+
+    // ========================
+    // STARRED MESSAGES
+    // ========================
+    async function openStarredMessagesPanel() {
+      closeContactInfo();
+      openSubPanel('starredMessagesPanel');
+      const container = document.getElementById('starredMessagesList');
+      container.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="ig-spinner"></div></div>';
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/starred`);
+        const msgs = data.messages || [];
+        if (msgs.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);"><svg fill="none" height="40" viewBox="0 0 24 24" width="40" stroke="var(--ig-secondary-text)" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg><div style="margin-top: 12px;">No starred messages</div></div>';
+          return;
+        }
+        container.innerHTML = msgs.map(m => `
+          <div onclick="jumpToMessage(${m.id})" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 10px; background: var(--ig-secondary-background); margin-bottom: 6px; cursor: pointer; position: relative;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <svg fill="#ffc107" height="14" viewBox="0 0 24 24" width="14" style="flex-shrink: 0; margin-top: 2px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">${m.sender_username || 'User'}</div>
+              <div style="font-size: 14px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.content || (m.type === 'image' ? '📷 Photo' : m.type === 'video' ? '🎬 Video' : 'Message')}</div>
+              <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px;">${formatTime(m.created_at)}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = '<div style="color: var(--ig-secondary-text); text-align: center; padding: 20px;">Failed to load starred messages</div>';
+      }
+    }
+
+    // ========================
+    // NOTIFICATIONS TOGGLE
+    // ========================
+    async function toggleChatNotifications(isOn) {
+      updateMuteToggleUI(isOn);
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/mute`, {
+          method: 'POST',
+          body: JSON.stringify({ muted: !isOn })
+        });
+        InnovateAPI.showAlert(isOn ? 'Notifications enabled' : 'Notifications muted', 'success');
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to update notification settings', 'error');
+      }
+    }
+
+    // ========================
+    // DISAPPEARING MESSAGES
+    // ========================
+    async function openDisappearingSettings() {
+      closeContactInfo();
+      openSubPanel('disappearingSettingsPanel');
+
+      // Load current setting
+      try {
+        const data = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/disappearing`);
+        let selectedValue = 'off';
+        if (data.mode === 'on_read') selectedValue = 'on_read';
+        else if (data.mode === 'timer') {
+          if (data.duration === 86400) selectedValue = 'timer_24h';
+          else if (data.duration === 604800) selectedValue = 'timer_7d';
+          else if (data.duration === 7776000) selectedValue = 'timer_90d';
+        }
+        const radio = document.querySelector(`input[name="disappearingMode"][value="${selectedValue}"]`);
+        if (radio) radio.checked = true;
+      } catch (e) { /* default to off */ }
+    }
+
+    async function saveDisappearingSettings() {
+      const selected = document.querySelector('input[name="disappearingMode"]:checked')?.value || 'off';
+      let mode = 'off', duration = 0;
+      if (selected === 'on_read') { mode = 'on_read'; }
+      else if (selected === 'timer_24h') { mode = 'timer'; duration = 86400; }
+      else if (selected === 'timer_7d') { mode = 'timer'; duration = 604800; }
+      else if (selected === 'timer_90d') { mode = 'timer'; duration = 7776000; }
+
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/disappearing`, {
+          method: 'POST',
+          body: JSON.stringify({ mode, duration })
+        });
+        InnovateAPI.showAlert('Disappearing messages updated', 'success');
+        closeSubPanel('disappearingSettingsPanel');
+        // Update status text
+        const statusEl = document.getElementById('contactInfoDisappearingStatus');
+        if (mode === 'off') statusEl.textContent = 'Off';
+        else if (mode === 'on_read') statusEl.textContent = 'Disappear after read';
+        else if (duration === 86400) statusEl.textContent = '24 hours';
+        else if (duration === 604800) statusEl.textContent = '7 days';
+        else if (duration === 7776000) statusEl.textContent = '90 days';
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to save settings', 'error');
+      }
+    }
+
+    // ========================
+    // CREATE GROUP WITH CONTACT
+    // ========================
+    let createGroupSelectedUsers = new Map();
+
+    function createGroupWithContact() {
+      closeContactInfo();
+      createGroupSelectedUsers = new Map();
+      // Pre-select the current contact
+      if (contactInfoData) {
+        createGroupSelectedUsers.set(contactInfoData.username, { id: contactInfoData.id, username: contactInfoData.username, profile_picture: contactInfoData.profile_picture });
+      }
+      renderCreateGroupSelected();
+      document.getElementById('createGroupName').value = '';
+      document.getElementById('createGroupSearch').value = '';
+      document.getElementById('createGroupResults').innerHTML = '';
+      openSubPanel('createGroupWithPanel');
+    }
+
+    function renderCreateGroupSelected() {
+      const container = document.getElementById('createGroupSelected');
+      container.innerHTML = '';
+      createGroupSelectedUsers.forEach((u, username) => {
+        const chip = document.createElement('div');
+        chip.style.cssText = 'display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--ig-secondary-background); border-radius: 20px; font-size: 13px;';
+        chip.innerHTML = `
+          <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;">
+          ${username}
+          <button onclick="removeFromGroupSelection('${username}')" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 16px; padding: 0 2px;">&times;</button>
+        `;
+        container.appendChild(chip);
+      });
+    }
+
+    function removeFromGroupSelection(username) {
+      createGroupSelectedUsers.delete(username);
+      renderCreateGroupSelected();
+    }
+
+    const searchUsersForGroup = InnovateAPI.debounce(async () => {
+      const q = document.getElementById('createGroupSearch').value.trim();
+      const container = document.getElementById('createGroupResults');
+      if (!q) { container.innerHTML = ''; return; }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(q)}`);
+        const users = data.users || [];
+        container.innerHTML = '';
+        users.filter(u => u.id !== user.id).forEach(u => {
+          const isSelected = createGroupSelectedUsers.has(u.username);
+          const row = document.createElement('div');
+          row.style.cssText = `display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: ${isSelected ? 'rgba(0,168,132,0.1)' : 'var(--ig-secondary-background)'}; border-radius: 10px; cursor: pointer;`;
+          row.innerHTML = `
+            <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">${u.username}</div>
+              <div style="font-size: 12px; color: var(--ig-secondary-text);">${u.fullname || ''}</div>
+            </div>
+            <div style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid ${isSelected ? '#00a884' : 'var(--ig-border)'}; display: flex; align-items: center; justify-content: center; background: ${isSelected ? '#00a884' : 'transparent'};">
+              ${isSelected ? '<svg fill="white" height="14" viewBox="0 0 24 24" width="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
+            </div>
+          `;
+          row.onclick = () => {
+            if (createGroupSelectedUsers.has(u.username)) {
+              createGroupSelectedUsers.delete(u.username);
+            } else {
+              createGroupSelectedUsers.set(u.username, { id: u.id, username: u.username, profile_picture: u.profile_picture });
+            }
+            renderCreateGroupSelected();
+            searchUsersForGroup(); // Re-render results to update checkmarks
+          };
+          container.appendChild(row);
+        });
+      } catch (e) {
+        container.innerHTML = '<div style="color: var(--ig-secondary-text); text-align: center; padding: 20px;">Search failed</div>';
+      }
+    }, 300);
+
+    async function submitCreateGroupWithContact() {
+      const name = document.getElementById('createGroupName').value.trim();
+      if (!name) { InnovateAPI.showAlert('Enter a group name', 'error'); return; }
+      const usernames = Array.from(createGroupSelectedUsers.keys());
+      if (usernames.length === 0) { InnovateAPI.showAlert('Add at least one member', 'error'); return; }
+
+      try {
+        const data = await InnovateAPI.apiRequest('/groups', { method: 'POST', body: JSON.stringify({ name, usernames }) });
+        if (data && data.group) {
+          closeSubPanel('createGroupWithPanel');
+          InnovateAPI.showAlert('Group created!', 'success');
+          openGroupChat(data.group.id, data.group.name);
+          setTimeout(() => loadConversations(), 300);
+        }
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to create group', 'error');
+      }
+    }
+
+    // ========================
+    // CLEAR CHAT
+    // ========================
+    async function clearChatFromPanel() {
+      if (!confirm('Clear all messages in this chat? This action cannot be undone.')) return;
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/clear`, { method: 'POST' });
+        InnovateAPI.showAlert('Chat cleared', 'success');
+        closeContactInfo();
+        document.getElementById('chatMessages').innerHTML = `
+          <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+            <div style="font-size: 24px; margin-bottom: 8px;">💬</div>
+            <div>Chat cleared</div>
+          </div>
+        `;
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to clear chat', 'error');
+      }
+    }
+
+    // ========================
+    // DELETE CHAT
+    // ========================
+    async function deleteChatFromPanel() {
+      if (!confirm('Delete this entire chat? Messages will be removed and the conversation will be deleted from your list.')) return;
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}`, { method: 'DELETE' });
+        InnovateAPI.showAlert('Chat deleted', 'success');
+        closeContactInfo();
+        currentContactId = null;
+        // Close chat window and reload conversations
+        document.getElementById('chatWindow').classList.remove('active');
+        document.getElementById('chatMessages').innerHTML = `
+          <div style="text-align: center; color: var(--ig-secondary-text); padding: 60px 40px; display: flex; flex-direction: column; align-items: center; gap: 24px;">
+            <div style="width: 96px; height: 96px; border-radius: 50%; background: var(--ig-secondary-background); display: flex; align-items: center; justify-content: center;">
+              <svg fill="none" height="56" viewBox="0 0 24 24" width="56" stroke="var(--ig-secondary-text)" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8 10h.01M12 10h.01M16 10h.01" stroke-width="2"></path></svg>
+            </div>
+            <div><div style="font-size: 20px; font-weight: 600; color: var(--ig-primary-text); margin-bottom: 8px;">Your messages</div><div style="font-size: 14px;">Select a conversation to start messaging</div></div>
+          </div>
+        `;
+        // Show nav again on mobile
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', '');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', '');
+        await loadConversations();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to delete chat', 'error');
+      }
+    }
+
+    // ========================
+    // BLOCK USER
+    // ========================
+    async function blockUserFromPanel() {
+      const username = contactInfoData?.username || 'this user';
+      if (!confirm(`Block ${username}? They won't be able to message you.`)) return;
+      try {
+        await InnovateAPI.apiRequest(`/users/${currentContactId}/block`, { method: 'POST' });
+        InnovateAPI.showAlert(`${username} blocked`, 'success');
+        closeContactInfo();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to block user', 'error');
+      }
+    }
+
+    // ========================
+    // REPORT USER
+    // ========================
+    function reportUserFromPanel() {
+      closeContactInfo();
+      const modal = document.getElementById('reportUserModal');
+      modal.style.display = 'flex';
+    }
+
+    function closeReportModal() {
+      document.getElementById('reportUserModal').style.display = 'none';
+    }
+
+    async function submitReport() {
+      const reason = document.querySelector('input[name="reportReason"]:checked')?.value;
+      if (!reason) { InnovateAPI.showAlert('Select a reason', 'error'); return; }
+      const details = document.getElementById('reportDetails').value;
+
+      try {
+        await InnovateAPI.apiRequest(`/messages/report/${currentContactId}`, {
+          method: 'POST',
+          body: JSON.stringify({ reason, details })
+        });
+        InnovateAPI.showAlert('Report submitted. Thank you.', 'success');
+        closeReportModal();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to submit report', 'error');
+      }
+    }
+
+    // ========================
+    // SUB-PANEL HELPERS
+    // ========================
+    function openSubPanel(panelId) {
+      const panel = document.getElementById(panelId);
+      panel.style.display = 'block';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          panel.style.transform = 'translateX(0)';
+        });
+      });
+    }
+
+    function closeSubPanel(panelId) {
+      const panel = document.getElementById(panelId);
+      panel.style.transform = 'translateX(100%)';
+      setTimeout(() => { panel.style.display = 'none'; }, 300);
+    }
+
+    // ========================
+    // GROUP INFO PANEL
+    // ========================
+
+    let groupInfoData = null;
+
+    async function openGroupInfo() {
+      if (!currentGroupId) return;
+
+      const panel = document.getElementById('groupInfoPanel');
+      panel.style.display = 'block';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          panel.style.transform = 'translateX(0)';
+        });
+      });
+
+      // Load group details
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/info`);
+        groupInfoData = data.group;
+        document.getElementById('groupInfoName').textContent = data.group.name || 'Group';
+        document.getElementById('groupInfoMemberCount').textContent = `Group · ${data.group.member_count || 0} members`;
+        document.getElementById('groupInfoMembersLabel').textContent = `${data.group.member_count || 0} members`;
+        
+        if (data.group.description) {
+          document.getElementById('groupInfoDescription').textContent = data.group.description;
+        } else {
+          document.getElementById('groupInfoDescription').textContent = 'Tap to add group description';
+        }
+
+        // Render members list
+        renderGroupMembers(data.group.members || []);
+      } catch (e) {
+        console.error('Error loading group info:', e);
+        // Fallback: use the name from the chat header
+        const chatName = document.getElementById('chatUsername')?.textContent || 'Group';
+        document.getElementById('groupInfoName').textContent = chatName;
+      }
+
+      // Load media count
+      try {
+        const mediaData = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/media`);
+        document.getElementById('groupInfoMediaCount').textContent = (mediaData.media || []).length;
+      } catch (e) { /* ignore */ }
+    }
+
+    function closeGroupInfo() {
+      const panel = document.getElementById('groupInfoPanel');
+      panel.style.transform = 'translateX(100%)';
+      setTimeout(() => { panel.style.display = 'none'; }, 300);
+    }
+
+    function renderGroupMembers(members) {
+      const list = document.getElementById('groupInfoMembersList');
+      list.innerHTML = '';
+      
+      // Sort: admins first, then alphabetically
+      members.sort((a, b) => {
+        if (a.role === 'admin' && b.role !== 'admin') return -1;
+        if (a.role !== 'admin' && b.role === 'admin') return 1;
+        return (a.username || '').localeCompare(b.username || '');
+      });
+
+      members.forEach((member, idx) => {
+        const memberEl = document.createElement('div');
+        memberEl.style.cssText = `display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer;${idx < members.length - 1 ? ' border-bottom: 1px solid var(--ig-border);' : ''}`;
+        memberEl.onmouseover = () => memberEl.style.opacity = '0.8';
+        memberEl.onmouseout = () => memberEl.style.opacity = '1';
+        memberEl.onclick = () => window.location.href = `/profile/${member.user_id}`;
+        
+        const avatar = member.profile_picture 
+          ? (member.profile_picture.startsWith('http') ? member.profile_picture : `/uploads/${member.profile_picture}`)
+          : '/images/default-avatar.svg';
+
+        const isYou = member.user_id === user.id;
+        const nameDisplay = isYou ? 'You' : (member.username || 'User');
+        
+        memberEl.innerHTML = `
+          <img src="${avatar}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='/images/default-avatar.svg'">
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(nameDisplay)}</div>
+            ${member.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(member.bio)}</div>` : ''}
+          </div>
+          ${member.role === 'admin' ? '<span style="font-size: 11px; color: #00a884; background: rgba(0,168,132,0.15); padding: 2px 8px; border-radius: 10px; font-weight: 600;">Group admin</span>' : ''}
+        `;
+        
+        list.appendChild(memberEl);
+      });
+    }
+
+    // ========================
+    // GROUP INFO FEATURES
+    // ========================
+    
+    function groupInfoSearchMessages() {
+      closeGroupInfo();
+      openSubPanel('groupSearchMessagesPanel');
+      setTimeout(() => document.getElementById('groupSearchInChatInput')?.focus(), 400);
+    }
+
+    const searchInGroupChatDebounced = InnovateAPI.debounce(async () => {
+      const q = document.getElementById('groupSearchInChatInput').value.trim();
+      const container = document.getElementById('groupSearchInChatResults');
+      if (!q) { container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Type to search messages</div>'; return; }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/search?q=${encodeURIComponent(q)}`);
+        const msgs = data.messages || [];
+        if (msgs.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No messages found</div>';
+          return;
+        }
+        container.innerHTML = '';
+        msgs.forEach(msg => {
+          const el = document.createElement('div');
+          el.style.cssText = 'padding: 12px; border-bottom: 1px solid var(--ig-border); cursor: pointer;';
+          el.innerHTML = `
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${escapeHtml(msg.sender_username || 'User')}</div>
+            <div style="font-size: 14px;">${linkifyText(msg.content || '')}</div>
+            <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px;">${formatMessageTime(msg.created_at)}</div>
+          `;
+          container.appendChild(el);
+        });
+      } catch (e) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error searching messages</div>';
+      }
+    }, 400);
+
+    function groupInfoAddMember() {
+      const modal = document.getElementById('groupAddMemberModal');
+      modal.style.display = 'flex';
+      document.getElementById('groupAddMemberSearch').value = '';
+      document.getElementById('groupAddMemberResults').innerHTML = '';
+    }
+
+    function closeGroupAddMemberModal() {
+      document.getElementById('groupAddMemberModal').style.display = 'none';
+    }
+
+    const searchUsersForGroupAdd = InnovateAPI.debounce(async () => {
+      const q = document.getElementById('groupAddMemberSearch').value.trim();
+      const container = document.getElementById('groupAddMemberResults');
+      if (!q) { container.innerHTML = ''; return; }
+
+      try {
+        const data = await InnovateAPI.apiRequest(`/search?q=${encodeURIComponent(q)}`);
+        const users = data.users || [];
+        container.innerHTML = '';
+        
+        // Filter out existing members
+        const existingIds = (groupInfoData?.members || []).map(m => m.user_id);
+        const filtered = users.filter(u => !existingIds.includes(u.id) && u.id !== user.id);
+        
+        if (filtered.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ig-secondary-text);">No users found</div>';
+          return;
+        }
+
+        filtered.forEach(u => {
+          const el = document.createElement('div');
+          el.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; border-radius: 10px;';
+          el.onmouseover = () => el.style.background = 'var(--ig-secondary-background)';
+          el.onmouseout = () => el.style.background = 'none';
+          const avatar = u.profile_picture ? (u.profile_picture.startsWith('http') ? u.profile_picture : `/uploads/${u.profile_picture}`) : '/images/default-avatar.svg';
+          el.innerHTML = `
+            <img src="${avatar}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" onerror="this.src='/images/default-avatar.svg'">
+            <div style="flex: 1;"><div style="font-weight: 600;">${escapeHtml(u.username)}</div></div>
+            <button onclick="event.stopPropagation(); addMemberToGroup(${u.id}, '${escapeHtml(u.username)}')" style="padding: 6px 16px; background: #00a884; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Add</button>
+          `;
+          container.appendChild(el);
+        });
+      } catch (e) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ig-secondary-text);">Error searching</div>';
+      }
+    }, 300);
+
+    async function addMemberToGroup(userId, username) {
+      try {
+        await InnovateAPI.apiRequest(`/groups/${currentGroupId}/members`, {
+          method: 'POST',
+          body: JSON.stringify({ user_id: userId })
+        });
+        InnovateAPI.showAlert(`${username} added to group`, 'success');
+        closeGroupAddMemberModal();
+        // Refresh group info
+        openGroupInfo();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to add member', 'error');
+      }
+    }
+
+    async function editGroupDescription() {
+      const current = groupInfoData?.description || '';
+      const newDesc = prompt('Enter group description:', current);
+      if (newDesc === null) return;
+      try {
+        await InnovateAPI.apiRequest(`/groups/${currentGroupId}/description`, {
+          method: 'PUT',
+          body: JSON.stringify({ description: newDesc })
+        });
+        document.getElementById('groupInfoDescription').textContent = newDesc || 'Tap to add group description';
+        if (groupInfoData) groupInfoData.description = newDesc;
+        InnovateAPI.showAlert('Description updated', 'success');
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to update description', 'error');
+      }
+    }
+
+    function toggleGroupNotifications(isOn) {
+      const slider = document.getElementById('groupMuteToggleSlider');
+      const knob = document.getElementById('groupMuteToggleKnob');
+      if (isOn) {
+        slider.style.backgroundColor = '#00a884';
+        knob.style.transform = 'translateX(20px)';
+      } else {
+        slider.style.backgroundColor = '#555';
+        knob.style.transform = 'translateX(0)';
+      }
+      InnovateAPI.showAlert(isOn ? 'Notifications enabled' : 'Notifications muted', 'success');
+    }
+
+    function openGroupDisappearingSettings() {
+      closeGroupInfo();
+      openSubPanel('disappearingSettingsPanel');
+    }
+
+    function openGroupMediaPanel() {
+      closeGroupInfo();
+      // Reuse existing media panel with group data
+      openSubPanel('mediaLinksDocsPanel');
+      // Load group media
+      loadGroupMediaContent();
+    }
+
+    async function loadGroupMediaContent() {
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/media`);
+        const mediaContainer = document.getElementById('mediaContent');
+        const linksContainer = document.getElementById('linksContent');
+        const docsContainer = document.getElementById('docsContent');
+        
+        mediaContainer.innerHTML = '';
+        linksContainer.innerHTML = '';
+        docsContainer.innerHTML = '';
+        
+        const items = data.media || [];
+        let mediaCount = 0, linkCount = 0, docCount = 0;
+
+        items.forEach(item => {
+          if (item.type === 'image') {
+            mediaCount++;
+            const img = document.createElement('div');
+            img.style.cssText = 'aspect-ratio: 1; overflow: hidden; border-radius: 4px; cursor: pointer;';
+            img.innerHTML = `<img src="${item.content}" alt="" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.style.display='none'">`;
+            img.onclick = () => window.open(item.content, '_blank');
+            mediaContainer.appendChild(img);
+          } else if (item.type === 'link') {
+            linkCount++;
+            const le = document.createElement('div');
+            le.style.cssText = 'padding: 12px; border-bottom: 1px solid var(--ig-border); cursor: pointer;';
+            le.innerHTML = `<div style="color: #00a884; word-break: break-all;">${escapeHtml(item.content)}</div><div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px;">${formatMessageTime(item.created_at)}</div>`;
+            le.onclick = () => window.open(item.content, '_blank');
+            linksContainer.appendChild(le);
+          }
+        });
+
+        if (!mediaCount) mediaContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--ig-secondary-text);">No media shared</div>';
+        if (!linkCount) linksContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No links shared</div>';
+        docsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No documents shared</div>';
+      } catch (e) {
+        console.error('Error loading group media:', e);
+      }
+    }
+
+    function openGroupStarredPanel() {
+      closeGroupInfo();
+      openSubPanel('starredMessagesPanel');
+      // Load group starred messages
+      loadGroupStarredMessages();
+    }
+
+    async function loadGroupStarredMessages() {
+      const container = document.getElementById('starredMessagesList');
+      container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Loading...</div>';
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/starred`);
+        const msgs = data.messages || [];
+        if (msgs.length === 0) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">No starred messages</div>';
+          return;
+        }
+        container.innerHTML = '';
+        msgs.forEach(msg => {
+          const el = document.createElement('div');
+          el.style.cssText = 'padding: 12px; border-bottom: 1px solid var(--ig-border);';
+          el.innerHTML = `
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px;">${escapeHtml(msg.sender_username || 'User')}</div>
+            <div style="font-size: 14px;">${linkifyText(msg.content || '')}</div>
+            <div style="font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px;">⭐ ${formatMessageTime(msg.created_at)}</div>
+          `;
+          container.appendChild(el);
+        });
+      } catch (e) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading starred messages</div>';
+      }
+    }
+
+    async function clearGroupChat() {
+      if (!confirm('Clear all messages in this group? This cannot be undone.')) return;
+      try {
+        await InnovateAPI.apiRequest(`/groups/${currentGroupId}/clear`, { method: 'POST' });
+        InnovateAPI.showAlert('Group chat cleared', 'success');
+        closeGroupInfo();
+        document.getElementById('chatMessages').innerHTML = `
+          <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+            <div style="font-size: 24px; margin-bottom: 8px;">💬</div>
+            <div>Chat cleared</div>
+          </div>
+        `;
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to clear chat', 'error');
+      }
+    }
+
+    async function exitGroup() {
+      if (!confirm('Exit this group? You will no longer receive messages from this group.')) return;
+      try {
+        await InnovateAPI.apiRequest(`/groups/${currentGroupId}/leave`, { method: 'POST' });
+        InnovateAPI.showAlert('You left the group', 'success');
+        closeGroupInfo();
+        currentGroupId = null;
+        document.getElementById('chatWindow').classList.remove('active');
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', '');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', '');
+        await loadConversations();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to exit group', 'error');
+      }
+    }
+
+    function reportGroup() {
+      closeGroupInfo();
+      const modal = document.getElementById('reportUserModal');
+      modal.style.display = 'flex';
+    }
+
+    function inviteViaLink() {
+      const link = `${window.location.origin}/join-group/${currentGroupId}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(link).then(() => {
+          InnovateAPI.showAlert('Invite link copied to clipboard!', 'success');
+        });
+      } else {
+        prompt('Copy this invite link:', link);
+      }
+    }
+
   </script>
 </body>
 </html>

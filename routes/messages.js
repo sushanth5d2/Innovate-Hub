@@ -558,4 +558,233 @@ router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
   });
 });
 
+// Get starred messages for a conversation
+router.get('/conversations/:contactId/starred', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  const query = `
+    SELECT m.*, sender.username as sender_username, sender.profile_picture as sender_picture,
+           sm.starred_at
+    FROM starred_messages sm
+    JOIN messages m ON sm.message_id = m.id
+    JOIN users sender ON m.sender_id = sender.id
+    WHERE sm.user_id = ?
+      AND ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+    ORDER BY sm.starred_at DESC
+  `;
+
+  db.all(query, [userId, userId, contactId, contactId, userId], (err, messages) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching starred messages' });
+    }
+    res.json({ success: true, messages: messages || [] });
+  });
+});
+
+// Get media, links and docs for a conversation
+router.get('/conversations/:contactId/media', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  const query = `
+    SELECT m.*, sender.username as sender_username
+    FROM messages m
+    JOIN users sender ON m.sender_id = sender.id
+    WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+      AND m.type IN ('image', 'video', 'file', 'gif')
+      AND m.is_deleted_by_sender = 0 AND m.is_deleted_by_receiver = 0
+    ORDER BY m.created_at DESC
+  `;
+
+  db.all(query, [userId, contactId, contactId, userId], (err, messages) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching media' });
+    }
+    res.json({ success: true, media: messages || [] });
+  });
+});
+
+// Search messages in a conversation
+router.get('/conversations/:contactId/search', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+  const { q } = req.query;
+
+  if (!q || q.trim().length === 0) {
+    return res.json({ success: true, messages: [] });
+  }
+
+  const query = `
+    SELECT m.*, sender.username as sender_username
+    FROM messages m
+    JOIN users sender ON m.sender_id = sender.id
+    WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+      AND m.content LIKE ?
+      AND m.is_deleted_by_sender = 0 AND m.is_deleted_by_receiver = 0
+    ORDER BY m.created_at DESC
+    LIMIT 50
+  `;
+
+  db.all(query, [userId, contactId, contactId, userId, `%${q}%`], (err, messages) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error searching messages' });
+    }
+    res.json({ success: true, messages: messages || [] });
+  });
+});
+
+// Clear chat (soft delete for current user)
+router.post('/conversations/:contactId/clear', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  const query = `
+    UPDATE messages
+    SET 
+      is_deleted_by_sender = CASE WHEN sender_id = ? THEN 1 ELSE is_deleted_by_sender END,
+      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN 1 ELSE is_deleted_by_receiver END
+    WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+  `;
+
+  db.run(query, [userId, userId, userId, contactId, contactId, userId], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Error clearing chat' });
+    }
+    res.json({ success: true });
+  });
+});
+
+// Set disappearing messages for a conversation
+router.post('/conversations/:contactId/disappearing', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+  const { mode, duration } = req.body; // mode: 'off' | 'timer' | 'on_read', duration: seconds (for timer mode)
+
+  // Store in a simple key-value style using a dedicated table or in-memory
+  // For now, we'll use a simple approach with a disappearing_settings table
+  db.run(`CREATE TABLE IF NOT EXISTS disappearing_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    contact_id INTEGER NOT NULL,
+    mode TEXT DEFAULT 'off',
+    duration INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, contact_id)
+  )`, (err) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+
+    db.run(`INSERT INTO disappearing_settings (user_id, contact_id, mode, duration, updated_at) 
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=datetime('now')`,
+      [userId, contactId, mode, duration || 0, mode, duration || 0],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Error saving settings' });
+        res.json({ success: true, mode, duration });
+      }
+    );
+  });
+});
+
+// Get disappearing messages setting
+router.get('/conversations/:contactId/disappearing', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  db.run(`CREATE TABLE IF NOT EXISTS disappearing_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    contact_id INTEGER NOT NULL,
+    mode TEXT DEFAULT 'off',
+    duration INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, contact_id)
+  )`, () => {
+    db.get('SELECT * FROM disappearing_settings WHERE user_id = ? AND contact_id = ?', [userId, contactId], (err, row) => {
+      if (err) return res.status(500).json({ error: 'Error fetching settings' });
+      res.json({ success: true, mode: row ? row.mode : 'off', duration: row ? row.duration : 0 });
+    });
+  });
+});
+
+// Toggle chat notifications mute
+router.post('/conversations/:contactId/mute', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+  const { muted } = req.body;
+
+  db.run(`CREATE TABLE IF NOT EXISTS chat_mute_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    contact_id INTEGER NOT NULL,
+    muted BOOLEAN DEFAULT 0,
+    UNIQUE(user_id, contact_id)
+  )`, (err) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+
+    db.run(`INSERT INTO chat_mute_settings (user_id, contact_id, muted) VALUES (?, ?, ?)
+            ON CONFLICT(user_id, contact_id) DO UPDATE SET muted=?`,
+      [userId, contactId, muted ? 1 : 0, muted ? 1 : 0],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Error saving mute setting' });
+        res.json({ success: true, muted: !!muted });
+      }
+    );
+  });
+});
+
+// Get mute status
+router.get('/conversations/:contactId/mute', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  db.run(`CREATE TABLE IF NOT EXISTS chat_mute_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    contact_id INTEGER NOT NULL,
+    muted BOOLEAN DEFAULT 0,
+    UNIQUE(user_id, contact_id)
+  )`, () => {
+    db.get('SELECT * FROM chat_mute_settings WHERE user_id = ? AND contact_id = ?', [userId, contactId], (err, row) => {
+      if (err) return res.status(500).json({ error: 'Error' });
+      res.json({ success: true, muted: row ? !!row.muted : false });
+    });
+  });
+});
+
+// Report a user
+router.post('/report/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const reporterId = req.user.userId;
+  const { userId } = req.params;
+  const { reason, details } = req.body;
+
+  db.run(`CREATE TABLE IF NOT EXISTS user_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL,
+    reported_user_id INTEGER NOT NULL,
+    reason TEXT,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`, (err) => {
+    if (err) return res.status(500).json({ error: 'DB error' });
+
+    db.run('INSERT INTO user_reports (reporter_id, reported_user_id, reason, details) VALUES (?, ?, ?, ?)',
+      [reporterId, userId, reason || 'other', details || ''],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Error submitting report' });
+        res.json({ success: true, message: 'Report submitted successfully' });
+      }
+    );
+  });
+});
+
 module.exports = router;
