@@ -36,6 +36,46 @@
   padding: 0;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+:root[data-theme="light"] *:hover {
+  scrollbar-color: rgba(0,0,0,0.12) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+}
+
+:root[data-theme="light"] *:hover::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+:root[data-theme="light"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.2);
 }
 
 body {
@@ -903,12 +943,6 @@ body {
   flex-direction: column;
   gap: 8px;
   background: transparent;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.ig-chat-messages::-webkit-scrollbar {
-  display: none;
 }
 
 .ig-message {
@@ -1097,6 +1131,7 @@ body {
   align-items: flex-end;
   gap: 4px;
   background-color: var(--ig-primary-background);
+  position: relative;
 }
 
 .ig-camera-circle {
@@ -1150,12 +1185,6 @@ body {
   line-height: 1.4;
   font-family: inherit;
   box-sizing: border-box;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.ig-chat-input::-webkit-scrollbar {
-  display: none;
 }
 
 .ig-chat-input::placeholder {

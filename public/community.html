@@ -3347,7 +3347,7 @@
               </div>
               
               <div style="background: var(--ig-secondary-background); border: 2px solid var(--ig-border); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
-                <p style="white-space: pre-wrap; line-height: 1.8; margin: 0; font-size: 15px;">${ann.body || ann.content || 'No content'}</p>
+                <p style="white-space: pre-wrap; line-height: 1.8; margin: 0; font-size: 15px;">${linkify(ann.body || ann.content || 'No content')}</p>
               </div>
               
               ${attachments.length > 0 ? `
@@ -5213,8 +5213,10 @@
       content.innerHTML = '<div class="loading"><div class="spinner"></div>Loading messages...</div>';
       footer.style.display = 'flex';
       footer.style.flexWrap = 'wrap';
+      footer.style.position = 'relative';
       footer.innerHTML = `
         <div id="replyIndicator" style="display: none; width: 100%; padding: 8px 12px; background: var(--ig-secondary-background); border-left: 3px solid var(--ig-blue); border-radius: 8px; margin-bottom: 8px; align-items: center; gap: 8px;"></div>
+        <div id="communityMentionDropdown" style="display: none; position: absolute; bottom: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; margin-bottom: 4px; box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 1000;"></div>
         <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)" accept="image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx">
         <button class="ws-icon-btn" onclick="document.getElementById('fileInput').click()" title="Attach files">
           <i class="fas fa-paperclip"></i>
@@ -5222,7 +5224,7 @@
         <button class="ws-icon-btn" onclick="showPollCreator()" title="Create a poll" style="color: var(--ig-blue);">
           <i class="fas fa-poll"></i>
         </button>
-        <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;" onkeypress="if(event.key==='Enter')sendMessage()">
+        <input type="text" class="form-input" id="chatInput" placeholder="Type a message..." style="flex: 1; margin: 0 12px;" onkeypress="if(event.key==='Enter' && !document.getElementById('communityMentionDropdown').querySelector('.cm-item.active')){sendMessage()}" onkeydown="handleCommunityMentionKeydown(event)" oninput="handleCommunityMentionInput(this)">
         <button class="btn btn-primary" onclick="sendMessage()">
           <i class="fas fa-paper-plane"></i>
         </button>
@@ -8805,12 +8807,13 @@
           </div>
           
           <!-- Message Textarea -->
-          <div style="margin-bottom: 20px;">
+          <div style="margin-bottom: 20px; position: relative;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--ig-primary-text);">
               <i class="fas fa-align-left" style="color: #667eea;"></i>
-              <span>Message *</span>
+              <span>Message * <span style="font-weight: 400; font-size: 12px; color: var(--ig-secondary-text);">(use @username to mention)</span></span>
             </label>
-            <textarea id="announcementMessage" rows="5" placeholder="Write your announcement message here... Be clear and concise." required style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical; font-size: 15px; line-height: 1.6; transition: all 0.2s; outline: none; font-family: inherit;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='var(--ig-border)'"></textarea>
+            <div id="announcementMentionDropdown" style="display: none; position: absolute; bottom: auto; top: 40px; left: 0; right: 0; max-height: 180px; overflow-y: auto; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 1000;"></div>
+            <textarea id="announcementMessage" rows="5" placeholder="Write your announcement message here... Use @username to mention people." required style="width: 100%; padding: 14px 16px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); resize: vertical; font-size: 15px; line-height: 1.6; transition: all 0.2s; outline: none; font-family: inherit;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='var(--ig-border)'" oninput="handleAnnouncementMentionInput(this)" onkeydown="handleAnnouncementMentionKeydown(event)"></textarea>
           </div>
           
           <!-- Attachments -->
@@ -11058,9 +11061,17 @@
       const fontWeight = isOwnMessage ? '700' : '600';
       const textShadow = isOwnMessage ? 'text-shadow: 0 1px 2px rgba(0,0,0,0.3);' : '';
       
-      return text.replace(urlRegex, (url) => {
+      let result = text.replace(urlRegex, (url) => {
         return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: ${linkColor}; text-decoration: underline; word-break: break-all; font-weight: ${fontWeight}; ${textShadow}">${url}</a>`;
       });
+      
+      // Render @mentions as clickable profile links
+      const mentionColor = isOwnMessage ? '#ffffff' : '#0095f6';
+      result = result.replace(/@(\w[\w.]*)/g, (match, username) => {
+        return `<a href="/profile/${username}" class="mention-link" onclick="event.stopPropagation();" style="color: ${mentionColor}; font-weight: 700; text-decoration: none; cursor: pointer;">@${username}</a>`;
+      });
+      
+      return result;
     }
     
     // Scroll to a specific message and highlight it
@@ -11617,5 +11628,273 @@
       }
     }
   </style>
+  
+  <!-- @Mention System for Community Chat -->
+  <script>
+    let cmMentionTimeout = null;
+    let cmMentionStartPos = -1;
+    
+    function handleCommunityMentionInput(input) {
+      const value = input.value;
+      const cursorPos = input.selectionStart;
+      
+      // Find @ before cursor
+      let atPos = -1;
+      for (let i = cursorPos - 1; i >= 0; i--) {
+        if (value[i] === '@') {
+          if (i === 0 || /\s/.test(value[i - 1])) {
+            atPos = i;
+            break;
+          }
+          break;
+        }
+        if (/\s/.test(value[i])) break;
+      }
+      
+      if (atPos === -1) {
+        closeCommunityMentionDropdown();
+        return;
+      }
+      
+      const query = value.substring(atPos + 1, cursorPos);
+      cmMentionStartPos = atPos;
+      
+      clearTimeout(cmMentionTimeout);
+      cmMentionTimeout = setTimeout(() => {
+        showCommunityMentionSuggestions(query);
+      }, 200);
+    }
+    
+    async function showCommunityMentionSuggestions(query) {
+      const dropdown = document.getElementById('communityMentionDropdown');
+      if (!dropdown) return;
+      
+      let users = [];
+      
+      // Search users via API
+      if (query.length >= 0) {
+        try {
+          const searchQuery = query || 'a'; // search 'a' if empty to get some results
+          const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(searchQuery)}`);
+          users = (data.users || []).filter(u => u.id !== state.user?.id);
+        } catch (e) {
+          console.error('Community mention search error:', e);
+        }
+      }
+      
+      if (users.length === 0) {
+        closeCommunityMentionDropdown();
+        return;
+      }
+      
+      users = users.slice(0, 6);
+      dropdown.innerHTML = '';
+      
+      users.forEach((u, idx) => {
+        const item = document.createElement('div');
+        item.className = 'cm-item';
+        item.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; transition: background 0.15s;';
+        if (idx === 0) item.style.borderRadius = '12px 12px 0 0';
+        if (idx === users.length - 1) item.style.borderRadius = idx === 0 ? '12px' : '0 0 12px 12px';
+        item.onmouseover = () => {
+          dropdown.querySelectorAll('.cm-item').forEach(i => { i.classList.remove('active'); i.style.background = 'none'; });
+          item.classList.add('active');
+          item.style.background = 'var(--ig-secondary-background)';
+        };
+        item.onmouseout = () => { item.classList.remove('active'); item.style.background = 'none'; };
+        
+        const avatar = u.profile_picture || '/images/default-avatar.svg';
+        item.innerHTML = `
+          <img src="${avatar}" alt="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" onerror="this.src='/images/default-avatar.svg'">
+          <div>
+            <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
+            ${u.fullname ? `<div style="font-size: 12px; color: var(--ig-secondary-text);">${u.fullname}</div>` : ''}
+          </div>
+        `;
+        item.onclick = () => insertCommunityMention(u.username);
+        dropdown.appendChild(item);
+      });
+      
+      dropdown.style.display = 'block';
+    }
+    
+    function insertCommunityMention(username) {
+      const input = document.getElementById('chatInput');
+      if (!input || cmMentionStartPos === -1) return;
+      
+      const value = input.value;
+      const cursorPos = input.selectionStart;
+      const before = value.substring(0, cmMentionStartPos);
+      const after = value.substring(cursorPos);
+      
+      input.value = before + '@' + username + ' ' + after;
+      const newPos = cmMentionStartPos + username.length + 2;
+      input.selectionStart = input.selectionEnd = newPos;
+      input.focus();
+      
+      closeCommunityMentionDropdown();
+      cmMentionStartPos = -1;
+    }
+    
+    function closeCommunityMentionDropdown() {
+      const dropdown = document.getElementById('communityMentionDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+    }
+    
+    function handleCommunityMentionKeydown(event) {
+      const dropdown = document.getElementById('communityMentionDropdown');
+      if (!dropdown || dropdown.style.display === 'none') return;
+      
+      const items = dropdown.querySelectorAll('.cm-item');
+      const activeItem = dropdown.querySelector('.cm-item.active');
+      
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (!activeItem && items.length > 0) {
+          items[0].classList.add('active');
+          items[0].style.background = 'var(--ig-secondary-background)';
+        } else if (activeItem) {
+          const idx = Array.from(items).indexOf(activeItem);
+          activeItem.classList.remove('active');
+          activeItem.style.background = 'none';
+          const next = items[(idx + 1) % items.length];
+          next.classList.add('active');
+          next.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (activeItem) {
+          const idx = Array.from(items).indexOf(activeItem);
+          activeItem.classList.remove('active');
+          activeItem.style.background = 'none';
+          const prev = items[(idx - 1 + items.length) % items.length];
+          prev.classList.add('active');
+          prev.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (activeItem) {
+          activeItem.click();
+        } else if (items.length > 0) {
+          items[0].click();
+        }
+      } else if (event.key === 'Escape') {
+        closeCommunityMentionDropdown();
+      }
+    }
+    
+    window.handleCommunityMentionInput = handleCommunityMentionInput;
+    window.handleCommunityMentionKeydown = handleCommunityMentionKeydown;
+    
+    // Announcement @mention handlers (reuse same logic with different dropdown/input IDs)
+    let annMentionTimeout = null;
+    let annMentionStartPos = -1;
+    
+    function handleAnnouncementMentionInput(textarea) {
+      const value = textarea.value;
+      const cursorPos = textarea.selectionStart;
+      
+      let atPos = -1;
+      for (let i = cursorPos - 1; i >= 0; i--) {
+        if (value[i] === '@') {
+          if (i === 0 || /\s/.test(value[i - 1])) { atPos = i; break; }
+          break;
+        }
+        if (/\s/.test(value[i])) break;
+      }
+      
+      if (atPos === -1) {
+        const dd = document.getElementById('announcementMentionDropdown');
+        if (dd) dd.style.display = 'none';
+        return;
+      }
+      
+      const query = value.substring(atPos + 1, cursorPos);
+      annMentionStartPos = atPos;
+      
+      clearTimeout(annMentionTimeout);
+      annMentionTimeout = setTimeout(async () => {
+        const dropdown = document.getElementById('announcementMentionDropdown');
+        if (!dropdown) return;
+        
+        let users = [];
+        try {
+          const searchQuery = query || 'a';
+          const data = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(searchQuery)}`);
+          users = (data.users || []).filter(u => u.id !== state.user?.id).slice(0, 6);
+        } catch (e) {}
+        
+        if (users.length === 0) { dropdown.style.display = 'none'; return; }
+        
+        dropdown.innerHTML = '';
+        users.forEach((u, idx) => {
+          const item = document.createElement('div');
+          item.className = 'ann-mention-item';
+          item.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; transition: background 0.15s;';
+          if (idx === 0) item.style.borderRadius = '12px 12px 0 0';
+          if (idx === users.length - 1) item.style.borderRadius = idx === 0 ? '12px' : '0 0 12px 12px';
+          item.onmouseover = () => {
+            dropdown.querySelectorAll('.ann-mention-item').forEach(i => { i.classList.remove('active'); i.style.background = 'none'; });
+            item.classList.add('active');
+            item.style.background = 'var(--ig-secondary-background)';
+          };
+          item.onmouseout = () => { item.classList.remove('active'); item.style.background = 'none'; };
+          const avatar = u.profile_picture || '/images/default-avatar.svg';
+          item.innerHTML = `
+            <img src="${avatar}" alt="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;" onerror="this.src='/images/default-avatar.svg'">
+            <div><div style="font-weight: 600; font-size: 14px;">${u.username}</div>${u.fullname ? `<div style="font-size: 12px; color: var(--ig-secondary-text);">${u.fullname}</div>` : ''}</div>
+          `;
+          item.onclick = () => {
+            const ta = document.getElementById('announcementMessage');
+            if (!ta || annMentionStartPos === -1) return;
+            const v = ta.value;
+            const cp = ta.selectionStart;
+            ta.value = v.substring(0, annMentionStartPos) + '@' + u.username + ' ' + v.substring(cp);
+            const np = annMentionStartPos + u.username.length + 2;
+            ta.selectionStart = ta.selectionEnd = np;
+            ta.focus();
+            dropdown.style.display = 'none';
+            annMentionStartPos = -1;
+          };
+          dropdown.appendChild(item);
+        });
+        dropdown.style.display = 'block';
+      }, 200);
+    }
+    
+    function handleAnnouncementMentionKeydown(event) {
+      const dropdown = document.getElementById('announcementMentionDropdown');
+      if (!dropdown || dropdown.style.display === 'none') return;
+      
+      const items = dropdown.querySelectorAll('.ann-mention-item');
+      const activeItem = dropdown.querySelector('.ann-mention-item.active');
+      
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (!activeItem && items.length > 0) { items[0].classList.add('active'); items[0].style.background = 'var(--ig-secondary-background)'; }
+        else if (activeItem) {
+          const idx = Array.from(items).indexOf(activeItem);
+          activeItem.classList.remove('active'); activeItem.style.background = 'none';
+          const next = items[(idx + 1) % items.length]; next.classList.add('active'); next.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (activeItem) {
+          const idx = Array.from(items).indexOf(activeItem);
+          activeItem.classList.remove('active'); activeItem.style.background = 'none';
+          const prev = items[(idx - 1 + items.length) % items.length]; prev.classList.add('active'); prev.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'Enter' && (activeItem || items.length > 0)) {
+        event.preventDefault();
+        (activeItem || items[0]).click();
+      } else if (event.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    }
+    
+    window.handleAnnouncementMentionInput = handleAnnouncementMentionInput;
+    window.handleAnnouncementMentionKeydown = handleAnnouncementMentionKeydown;
+  </script>
 </body>
 </html>

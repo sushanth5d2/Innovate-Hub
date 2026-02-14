@@ -348,7 +348,7 @@
   <div class="ig-profile-content">
     <!-- Profile Info Section -->
     <div class="ig-profile-info">
-      <img id="profile-picture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e1e8ed'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23fff'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23fff'/%3E%3C/svg%3E" alt="Profile" class="ig-profile-pic">
+      <img id="profile-picture" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e1e8ed'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23fff'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23fff'/%3E%3C/svg%3E" alt="Profile" class="ig-profile-pic" style="cursor: pointer;" onclick="openProfilePhotoPreview(this.src)">
       
       <div class="ig-profile-stats">
         <div class="ig-stat">
@@ -543,8 +543,11 @@
     
     // Get userId from path or use query parameter
     const pathParts = window.location.pathname.split('/');
-    let userId = usernameParam ? null : (pathParts[pathParts.length - 1] || currentUser.id);
-    let isOwnProfile = !usernameParam && (currentUser.id == userId);
+    const lastPathPart = pathParts[pathParts.length - 1] || '';
+    // If the last path segment is non-numeric, treat it as a username
+    const isPathUsername = lastPathPart && isNaN(lastPathPart);
+    let userId = (usernameParam || isPathUsername) ? null : (lastPathPart || currentUser.id);
+    let isOwnProfile = !usernameParam && !isPathUsername && (currentUser.id == userId);
     let activeTab = 'posts';
     let listModalPreviousOverflow = '';
 
@@ -556,11 +559,12 @@
     async function loadProfile() {
       try {
         let profileUrl;
+        const lookupUsername = usernameParam || (isPathUsername ? lastPathPart : null);
         
-        // If username is provided, fetch by username
-        if (usernameParam) {
+        // If username is provided (via query param or path), fetch by username
+        if (lookupUsername) {
           // First, get user by searching for username
-          const searchResponse = await fetch(`/api/search/users?q=${encodeURIComponent(usernameParam)}`, {
+          const searchResponse = await fetch(`/api/search/users?q=${encodeURIComponent(lookupUsername)}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -569,7 +573,7 @@
           if (!searchResponse.ok) throw new Error('Failed to find user');
           
           const searchData = await searchResponse.json();
-          const foundUser = searchData.users?.find(u => u.username === usernameParam);
+          const foundUser = searchData.users?.find(u => u.username === lookupUsername);
           
           if (!foundUser) throw new Error('User not found');
           
@@ -821,6 +825,18 @@
 
     function getAvatarUrl(profilePicture) {
       return profilePicture || '/images/default-avatar.svg' || getDefaultAvatarDataUri();
+    }
+
+    function openProfilePhotoPreview(src) {
+      if (!src || src.includes('default-avatar') || src.startsWith('data:image/svg')) return;
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); z-index: 999999; display: flex; align-items: center; justify-content: center; flex-direction: column;';
+      modal.innerHTML = `
+        <button onclick="this.parentElement.remove()" style="position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2;">&times;</button>
+        <img src="${src}" style="max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px;">
+      `;
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.body.appendChild(modal);
     }
 
     function openListModal() {

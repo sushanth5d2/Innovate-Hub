@@ -8,50 +8,6 @@
   --exp-soft-2: rgba(255, 255, 255, 0.08);
 }
 
-/* Elegant transparent scrollbars */
-.exp-overlay *,
-.exp-detail *,
-.exp-detail-panel *,
-.ig-modal-overlay *,
-.exp-drawer * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.15) transparent;
-}
-
-.exp-overlay ::-webkit-scrollbar,
-.exp-detail ::-webkit-scrollbar,
-.exp-detail-panel ::-webkit-scrollbar,
-.ig-modal-overlay ::-webkit-scrollbar,
-.exp-drawer ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.exp-overlay ::-webkit-scrollbar-track,
-.exp-detail ::-webkit-scrollbar-track,
-.exp-detail-panel ::-webkit-scrollbar-track,
-.ig-modal-overlay ::-webkit-scrollbar-track,
-.exp-drawer ::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.exp-overlay ::-webkit-scrollbar-thumb,
-.exp-detail ::-webkit-scrollbar-thumb,
-.exp-detail-panel ::-webkit-scrollbar-thumb,
-.ig-modal-overlay ::-webkit-scrollbar-thumb,
-.exp-drawer ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
-  border-radius: 3px;
-}
-
-.exp-overlay ::-webkit-scrollbar-thumb:hover,
-.exp-detail ::-webkit-scrollbar-thumb:hover,
-.exp-detail-panel ::-webkit-scrollbar-thumb:hover,
-.ig-modal-overlay ::-webkit-scrollbar-thumb:hover,
-.exp-drawer ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.25);
-}
-
 .exp-page {
   max-width: 1180px;
   margin: 0 auto;

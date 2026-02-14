@@ -2,58 +2,74 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
+const upload = require('../middleware/upload');
 
 router.use(authMiddleware);
 
-// Create a group
-router.post('/', (req, res) => {
+// Create a group (supports multipart with profile_picture or JSON body)
+router.post('/', upload.single('profile_picture'), (req, res) => {
   const db = getDb();
   const creatorId = req.user.userId || req.user.id;
-  const { name, member_ids = [], usernames = [] } = req.body || {};
+  
+  let name, member_ids, usernames;
+  if (req.is('multipart/form-data')) {
+    name = req.body.name;
+    member_ids = [];
+    try { usernames = JSON.parse(req.body.usernames || '[]'); } catch(e) { usernames = []; }
+  } else {
+    ({ name, member_ids = [], usernames = [] } = req.body || {});
+  }
 
   if (!name) {
     return res.status(400).json({ error: 'Group name is required' });
   }
 
-  db.run(
-    `INSERT INTO group_conversations (creator_id, name) VALUES (?, ?)`,
-    [creatorId, name],
-    function(err) {
-      if (err) return res.status(500).json({ error: 'Failed to create group' });
-      const groupId = this.lastID;
+  // Ensure profile_picture column exists
+  db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
+    const profilePic = req.file ? req.file.path.replace(/\\/g, '/').replace(/^\.?\/?/, '/') : '';
+    
+    db.run(
+      `INSERT INTO group_conversations (creator_id, name, profile_picture) VALUES (?, ?, ?)`,
+      [creatorId, name, profilePic],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to create group' });
+        const groupId = this.lastID;
 
-      // Resolve usernames to user IDs if provided
-      const resolveUsernames = () => new Promise((resolve) => {
-        if (!usernames || usernames.length === 0) return resolve([]);
-        const placeholders = usernames.map(() => '?').join(',');
-        db.all(`SELECT id FROM users WHERE username IN (${placeholders})`, usernames, (e, rows) => {
-          if (e) return resolve([]);
-          resolve(rows.map(r => r.id));
+        // Resolve usernames to user IDs if provided
+        const resolveUsernames = () => new Promise((resolve) => {
+          if (!usernames || usernames.length === 0) return resolve([]);
+          const placeholders = usernames.map(() => '?').join(',');
+          db.all(`SELECT id FROM users WHERE username IN (${placeholders})`, usernames, (e, rows) => {
+            if (e) return resolve([]);
+            resolve(rows.map(r => r.id));
+          });
         });
-      });
 
-      resolveUsernames().then((resolvedIds) => {
-        const allMembers = Array.from(new Set([creatorId, ...member_ids, ...resolvedIds]));
-        const stmt = db.prepare(`INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)`);
-        allMembers.forEach(uid => {
-          const role = uid === creatorId ? 'admin' : 'member';
-          stmt.run(groupId, uid, role);
+        resolveUsernames().then((resolvedIds) => {
+          const allMembers = Array.from(new Set([creatorId, ...member_ids, ...resolvedIds]));
+          const stmt = db.prepare(`INSERT OR IGNORE INTO group_members (group_id, user_id, role) VALUES (?, ?, ?)`);
+          allMembers.forEach(uid => {
+            const role = uid === creatorId ? 'admin' : 'member';
+            stmt.run(groupId, uid, role);
+          });
+          stmt.finalize((finalErr) => {
+            if (finalErr) return res.status(500).json({ error: 'Failed to add members' });
+            res.json({ success: true, group: { id: groupId, name, profile_picture: profilePic } });
+          });
         });
-        stmt.finalize((finalErr) => {
-          if (finalErr) return res.status(500).json({ error: 'Failed to add members' });
-          res.json({ success: true, group: { id: groupId, name } });
-        });
-      });
-    }
-  );
+      }
+    );
+  });
 });
 
 // List groups for current user with previews and unread counts
 router.get('/', (req, res) => {
   const db = getDb();
   const userId = req.user.userId || req.user.id;
+  // Ensure profile_picture column exists
+  db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
   db.all(
-    `SELECT g.id, g.name, g.created_at,
+    `SELECT g.id, g.name, g.created_at, g.profile_picture,
             (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as member_count,
             (SELECT content FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1) as last_message,
             (SELECT type FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1) as last_message_type,
@@ -61,11 +77,45 @@ router.get('/', (req, res) => {
             (SELECT COUNT(*) FROM group_messages WHERE group_id = g.id AND is_read = 0 AND sender_id != ?) as unread_count
      FROM group_conversations g
      INNER JOIN group_members m ON (m.group_id = g.id AND m.user_id = ?)
-     ORDER BY g.created_at DESC`,
+     ORDER BY COALESCE(last_message_time, g.created_at) DESC`,
     [userId, userId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch groups' });
       res.json({ success: true, groups: rows });
+    }
+  );
+  });
+});
+
+// Make/revoke admin for a group member
+router.put('/:groupId/members/:userId/role', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const targetUserId = parseInt(req.params.userId, 10);
+  const requesterId = req.user.userId || req.user.id;
+  const { role } = req.body || {};
+  
+  if (!role || !['admin', 'member'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role. Must be admin or member' });
+  }
+  
+  // Check if requester is admin
+  db.get(
+    `SELECT role FROM group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, requesterId],
+    (err, requester) => {
+      if (err || !requester || requester.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can change member roles' });
+      }
+      
+      db.run(
+        `UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?`,
+        [role, groupId, targetUserId],
+        (updateErr) => {
+          if (updateErr) return res.status(500).json({ error: 'Failed to update role' });
+          res.json({ success: true });
+        }
+      );
     }
   );
 });
@@ -273,32 +323,38 @@ router.get('/:groupId/info', (req, res) => {
   const groupId = parseInt(req.params.groupId, 10);
   const userId = req.user.userId || req.user.id;
 
-  db.get(
-    `SELECT g.id, g.name, g.creator_id, g.created_at, g.description,
-            (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
-     FROM group_conversations g
-     WHERE g.id = ?`,
-    [groupId],
-    (err, group) => {
-      if (err) return res.status(500).json({ error: 'Database error' });
-      if (!group) return res.status(404).json({ error: 'Group not found' });
-
-      // Get members with user info
-      db.all(
-        `SELECT gm.user_id, gm.role, gm.joined_at, u.username, u.profile_picture, u.bio
-         FROM group_members gm
-         INNER JOIN users u ON u.id = gm.user_id
-         WHERE gm.group_id = ?
-         ORDER BY gm.role ASC, gm.joined_at ASC`,
+  // Ensure description column exists
+  db.run(`ALTER TABLE group_conversations ADD COLUMN description TEXT DEFAULT ''`, () => {
+    // Ensure profile_picture column exists
+    db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
+      db.get(
+        `SELECT g.id, g.name, g.creator_id, g.created_at, g.description, g.profile_picture,
+                (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as member_count
+         FROM group_conversations g
+         WHERE g.id = ?`,
         [groupId],
-        (err2, members) => {
-          if (err2) members = [];
-          group.members = members;
-          res.json({ success: true, group });
+        (err, group) => {
+          if (err) return res.status(500).json({ error: 'Database error' });
+          if (!group) return res.status(404).json({ error: 'Group not found' });
+
+          // Get members with user info
+          db.all(
+            `SELECT gm.user_id, gm.role, gm.joined_at, u.username, u.profile_picture, u.bio
+             FROM group_members gm
+             INNER JOIN users u ON u.id = gm.user_id
+             WHERE gm.group_id = ?
+             ORDER BY gm.role ASC, gm.joined_at ASC`,
+            [groupId],
+            (err2, members) => {
+              if (err2) members = [];
+              group.members = members;
+              res.json({ success: true, group });
+            }
+          );
         }
       );
-    }
-  );
+    });
+  });
 });
 
 // Update group description
@@ -320,6 +376,45 @@ router.put('/:groupId/description', (req, res) => {
       }
     );
   });
+});
+
+// Update group profile picture
+router.post('/:groupId/profile-picture', upload.single('profile_picture'), (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  
+  const filePath = req.file.path.replace(/\\/g, '/').replace(/^\.?\/?/, '/');
+  
+  // Ensure column exists
+  db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
+    db.run(
+      `UPDATE group_conversations SET profile_picture = ? WHERE id = ?`,
+      [filePath, groupId],
+      (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to update profile picture' });
+        res.json({ success: true, profile_picture: filePath });
+      }
+    );
+  });
+});
+
+// Update group name
+router.put('/:groupId/name', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+  const { name } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+  
+  db.run(
+    `UPDATE group_conversations SET name = ? WHERE id = ?`,
+    [name, groupId],
+    (err) => {
+      if (err) return res.status(500).json({ error: 'Failed to update name' });
+      res.json({ success: true });
+    }
+  );
 });
 
 // Search group messages

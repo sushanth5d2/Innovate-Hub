@@ -90,12 +90,6 @@
   border-bottom: 2px solid var(--ig-border);
   padding-bottom: 0;
   overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.ss-tabs::-webkit-scrollbar {
-  display: none;
 }
 
 .ss-tab {
@@ -390,23 +384,6 @@
   padding: 20px;
 }
 
-.ss-detail-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ss-detail-body::-webkit-scrollbar-track {
-  background: var(--ig-secondary-background);
-}
-
-.ss-detail-body::-webkit-scrollbar-thumb {
-  background: var(--ig-border);
-  border-radius: 3px;
-}
-
-.ss-detail-body::-webkit-scrollbar-thumb:hover {
-  background: var(--ig-secondary-text);
-}
-
 .ss-detail-section {
   margin-bottom: 24px;
 }
@@ -686,23 +663,6 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-}
-
-.ss-modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.ss-modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ss-modal-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-.ss-modal-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .ss-modal-footer {

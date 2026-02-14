@@ -777,7 +777,7 @@
                 ${ann.is_pinned ? '<span class="pinned-badge">PINNED</span>' : ''}
               </div>
               ${ann.title ? `<div class="announcement-title">${ann.title}</div>` : ''}
-              <div class="announcement-body">${ann.body || ''}</div>
+              <div class="announcement-body">${(ann.body || '').replace(/@(\w[\w.]*)/g, '<a href="/profile/$1" class="mention-link" onclick="event.stopPropagation();" style="color: #0095f6; font-weight: 600; text-decoration: none; cursor: pointer;">@$1</a>')}</div>
             </div>
           `).join('');
         }
