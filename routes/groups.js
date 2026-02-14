@@ -203,6 +203,57 @@ router.post('/:groupId/messages', (req, res) => {
   );
 });
 
+// Send a file/image message in a group
+router.post('/:groupId/messages/file', upload.single('file'), (req, res) => {
+  const db = getDb();
+  const senderId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const file = req.file;
+  const originalFilename = file.originalname;
+  const filePath = file.mimetype.startsWith('image/')
+    ? `/uploads/images/${file.filename}`
+    : `/uploads/files/${file.filename}`;
+  const fileType = file.mimetype.startsWith('image/') ? 'image'
+    : file.mimetype.startsWith('video/') ? 'video' : 'file';
+
+  // Check membership
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+     UNION
+     SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, senderId, groupId, senderId],
+    (err, member) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!member) return res.status(403).json({ error: 'You are not a member of this group' });
+
+      db.run(
+        `INSERT INTO group_messages (group_id, sender_id, content, type) VALUES (?, ?, ?, ?)`,
+        [groupId, senderId, filePath, fileType],
+        function(err) {
+          if (err) return res.status(500).json({ error: 'Failed to send file' });
+          const messageId = this.lastID;
+          db.get(
+            `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username,
+                    gm.content, gm.type, gm.is_read, gm.created_at
+             FROM group_messages gm
+             INNER JOIN users u ON (u.id = gm.sender_id)
+             WHERE gm.id = ?`,
+            [messageId],
+            (err2, message) => {
+              if (err2) return res.status(500).json({ error: 'File sent but failed to retrieve' });
+              message.original_filename = originalFilename;
+              res.json({ success: true, message });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 // Mark messages as read for current user (simple global is_read flag)
 router.post('/:groupId/read', (req, res) => {
   const db = getDb();

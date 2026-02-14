@@ -1024,6 +1024,27 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* @mention link styling */
+.mention-link {
+  color: #00d4ff;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mention-link:hover {
+  text-decoration: underline;
+}
+.ig-message-sent .mention-link {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.ig-message-received .mention-link {
+  color: #00d4ff !important;
+}
+[data-theme="light"] .ig-message-received .mention-link {
+  color: #0095f6 !important;
+}
+
 /* Message Context Menu */
 .ig-message-context-menu {
   position: fixed;

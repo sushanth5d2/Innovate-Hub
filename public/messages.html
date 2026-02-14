@@ -1852,14 +1852,86 @@
           wrapperEl.appendChild(labelEl);
 
           const messageEl = document.createElement('div');
-          messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
           const grpMsgText = msg.content || '';
-          messageEl.innerHTML = linkifyText(grpMsgText);
+          const msgType = msg.type || 'text';
+          
+          if (msgType === 'image' || msgType === 'gif') {
+            // Image message
+            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            const filename = msg.original_filename || grpMsgText.split('/').pop();
+            const imgWrapper = document.createElement('div');
+            imgWrapper.style.cssText = 'position: relative; display: inline-block;';
+            const img = document.createElement('img');
+            img.src = grpMsgText;
+            img.style.cssText = 'max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;';
+            img.onclick = () => openMediaPreview(grpMsgText, msgType, filename);
+            const downloadBtn = document.createElement('button');
+            downloadBtn.onclick = (e) => { e.stopPropagation(); downloadFile(grpMsgText, filename); };
+            downloadBtn.style.cssText = 'position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;';
+            downloadBtn.innerHTML = '<svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>';
+            imgWrapper.appendChild(img);
+            imgWrapper.appendChild(downloadBtn);
+            messageEl.appendChild(imgWrapper);
+          } else if (msgType === 'video') {
+            // Video message
+            messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
+            const filename = msg.original_filename || grpMsgText.split('/').pop();
+            const videoWrapper = document.createElement('div');
+            videoWrapper.style.cssText = 'position: relative; display: inline-block;';
+            const video = document.createElement('video');
+            video.controls = true;
+            video.style.cssText = 'max-width: 250px; max-height: 350px; border-radius: 18px; display: block;';
+            video.innerHTML = `<source src="${grpMsgText}">`;
+            const downloadBtn = document.createElement('button');
+            downloadBtn.onclick = (e) => { e.stopPropagation(); downloadFile(grpMsgText, filename); };
+            downloadBtn.style.cssText = 'position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10;';
+            downloadBtn.innerHTML = '<svg fill="currentColor" height="16" viewBox="0 0 24 24" width="16"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>';
+            videoWrapper.appendChild(video);
+            videoWrapper.appendChild(downloadBtn);
+            messageEl.appendChild(videoWrapper);
+          } else if (msgType === 'file' || msgType === 'document') {
+            // File/document message
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            const filename = msg.original_filename || grpMsgText.split('/').pop();
+            const isPdf = /\.pdf$/i.test(filename);
+            const isDoc = /\.(doc|docx|txt)$/i.test(filename);
+            const icon = isPdf ? '📄' : isDoc ? '📝' : '📎';
+            const fileContainer = document.createElement('div');
+            fileContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-secondary-background); border-radius: 12px; max-width: 250px; cursor: pointer;';
+            fileContainer.onclick = () => openMediaPreview(grpMsgText, 'file', filename);
+            fileContainer.innerHTML = `
+              <div style="font-size: 32px;">${icon}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${filename}</div>
+                <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">Click to preview</div>
+              </div>
+            `;
+            const downloadBtn = document.createElement('button');
+            downloadBtn.onclick = (e) => { e.stopPropagation(); downloadFile(grpMsgText, filename); };
+            downloadBtn.style.cssText = 'background: var(--ig-blue); border: none; color: white; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;';
+            downloadBtn.innerHTML = '<svg fill="currentColor" height="18" viewBox="0 0 24 24" width="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>';
+            fileContainer.appendChild(downloadBtn);
+            messageEl.appendChild(fileContainer);
+          } else if (msgType === 'voice') {
+            // Voice message
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            messageEl.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <audio controls style="max-width: 200px;">
+                  <source src="${grpMsgText}">
+                </audio>
+              </div>
+            `;
+          } else {
+            // Text message (default)
+            messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
+            messageEl.innerHTML = linkifyText(grpMsgText);
 
-          // Add link preview if message contains URL
-          const grpFirstUrl = extractFirstUrl(grpMsgText);
-          if (grpFirstUrl) {
-            createLinkPreview(grpFirstUrl, messageEl);
+            // Add link preview if message contains URL
+            const grpFirstUrl = extractFirstUrl(grpMsgText);
+            if (grpFirstUrl) {
+              createLinkPreview(grpFirstUrl, messageEl);
+            }
           }
 
           const timeEl = document.createElement('div');
@@ -2515,7 +2587,7 @@
       });
       // Then render @mentions as clickable profile links
       result = result.replace(/@(\w[\w.]*)/g, (match, username) => {
-        return `<a href="/profile/${username}" class="mention-link" onclick="event.stopPropagation();" style="color: #0095f6; font-weight: 600; text-decoration: none; cursor: pointer;">@${username}</a>`;
+        return `<a href="/profile/${username}" class="mention-link" onclick="event.stopPropagation();">@${username}</a>`;
       });
       return result;
     }
@@ -3113,7 +3185,7 @@
     
     // File sending
     async function sendFile(file, filename) {
-      if (!currentContactId) {
+      if (!currentContactId && !currentGroupId) {
         InnovateAPI.showAlert('Please select a conversation first', 'error');
         return;
       }
@@ -3124,7 +3196,6 @@
       
       const formData = new FormData();
       formData.append('file', file, filename || file.name);
-      formData.append('receiver_id', currentContactId);
       
       // Determine type
       let fileType = 'file';
@@ -3133,7 +3204,16 @@
       } else if (file.type.startsWith('video/')) {
         fileType = 'video';
       }
-      formData.append('type', fileType);
+      
+      // Build endpoint based on DM vs Group
+      let endpoint;
+      if (currentGroupId) {
+        endpoint = `/groups/${currentGroupId}/messages/file`;
+      } else {
+        formData.append('receiver_id', currentContactId);
+        formData.append('type', fileType);
+        endpoint = '/messages/send';
+      }
       
       const fname = filename || file.name || 'file';
       const messagesContainer = document.getElementById('chatMessages');
@@ -3155,7 +3235,7 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
       try {
-        const response = await InnovateAPI.apiRequest('/messages/send', {
+        const response = await InnovateAPI.apiRequest(endpoint, {
           method: 'POST',
           body: formData
         });
@@ -3233,6 +3313,15 @@
         document.querySelectorAll('.ig-attach-menu input[type="file"], .ig-chat-input-container input[type="file"]').forEach(input => {
           input.value = '';
         });
+        
+        // Reload messages to get full data
+        setTimeout(() => {
+          if (currentGroupId) {
+            loadGroupMessages(currentGroupId);
+          } else if (currentContactId) {
+            loadMessages(currentContactId);
+          }
+        }, 500);
         
         InnovateAPI.showAlert('File sent successfully', 'success');
       } catch (error) {
@@ -4097,9 +4186,26 @@
         }
       });
 
-      // Also auto-grow on paste
-      messageInput.addEventListener('paste', () => {
+      // Handle paste: auto-grow + paste images from clipboard
+      messageInput.addEventListener('paste', (e) => {
         setTimeout(autoGrowTextarea, 0);
+        
+        // Check clipboard for image data
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        
+        const imageFiles = [];
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            const file = items[i].getAsFile();
+            if (file) imageFiles.push(file);
+          }
+        }
+        
+        if (imageFiles.length > 0) {
+          e.preventDefault(); // Prevent pasting image as text
+          previewFilesBeforeSend(imageFiles);
+        }
       });
     }
 

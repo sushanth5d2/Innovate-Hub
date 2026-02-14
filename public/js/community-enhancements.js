@@ -251,7 +251,7 @@ async function showCommentSection(announcementId) {
                       </button>
                     ` : ''}
                   </div>
-                  <p style="margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${(comment.content || '').replace(/@(\w[\w.]*)/g, '<a href="/profile/$1" class="mention-link" onclick="event.stopPropagation();" style="color: #0095f6; font-weight: 600; text-decoration: none; cursor: pointer;">@$1</a>')}</p>
+                  <p style="margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${(comment.content || '').replace(/@(\w[\w.]*)/g, '<a href="/profile/$1" class="mention-link" onclick="event.stopPropagation();" style="color: #00d4ff; font-weight: 600; text-decoration: none; cursor: pointer;">@$1</a>')}</p>
                 </div>
               </div>
             `).join('')}
