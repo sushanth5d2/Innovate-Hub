@@ -55,6 +55,7 @@ router.get('/', authMiddleware, (req, res) => {
               images: post.images ? JSON.parse(post.images) : [],
               files: post.files ? JSON.parse(post.files) : [],
               hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+              custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
               user_has_liked: post.user_has_liked > 0,
               is_saved: post.is_saved > 0,
               poll: {
@@ -78,6 +79,7 @@ router.get('/', authMiddleware, (req, res) => {
           images: post.images ? JSON.parse(post.images) : [],
           files: post.files ? JSON.parse(post.files) : [],
           hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+          custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
           user_has_liked: post.user_has_liked > 0,
           is_saved: post.is_saved > 0,
           poll: null
@@ -184,7 +186,8 @@ router.post('/', authMiddleware, upload.fields([
     enable_interested,
     poll_question,
     poll_options,
-    poll_expiry
+    poll_expiry,
+    custom_button
   } = req.body;
 
   let images = [];
@@ -216,8 +219,8 @@ router.post('/', authMiddleware, upload.fields([
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, scheduled_at, expires_at, hashtags, enable_contact, enable_interested)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -233,7 +236,8 @@ router.post('/', authMiddleware, upload.fields([
       expires_at,
       hashtags || null,
       enable_contact === '1' || enable_contact === true ? 1 : 0,
-      enable_interested === '1' || enable_interested === true ? 1 : 0
+      enable_interested === '1' || enable_interested === true ? 1 : 0,
+      custom_button || null
     ],
     function(err) {
       if (err) {
@@ -500,6 +504,7 @@ router.get('/:postId', authMiddleware, (req, res) => {
     try { post.images = post.images ? JSON.parse(post.images) : []; } catch(e) { post.images = []; }
     try { post.files = post.files ? JSON.parse(post.files) : []; } catch(e) { post.files = []; }
     try { post.hashtags = post.hashtags ? JSON.parse(post.hashtags) : []; } catch(e) { post.hashtags = []; }
+    try { post.custom_button = post.custom_button ? JSON.parse(post.custom_button) : null; } catch(e) { post.custom_button = null; }
     
     // Get poll data if exists
     db.get('SELECT * FROM polls WHERE post_id = ?', [postId], (err2, poll) => {
@@ -551,7 +556,7 @@ router.post('/:postId/action', authMiddleware, (req, res) => {
   const { postId } = req.params;
   const { action_type } = req.body;
 
-  if (!action_type || !['contact', 'interested'].includes(action_type)) {
+  if (!action_type || !['contact', 'interested', 'custom_dm', 'custom_hire'].includes(action_type)) {
     return res.status(400).json({ error: 'Invalid action type' });
   }
 
@@ -588,6 +593,102 @@ router.post('/:postId/action', authMiddleware, (req, res) => {
     });
 
     res.json({ success: true });
+  });
+});
+
+// Handle custom button submissions (DM, Hire Me form)
+router.post('/:postId/custom-button-action', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+  const { action, message, hire_data } = req.body;
+
+  // Get the post and its owner
+  db.get('SELECT p.*, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [postId], (err, post) => {
+    if (err || !post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (post.user_id === userId) {
+      return res.status(400).json({ error: 'Cannot perform this action on your own post' });
+    }
+
+    // Get the acting user's info
+    db.get('SELECT username FROM users WHERE id = ?', [userId], (err, actingUser) => {
+      if (err || !actingUser) {
+        return res.status(500).json({ error: 'User not found' });
+      }
+
+      let dmContent = '';
+
+      if (action === 'dm') {
+        dmContent = message || `Hi! I'm reaching out about your post.`;
+      } else if (action === 'hire_me') {
+        if (!hire_data) {
+          return res.status(400).json({ error: 'Hire form data required' });
+        }
+        // Format hire details neatly
+        dmContent = `📋 **Hire Me Application**\n`;
+        dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
+        if (hire_data.name) dmContent += `👤 Name: ${hire_data.name}\n`;
+        if (hire_data.email) dmContent += `📧 Email: ${hire_data.email}\n`;
+        if (hire_data.contact) dmContent += `📞 Contact: ${hire_data.contact}\n`;
+        if (hire_data.resume_link) dmContent += `🔗 Resume: ${hire_data.resume_link}\n`;
+        if (hire_data.custom_fields && Object.keys(hire_data.custom_fields).length > 0) {
+          dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
+          dmContent += `📝 Additional Info:\n`;
+          for (const [key, value] of Object.entries(hire_data.custom_fields)) {
+            if (value) dmContent += `  • ${key}: ${value}\n`;
+          }
+        }
+        dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
+        dmContent += `Sent via post by @${actingUser.username}`;
+      } else {
+        return res.status(400).json({ error: 'Invalid action' });
+      }
+
+      // Send DM to post owner
+      db.run(
+        'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+        [userId, post.user_id, dmContent, '[]'],
+        function(err) {
+          if (err) {
+            console.error('Error sending DM:', err);
+            return res.status(500).json({ error: 'Failed to send message' });
+          }
+
+          // Create notification
+          const notifContent = action === 'hire_me' 
+            ? 'submitted a hire me application on your post'
+            : 'sent you a message about your post';
+          
+          db.run(
+            'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+            [post.user_id, 'custom_button', notifContent, postId, userId]
+          );
+
+          // Real-time notification
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`user_${post.user_id}`).emit('notification:receive', {
+              type: 'custom_button',
+              content: notifContent,
+              post_id: postId,
+              created_by: userId
+            });
+            io.to(`user_${post.user_id}`).emit('message:receive', {
+              id: this.lastID,
+              sender_id: userId,
+              sender_username: actingUser.username,
+              content: dmContent,
+              created_at: new Date().toISOString()
+            });
+          }
+
+          res.json({ success: true, message: 'Message sent successfully' });
+        }
+      );
+    });
   });
 });
 
@@ -824,7 +925,7 @@ router.put('/:postId', authMiddleware, upload.fields([
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags } = req.body;
+  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button } = req.body;
 
   db.get('SELECT * FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, post) => {
     if (err || !post) {
@@ -887,6 +988,12 @@ router.put('/:postId', authMiddleware, upload.fields([
     if (enable_interested !== undefined) {
       updateFields.push('enable_interested = ?');
       updateValues.push(enable_interested === '1' || enable_interested === true ? 1 : 0);
+    }
+    
+    // Custom button
+    if (custom_button !== undefined) {
+      updateFields.push('custom_button = ?');
+      updateValues.push(custom_button || null);
     }
     
     updateValues.push(postId);

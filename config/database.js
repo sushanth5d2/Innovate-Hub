@@ -1617,6 +1617,13 @@ const migrateDatabase = () => {
         console.error('Error adding original_filename column to ai_chat_messages:', err);
       }
     });
+
+    // Add custom_button JSON column to posts for custom action buttons
+    db.run(`ALTER TABLE posts ADD COLUMN custom_button TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: custom_button column migration - ', err ? err.message : 'ok');
+      }
+    });
   });
 };
 

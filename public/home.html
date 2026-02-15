@@ -245,7 +245,7 @@
           <svg id="advancedChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="advancedOptions" class="cp-advanced" style="display: none;">
-          <label class="cp-toggle-row">
+          <label class="cp-toggle-row" style="display: none;">
             <div class="cp-toggle-info">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
               <span>Contact Me Button</span>
@@ -255,7 +255,7 @@
               <span class="cp-switch-slider"></span>
             </div>
           </label>
-          <label class="cp-toggle-row">
+          <label class="cp-toggle-row" style="display: none;">
             <div class="cp-toggle-info">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               <span>I'm Interested Button</span>
@@ -265,6 +265,78 @@
               <span class="cp-switch-slider"></span>
             </div>
           </label>
+
+          <!-- Custom Button Builder -->
+          <div class="cb-builder">
+            <div class="cb-builder-header">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              <span>Custom Action Button</span>
+            </div>
+            <input type="text" id="cbButtonName" class="cp-input cb-name-input" placeholder="Button name (e.g. Apply Now, Get Quote)">
+
+            <!-- Contact Me Checkbox -->
+            <div class="cb-check-row">
+              <input type="checkbox" id="cbContactMe" onchange="toggleCBSection('cbContactFields')">
+              <label class="cb-check-label" for="cbContactMe">📞 Contact Me</label>
+            </div>
+            <div id="cbContactFields" class="cb-sub-fields" style="display:none;">
+              <div class="cb-multi-group" id="cbLinksGroup">
+                <label class="cb-field-label">Links</label>
+                <div class="cb-multi-row"><input type="url" class="cp-input cb-link-input" placeholder="https://example.com"><button type="button" class="cb-add-btn" onclick="addCBField('cbLinksGroup','url','https://...')">+</button></div>
+              </div>
+              <div class="cb-multi-group" id="cbEmailsGroup">
+                <label class="cb-field-label">Emails</label>
+                <div class="cb-multi-row"><input type="email" class="cp-input cb-email-input" placeholder="email@example.com"><button type="button" class="cb-add-btn" onclick="addCBField('cbEmailsGroup','email','email@example.com')">+</button></div>
+              </div>
+              <div class="cb-multi-group" id="cbPhonesGroup">
+                <label class="cb-field-label">Phone Numbers</label>
+                <div class="cb-multi-row"><input type="tel" class="cp-input cb-phone-input" placeholder="+1234567890"><button type="button" class="cb-add-btn" onclick="addCBField('cbPhonesGroup','tel','+1234567890')">+</button></div>
+              </div>
+            </div>
+
+            <!-- DM Checkbox -->
+            <div class="cb-check-row">
+              <input type="checkbox" id="cbDM" onchange="toggleCBSection('cbDMFields')">
+              <label class="cb-check-label" for="cbDM">💬 DM (Direct Message)</label>
+            </div>
+            <div id="cbDMFields" class="cb-sub-fields" style="display:none;">
+              <textarea id="cbDMMessage" class="cp-input cb-dm-textarea" placeholder="Custom message (leave empty for user's own message)" rows="2"></textarea>
+              <p class="cb-hint">When clicked, this message will be sent to your DM. Leave empty to let the viewer write their own.</p>
+            </div>
+
+            <!-- Register Checkbox -->
+            <div class="cb-check-row">
+              <input type="checkbox" id="cbRegister" onchange="toggleCBSection('cbRegisterFields')">
+              <label class="cb-check-label" for="cbRegister">📝 Register</label>
+            </div>
+            <div id="cbRegisterFields" class="cb-sub-fields" style="display:none;">
+              <input type="url" id="cbRegisterLink" class="cp-input" placeholder="Registration link (https://...)">
+              <p class="cb-hint">Clicking will redirect the user to this registration page.</p>
+            </div>
+
+            <!-- Hire Me Checkbox -->
+            <div class="cb-check-row">
+              <input type="checkbox" id="cbHireMe" onchange="toggleCBSection('cbHireMeFields')">
+              <label class="cb-check-label" for="cbHireMe">💼 Hire Me</label>
+            </div>
+            <div id="cbHireMeFields" class="cb-sub-fields" style="display:none;">
+              <p class="cb-hint">Select which fields viewers must fill out. The details will be sent to your DM.</p>
+              <div class="cb-hire-fields-list">
+                <label class="cb-hire-field-check"><input type="checkbox" id="cbHireName" checked> 👤 Name</label>
+                <label class="cb-hire-field-check"><input type="checkbox" id="cbHireEmail" checked> 📧 Email</label>
+                <label class="cb-hire-field-check"><input type="checkbox" id="cbHireContact" checked> 📞 Contact Number</label>
+                <label class="cb-hire-field-check"><input type="checkbox" id="cbHireResume"> 📎 Resume Link</label>
+              </div>
+              <div class="cb-custom-fields-area">
+                <label class="cb-field-label">Custom Fields</label>
+                <div id="cbCustomFieldsList"></div>
+                <button type="button" class="cp-add-option-btn" onclick="addCBCustomField()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add custom field
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -614,6 +686,227 @@
     .cp-switch input:checked + .cp-switch-slider::before {
       transform: translateX(20px);
     }
+
+    /* ===== Custom Button Builder ===== */
+    .cb-builder {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--ig-border);
+    }
+    .cb-builder-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 600; color: var(--ig-primary-text);
+      margin-bottom: 10px;
+    }
+    .cb-name-input {
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+    .cb-check-row {
+      display: flex; align-items: center; gap: 0;
+      padding: 0; margin-bottom: 8px;
+      cursor: pointer; user-select: none;
+      position: relative;
+    }
+    .cb-check-row input[type="checkbox"] {
+      position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+    }
+    .cb-check-label {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 12px 16px;
+      background: var(--ig-secondary-background);
+      border: 2px solid var(--ig-border);
+      border-radius: 12px;
+      font-size: 14px; font-weight: 600;
+      color: var(--ig-primary-text);
+      transition: all 0.25s ease;
+    }
+    .cb-check-label::after {
+      content: ''; margin-left: auto; flex-shrink: 0;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--ig-border);
+      background: transparent;
+      transition: all 0.25s ease;
+      box-sizing: border-box;
+    }
+    .cb-check-row input[type="checkbox"]:checked + .cb-check-label {
+      border-color: var(--ig-blue);
+      background: rgba(0,149,246,0.08);
+      color: var(--ig-blue);
+    }
+    .cb-check-row input[type="checkbox"]:checked + .cb-check-label::after {
+      border-color: var(--ig-blue);
+      background: var(--ig-blue);
+      box-shadow: inset 0 0 0 3px var(--ig-primary-background);
+    }
+    .cb-check-row:hover .cb-check-label {
+      border-color: rgba(0,149,246,0.5);
+      background: rgba(0,149,246,0.04);
+    }
+    .cb-sub-fields {
+      padding: 10px 0 10px 28px;
+      animation: cbSlideDown 0.2s ease;
+    }
+    @keyframes cbSlideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .cb-multi-group { margin-bottom: 10px; }
+    .cb-field-label {
+      font-size: 12px; font-weight: 600; color: var(--ig-secondary-text);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 6px; display: block;
+    }
+    .cb-multi-row {
+      display: flex; gap: 6px; margin-bottom: 6px;
+    }
+    .cb-multi-row .cp-input { flex: 1; font-size: 13px; padding: 8px 10px; }
+    .cb-add-btn {
+      width: 34px; height: 34px; border: 1px solid var(--ig-border);
+      background: var(--ig-secondary-background); color: var(--ig-blue);
+      border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    .cb-add-btn:hover { background: var(--ig-blue); color: white; }
+    .cb-remove-btn {
+      width: 34px; height: 34px; border: 1px solid var(--ig-border);
+      background: var(--ig-secondary-background); color: var(--ig-error, #ed4956);
+      border-radius: 8px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    .cb-remove-btn:hover { background: var(--ig-error, #ed4956); color: white; }
+    .cb-dm-textarea {
+      resize: none; font-size: 13px; min-height: 42px;
+    }
+    .cb-hint {
+      font-size: 12px; color: var(--ig-secondary-text);
+      margin: 6px 0 0; line-height: 1.4;
+    }
+    .cb-hire-fields-list {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 8px 0;
+    }
+    .cb-hire-field-check {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--ig-primary-text);
+      cursor: pointer; padding: 8px 14px;
+      background: var(--ig-secondary-background);
+      border: 1.5px solid var(--ig-border);
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .cb-hire-field-check:hover {
+      border-color: rgba(0,149,246,0.5);
+      background: rgba(0,149,246,0.04);
+    }
+    .cb-hire-field-check:has(input:checked) {
+      border-color: var(--ig-blue);
+      background: rgba(0,149,246,0.08);
+      color: var(--ig-blue);
+    }
+    .cb-hire-field-check input {
+      accent-color: var(--ig-blue); cursor: pointer;
+      width: 16px; height: 16px;
+    }
+    .cb-custom-fields-area { margin-top: 10px; }
+    .cb-custom-field-row {
+      display: flex; gap: 6px; margin-bottom: 6px;
+    }
+    .cb-custom-field-row .cp-input { flex: 1; font-size: 13px; padding: 8px 10px; }
+
+    /* Custom Button on Post */
+    .cb-post-button {
+      display: block; width: calc(100% - 32px);
+      margin: 0 16px 12px; padding: 10px 16px;
+      background: linear-gradient(135deg, var(--ig-blue), #6366f1);
+      color: white; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; text-align: center;
+    }
+    .cb-post-button:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .cb-post-button:active { transform: scale(0.98); }
+
+    /* Custom Button Action Modal */
+    .cb-modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 10002; display: flex;
+      align-items: center; justify-content: center;
+      padding: 16px; animation: cpFadeIn 0.2s ease;
+    }
+    .cb-modal {
+      background: var(--ig-primary-background);
+      border-radius: 16px; width: 100%; max-width: 440px;
+      max-height: 85vh; overflow-y: auto;
+      animation: cpSlideUp 0.3s ease;
+      border: 1px solid var(--ig-border);
+    }
+    .cb-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--ig-border);
+    }
+    .cb-modal-title { font-size: 16px; font-weight: 700; color: var(--ig-primary-text); margin: 0; }
+    .cb-modal-close {
+      background: none; border: none; color: var(--ig-primary-text);
+      cursor: pointer; font-size: 22px; padding: 4px 8px;
+      border-radius: 50%; transition: background 0.2s;
+    }
+    .cb-modal-close:hover { background: var(--ig-hover); }
+    .cb-modal-body { padding: 16px; }
+    .cb-modal-section {
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--ig-border);
+    }
+    .cb-modal-section:last-child { border-bottom: none; margin-bottom: 0; }
+    .cb-modal-section-title {
+      font-size: 14px; font-weight: 700; color: var(--ig-primary-text);
+      margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .cb-contact-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; margin-bottom: 6px;
+      background: var(--ig-secondary-background);
+      border-radius: 8px; font-size: 14px; color: var(--ig-primary-text);
+      cursor: pointer; transition: background 0.2s;
+      text-decoration: none;
+    }
+    .cb-contact-item:hover { background: var(--ig-hover); }
+    .cb-contact-item svg { flex-shrink: 0; }
+    .cb-hire-form-group {
+      margin-bottom: 12px;
+    }
+    .cb-hire-form-group label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: var(--ig-secondary-text); margin-bottom: 4px;
+    }
+    .cb-hire-form-group input {
+      width: 100%; padding: 10px 12px;
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border); border-radius: 8px;
+      color: var(--ig-primary-text); font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .cb-hire-form-group input:focus { border-color: var(--ig-blue); }
+    .cb-dm-input-area { margin-top: 8px; }
+    .cb-dm-input-area textarea {
+      width: 100%; padding: 10px 12px;
+      background: var(--ig-secondary-background);
+      border: 1px solid var(--ig-border); border-radius: 8px;
+      color: var(--ig-primary-text); font-size: 14px;
+      outline: none; resize: none; min-height: 60px;
+      font-family: inherit; transition: border-color 0.2s;
+    }
+    .cb-dm-input-area textarea:focus { border-color: var(--ig-blue); }
+    .cb-submit-btn {
+      display: block; width: 100%; padding: 12px;
+      background: var(--ig-blue); color: white; border: none;
+      border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; margin-top: 10px;
+    }
+    .cb-submit-btn:hover { opacity: 0.9; }
+    .cb-submit-btn:disabled { opacity: 0.5; cursor: default; }
 
     /* Responsive */
     @media (max-width: 540px) {
@@ -2442,6 +2735,12 @@
           ` : ''}
         </div>
         ` : ''}
+
+        ${post.custom_button ? `
+        <button class="cb-post-button" onclick='openCustomButtonModal(${post.id}, ${post.user_id}, ${JSON.stringify(JSON.stringify(post.custom_button))})'>
+          ${post.custom_button.name || 'Action'}
+        </button>
+        ` : ''}
         
         <div class="ig-post-time">${InnovateAPI.formatDate(post.created_at)}</div>
         
@@ -2648,6 +2947,9 @@
       if (adv) adv.style.display = 'none';
       const advToggle = document.querySelector('.cp-advanced-toggle');
       if (advToggle) advToggle.classList.remove('cp-open');
+
+      // Reset custom button builder fields
+      resetCustomButtonBuilder();
 
       // Reset poll options
       const pollOpts = document.getElementById('pollOptions');
@@ -3146,6 +3448,12 @@
       // Add action buttons
       formData.append('enable_contact', enableContact ? '1' : '0');
       formData.append('enable_interested', enableInterested ? '1' : '0');
+      
+      // Add custom button data
+      const customButtonData = collectCustomButtonData();
+      if (customButtonData) {
+        formData.append('custom_button', JSON.stringify(customButtonData));
+      }
       
       try {
         await InnovateAPI.apiRequest('/posts', {
@@ -4480,6 +4788,357 @@
         console.error('Error checking messages:', error);
       }
     }, 30000); // Every 30 seconds
+
+    // ========== Custom Button Builder Functions ==========
+
+    function resetCustomButtonBuilder() {
+      const nameInput = document.getElementById('cbButtonName');
+      if (nameInput) nameInput.value = '';
+      
+      ['cbContactMe', 'cbDM', 'cbRegister', 'cbHireMe'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+      
+      ['cbContactFields', 'cbDMFields', 'cbRegisterFields', 'cbHireMeFields'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+      
+      // Reset contact multi-fields to single row
+      ['cbLinksGroup', 'cbEmailsGroup', 'cbPhonesGroup'].forEach(gid => {
+        const grp = document.getElementById(gid);
+        if (!grp) return;
+        const label = grp.querySelector('.cb-field-label')?.textContent || '';
+        const type = gid === 'cbLinksGroup' ? 'url' : gid === 'cbEmailsGroup' ? 'email' : 'tel';
+        const ph = gid === 'cbLinksGroup' ? 'https://...' : gid === 'cbEmailsGroup' ? 'email@example.com' : '+1234567890';
+        const cls = gid === 'cbLinksGroup' ? 'cb-link-input' : gid === 'cbEmailsGroup' ? 'cb-email-input' : 'cb-phone-input';
+        const rows = grp.querySelectorAll('.cb-multi-row');
+        rows.forEach((r, i) => { if (i > 0) r.remove(); });
+        const firstInput = grp.querySelector('input');
+        if (firstInput) firstInput.value = '';
+      });
+      
+      const dmMsg = document.getElementById('cbDMMessage');
+      if (dmMsg) dmMsg.value = '';
+      
+      const regLink = document.getElementById('cbRegisterLink');
+      if (regLink) regLink.value = '';
+      
+      // Reset hire me checkboxes
+      ['cbHireName', 'cbHireEmail', 'cbHireContact'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = true;
+      });
+      const resumeChk = document.getElementById('cbHireResume');
+      if (resumeChk) resumeChk.checked = false;
+      
+      const customFieldsList = document.getElementById('cbCustomFieldsList');
+      if (customFieldsList) customFieldsList.innerHTML = '';
+    }
+
+    function toggleCBSection(sectionId) {
+      const section = document.getElementById(sectionId);
+      if (!section) return;
+      const checkboxId = sectionId.replace('Fields', '').replace('cbContact', 'cbContactMe').replace('cbDM', 'cbDM').replace('cbRegister', 'cbRegister').replace('cbHireMe', 'cbHireMe');
+      // Map section IDs to checkbox IDs
+      const mapping = {
+        'cbContactFields': 'cbContactMe',
+        'cbDMFields': 'cbDM',
+        'cbRegisterFields': 'cbRegister',
+        'cbHireMeFields': 'cbHireMe'
+      };
+      const chk = document.getElementById(mapping[sectionId]);
+      section.style.display = chk && chk.checked ? 'block' : 'none';
+    }
+
+    function addCBField(groupId, type, placeholder) {
+      const group = document.getElementById(groupId);
+      if (!group) return;
+      const rows = group.querySelectorAll('.cb-multi-row');
+      if (rows.length >= 5) {
+        InnovateAPI.showAlert('Maximum 5 entries', 'info');
+        return;
+      }
+      const row = document.createElement('div');
+      row.className = 'cb-multi-row';
+      row.innerHTML = `
+        <input type="${type}" class="cp-input" placeholder="${placeholder}">
+        <button type="button" class="cb-remove-btn" onclick="this.parentElement.remove()">×</button>
+      `;
+      group.appendChild(row);
+    }
+
+    function addCBCustomField() {
+      const list = document.getElementById('cbCustomFieldsList');
+      if (!list) return;
+      const count = list.querySelectorAll('.cb-custom-field-row').length;
+      if (count >= 5) {
+        InnovateAPI.showAlert('Maximum 5 custom fields', 'info');
+        return;
+      }
+      const row = document.createElement('div');
+      row.className = 'cb-custom-field-row';
+      row.innerHTML = `
+        <input type="text" class="cp-input" placeholder="Field name (e.g. Portfolio URL)">
+        <button type="button" class="cb-remove-btn" onclick="this.parentElement.remove()">×</button>
+      `;
+      list.appendChild(row);
+    }
+
+    function collectCustomButtonData() {
+      const name = document.getElementById('cbButtonName')?.value?.trim();
+      const contactMe = document.getElementById('cbContactMe')?.checked;
+      const dm = document.getElementById('cbDM')?.checked;
+      const register = document.getElementById('cbRegister')?.checked;
+      const hireMe = document.getElementById('cbHireMe')?.checked;
+
+      // Only create custom button if name is provided and at least one option is checked
+      if (!name || (!contactMe && !dm && !register && !hireMe)) return null;
+
+      const data = { name };
+
+      if (contactMe) {
+        const links = getMultiFieldValues('cbLinksGroup');
+        const emails = getMultiFieldValues('cbEmailsGroup');
+        const phones = getMultiFieldValues('cbPhonesGroup');
+        data.contact_me = { enabled: true, links, emails, phones };
+      }
+
+      if (dm) {
+        const message = document.getElementById('cbDMMessage')?.value?.trim() || '';
+        data.dm = { enabled: true, message };
+      }
+
+      if (register) {
+        const link = document.getElementById('cbRegisterLink')?.value?.trim() || '';
+        data.register = { enabled: true, link };
+      }
+
+      if (hireMe) {
+        const fields = [];
+        if (document.getElementById('cbHireName')?.checked) fields.push('name');
+        if (document.getElementById('cbHireEmail')?.checked) fields.push('email');
+        if (document.getElementById('cbHireContact')?.checked) fields.push('contact');
+        if (document.getElementById('cbHireResume')?.checked) fields.push('resume_link');
+        
+        const customFields = [];
+        document.querySelectorAll('#cbCustomFieldsList .cb-custom-field-row input').forEach(inp => {
+          const val = inp.value.trim();
+          if (val) customFields.push(val);
+        });
+        
+        data.hire_me = { enabled: true, fields, custom_fields: customFields };
+      }
+
+      return data;
+    }
+
+    function getMultiFieldValues(groupId) {
+      const group = document.getElementById(groupId);
+      if (!group) return [];
+      const values = [];
+      group.querySelectorAll('.cb-multi-row input').forEach(inp => {
+        const val = inp.value.trim();
+        if (val) values.push(val);
+      });
+      return values;
+    }
+
+    // ========== Custom Button Action Modal (on post view) ==========
+
+    function openCustomButtonModal(postId, postUserId, configJson) {
+      const config = typeof configJson === 'string' ? JSON.parse(configJson) : configJson;
+      const currentUser = InnovateAPI.getCurrentUser();
+      const isOwnPost = currentUser && currentUser.id == postUserId;
+
+      // Remove any existing modal
+      document.getElementById('cbActionModal')?.remove();
+
+      let sections = '';
+
+      // Contact Me section
+      if (config.contact_me && config.contact_me.enabled) {
+        let items = '';
+        (config.contact_me.links || []).forEach(link => {
+          items += `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="cb-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            <span>${escapeHtml(link)}</span>
+          </a>`;
+        });
+        (config.contact_me.emails || []).forEach(email => {
+          items += `<a href="mailto:${escapeHtml(email)}" class="cb-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1306c" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>${escapeHtml(email)}</span>
+          </a>`;
+        });
+        (config.contact_me.phones || []).forEach(phone => {
+          items += `<a href="tel:${escapeHtml(phone)}" class="cb-contact-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00c853" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            <span>${escapeHtml(phone)}</span>
+          </a>`;
+        });
+        if (items) {
+          sections += `<div class="cb-modal-section">
+            <div class="cb-modal-section-title">📞 Contact Information</div>
+            ${items}
+          </div>`;
+        }
+      }
+
+      // Register section
+      if (config.register && config.register.enabled && config.register.link) {
+        sections += `<div class="cb-modal-section">
+          <div class="cb-modal-section-title">📝 Register</div>
+          <a href="${escapeHtml(config.register.link)}" target="_blank" rel="noopener" class="cb-contact-item" style="color: var(--ig-blue); font-weight: 600;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            <span>Open Registration Page</span>
+          </a>
+        </div>`;
+      }
+
+      // DM section
+      if (config.dm && config.dm.enabled && !isOwnPost) {
+        const prefilledMsg = config.dm.message ? escapeHtml(config.dm.message) : '';
+        sections += `<div class="cb-modal-section">
+          <div class="cb-modal-section-title">💬 Send Message</div>
+          <div class="cb-dm-input-area">
+            <textarea id="cbDMActionMsg" placeholder="Write your message..." rows="3">${prefilledMsg}</textarea>
+            <button class="cb-submit-btn" onclick="sendCustomDM(${postId}, this)">Send Message</button>
+          </div>
+        </div>`;
+      }
+
+      // Hire Me section
+      if (config.hire_me && config.hire_me.enabled && !isOwnPost) {
+        let formFields = '';
+        const fields = config.hire_me.fields || [];
+        
+        if (fields.includes('name')) {
+          formFields += `<div class="cb-hire-form-group"><label>👤 Name</label><input type="text" id="cbHireFormName" placeholder="Your full name" required></div>`;
+        }
+        if (fields.includes('email')) {
+          formFields += `<div class="cb-hire-form-group"><label>📧 Email</label><input type="email" id="cbHireFormEmail" placeholder="your@email.com" required></div>`;
+        }
+        if (fields.includes('contact')) {
+          formFields += `<div class="cb-hire-form-group"><label>📞 Contact Number</label><input type="tel" id="cbHireFormContact" placeholder="+1234567890"></div>`;
+        }
+        if (fields.includes('resume_link')) {
+          formFields += `<div class="cb-hire-form-group"><label>📎 Resume Link</label><input type="url" id="cbHireFormResume" placeholder="https://drive.google.com/..."></div>`;
+        }
+        
+        // Custom fields
+        (config.hire_me.custom_fields || []).forEach((fieldName, idx) => {
+          formFields += `<div class="cb-hire-form-group"><label>📝 ${escapeHtml(fieldName)}</label><input type="text" class="cb-hire-custom-input" data-field-name="${escapeHtml(fieldName)}" placeholder="Enter ${escapeHtml(fieldName)}"></div>`;
+        });
+
+        if (formFields) {
+          sections += `<div class="cb-modal-section">
+            <div class="cb-modal-section-title">💼 Hire Me - Application Form</div>
+            <form id="cbHireForm" onsubmit="submitHireForm(event, ${postId})">
+              ${formFields}
+              <button type="submit" class="cb-submit-btn">Submit Application</button>
+            </form>
+          </div>`;
+        }
+      }
+
+      if (!sections) {
+        InnovateAPI.showAlert('No actions available', 'info');
+        return;
+      }
+
+      // Create modal
+      const modal = document.createElement('div');
+      modal.id = 'cbActionModal';
+      modal.className = 'cb-modal-overlay';
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      modal.innerHTML = `
+        <div class="cb-modal" onclick="event.stopPropagation()">
+          <div class="cb-modal-header">
+            <h3 class="cb-modal-title">${escapeHtml(config.name || 'Action')}</h3>
+            <button class="cb-modal-close" onclick="document.getElementById('cbActionModal').remove()">×</button>
+          </div>
+          <div class="cb-modal-body">${sections}</div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    async function sendCustomDM(postId, btn) {
+      const textarea = document.getElementById('cbDMActionMsg');
+      const message = textarea?.value?.trim();
+      if (!message) {
+        InnovateAPI.showAlert('Please enter a message', 'error');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/custom-button-action`, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'dm', message })
+        });
+        InnovateAPI.showAlert('Message sent successfully!', 'success');
+        document.getElementById('cbActionModal')?.remove();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to send message', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Send Message';
+      }
+    }
+
+    async function submitHireForm(event, postId) {
+      event.preventDefault();
+      const form = document.getElementById('cbHireForm');
+      const submitBtn = form.querySelector('.cb-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      const hire_data = {};
+      const nameInput = document.getElementById('cbHireFormName');
+      const emailInput = document.getElementById('cbHireFormEmail');
+      const contactInput = document.getElementById('cbHireFormContact');
+      const resumeInput = document.getElementById('cbHireFormResume');
+
+      if (nameInput) hire_data.name = nameInput.value.trim();
+      if (emailInput) hire_data.email = emailInput.value.trim();
+      if (contactInput) hire_data.contact = contactInput.value.trim();
+      if (resumeInput) hire_data.resume_link = resumeInput.value.trim();
+
+      // Collect custom fields
+      const customFields = {};
+      form.querySelectorAll('.cb-hire-custom-input').forEach(inp => {
+        const fieldName = inp.getAttribute('data-field-name');
+        if (fieldName && inp.value.trim()) {
+          customFields[fieldName] = inp.value.trim();
+        }
+      });
+      if (Object.keys(customFields).length > 0) {
+        hire_data.custom_fields = customFields;
+      }
+
+      // Validate at least one field filled
+      if (!hire_data.name && !hire_data.email && !hire_data.contact && !hire_data.resume_link && Object.keys(customFields).length === 0) {
+        InnovateAPI.showAlert('Please fill in at least one field', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Application';
+        return;
+      }
+
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/custom-button-action`, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'hire_me', hire_data })
+        });
+        InnovateAPI.showAlert('Application submitted successfully! Details sent to the post creator.', 'success');
+        document.getElementById('cbActionModal')?.remove();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to submit application', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Application';
+      }
+    }
   </script>
 </body>
 </html>
