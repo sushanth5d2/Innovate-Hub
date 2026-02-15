@@ -627,22 +627,19 @@ router.post('/:postId/custom-button-action', authMiddleware, (req, res) => {
         if (!hire_data) {
           return res.status(400).json({ error: 'Hire form data required' });
         }
-        // Format hire details neatly
-        dmContent = `📋 **Hire Me Application**\n`;
-        dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
-        if (hire_data.name) dmContent += `👤 Name: ${hire_data.name}\n`;
-        if (hire_data.email) dmContent += `📧 Email: ${hire_data.email}\n`;
-        if (hire_data.contact) dmContent += `📞 Contact: ${hire_data.contact}\n`;
-        if (hire_data.resume_link) dmContent += `🔗 Resume: ${hire_data.resume_link}\n`;
+        // Format hire details as structured data for rich card rendering
+        dmContent = `[HIRE_APPLICATION]\n`;
+        if (hire_data.name) dmContent += `name::${hire_data.name}\n`;
+        if (hire_data.email) dmContent += `email::${hire_data.email}\n`;
+        if (hire_data.contact) dmContent += `contact::${hire_data.contact}\n`;
+        if (hire_data.resume_link) dmContent += `resume::${hire_data.resume_link}\n`;
         if (hire_data.custom_fields && Object.keys(hire_data.custom_fields).length > 0) {
-          dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
-          dmContent += `📝 Additional Info:\n`;
           for (const [key, value] of Object.entries(hire_data.custom_fields)) {
-            if (value) dmContent += `  • ${key}: ${value}\n`;
+            if (value) dmContent += `custom::${key}::${value}\n`;
           }
         }
-        dmContent += `━━━━━━━━━━━━━━━━━━━━\n`;
-        dmContent += `Sent via post by @${actingUser.username}`;
+        dmContent += `from::@${actingUser.username}\n`;
+        dmContent += `[/HIRE_APPLICATION]`;
       } else {
         return res.status(400).json({ error: 'Invalid action' });
       }

@@ -10,6 +10,99 @@
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
     .chat-link { color: #58d68d !important; text-decoration: underline !important; word-break: break-all; font-weight: 500; }
     .ig-message-received .chat-link { color: #00a884 !important; }
+
+    /* Hire Application Card */
+    .hire-card-msg {
+      padding: 0 !important;
+      border-radius: 12px !important;
+      overflow: hidden;
+      background: #2a2a2e !important;
+      max-width: 300px;
+      white-space: normal !important;
+    }
+    [data-theme="light"] .hire-card-msg {
+      background: #f0f0f5 !important;
+    }
+    .hire-card {
+      width: 100%;
+      border-radius: 0;
+      overflow: hidden;
+      font-size: 13px;
+    }
+    .hire-card-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hire-card-header-icon {
+      width: 30px; height: 30px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .hire-card-header-text {
+      color: #fff; font-weight: 700; font-size: 14px;
+      line-height: 1.2;
+    }
+    .hire-card-header-sub {
+      color: rgba(255,255,255,0.7); font-size: 10px; font-weight: 400;
+      margin-top: 1px;
+    }
+    .hire-card-body {
+      padding: 8px 14px 6px;
+    }
+    .hire-card-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .hire-card-row:last-child { border-bottom: none; }
+    .hire-card-icon {
+      width: 26px; height: 26px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .hire-card-label {
+      font-size: 10px; color: rgba(255,255,255,0.45);
+      text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+      line-height: 1;
+    }
+    .hire-card-value {
+      font-size: 13px; color: #fff; font-weight: 500;
+      word-break: break-word; line-height: 1.2;
+    }
+    .hire-card-value a {
+      color: #58d68d; text-decoration: none;
+    }
+    .hire-card-value a:hover { text-decoration: underline; }
+    .hire-card-custom-section {
+      margin-top: 2px; padding-top: 4px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .hire-card-custom-title {
+      font-size: 10px; color: rgba(255,255,255,0.45);
+      text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .hire-card-custom-item {
+      display: flex; gap: 6px;
+      padding: 2px 0;
+      font-size: 12px;
+    }
+    .hire-card-custom-key { color: rgba(255,255,255,0.5); }
+    .hire-card-custom-val { color: #fff; font-weight: 500; }
+    .hire-card-footer {
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.03);
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .hire-card-footer a { color: #667eea; text-decoration: none; font-weight: 600; }
+    .hire-card-footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body class="ig-messages-page">
@@ -1100,6 +1193,10 @@
             return '✓ Todo list';
           }
         default:
+          // Show clean preview for hire application messages
+          if (message.includes('[HIRE_APPLICATION]') || message.includes('[/HIRE_APPLICATION]') || message.includes('**Hire Me Application**')) {
+            return '\uD83D\uDCBC Hire Me Application';
+          }
           // For text messages, truncate if too long
           return message.length > 40 ? message.substring(0, 40) + '...' : message;
       }
@@ -1625,14 +1722,25 @@
             
             const textContent = document.createElement('div');
             const msgText = msg.content || '';
-            textContent.innerHTML = linkifyText(msgText);
+
+            // Check if this is a Hire Me application card (new or old format)
+            if (msgText.includes('[HIRE_APPLICATION]')) {
+              textContent.innerHTML = renderHireApplicationCard(msgText);
+              messageEl.classList.add('hire-card-msg');
+            } else if (msgText.includes('**Hire Me Application**') || msgText.includes('Hire Me Application')) {
+              textContent.innerHTML = renderOldHireApplicationCard(msgText);
+              messageEl.classList.add('hire-card-msg');
+            } else {
+              textContent.innerHTML = linkifyText(msgText);
+            }
             
             textWrapper.appendChild(textContent);
             messageEl.appendChild(textWrapper);
 
-            // Add link preview if message contains URL
+            // Add link preview if message contains URL (skip for hire application cards)
+            const isHireCard = msgText.includes('[HIRE_APPLICATION]') || msgText.includes('**Hire Me Application**') || msgText.includes('Hire Me Application');
             const firstUrl = extractFirstUrl(msgText);
-            if (firstUrl) {
+            if (firstUrl && !isHireCard) {
               createLinkPreview(firstUrl, messageEl);
             }
             
@@ -2590,6 +2698,113 @@
         return `<a href="/profile/${username}" class="mention-link" onclick="event.stopPropagation();">@${username}</a>`;
       });
       return result;
+    }
+
+    function renderHireApplicationCard(text) {
+      const lines = text.split('\n').filter(l => l.trim());
+      let name = '', email = '', contact = '', resume = '', from = '';
+      const customFields = [];
+
+      lines.forEach(line => {
+        if (line.startsWith('name::')) name = line.substring(6).trim();
+        else if (line.startsWith('email::')) email = line.substring(7).trim();
+        else if (line.startsWith('contact::')) contact = line.substring(9).trim();
+        else if (line.startsWith('resume::')) resume = line.substring(8).trim();
+        else if (line.startsWith('from::')) from = line.substring(6).trim();
+        else if (line.startsWith('custom::')) {
+          const parts = line.substring(8).split('::');
+          if (parts.length >= 2) customFields.push({ key: parts[0].trim(), value: parts.slice(1).join('::').trim() });
+        }
+      });
+
+      const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+      let rows = '';
+      if (name) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDC64</div><div><div class="hire-card-label">Name</div><div class="hire-card-value">${esc(name)}</div></div></div>`;
+      if (email) rows += `<div class="hire-card-row"><div class="hire-card-icon">\u2709\uFE0F</div><div><div class="hire-card-label">Email</div><div class="hire-card-value"><a href="mailto:${esc(email)}">${esc(email)}</a></div></div></div>`;
+      if (contact) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDCDE</div><div><div class="hire-card-label">Phone</div><div class="hire-card-value"><a href="tel:${esc(contact)}">${esc(contact)}</a></div></div></div>`;
+      if (resume) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDCCE</div><div><div class="hire-card-label">Resume</div><div class="hire-card-value"><a href="${esc(resume)}" target="_blank" rel="noopener">${esc(resume).length > 35 ? esc(resume).substring(0,32) + '...' : esc(resume)}</a></div></div></div>`;
+
+      let customHtml = '';
+      if (customFields.length > 0) {
+        customHtml = `<div class="hire-card-custom-section"><div class="hire-card-custom-title">Additional Info</div>`;
+        customFields.forEach(f => {
+          customHtml += `<div class="hire-card-custom-item"><span class="hire-card-custom-key">${esc(f.key)}:</span><span class="hire-card-custom-val">${esc(f.value)}</span></div>`;
+        });
+        customHtml += `</div>`;
+      }
+
+      const fromUser = from.startsWith('@') ? from.substring(1) : from;
+      const footerHtml = from ? `<div class="hire-card-footer"><span>\u2728 Applied by</span><a href="/profile/${esc(fromUser)}">${esc(from)}</a></div>` : '';
+
+      return `<div class="hire-card">
+        <div class="hire-card-header">
+          <div class="hire-card-header-icon">\uD83D\uDCBC</div>
+          <div><div class="hire-card-header-text">Hire Me Application</div><div class="hire-card-header-sub">New candidate applied</div></div>
+        </div>
+        <div class="hire-card-body">${rows}${customHtml}</div>
+        ${footerHtml}
+      </div>`;
+    }
+
+    function renderOldHireApplicationCard(text) {
+      const lines = text.split('\n');
+      let name = '', email = '', contact = '', resume = '', from = '';
+      const customFields = [];
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        // Match old emoji format lines
+        const nameMatch = trimmed.match(/Name:\s*(.+)/i);
+        const emailMatch = trimmed.match(/Email:\s*(.+)/i);
+        const contactMatch = trimmed.match(/Contact:\s*(.+)/i);
+        const resumeMatch = trimmed.match(/Resume:\s*(.+)/i);
+        const fromMatch = trimmed.match(/Sent via post by\s*(@?\w+)/i);
+        
+        if (nameMatch && !name) name = nameMatch[1].trim();
+        else if (emailMatch && !email) email = emailMatch[1].trim();
+        else if (contactMatch && !contact) contact = contactMatch[1].trim();
+        else if (resumeMatch && !resume) resume = resumeMatch[1].trim();
+        else if (fromMatch) from = fromMatch[1].trim();
+        else if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
+          // Custom/additional info fields like "• Message for Hiring Manager: ..."
+          const bullet = trimmed.replace(/^[•\-]\s*/, '');
+          const colonIdx = bullet.indexOf(':');
+          if (colonIdx > 0) {
+            customFields.push({ key: bullet.substring(0, colonIdx).trim(), value: bullet.substring(colonIdx + 1).trim() });
+          }
+        }
+      });
+
+      // Reuse the same card renderer with the parsed data
+      const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+      let rows = '';
+      if (name) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDC64</div><div><div class="hire-card-label">Name</div><div class="hire-card-value">${esc(name)}</div></div></div>`;
+      if (email) rows += `<div class="hire-card-row"><div class="hire-card-icon">\u2709\uFE0F</div><div><div class="hire-card-label">Email</div><div class="hire-card-value"><a href="mailto:${esc(email)}">${esc(email)}</a></div></div></div>`;
+      if (contact) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDCDE</div><div><div class="hire-card-label">Phone</div><div class="hire-card-value"><a href="tel:${esc(contact)}">${esc(contact)}</a></div></div></div>`;
+      if (resume) rows += `<div class="hire-card-row"><div class="hire-card-icon">\uD83D\uDCCE</div><div><div class="hire-card-label">Resume</div><div class="hire-card-value"><a href="${esc(resume)}" target="_blank" rel="noopener">${esc(resume).length > 35 ? esc(resume).substring(0,32) + '...' : esc(resume)}</a></div></div></div>`;
+
+      let customHtml = '';
+      if (customFields.length > 0) {
+        customHtml = `<div class="hire-card-custom-section"><div class="hire-card-custom-title">Additional Info</div>`;
+        customFields.forEach(f => {
+          customHtml += `<div class="hire-card-custom-item"><span class="hire-card-custom-key">${esc(f.key)}:</span><span class="hire-card-custom-val">${esc(f.value)}</span></div>`;
+        });
+        customHtml += `</div>`;
+      }
+
+      const fromUser = from.startsWith('@') ? from.substring(1) : from;
+      const footerHtml = from ? `<div class="hire-card-footer"><span>\u2728 Applied by</span><a href="/profile/${esc(fromUser)}">${esc(from)}</a></div>` : '';
+
+      return `<div class="hire-card">
+        <div class="hire-card-header">
+          <div class="hire-card-header-icon">\uD83D\uDCBC</div>
+          <div><div class="hire-card-header-text">Hire Me Application</div><div class="hire-card-header-sub">New candidate applied</div></div>
+        </div>
+        <div class="hire-card-body">${rows}${customHtml}</div>
+        ${footerHtml}
+      </div>`;
     }
 
     function hasUrl(text) {

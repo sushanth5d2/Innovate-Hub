@@ -818,23 +818,30 @@
         
         // If username is provided (via query param or path), fetch by username
         if (lookupUsername) {
-          // First, get user by searching for username
-          const searchResponse = await fetch(`/api/search/users?q=${encodeURIComponent(lookupUsername)}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          
-          if (!searchResponse.ok) throw new Error('Failed to find user');
-          
-          const searchData = await searchResponse.json();
-          const foundUser = searchData.users?.find(u => u.username === lookupUsername);
-          
-          if (!foundUser) throw new Error('User not found');
-          
-          userId = foundUser.id;
-          isOwnProfile = currentUser.id == userId;
-          profileUrl = `/api/users/${userId}`;
+          // If looking up own profile by username, skip search (search excludes self)
+          if (currentUser.username && lookupUsername.toLowerCase() === currentUser.username.toLowerCase()) {
+            userId = currentUser.id;
+            isOwnProfile = true;
+            profileUrl = `/api/users/${userId}`;
+          } else {
+            // Search for user by username
+            const searchResponse = await fetch(`/api/search/users?q=${encodeURIComponent(lookupUsername)}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+            
+            if (!searchResponse.ok) throw new Error('Failed to find user');
+            
+            const searchData = await searchResponse.json();
+            const foundUser = searchData.users?.find(u => u.username === lookupUsername);
+            
+            if (!foundUser) throw new Error('User not found');
+            
+            userId = foundUser.id;
+            isOwnProfile = currentUser.id == userId;
+            profileUrl = `/api/users/${userId}`;
+          }
         } else {
           profileUrl = `/api/users/${userId}`;
         }
