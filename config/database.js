@@ -1624,6 +1624,13 @@ const migrateDatabase = () => {
         console.log('Note: custom_button column migration - ', err ? err.message : 'ok');
       }
     });
+
+    // Add comment_to_dm JSON column to posts for Comment-to-DM feature
+    db.run(`ALTER TABLE posts ADD COLUMN comment_to_dm TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: comment_to_dm column migration - ', err ? err.message : 'ok');
+      }
+    });
   });
 };
 

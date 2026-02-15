@@ -140,7 +140,7 @@
 
         <!-- Caption -->
         <div class="cp-caption-wrap">
-          <textarea id="postContent" class="cp-caption" placeholder="Write a caption..." rows="4" oninput="onCaptionInput(this)"></textarea>
+          <textarea id="postContent" class="cp-caption" placeholder="Write the content or caption..." rows="4" oninput="onCaptionInput(this)"></textarea>
           <div class="cp-char-count"><span id="cpCharCount">0</span> / 2,200</div>
         </div>
 
@@ -337,12 +337,78 @@
               </div>
             </div>
           </div>
+
+          <!-- Comment to DM Feature -->
+          <div class="cb-builder" style="margin-top: 12px;">
+            <label class="cp-toggle-row" style="padding: 0; margin-bottom: 8px;">
+              <div class="cp-toggle-info">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                <span style="font-weight: 600; font-size: 14px;">Comment to DM</span>
+              </div>
+              <div class="cp-switch">
+                <input type="checkbox" id="enableCommentDM" onchange="toggleCBSection('commentDMFields')">
+                <span class="cp-switch-slider"></span>
+              </div>
+            </label>
+            <p class="cb-hint" style="margin-top: 0;">When enabled, anyone who comments will automatically receive a DM from you.</p>
+
+            <div id="commentDMFields" class="cb-sub-fields" style="display:none;">
+              <!-- Follow Required Toggle -->
+              <label class="cp-toggle-row" style="padding: 4px 0;">
+                <div class="cp-toggle-info">
+                  <span style="font-size: 13px;">🔒 Require Follow</span>
+                </div>
+                <div class="cp-switch">
+                  <input type="checkbox" id="cdmRequireFollow" checked onchange="toggleCBSection('cdmNotFollowingSection')">
+                  <span class="cp-switch-slider"></span>
+                </div>
+              </label>
+              <p class="cb-hint">Only send the content after the user follows you.</p>
+
+              <!-- Not Following Message -->
+              <div id="cdmNotFollowingSection" class="cb-sub-fields" style="display:block;">
+                <label class="cb-field-label">Message if not following</label>
+                <textarea id="cdmNotFollowMsg" class="cp-input cb-dm-textarea" rows="2" placeholder="Oh no! It seems you're not following me 😭 Follow me and click 'I'm following' to get the link ✨"></textarea>
+                <p class="cb-hint">Leave empty for default message.</p>
+              </div>
+
+              <!-- DM Message -->
+              <label class="cb-field-label" style="margin-top: 8px;">💬 DM Message</label>
+              <p class="cb-hint">This message will be shown above the buttons in the DM.</p>
+              <textarea id="cdmDMMessage" class="cp-input cb-dm-textarea" rows="2" placeholder="e.g. Here is the website link that most users use, check it out!"></textarea>
+
+              <!-- DM Items (multiple) -->
+              <label class="cb-field-label" style="margin-top: 8px;">📩 Custom DM Buttons</label>
+              <p class="cb-hint">Add custom buttons with content. Each button will appear below your message.</p>
+              <div id="cdmItemsList">
+                <div class="cdm-item" data-idx="0">
+                  <input type="text" class="cp-input cdm-item-label" placeholder="Custom button name (e.g. Get Link, Download)" value="">
+                  <input type="text" class="cp-input cdm-item-content" placeholder="Link or content to send" value="">
+                </div>
+              </div>
+              <button type="button" class="cp-add-option-btn" onclick="addCDMItem()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                + Add another custom button
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <style>
+    /* ===== Caption Link/Hashtag/Mention Styling ===== */
+    .ig-caption-link {
+      color: #00376b;
+      color: var(--ig-link-color, #e0f1ff);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .ig-caption-link:hover {
+      text-decoration: underline;
+    }
+
     /* ===== Create Post Modal - Instagram-Style ===== */
     .cp-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -907,6 +973,16 @@
     }
     .cb-submit-btn:hover { opacity: 0.9; }
     .cb-submit-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* Comment to DM items */
+    .cdm-item {
+      display: flex; gap: 8px; margin-bottom: 8px; align-items: center;
+    }
+    .cdm-item .cp-input { flex: 1; margin: 0; }
+    .cdm-item-remove {
+      background: none; border: none; color: var(--ig-error, #ed4956);
+      font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;
+    }
 
     /* Responsive */
     @media (max-width: 540px) {
@@ -1491,7 +1567,7 @@
 
         <!-- Caption -->
         <div class="cp-caption-wrap">
-          <textarea id="editPostContent" class="cp-caption" placeholder="Write a caption..." rows="4" oninput="onEditCaptionInput(this)"></textarea>
+          <textarea id="editPostContent" class="cp-caption" placeholder="Write the content or caption..." rows="4" oninput="onEditCaptionInput(this)"></textarea>
           <div class="cp-char-count"><span id="editCharCount">0</span> / 2,200</div>
         </div>
 
@@ -2676,7 +2752,8 @@
         ${post.content ? `
         <div class="ig-post-caption">
           <span class="ig-caption-username">${post.username}</span>
-          <span class="ig-caption-text">${post.content}</span>
+          <span class="ig-caption-text">${linkifyCaption(post.content)}</span>
+          ${post.content.length > 150 ? `<button class="ig-caption-more" onclick="this.previousElementSibling.style.display='inline'; this.style.display='none';">more</button>` : ''}
         </div>
         ` : ''}
 
@@ -3453,6 +3530,12 @@
       const customButtonData = collectCustomButtonData();
       if (customButtonData) {
         formData.append('custom_button', JSON.stringify(customButtonData));
+      }
+      
+      // Add comment-to-DM data
+      const commentDMData = collectCommentDMData();
+      if (commentDMData) {
+        formData.append('comment_to_dm', JSON.stringify(commentDMData));
       }
       
       try {
@@ -4580,7 +4663,7 @@
           ${post.content ? `
           <div class="ig-post-caption">
             <span class="ig-caption-username">${post.username}</span>
-            <span class="ig-caption-text">${getPlainText(post.content).substring(0, 200)}${getPlainText(post.content).length > 200 ? '...' : ''}</span>
+            <span class="ig-caption-text">${linkifyCaption(post.content)}</span>
           </div>
           ` : ''}
 
@@ -4789,6 +4872,44 @@
       }
     }, 30000); // Every 30 seconds
 
+    // ========== Linkify Caption ==========
+    function linkifyCaption(text) {
+      if (!text) return '';
+      // Escape HTML first
+      const div = document.createElement('div');
+      div.textContent = text;
+      let escaped = div.innerHTML;
+      // Process hashtags FIRST (before URLs, to avoid matching #hex inside style attrs)
+      // Use a placeholder approach: extract hashtags, replace URLs, then restore
+      const hashtagPlaceholders = [];
+      escaped = escaped.replace(/(^|\s)#(\w+)/g, (match, space, tag) => {
+        const idx = hashtagPlaceholders.length;
+        hashtagPlaceholders.push(`${space}<span class="ig-caption-link">#${tag}</span>`);
+        return `__HASHTAG_${idx}__`;
+      });
+      // Linkify @mentions
+      const mentionPlaceholders = [];
+      escaped = escaped.replace(/(^|\s)@(\w[\w.]*)/g, (match, space, username) => {
+        const idx = mentionPlaceholders.length;
+        mentionPlaceholders.push(`${space}<a href="/profile/${username}" class="ig-caption-link" onclick="event.stopPropagation();">@${username}</a>`);
+        return `__MENTION_${idx}__`;
+      });
+      // Linkify URLs
+      escaped = escaped.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
+        let display = url.replace(/^https?:\/\/(www\.)?/, '');
+        if (display.length > 50) display = display.substring(0, 47) + '...';
+        return `<a href="${url}" target="_blank" rel="noopener" class="ig-caption-link" onclick="event.stopPropagation();">${display}</a>`;
+      });
+      // Restore placeholders
+      hashtagPlaceholders.forEach((val, idx) => {
+        escaped = escaped.replace(`__HASHTAG_${idx}__`, val);
+      });
+      mentionPlaceholders.forEach((val, idx) => {
+        escaped = escaped.replace(`__MENTION_${idx}__`, val);
+      });
+      return escaped;
+    }
+
     // ========== Custom Button Builder Functions ==========
 
     function resetCustomButtonBuilder() {
@@ -4840,13 +4961,14 @@
     function toggleCBSection(sectionId) {
       const section = document.getElementById(sectionId);
       if (!section) return;
-      const checkboxId = sectionId.replace('Fields', '').replace('cbContact', 'cbContactMe').replace('cbDM', 'cbDM').replace('cbRegister', 'cbRegister').replace('cbHireMe', 'cbHireMe');
-      // Map section IDs to checkbox IDs
+      // Map section IDs to their corresponding checkbox IDs
       const mapping = {
         'cbContactFields': 'cbContactMe',
         'cbDMFields': 'cbDM',
         'cbRegisterFields': 'cbRegister',
-        'cbHireMeFields': 'cbHireMe'
+        'cbHireMeFields': 'cbHireMe',
+        'commentDMFields': 'enableCommentDM',
+        'cdmNotFollowingSection': 'cdmRequireFollow'
       };
       const chk = document.getElementById(mapping[sectionId]);
       section.style.display = chk && chk.checked ? 'block' : 'none';
@@ -4943,6 +5065,66 @@
         if (val) values.push(val);
       });
       return values;
+    }
+
+    // ========== Comment to DM Functions ==========
+
+    function addCDMItem() {
+      const list = document.getElementById('cdmItemsList');
+      const idx = list.querySelectorAll('.cdm-item').length;
+      const item = document.createElement('div');
+      item.className = 'cdm-item';
+      item.dataset.idx = idx;
+      item.innerHTML = `
+        <input type="text" class="cp-input cdm-item-label" placeholder="Custom button name" value="">
+        <input type="text" class="cp-input cdm-item-content" placeholder="Link or content to send" value="">
+        <button type="button" class="cdm-item-remove" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      list.appendChild(item);
+    }
+
+    function collectCommentDMData() {
+      const enabled = document.getElementById('enableCommentDM')?.checked;
+      if (!enabled) return null;
+
+      const requireFollow = document.getElementById('cdmRequireFollow')?.checked || false;
+      const notFollowMsg = document.getElementById('cdmNotFollowMsg')?.value?.trim() || '';
+      const dmMessage = document.getElementById('cdmDMMessage')?.value?.trim() || '';
+
+      const items = [];
+      document.querySelectorAll('#cdmItemsList .cdm-item').forEach(el => {
+        const label = el.querySelector('.cdm-item-label')?.value?.trim();
+        const content = el.querySelector('.cdm-item-content')?.value?.trim();
+        if (label && content) items.push({ label, content });
+      });
+
+      if (items.length === 0) return null;
+
+      return {
+        enabled: true,
+        require_follow: requireFollow,
+        not_following_msg: notFollowMsg,
+        dm_message: dmMessage,
+        items: items
+      };
+    }
+
+    function resetCommentDM() {
+      const el = document.getElementById('enableCommentDM');
+      if (el) el.checked = false;
+      const fields = document.getElementById('commentDMFields');
+      if (fields) fields.style.display = 'none';
+      const follow = document.getElementById('cdmRequireFollow');
+      if (follow) follow.checked = true;
+      const msg = document.getElementById('cdmNotFollowMsg');
+      if (msg) msg.value = '';
+      const dmMsg = document.getElementById('cdmDMMessage');
+      if (dmMsg) dmMsg.value = '';
+      const list = document.getElementById('cdmItemsList');
+      if (list) list.innerHTML = `<div class="cdm-item" data-idx="0">
+        <input type="text" class="cp-input cdm-item-label" placeholder="Custom button name (e.g. Get Link, Download)" value="">
+        <input type="text" class="cp-input cdm-item-content" placeholder="Link or content to send" value="">
+      </div>`;
     }
 
     // ========== Custom Button Action Modal (on post view) ==========

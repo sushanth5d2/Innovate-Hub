@@ -103,6 +103,58 @@
     }
     .hire-card-footer a { color: #667eea; text-decoration: none; font-weight: 600; }
     .hire-card-footer a:hover { text-decoration: underline; }
+
+    /* Comment-to-DM Cards */
+    .cdm-card-msg {
+      padding: 0 !important;
+      border-radius: 16px !important;
+      overflow: hidden;
+      max-width: 320px;
+      white-space: normal !important;
+    }
+    .cdm-card {
+      width: 100%;
+      font-size: 14px;
+    }
+    .cdm-card-text {
+      padding: 14px 16px 12px;
+      color: #fff;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .cdm-card-buttons {
+      padding: 0 12px 12px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .cdm-card-btn {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    .cdm-btn-secondary {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+    .cdm-btn-secondary:hover { background: rgba(255,255,255,0.2); }
+    .cdm-btn-primary {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+    .cdm-btn-primary:hover { background: rgba(255,255,255,0.2); }
+    .cdm-btn-link {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+    }
+    .cdm-btn-link:hover { background: rgba(255,255,255,0.2); }
   </style>
 </head>
 <body class="ig-messages-page">
@@ -1193,9 +1245,18 @@
             return '✓ Todo list';
           }
         default:
-          // Show clean preview for hire application messages
+          // Show clean preview for special messages
           if (message.includes('[HIRE_APPLICATION]') || message.includes('[/HIRE_APPLICATION]') || message.includes('**Hire Me Application**')) {
             return '\uD83D\uDCBC Hire Me Application';
+          }
+          if (message.includes('[CDM_BUTTONS]')) {
+            return '\uD83D\uDCE9 Sent you content';
+          }
+          if (message.includes('[CDM_FOLLOW_PROMPT]') || message.includes('[CDM_NOT_FOLLOWING]')) {
+            return '\uD83D\uDD12 Follow to get the link';
+          }
+          if (message.includes('[CDM_CONTENT]')) {
+            return '\uD83D\uDCE9 Sent you a link';
           }
           // For text messages, truncate if too long
           return message.length > 40 ? message.substring(0, 40) + '...' : message;
@@ -1730,6 +1791,15 @@
             } else if (msgText.includes('**Hire Me Application**') || msgText.includes('Hire Me Application')) {
               textContent.innerHTML = renderOldHireApplicationCard(msgText);
               messageEl.classList.add('hire-card-msg');
+            } else if (msgText.includes('[CDM_BUTTONS]')) {
+              textContent.innerHTML = renderCDMButtons(msgText);
+              messageEl.classList.add('cdm-card-msg');
+            } else if (msgText.includes('[CDM_FOLLOW_PROMPT]') || msgText.includes('[CDM_NOT_FOLLOWING]')) {
+              textContent.innerHTML = renderCDMFollowPrompt(msgText);
+              messageEl.classList.add('cdm-card-msg');
+            } else if (msgText.includes('[CDM_CONTENT]')) {
+              textContent.innerHTML = renderCDMContent(msgText);
+              messageEl.classList.add('cdm-card-msg');
             } else {
               textContent.innerHTML = linkifyText(msgText);
             }
@@ -1737,10 +1807,10 @@
             textWrapper.appendChild(textContent);
             messageEl.appendChild(textWrapper);
 
-            // Add link preview if message contains URL (skip for hire application cards)
-            const isHireCard = msgText.includes('[HIRE_APPLICATION]') || msgText.includes('**Hire Me Application**') || msgText.includes('Hire Me Application');
+            // Add link preview if message contains URL (skip for special cards)
+            const isSpecialCard = msgText.includes('[HIRE_APPLICATION]') || msgText.includes('**Hire Me Application**') || msgText.includes('Hire Me Application') || msgText.includes('[CDM_');
             const firstUrl = extractFirstUrl(msgText);
-            if (firstUrl && !isHireCard) {
+            if (firstUrl && !isSpecialCard) {
               createLinkPreview(firstUrl, messageEl);
             }
             
@@ -2805,6 +2875,134 @@
         <div class="hire-card-body">${rows}${customHtml}</div>
         ${footerHtml}
       </div>`;
+    }
+
+    // ========== Comment-to-DM Renderers ==========
+
+    function renderCDMButtons(text) {
+      const lines = text.split('\n');
+      let owner = '', postId = '', requireFollow = false, dmMessage = '';
+      const buttons = [];
+      lines.forEach(line => {
+        if (line.startsWith('owner::')) owner = line.substring(7).trim();
+        else if (line.startsWith('post_id::')) postId = line.substring(9).trim();
+        else if (line.startsWith('require_follow::')) requireFollow = line.substring(16).trim() === '1';
+        else if (line.startsWith('dm_message::')) dmMessage = line.substring(12).trim();
+        else if (line.startsWith('button::')) {
+          const parts = line.substring(8).split('::');
+          if (parts.length >= 2) buttons.push({ label: parts[0].trim(), content: parts.slice(1).join('::').trim() });
+        }
+      });
+
+      const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+      const ownerClean = owner.startsWith('@') ? owner.substring(1) : owner;
+
+      // Use custom DM message if provided, otherwise default
+      const messageText = dmMessage || `Hey! Here's what ${owner} shared with you \u2728`;
+
+      let buttonsHtml = '';
+      buttons.forEach(btn => {
+        buttonsHtml += `<button class="cdm-card-btn cdm-btn-link" onclick="event.stopPropagation(); cdmButtonClick('${esc(postId)}', '${esc(btn.label)}', '${esc(btn.content)}')">${esc(btn.label)}</button>`;
+      });
+
+      return `<div class="cdm-card">
+        <div class="cdm-card-text">${esc(messageText)}</div>
+        <div class="cdm-card-buttons">${buttonsHtml}</div>
+      </div>`;
+    }
+
+    async function cdmButtonClick(postId, buttonLabel, buttonContent) {
+      try {
+        const resp = await fetch(`/api/posts/${postId}/cdm-button-click`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token'),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ buttonLabel, buttonContent })
+        });
+        const data = await resp.json();
+        // Reload messages to show the new DM (either content or follow prompt)
+        if (typeof loadMessages === 'function') loadMessages(currentContactId);
+      } catch(e) {
+        console.error('CDM button click error:', e);
+      }
+    }
+
+    function renderCDMFollowPrompt(text) {
+      const lines = text.split('\n');
+      let msg = '', owner = '', postId = '';
+      lines.forEach(line => {
+        if (line.startsWith('msg::')) msg = line.substring(5).trim();
+        else if (line.startsWith('owner::')) owner = line.substring(7).trim();
+        else if (line.startsWith('post_id::')) postId = line.substring(9).trim();
+      });
+
+      const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+      const ownerClean = owner.startsWith('@') ? owner.substring(1) : owner;
+
+      return `<div class="cdm-card">
+        <div class="cdm-card-text">${esc(msg)}</div>
+        <div class="cdm-card-buttons">
+          <a href="/profile/${esc(ownerClean)}" class="cdm-card-btn cdm-btn-secondary" onclick="event.stopPropagation();">Visit Profile</a>
+          <button class="cdm-card-btn cdm-btn-primary" onclick="event.stopPropagation(); cdmVerifyFollow('${esc(postId)}')">I'm following \u2705</button>
+        </div>
+      </div>`;
+    }
+
+    function renderCDMContent(text) {
+      const lines = text.split('\n');
+      let from = '', msg = '';
+      const buttons = [];
+      lines.forEach(line => {
+        if (line.startsWith('from::')) from = line.substring(6).trim();
+        else if (line.startsWith('msg::')) msg = line.substring(5).trim();
+        else if (line.startsWith('button::')) {
+          const parts = line.substring(8).split('::');
+          if (parts.length >= 2) buttons.push({ label: parts[0].trim(), content: parts.slice(1).join('::').trim() });
+        }
+      });
+
+      const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+      const isUrl = (s) => /^https?:\/\//i.test(s);
+
+      const messageText = msg || 'Here is the content \u2728';
+
+      let buttonsHtml = '';
+      buttons.forEach(btn => {
+        if (isUrl(btn.content)) {
+          buttonsHtml += `<a href="${esc(btn.content)}" target="_blank" rel="noopener" class="cdm-card-btn cdm-btn-link" onclick="event.stopPropagation();">${esc(btn.label)}</a>`;
+        } else {
+          buttonsHtml += `<div class="cdm-card-btn cdm-btn-secondary" style="cursor: default;">${esc(btn.label)}<br><span style="font-weight: 400; font-size: 12px; opacity: 0.8;">${esc(btn.content)}</span></div>`;
+        }
+      });
+
+      const fromHtml = from ? `<div class="cdm-card-text" style="padding-top: 0; font-size: 12px; opacity: 0.6;">From ${esc(from)}</div>` : '';
+
+      return `<div class="cdm-card">
+        <div class="cdm-card-text" style="padding-bottom: 6px;">${esc(messageText)}</div>
+        <div class="cdm-card-buttons">${buttonsHtml}</div>
+        ${fromHtml}
+      </div>`;
+    }
+
+    async function cdmVerifyFollow(postId) {
+      try {
+        const resp = await fetch(`/api/posts/${postId}/verify-follow`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token'),
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await resp.json();
+        if (data.following) {
+          // Reload messages to show the new content DM
+          if (typeof loadMessages === 'function') loadMessages(currentContactId);
+        }
+      } catch(e) {
+        console.error('Verify follow error:', e);
+      }
     }
 
     function hasUrl(text) {

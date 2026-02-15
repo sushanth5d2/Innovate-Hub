@@ -187,7 +187,8 @@ router.post('/', authMiddleware, upload.fields([
     poll_question,
     poll_options,
     poll_expiry,
-    custom_button
+    custom_button,
+    comment_to_dm
   } = req.body;
 
   let images = [];
@@ -219,8 +220,8 @@ router.post('/', authMiddleware, upload.fields([
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -237,7 +238,8 @@ router.post('/', authMiddleware, upload.fields([
       hashtags || null,
       enable_contact === '1' || enable_contact === true ? 1 : 0,
       enable_interested === '1' || enable_interested === true ? 1 : 0,
-      custom_button || null
+      custom_button || null,
+      comment_to_dm || null
     ],
     function(err) {
       if (err) {
@@ -713,7 +715,7 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
       db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
 
       // Create notification for post owner
-      db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
+      db.get('SELECT user_id, comment_to_dm, username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [postId], (err, post) => {
         if (post && post.user_id !== userId) {
           db.run(
             'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
@@ -729,6 +731,19 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
               post_id: postId,
               created_by: userId
             });
+          }
+        }
+
+        // Comment-to-DM: always send DM with buttons to commenter
+        if (post && post.comment_to_dm && post.user_id !== userId) {
+          try {
+            const cdmConfig = JSON.parse(post.comment_to_dm);
+            if (cdmConfig.enabled) {
+              // Always send DM with buttons — follow check happens when button is clicked
+              sendCommentDMWithButtons(db, post.user_id, userId, cdmConfig, post.username, postId, req.app.get('io'));
+            }
+          } catch (e) {
+            console.error('Comment-to-DM error:', e);
           }
         }
       });
@@ -1085,6 +1100,227 @@ router.delete('/:postId', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
+});
+
+// ========== Comment-to-DM Helper Functions ==========
+
+// Always send DM with buttons when someone comments
+function sendCommentDMWithButtons(db, postOwnerId, commenterId, cdmConfig, ownerUsername, postId, io) {
+  const items = cdmConfig.items || [];
+  const requireFollow = cdmConfig.require_follow || false;
+  const notFollowMsg = cdmConfig.not_following_msg || '';
+  const dmMessage = cdmConfig.dm_message || '';
+
+  let dmContent = `[CDM_BUTTONS]\n`;
+  dmContent += `owner::@${ownerUsername}\n`;
+  dmContent += `post_id::${postId}\n`;
+  dmContent += `require_follow::${requireFollow ? '1' : '0'}\n`;
+  if (dmMessage) dmContent += `dm_message::${dmMessage}\n`;
+  items.forEach(item => {
+    dmContent += `button::${item.label}::${item.content}\n`;
+  });
+  dmContent += `[/CDM_BUTTONS]`;
+
+  db.run(
+    'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+    [postOwnerId, commenterId, dmContent, '[]'],
+    function(err) {
+      if (!err && io) {
+        db.get('SELECT username, profile_picture FROM users WHERE id = ?', [postOwnerId], (e, sender) => {
+          io.to(`user-${commenterId}`).emit('message:receive', {
+            id: this.lastID,
+            sender_id: postOwnerId,
+            receiver_id: commenterId,
+            content: dmContent,
+            sender_username: sender?.username,
+            sender_profile_picture: sender?.profile_picture,
+            created_at: new Date().toISOString()
+          });
+        });
+      }
+    }
+  );
+}
+
+// When user clicks a button, check follow + send appropriate DM
+router.post('/:postId/cdm-button-click', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+  const { buttonLabel, buttonContent } = req.body;
+
+  db.get('SELECT p.user_id, p.comment_to_dm, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [postId], (err, post) => {
+    if (err || !post) return res.status(404).json({ error: 'Post not found' });
+    if (!post.comment_to_dm) return res.status(400).json({ error: 'No Comment-to-DM config' });
+
+    let cdmConfig;
+    try { cdmConfig = JSON.parse(post.comment_to_dm); } catch(e) { return res.status(400).json({ error: 'Invalid config' }); }
+
+    if (cdmConfig.require_follow) {
+      // Check if user follows the post owner
+      db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [userId, post.user_id], (err, followRow) => {
+        if (!followRow) {
+          // NOT following — send follow prompt DM
+          const defaultMsg = `Oh no! It seems you're not following me 😭 It would really mean a lot if you visit my profile and hit the follow button 🥺 . Once you have done that, click on the 'I'm following' button below and you will get the link ✨ .`;
+          const customMsg = cdmConfig.not_following_msg || defaultMsg;
+
+          let dmContent = `[CDM_FOLLOW_PROMPT]\n`;
+          dmContent += `msg::${customMsg}\n`;
+          dmContent += `owner::@${post.username}\n`;
+          dmContent += `post_id::${postId}\n`;
+          dmContent += `[/CDM_FOLLOW_PROMPT]`;
+
+          db.run(
+            'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+            [post.user_id, userId, dmContent, '[]'],
+            function(err2) {
+              const io = req.app.get('io');
+              if (!err2 && io) {
+                io.to(`user-${userId}`).emit('message:receive', {
+                  id: this.lastID,
+                  sender_id: post.user_id,
+                  receiver_id: userId,
+                  content: dmContent,
+                  sender_username: post.username,
+                  created_at: new Date().toISOString()
+                });
+              }
+              return res.json({ success: false, following: false });
+            }
+          );
+        } else {
+          // IS following — send the actual content for that button
+          const customMsg = cdmConfig.dm_message || 'Here is the content ✨';
+          let dmContent = `[CDM_CONTENT]\n`;
+          dmContent += `from::@${post.username}\n`;
+          dmContent += `msg::${customMsg}\n`;
+          dmContent += `button::${buttonLabel}::${buttonContent}\n`;
+          dmContent += `[/CDM_CONTENT]`;
+
+          db.run(
+            'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+            [post.user_id, userId, dmContent, '[]'],
+            function(err2) {
+              const io = req.app.get('io');
+              if (!err2 && io) {
+                io.to(`user-${userId}`).emit('message:receive', {
+                  id: this.lastID,
+                  sender_id: post.user_id,
+                  receiver_id: userId,
+                  content: dmContent,
+                  sender_username: post.username,
+                  created_at: new Date().toISOString()
+                });
+              }
+              return res.json({ success: true, following: true });
+            }
+          );
+        }
+      });
+    } else {
+      // No follow required — send content directly
+      const customMsg2 = cdmConfig.dm_message || 'Here is the content ✨';
+      let dmContent = `[CDM_CONTENT]\n`;
+      dmContent += `from::@${post.username}\n`;
+      dmContent += `msg::${customMsg2}\n`;
+      dmContent += `button::${buttonLabel}::${buttonContent}\n`;
+      dmContent += `[/CDM_CONTENT]`;
+
+      db.run(
+        'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+        [post.user_id, userId, dmContent, '[]'],
+        function(err2) {
+          const io = req.app.get('io');
+          if (!err2 && io) {
+            io.to(`user-${userId}`).emit('message:receive', {
+              id: this.lastID,
+              sender_id: post.user_id,
+              receiver_id: userId,
+              content: dmContent,
+              sender_username: post.username,
+              created_at: new Date().toISOString()
+            });
+          }
+          return res.json({ success: true, following: true });
+        }
+      );
+    }
+  });
+});
+
+// Verify follow and send content (called when user clicks "I'm following")
+router.post('/:postId/verify-follow', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+
+  db.get('SELECT p.user_id, p.comment_to_dm, u.username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [postId], (err, post) => {
+    if (err || !post) return res.status(404).json({ error: 'Post not found' });
+    if (!post.comment_to_dm) return res.status(400).json({ error: 'No Comment-to-DM on this post' });
+
+    let cdmConfig;
+    try { cdmConfig = JSON.parse(post.comment_to_dm); } catch(e) { return res.status(400).json({ error: 'Invalid config' }); }
+
+    db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [userId, post.user_id], (err, followRow) => {
+      if (!followRow) {
+        const notFollowMsg = cdmConfig.not_following_msg || `I don't see that you're following me yet 😅 Please make sure to follow my account first, then click 'I'm following' again! ✨`;
+        let dmContent = `[CDM_NOT_FOLLOWING]\n`;
+        dmContent += `msg::${notFollowMsg}\n`;
+        dmContent += `owner::@${post.username}\n`;
+        dmContent += `post_id::${postId}\n`;
+        dmContent += `[/CDM_NOT_FOLLOWING]`;
+
+        db.run(
+          'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+          [post.user_id, userId, dmContent, '[]'],
+          function(err2) {
+            const io = req.app.get('io');
+            if (!err2 && io) {
+              io.to(`user-${userId}`).emit('message:receive', {
+                id: this.lastID,
+                sender_id: post.user_id,
+                receiver_id: userId,
+                content: dmContent,
+                sender_username: post.username,
+                created_at: new Date().toISOString()
+              });
+            }
+            return res.json({ success: false, following: false });
+          }
+        );
+      } else {
+        // IS following — send ALL content items
+        const items = cdmConfig.items || [];
+        const verifyMsg = cdmConfig.dm_message || 'Here is the content ✨';
+        let dmContent = `[CDM_CONTENT]\n`;
+        dmContent += `from::@${post.username}\n`;
+        dmContent += `msg::${verifyMsg}\n`;
+        items.forEach(item => {
+          dmContent += `button::${item.label}::${item.content}\n`;
+        });
+        dmContent += `[/CDM_CONTENT]`;
+
+        db.run(
+          'INSERT INTO messages (sender_id, receiver_id, content, attachments) VALUES (?, ?, ?, ?)',
+          [post.user_id, userId, dmContent, '[]'],
+          function(err2) {
+            const io = req.app.get('io');
+            if (!err2 && io) {
+              io.to(`user-${userId}`).emit('message:receive', {
+                id: this.lastID,
+                sender_id: post.user_id,
+                receiver_id: userId,
+                content: dmContent,
+                sender_username: post.username,
+                created_at: new Date().toISOString()
+              });
+            }
+            return res.json({ success: true, following: true });
+          }
+        );
+      }
+    });
+  });
 });
 
 module.exports = router;

@@ -566,6 +566,8 @@ body {
 
 .ig-caption-text {
   color: var(--ig-primary-text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .ig-caption-more {
