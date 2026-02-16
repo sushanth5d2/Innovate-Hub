@@ -5859,7 +5859,8 @@
       openai:      { color: '#10a37f', icon: '🤖', label: 'OpenAI' },
       xai:         { color: '#1da1f2', icon: '⚡', label: 'xAI' },
       anthropic:   { color: '#d4a574', icon: '🧠', label: 'Anthropic' },
-      deepseek:    { color: '#0066ff', icon: '🔬', label: 'DeepSeek' }
+      deepseek:    { color: '#0066ff', icon: '🔬', label: 'DeepSeek' },
+      pollinations: { color: '#8b5cf6', icon: '🌸', label: 'Pollinations (FREE)' }
     };
 
     // Load available AI models
@@ -6080,7 +6081,7 @@
       });
 
       // Sort providers: free first, then premium
-      const providerOrder = ['groq', 'google', 'huggingface', 'cohere', 'mistral', 'openrouter', 'ollama', 'openai', 'xai', 'anthropic', 'deepseek'];
+      const providerOrder = ['groq', 'google', 'pollinations', 'huggingface', 'cohere', 'mistral', 'openrouter', 'ollama', 'openai', 'xai', 'anthropic', 'deepseek'];
       const sortedProviders = Object.entries(providers).sort(([a], [b]) => {
         const ai = providerOrder.indexOf(a); const bi = providerOrder.indexOf(b);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);

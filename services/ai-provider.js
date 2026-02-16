@@ -406,6 +406,94 @@ setInterval(fetchGroqModels, 5 * 60 * 1000);
 fetchMistralModels();
 setInterval(fetchMistralModels, 5 * 60 * 1000);
 
+// ===================== Pollinations Dynamic Model Fetching =====================
+let pollinationsModelsFetched = false;
+let pollinationsDefaultModel = 'openai-fast'; // Fallback default
+
+/**
+ * Fetch all available text models from Pollinations API and register them dynamically.
+ * All Pollinations models are FREE with no API key needed.
+ */
+async function fetchPollinationsModels() {
+  try {
+    const resp = await axios.get('https://text.pollinations.ai/models', { timeout: 10000 });
+    const models = Array.isArray(resp.data) ? resp.data : [];
+    if (models.length === 0) return;
+
+    // Remove existing dynamically-added Pollinations models
+    for (const key of Object.keys(AI_MODELS)) {
+      if (AI_MODELS[key]?.provider === 'pollinations' && AI_MODELS[key]._dynamic) {
+        delete AI_MODELS[key];
+      }
+    }
+
+    // Filter to text-capable models only (must have text output)
+    const textModels = models.filter(m => {
+      const outputMods = m.output_modalities || [];
+      return outputMods.includes('text');
+    });
+
+    let count = 0;
+    for (const m of textModels) {
+      const modelName = m.name;
+      const modelId = `pollinations/${modelName}`;
+
+      // Skip if already hardcoded (keep the base pollinations-openai entry)
+      if (AI_MODELS[modelId] && !AI_MODELS[modelId]._dynamic) continue;
+
+      const displayName = m.description || modelName
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      const features = [];
+      if (m.vision) features.push('vision');
+      if (m.reasoning) features.push('reasoning');
+      if (m.tools) features.push('tools');
+      if (m.audio) features.push('audio');
+      const featureStr = features.length > 0 ? ` (${features.join(', ')})` : '';
+
+      AI_MODELS[modelId] = {
+        provider: 'pollinations',
+        name: displayName,
+        description: `FREE - No API key needed${featureStr}`,
+        maxTokens: 4096,
+        envKey: '_ALWAYS_AVAILABLE_',
+        free: true,
+        noKeyRequired: true,
+        _dynamic: true,
+        _pollinationsModelName: modelName,
+        _vision: m.vision || false,
+        _aliases: m.aliases || []
+      };
+      count++;
+    }
+
+    // Set the default model to the first available text model
+    if (textModels.length > 0) {
+      pollinationsDefaultModel = textModels[0].name;
+    }
+
+    // Update the static pollinations-openai entry to use the current default
+    if (AI_MODELS['pollinations-openai']) {
+      AI_MODELS['pollinations-openai']._pollinationsModelName = pollinationsDefaultModel;
+    }
+
+    pollinationsAvailable = true;
+    if (!pollinationsModelsFetched) {
+      console.log(`[Pollinations] Loaded ${count} free models (default: ${pollinationsDefaultModel})`);
+      pollinationsModelsFetched = true;
+    }
+  } catch (err) {
+    if (!pollinationsModelsFetched) {
+      console.log(`[Pollinations] Failed to fetch models: ${err.message}`);
+    }
+  }
+}
+
+// Fetch Pollinations models on startup and refresh every 5 minutes
+fetchPollinationsModels();
+setInterval(fetchPollinationsModels, 5 * 60 * 1000);
+
 // ===================== Provider Failure Cache =====================
 // Skip providers that failed recently to avoid wasting time on retries
 const providerFailureCache = new Map(); // key: 'provider:modelId' → timestamp of failure
@@ -1115,7 +1203,7 @@ async function chat(modelId, messages, options = {}) {
       case 'openrouter':
         return await callOpenRouter(modelId, apiKey, messages, temperature, maxTokens);
       case 'pollinations':
-        return await callPollinationsWithPrompt(messages, temperature, maxTokens, INNOVATE_AI_SYSTEM_PROMPT);
+        return await callPollinationsWithPrompt(messages, temperature, maxTokens, INNOVATE_AI_SYSTEM_PROMPT, modelId);
       case 'builtin':
         return await callBuiltinFallback(messages, INNOVATE_AI_SYSTEM_PROMPT);
       default:
@@ -1255,7 +1343,7 @@ async function callInnovateAI(modelId, messages, temperature, maxTokens) {
           result = await callLocalAIServiceWithPrompt(candidate.provider, candidate.modelId, innovateMessages, temperature, maxTokens, systemPrompt);
           break;
         case 'pollinations':
-          result = await callPollinationsWithPrompt(innovateMessages, temperature, maxTokens, systemPrompt);
+          result = await callPollinationsWithPrompt(innovateMessages, temperature, maxTokens, systemPrompt, candidate.modelId);
           break;
         case 'builtin':
           result = await callBuiltinFallback(innovateMessages, systemPrompt);
@@ -1339,14 +1427,25 @@ const callOpenRouterWithPrompt = makeOpenAICompatibleCall(
  * Pollinations AI - FREE, no API key needed, always available
  * Uses OpenAI-compatible format at https://text.pollinations.ai/openai
  */
-async function callPollinationsWithPrompt(messages, temperature, maxTokens, systemPrompt) {
+async function callPollinationsWithPrompt(messages, temperature, maxTokens, systemPrompt, modelId) {
   const MAX_RETRIES = 2;
   let lastError = null;
+
+  // Resolve which Pollinations model name to use
+  let pollinationsModel = pollinationsDefaultModel;
+  if (modelId) {
+    const config = AI_MODELS[modelId];
+    if (config?._pollinationsModelName) {
+      pollinationsModel = config._pollinationsModelName;
+    } else if (modelId.startsWith('pollinations/')) {
+      pollinationsModel = modelId.replace('pollinations/', '');
+    }
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const payload = {
-        model: 'mistral',
+        model: pollinationsModel,
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
@@ -1587,7 +1686,7 @@ async function callPollinationsVision(messages, imageData, temperature, maxToken
   });
 
   const payload = {
-    model: 'mistral',
+    model: 'openai-fast',
     messages: apiMessages,
     temperature,
     max_tokens: maxTokens,
