@@ -1631,6 +1631,23 @@ const migrateDatabase = () => {
         console.log('Note: comment_to_dm column migration - ', err ? err.message : 'ok');
       }
     });
+
+    // Portfolio projects table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS portfolio_projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        technologies TEXT DEFAULT '',
+        url TEXT DEFAULT '',
+        thumbnail TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
   });
 };
 

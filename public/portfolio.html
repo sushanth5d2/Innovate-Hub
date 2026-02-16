@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Profile - Innovate</title>
+  <title>Portfolio - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
@@ -842,207 +842,6 @@
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-    /* ===== Post Detail Modal ===== */
-    .pf-post-modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(8px);
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-    .pf-post-modal-overlay.active { display: flex; }
-    .pf-post-modal {
-      background: var(--pf-card);
-      border-radius: 16px;
-      max-width: 600px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-      border: 1px solid rgba(255,255,255,0.08);
-      animation: pfModalIn 0.3s ease;
-    }
-    .pf-post-modal-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .pf-post-modal-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    .pf-post-modal-username {
-      font-weight: 600;
-      color: var(--pf-text);
-      font-size: 14px;
-    }
-    .pf-post-modal-time {
-      font-size: 12px;
-      color: var(--pf-text2);
-    }
-    .pf-post-modal-close {
-      margin-left: auto;
-      background: none;
-      border: none;
-      color: var(--pf-text2);
-      font-size: 22px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .pf-post-modal-close:hover { color: var(--pf-text); background: rgba(255,255,255,0.08); }
-    .pf-post-modal-images {
-      width: 100%;
-      position: relative;
-    }
-    .pf-post-modal-images img {
-      width: 100%;
-      display: block;
-      max-height: 500px;
-      object-fit: cover;
-    }
-    .pf-post-modal-images video {
-      width: 100%;
-      display: block;
-      max-height: 500px;
-      background: #000;
-    }
-    .pf-post-modal-carousel {
-      position: relative;
-      overflow: hidden;
-    }
-    .pf-post-modal-carousel-track {
-      display: flex;
-      transition: transform 0.3s ease;
-    }
-    .pf-post-modal-carousel-track img {
-      min-width: 100%;
-      flex-shrink: 0;
-    }
-    .pf-post-carousel-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      cursor: pointer;
-      font-size: 14px;
-      z-index: 2;
-    }
-    .pf-post-carousel-btn.prev { left: 8px; }
-    .pf-post-carousel-btn.next { right: 8px; }
-    .pf-post-modal-content {
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--pf-text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .pf-post-modal-actions {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }
-    .pf-post-action-btn {
-      background: none;
-      border: none;
-      color: var(--pf-text2);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 14px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .pf-post-action-btn:hover { background: rgba(255,255,255,0.06); color: var(--pf-text); }
-    .pf-post-action-btn.liked { color: #ef4444; }
-    .pf-post-modal-comments {
-      padding: 0 16px 16px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    .pf-post-comment {
-      display: flex;
-      gap: 10px;
-      padding: 10px 0;
-      border-top: 1px solid rgba(255,255,255,0.04);
-    }
-    .pf-post-comment-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-    .pf-post-comment-body {
-      flex: 1;
-    }
-    .pf-post-comment-user {
-      font-weight: 600;
-      font-size: 13px;
-      color: var(--pf-text);
-      margin-bottom: 2px;
-    }
-    .pf-post-comment-text {
-      font-size: 13px;
-      color: var(--pf-text2);
-      line-height: 1.4;
-    }
-    .pf-post-comment-time {
-      font-size: 11px;
-      color: var(--pf-text2);
-      opacity: 0.7;
-      margin-top: 2px;
-    }
-    .pf-post-comment-input-row {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }
-    .pf-post-comment-input {
-      flex: 1;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
-      padding: 8px 16px;
-      color: var(--pf-text);
-      font-size: 13px;
-      outline: none;
-    }
-    .pf-post-comment-input:focus { border-color: var(--pf-accent); }
-    .pf-post-comment-send {
-      background: var(--pf-accent);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 36px;
-      height: 36px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pf-post-comment-send:hover { opacity: 0.85; }
-
     /* ===== Mouse 3D tilt for cards ===== */
     .pf-3d-tilt {
       transform-style: preserve-3d;
@@ -1475,7 +1274,7 @@
       <button class="pf-back-btn" onclick="goBack()" title="Back">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       </button>
-      <div class="pf-nav-title">Profile</div>
+      <div class="pf-nav-title">Portfolio</div>
       <div style="display:flex;gap:8px;">
         <button class="pf-share-btn" id="pf-settings-btn" onclick="openSettingsDrawer()" title="Settings" style="display:none;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1837,28 +1636,6 @@
     </div>
   </div>
 
-  <!-- Post Detail Modal -->
-  <div class="pf-post-modal-overlay" id="pf-post-modal">
-    <div class="pf-post-modal">
-      <div class="pf-post-modal-header">
-        <img class="pf-post-modal-avatar" id="pf-post-avatar" src="" alt="">
-        <div>
-          <div class="pf-post-modal-username" id="pf-post-username"></div>
-          <div class="pf-post-modal-time" id="pf-post-time"></div>
-        </div>
-        <button class="pf-post-modal-close" onclick="closePostModal()">&times;</button>
-      </div>
-      <div class="pf-post-modal-images" id="pf-post-images"></div>
-      <div class="pf-post-modal-content" id="pf-post-content"></div>
-      <div class="pf-post-modal-actions" id="pf-post-actions"></div>
-      <div class="pf-post-modal-comments" id="pf-post-comments"></div>
-      <div class="pf-post-comment-input-row">
-        <input class="pf-post-comment-input" id="pf-post-comment-input" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitPostComment()">
-        <button class="pf-post-comment-send" onclick="submitPostComment()"><i class="fas fa-paper-plane"></i></button>
-      </div>
-    </div>
-  </div>
-
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -1866,11 +1643,6 @@
     // ===== Portfolio Page Logic =====
     const urlParams = new URLSearchParams(window.location.search);
     const viewUsername = urlParams.get('username');
-    // Also support /profile/:id or /profile/:username URL pattern used throughout the app
-    const pathMatch = window.location.pathname.match(/^\/profile\/(.+)$/);
-    const pathParam = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
-    const viewUserId = pathParam && /^\d+$/.test(pathParam) ? parseInt(pathParam) : null;
-    const viewUsernameFromPath = pathParam && !/^\d+$/.test(pathParam) ? pathParam : null;
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     let portfolioUserId = null;
     let isOwnPortfolio = false;
@@ -1890,7 +1662,11 @@
     };
 
     function goBack() {
-      window.location.href = '/home';
+      if (viewUsername) {
+        window.location.href = `/profile.html?username=${viewUsername}`;
+      } else {
+        window.location.href = '/profile.html';
+      }
     }
 
     function showToast(message) {
@@ -1910,20 +1686,17 @@
       try {
         let user;
 
-        // Determine which user to view: ?username=, /profile/:id, /profile/:username, or self
-        const effectiveUsername = viewUsername || viewUsernameFromPath;
-
-        if (effectiveUsername) {
-          // Viewing via username (query param or path)
-          if (currentUser.username && effectiveUsername.toLowerCase() === currentUser.username.toLowerCase()) {
+        if (viewUsername) {
+          // Viewing someone else's portfolio
+          if (currentUser.username && viewUsername.toLowerCase() === currentUser.username.toLowerCase()) {
             portfolioUserId = currentUser.id;
             isOwnPortfolio = true;
           } else {
-            const searchRes = await fetch(`/api/search/users?q=${encodeURIComponent(effectiveUsername)}`, {
+            const searchRes = await fetch(`/api/search/users?q=${encodeURIComponent(viewUsername)}`, {
               headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const searchData = await searchRes.json();
-            const found = searchData.users?.find(u => u.username.toLowerCase() === effectiveUsername.toLowerCase());
+            const found = searchData.users?.find(u => u.username.toLowerCase() === viewUsername.toLowerCase());
 
             if (!found) {
               alert('User not found');
@@ -1932,10 +1705,6 @@
             portfolioUserId = found.id;
             isOwnPortfolio = currentUser.id == found.id;
           }
-        } else if (viewUserId) {
-          // Viewing via /profile/:id URL path (numeric ID)
-          portfolioUserId = viewUserId;
-          isOwnPortfolio = currentUser.id == viewUserId;
         } else {
           portfolioUserId = currentUser.id;
           isOwnPortfolio = true;
@@ -2593,180 +2362,6 @@
       if (url && url !== '#') window.open(url, '_blank');
     }
 
-    let currentViewPostId = null;
-
-    async function viewPost(postId) {
-      currentViewPostId = postId;
-      const modal = document.getElementById('pf-post-modal');
-      modal.classList.add('active');
-      document.body.style.overflow = 'hidden';
-
-      try {
-        const [postRes, commentsRes] = await Promise.all([
-          fetch(`/api/posts/${postId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch(`/api/posts/${postId}/comments`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
-        ]);
-
-        if (!postRes.ok) { showToast('Post not found'); closePostModal(); return; }
-
-        const postData = await postRes.json();
-        const post = postData.post;
-        const commentsData = commentsRes.ok ? await commentsRes.json() : { comments: [] };
-        const comments = commentsData.comments || [];
-
-        // Header
-        document.getElementById('pf-post-avatar').src = post.profile_picture || defaultAvatar;
-        document.getElementById('pf-post-username').textContent = post.username;
-        document.getElementById('pf-post-time').textContent = formatTimeAgo(post.created_at);
-
-        // Images / Video
-        const imagesDiv = document.getElementById('pf-post-images');
-        const images = Array.isArray(post.images) ? post.images : [];
-        if (images.length > 1) {
-          let idx = 0;
-          imagesDiv.innerHTML = `
-            <div class="pf-post-modal-carousel">
-              <div class="pf-post-modal-carousel-track" id="pf-carousel-track">
-                ${images.map(img => `<img src="${img}" alt="Post" onerror="this.style.display='none'">`).join('')}
-              </div>
-              <button class="pf-post-carousel-btn prev" onclick="slidePostCarousel(-1)">&#8249;</button>
-              <button class="pf-post-carousel-btn next" onclick="slidePostCarousel(1)">&#8250;</button>
-            </div>`;
-          window._postCarouselIdx = 0;
-        } else if (images.length === 1) {
-          imagesDiv.innerHTML = `<img src="${images[0]}" alt="Post" onerror="this.style.display='none'">`;
-        } else if (post.video_url) {
-          imagesDiv.innerHTML = `<video src="${post.video_url}" controls></video>`;
-        } else {
-          imagesDiv.innerHTML = '';
-        }
-
-        // Content
-        document.getElementById('pf-post-content').textContent = post.content || '';
-        if (!post.content) document.getElementById('pf-post-content').style.display = 'none';
-        else document.getElementById('pf-post-content').style.display = '';
-
-        // Actions
-        const liked = post.user_has_liked > 0;
-        const saved = post.is_saved > 0;
-        document.getElementById('pf-post-actions').innerHTML = `
-          <button class="pf-post-action-btn ${liked ? 'liked' : ''}" id="pf-post-like-btn" onclick="togglePostLike(${post.id})">
-            <i class="${liked ? 'fas' : 'far'} fa-heart"></i>
-            <span id="pf-post-likes-count">${post.likes_count || 0}</span>
-          </button>
-          <button class="pf-post-action-btn">
-            <i class="far fa-comment"></i>
-            <span>${comments.length}</span>
-          </button>
-          <button class="pf-post-action-btn" onclick="togglePostSave(${post.id})" id="pf-post-save-btn">
-            <i class="${saved ? 'fas' : 'far'} fa-bookmark"></i>
-          </button>
-        `;
-
-        // Comments
-        renderPostComments(comments);
-
-      } catch (err) {
-        console.error('Error loading post:', err);
-        showToast('Error loading post');
-        closePostModal();
-      }
-    }
-
-    function closePostModal() {
-      document.getElementById('pf-post-modal').classList.remove('active');
-      document.body.style.overflow = '';
-      currentViewPostId = null;
-    }
-
-    function slidePostCarousel(dir) {
-      const track = document.getElementById('pf-carousel-track');
-      if (!track) return;
-      const total = track.children.length;
-      window._postCarouselIdx = Math.max(0, Math.min(total - 1, (window._postCarouselIdx || 0) + dir));
-      track.style.transform = `translateX(-${window._postCarouselIdx * 100}%)`;
-    }
-
-    function renderPostComments(comments) {
-      const container = document.getElementById('pf-post-comments');
-      if (!comments.length) {
-        container.innerHTML = '<p style="color:var(--pf-text2);font-size:13px;padding:8px 0;">No comments yet</p>';
-        return;
-      }
-      container.innerHTML = comments.map(c => `
-        <div class="pf-post-comment">
-          <img class="pf-post-comment-avatar" src="${c.profile_picture || defaultAvatar}" alt="">
-          <div class="pf-post-comment-body">
-            <div class="pf-post-comment-user">${c.username}</div>
-            <div class="pf-post-comment-text">${c.content || ''}</div>
-            <div class="pf-post-comment-time">${formatTimeAgo(c.created_at)}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    async function togglePostLike(postId) {
-      try {
-        const btn = document.getElementById('pf-post-like-btn');
-        const isLiked = btn.classList.contains('liked');
-        const res = await fetch(`/api/posts/${postId}/${isLiked ? 'unlike' : 'like'}`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) {
-          btn.classList.toggle('liked');
-          const icon = btn.querySelector('i');
-          icon.className = btn.classList.contains('liked') ? 'fas fa-heart' : 'far fa-heart';
-          const countEl = document.getElementById('pf-post-likes-count');
-          countEl.textContent = parseInt(countEl.textContent) + (btn.classList.contains('liked') ? 1 : -1);
-        }
-      } catch (err) { console.error('Like error:', err); }
-    }
-
-    async function togglePostSave(postId) {
-      try {
-        const btn = document.getElementById('pf-post-save-btn');
-        const isSaved = btn.querySelector('i').classList.contains('fas');
-        const res = await fetch(`/api/posts/${postId}/${isSaved ? 'unsave' : 'save'}`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) {
-          btn.querySelector('i').className = isSaved ? 'far fa-bookmark' : 'fas fa-bookmark';
-          showToast(isSaved ? 'Post unsaved' : 'Post saved');
-        }
-      } catch (err) { console.error('Save error:', err); }
-    }
-
-    async function submitPostComment() {
-      if (!currentViewPostId) return;
-      const input = document.getElementById('pf-post-comment-input');
-      const content = input.value.trim();
-      if (!content) return;
-
-      try {
-        const res = await fetch(`/api/posts/${currentViewPostId}/comments`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ content })
-        });
-        if (res.ok) {
-          input.value = '';
-          // Reload comments
-          const commentsRes = await fetch(`/api/posts/${currentViewPostId}/comments`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (commentsRes.ok) {
-            const data = await commentsRes.json();
-            renderPostComments(data.comments || []);
-          }
-        }
-      } catch (err) { console.error('Comment error:', err); }
-    }
-
     async function loadRecentPosts() {
       try {
         const res = await fetch(`/api/users/${portfolioUserId}/posts`, {
@@ -2788,7 +2383,7 @@
           const timeAgo = formatTimeAgo(p.created_at);
           const likes = p.likes_count || 0;
 
-          return `<div class="pf-activity-card pf-3d-tilt" onclick="viewPost(${p.id})" style="cursor:pointer;">
+          return `<div class="pf-activity-card pf-3d-tilt">
             ${images.length > 0
               ? `<img class="pf-activity-img" src="${images[0]}" alt="Post" onerror="this.style.display='none'">`
               : p.video_url
@@ -2960,7 +2555,7 @@
     function sharePortfolio() {
       const url = window.location.href;
       if (navigator.share) {
-        navigator.share({ title: 'Profile', url });
+        navigator.share({ title: 'Portfolio', url });
       } else {
         navigator.clipboard.writeText(url);
         showToast('Link copied!');
