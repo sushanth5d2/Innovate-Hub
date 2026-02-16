@@ -337,4 +337,157 @@ router.put('/online-status', authMiddleware, (req, res) => {
   );
 });
 
+// Remove a follower (remove someone who follows you)
+router.delete('/:userId/remove-follower', authMiddleware, (req, res) => {
+  const db = getDb();
+  const currentUserId = req.user.userId;
+  const followerToRemove = parseInt(req.params.userId);
+
+  db.run(
+    'DELETE FROM followers WHERE follower_id = ? AND following_id = ?',
+    [followerToRemove, currentUserId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error removing follower' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// Mute a user
+router.post('/:userId/mute', authMiddleware, (req, res) => {
+  const db = getDb();
+  const currentUserId = req.user.userId;
+  const mutedUserId = parseInt(req.params.userId);
+
+  // Create muted_users table if not exists, then insert
+  db.run(`CREATE TABLE IF NOT EXISTS muted_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    muted_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, muted_id)
+  )`, (err) => {
+    if (err) return res.status(500).json({ error: 'Error creating mute table' });
+
+    db.run(
+      'INSERT OR IGNORE INTO muted_users (user_id, muted_id) VALUES (?, ?)',
+      [currentUserId, mutedUserId],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Error muting user' });
+        res.json({ success: true });
+      }
+    );
+  });
+});
+
+// Unmute a user
+router.delete('/:userId/mute', authMiddleware, (req, res) => {
+  const db = getDb();
+  const currentUserId = req.user.userId;
+  const mutedUserId = parseInt(req.params.userId);
+
+  db.run(
+    'DELETE FROM muted_users WHERE user_id = ? AND muted_id = ?',
+    [currentUserId, mutedUserId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Error unmuting user' });
+      res.json({ success: true });
+    }
+  );
+});
+
+// Search users (for @mention and share)
+router.get('/search/query', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { q } = req.query;
+  const userId = req.user.userId;
+
+  if (!q || q.length < 1) {
+    return res.json({ success: true, users: [] });
+  }
+
+  const query = `
+    SELECT id, username, profile_picture, bio
+    FROM users
+    WHERE username LIKE ? AND id != ?
+    ORDER BY username ASC
+    LIMIT 10
+  `;
+
+  db.all(query, [`%${q}%`, userId], (err, users) => {
+    if (err) return res.status(500).json({ error: 'Error searching users' });
+    res.json({ success: true, users: users || [] });
+  });
+});
+
+// Get frequently messaged users (for share post)
+router.get('/frequent/messaged', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT u.id, u.username, u.profile_picture, u.bio, COUNT(*) as msg_count
+    FROM messages m
+    JOIN users u ON (
+      CASE
+        WHEN m.sender_id = ? THEN m.receiver_id = u.id
+        WHEN m.receiver_id = ? THEN m.sender_id = u.id
+      END
+    )
+    WHERE (m.sender_id = ? OR m.receiver_id = ?) AND u.id != ?
+    GROUP BY u.id
+    ORDER BY msg_count DESC
+    LIMIT 10
+  `;
+
+  db.all(query, [userId, userId, userId, userId, userId], (err, users) => {
+    if (err) return res.status(500).json({ error: 'Error fetching users' });
+    res.json({ success: true, users: users || [] });
+  });
+});
+
+// Get followers with follow-back status
+router.get('/:userId/followers-detailed', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { userId } = req.params;
+  const currentUserId = req.user.userId;
+
+  const query = `
+    SELECT u.id, u.username, u.profile_picture, u.bio,
+           f.created_at as followed_at,
+           (SELECT COUNT(*) FROM followers WHERE follower_id = ? AND following_id = u.id) as is_following_back
+    FROM followers f
+    JOIN users u ON f.follower_id = u.id
+    WHERE f.following_id = ?
+    ORDER BY f.created_at DESC
+  `;
+
+  db.all(query, [currentUserId, userId], (err, followers) => {
+    if (err) return res.status(500).json({ error: 'Error fetching followers' });
+    res.json({ success: true, followers: followers || [] });
+  });
+});
+
+// Get following with detailed info
+router.get('/:userId/following-detailed', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { userId } = req.params;
+
+  const query = `
+    SELECT u.id, u.username, u.profile_picture, u.bio,
+           f.created_at as followed_at
+    FROM followers f
+    JOIN users u ON f.following_id = u.id
+    WHERE f.follower_id = ?
+    ORDER BY f.created_at DESC
+  `;
+
+  db.all(query, [userId], (err, following) => {
+    if (err) return res.status(500).json({ error: 'Error fetching following' });
+    res.json({ success: true, following: following || [] });
+  });
+});
+
 module.exports = router;

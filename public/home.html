@@ -3383,10 +3383,162 @@
     }
 
     // Share post
-    function sharePost(postId) {
+    async function sharePost(postId) {
       const url = `${window.location.origin}/post/${postId}`;
+
+      const modal = document.createElement('div');
+      modal.className = 'ig-modal-overlay';
+      modal.style.display = 'flex';
+      modal.id = 'shareModalOverlay';
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      const close = () => {
+        document.removeEventListener('keydown', onKeyDown);
+        document.body.style.overflow = previousOverflow;
+        modal.remove();
+      };
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') close();
+      };
+      document.addEventListener('keydown', onKeyDown);
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) close();
+      });
+
+      // Fetch frequent contacts
+      let suggestedUsers = [];
+      try {
+        const res = await InnovateAPI.apiRequest('/users/frequent/messaged');
+        suggestedUsers = res.users || [];
+      } catch (e) { /* no suggested users */ }
+
+      modal.innerHTML = `
+        <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 80vh; overflow: hidden; position: relative; border-radius: 16px; display: flex; flex-direction: column;">
+          <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2; flex-shrink: 0;">
+            Share
+            <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
+          </div>
+          <div style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border); flex-shrink: 0;">
+            <input type="text" id="shareSearchInput" placeholder="Search people..." 
+              style="width: 100%; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-background); color: var(--ig-primary-text); font-size: 14px; outline: none;"
+              oninput="searchShareUsers(this.value, ${postId})">
+          </div>
+          <div id="shareUsersContainer" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+            ${suggestedUsers.length > 0 ? `
+              <div style="padding: 10px 16px 6px; font-size: 13px; font-weight: 600; color: var(--ig-secondary-text);">Suggested</div>
+              ${suggestedUsers.map(u => `
+                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
+                  <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
+                    ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
+                  </div>
+                  <button onclick="sendPostToUser(${u.user_id || u.id}, ${postId}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Send</button>
+                </div>
+              `).join('')}
+            ` : `
+              <div style="padding: 20px 16px; color: var(--ig-secondary-text); text-align: center; font-size: 14px;">Search for people to share with</div>
+            `}
+          </div>
+          <div style="padding: 16px; border-top: 1px solid var(--ig-border); flex-shrink: 0;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+              <button onclick="copyShareLink('${url}')" style="background: none; border: none; cursor: pointer; color: var(--ig-primary-text); padding: 0;">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--ig-background); border: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 20px;">🔗</div>
+                <div style="font-size: 12px;">Copy Link</div>
+              </button>
+              <a href="https://wa.me/?text=${encodeURIComponent(url)}" target="_blank" style="text-decoration: none; color: var(--ig-primary-text);">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #25d366; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
+                  <i class="fab fa-whatsapp" style="color: white;"></i>
+                </div>
+                <div style="font-size: 12px;">WhatsApp</div>
+              </a>
+              <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}" target="_blank" style="text-decoration: none; color: var(--ig-primary-text);">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #1da1f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
+                  <i class="fab fa-twitter" style="color: white;"></i>
+                </div>
+                <div style="font-size: 12px;">Twitter</div>
+              </a>
+              <a href="mailto:?body=${encodeURIComponent(url)}" style="text-decoration: none; color: var(--ig-primary-text);">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #ea4335; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
+                  <i class="fas fa-envelope" style="color: white;"></i>
+                </div>
+                <div style="font-size: 12px;">Email</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        close();
+      });
+
+      modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+
+      document.body.appendChild(modal);
+    }
+
+    function copyShareLink(url) {
       InnovateAPI.copyToClipboard(url);
       InnovateAPI.showAlert('Link copied!', 'success');
+    }
+
+    let shareSearchTimeout = null;
+
+    async function searchShareUsers(query, postId) {
+      clearTimeout(shareSearchTimeout);
+      if (!query.trim()) return;
+      shareSearchTimeout = setTimeout(async () => {
+        try {
+          const res = await InnovateAPI.apiRequest(`/users/search/query?q=${encodeURIComponent(query)}`);
+          const users = res.users || [];
+          const container = document.getElementById('shareUsersContainer');
+          if (!container) return;
+
+          if (users.length === 0) {
+            container.innerHTML = `<div style="padding: 20px 16px; color: var(--ig-secondary-text); text-align: center;">No users found</div>`;
+            return;
+          }
+
+          container.innerHTML = users.map(u => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
+              <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
+                ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
+              </div>
+              <button onclick="sendPostToUser(${u.id}, ${postId}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Send</button>
+            </div>
+          `).join('');
+        } catch (err) {
+          /* ignore */
+        }
+      }, 300);
+    }
+
+    async function sendPostToUser(userId, postId, btn) {
+      try {
+        const url = `${window.location.origin}/post/${postId}`;
+        await InnovateAPI.apiRequest('/messages/send', {
+          method: 'POST',
+          body: JSON.stringify({
+            receiver_id: userId,
+            content: `Check out this post: ${url}`
+          })
+        });
+        btn.textContent = 'Sent';
+        btn.disabled = true;
+        btn.style.background = 'transparent';
+        btn.style.border = '1px solid var(--ig-border)';
+        btn.style.color = 'var(--ig-primary-text)';
+      } catch (err) {
+        InnovateAPI.showAlert('Failed to send', 'error');
+      }
     }
 
     // Post menu
@@ -4490,20 +4642,25 @@
         });
 
         modal.innerHTML = `
-          <div class="ig-modal" style="max-width: 400px; max-height: 500px; overflow-y: auto; position: relative;">
-            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">
-              Liked by
+          <div class="ig-modal" style="max-width: 400px; max-height: 500px; overflow: hidden; position: relative; border-radius: 16px;">
+            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2;">
+              Likes
               <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
             </div>
-            <div style="padding: 8px 0;">
+            <div style="padding: 4px 0; max-height: 420px; overflow-y: auto;">
               ${response.likes.map(u => `
-                <a href="/profile/${u.user_id}" class="ig-modal-item" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: inherit;">
-                  <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 600;">${u.username}</div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
+                  <a href="/profile/${u.user_id}" style="flex-shrink: 0;">
+                    <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border);">
+                  </a>
+                  <a href="/profile/${u.user_id}" style="flex: 1; min-width: 0; text-decoration: none; color: inherit;">
+                    <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
                     ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
-                  </div>
-                </a>
+                  </a>
+                  ${u.user_id !== user.id ? `
+                    <button onclick="followFromLikes(${u.user_id}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Follow</button>
+                  ` : ''}
+                </div>
               `).join('')}
             </div>
           </div>
@@ -4523,6 +4680,18 @@
       }
     }
 
+    async function followFromLikes(userId, btn) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'POST' });
+        btn.textContent = 'Following';
+        btn.style.background = 'transparent';
+        btn.style.border = '1px solid var(--ig-border)';
+        btn.style.color = 'var(--ig-primary-text)';
+      } catch (err) {
+        InnovateAPI.showAlert('Failed to follow', 'error');
+      }
+    }
+
     // View all comments modal
     async function openCommentsModal(postId) {
       try {
@@ -4532,6 +4701,7 @@
         const modal = document.createElement('div');
         modal.className = 'ig-modal-overlay';
         modal.style.display = 'flex';
+        modal.id = 'commentsModalOverlay';
 
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -4552,23 +4722,33 @@
         });
 
         modal.innerHTML = `
-          <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 70vh; overflow-y: auto; position: relative;">
-            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">
+          <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 80vh; overflow: hidden; position: relative; border-radius: 16px; display: flex; flex-direction: column;">
+            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2; flex-shrink: 0;">
               Comments
               <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
             </div>
-            <div style="padding: 8px 0;">
-              ${comments.length ? comments.map(c => `
-                <div style="display: flex; gap: 12px; padding: 12px 16px;">
-                  <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
-                  <div style="flex: 1;">
-                    <div style="font-weight: 600; margin-bottom: 2px;">${c.username}</div>
-                    <div style="white-space: pre-wrap;">${c.content}</div>
-                  </div>
+            <div id="commentsListContainer" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+              ${comments.length ? comments.map(c => renderCommentItem(c, postId)).join('') : `
+                <div style="padding: 40px 16px; color: var(--ig-secondary-text); text-align: center;">
+                  <div style="font-size: 28px; margin-bottom: 8px;">💬</div>
+                  No comments yet. Be the first!
                 </div>
-              `).join('') : `
-                <div style="padding: 20px 16px; color: var(--ig-secondary-text); text-align: center;">No comments yet</div>
               `}
+            </div>
+            <div id="commentReplyInfo" style="display:none; padding: 8px 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); font-size: 12px; color: var(--ig-secondary-text); flex-shrink: 0;">
+              Replying to <strong id="replyToUsername"></strong>
+              <button onclick="cancelReply()" style="float:right;background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:14px;">✕</button>
+            </div>
+            <div style="display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--ig-border); align-items: center; flex-shrink: 0;">
+              <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+              <div style="flex: 1; position: relative;">
+                <input type="text" id="modalCommentInput" placeholder="Add a comment..." 
+                  style="width: 100%; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;"
+                  onkeydown="if(event.key==='Enter')submitModalComment(${postId})"
+                  oninput="handleCommentMention(this)">
+                <div id="mentionDropdown" style="display:none; position:absolute; bottom:100%; left:0; right:0; max-height:150px; overflow-y:auto; background:var(--ig-secondary-background); border:1px solid var(--ig-border); border-radius:12px; margin-bottom:4px; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:10;"></div>
+              </div>
+              <button onclick="submitModalComment(${postId})" style="background: none; border: none; color: var(--ig-blue); font-weight: 600; font-size: 14px; cursor: pointer; padding: 8px; flex-shrink: 0;">Post</button>
             </div>
           </div>
         `;
@@ -4583,6 +4763,174 @@
         document.body.appendChild(modal);
       } catch (error) {
         InnovateAPI.showAlert('Failed to load comments', 'error');
+      }
+    }
+
+    function renderCommentItem(c, postId) {
+      const isOwn = c.user_id === user.id;
+      const timeAgo = typeof InnovateAPI !== 'undefined' && InnovateAPI.formatDate ? InnovateAPI.formatDate(c.created_at) : '';
+      const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" style="color:var(--ig-blue);text-decoration:none;font-weight:600;">@$1</a>');
+      return `
+        <div style="display: flex; gap: 12px; padding: 12px 16px; position: relative;" data-comment-id="${c.id}">
+          <a href="/profile/${c.user_id}" style="flex-shrink: 0;">
+            <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">
+          </a>
+          <div style="flex: 1; min-width: 0;">
+            <div style="margin-bottom: 4px;">
+              <a href="/profile/${c.user_id}" style="font-weight: 600; text-decoration: none; color: var(--ig-primary-text); font-size: 14px;">${c.username}</a>
+              <span style="font-size: 14px; white-space: pre-wrap; word-break: break-word; margin-left: 6px;">${contentWithMentions}</span>
+            </div>
+            <div style="display: flex; gap: 14px; font-size: 12px; color: var(--ig-secondary-text); align-items: center;">
+              <span>${timeAgo}</span>
+              <button onclick="replyToComment(${c.id}, '${c.username}', ${postId})" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:12px;font-weight:600;padding:0;">Reply</button>
+              ${isOwn ? `<button onclick="deleteComment(${postId}, ${c.id}, this)" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;font-weight:600;padding:0;">Delete</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    let currentReplyTo = null;
+
+    function replyToComment(commentId, username, postId) {
+      currentReplyTo = { commentId, username, postId };
+      const replyInfo = document.getElementById('commentReplyInfo');
+      const replyUser = document.getElementById('replyToUsername');
+      if (replyInfo && replyUser) {
+        replyInfo.style.display = 'block';
+        replyUser.textContent = '@' + username;
+      }
+      const input = document.getElementById('modalCommentInput');
+      if (input) {
+        input.value = `@${username} `;
+        input.focus();
+      }
+    }
+
+    function cancelReply() {
+      currentReplyTo = null;
+      const replyInfo = document.getElementById('commentReplyInfo');
+      if (replyInfo) replyInfo.style.display = 'none';
+      const input = document.getElementById('modalCommentInput');
+      if (input) input.value = '';
+    }
+
+    async function deleteComment(postId, commentId, btn) {
+      if (!confirm('Delete this comment?')) return;
+      try {
+        await InnovateAPI.apiRequest(`/posts/${postId}/comments/${commentId}`, { method: 'DELETE' });
+        const commentEl = btn.closest('[data-comment-id]');
+        if (commentEl) commentEl.remove();
+        InnovateAPI.showAlert('Comment deleted', 'success');
+        loadPosts(); // Refresh comment count
+      } catch (err) {
+        InnovateAPI.showAlert('Failed to delete comment', 'error');
+      }
+    }
+
+    let mentionSearchTimeout = null;
+
+    async function handleCommentMention(input) {
+      const val = input.value;
+      const cursorPos = input.selectionStart;
+      const textBeforeCursor = val.substring(0, cursorPos);
+      const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+      const dropdown = document.getElementById('mentionDropdown');
+
+      if (!mentionMatch || mentionMatch[1].length < 1) {
+        if (dropdown) dropdown.style.display = 'none';
+        return;
+      }
+
+      const query = mentionMatch[1];
+      clearTimeout(mentionSearchTimeout);
+      mentionSearchTimeout = setTimeout(async () => {
+        try {
+          const res = await InnovateAPI.apiRequest(`/users/search/query?q=${encodeURIComponent(query)}`);
+          const users = res.users || [];
+          
+          if (users.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+          }
+
+          dropdown.style.display = 'block';
+          dropdown.innerHTML = users.map(u => `
+            <div onclick="insertMention('${u.username}')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='var(--ig-border)'" onmouseout="this.style.background=''">
+              <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">
+              <div>
+                <div style="font-weight:600;font-size:13px;">${u.username}</div>
+                ${u.bio ? `<div style="font-size:11px;color:var(--ig-secondary-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${u.bio}</div>` : ''}
+              </div>
+            </div>
+          `).join('');
+        } catch (err) {
+          dropdown.style.display = 'none';
+        }
+      }, 300);
+    }
+
+    function insertMention(username) {
+      const input = document.getElementById('modalCommentInput');
+      if (!input) return;
+      const val = input.value;
+      const cursorPos = input.selectionStart;
+      const textBeforeCursor = val.substring(0, cursorPos);
+      const textAfterCursor = val.substring(cursorPos);
+      const newBefore = textBeforeCursor.replace(/@\w*$/, `@${username} `);
+      input.value = newBefore + textAfterCursor;
+      input.focus();
+      input.selectionStart = input.selectionEnd = newBefore.length;
+      const dropdown = document.getElementById('mentionDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+    }
+
+    async function submitModalComment(postId) {
+      const input = document.getElementById('modalCommentInput');
+      if (!input) return;
+      const content = input.value.trim();
+      if (!content) return;
+
+      try {
+        let endpoint = `/posts/${postId}/comments`;
+        let body = { content };
+
+        if (currentReplyTo && currentReplyTo.commentId) {
+          endpoint = `/posts/${postId}/comments/${currentReplyTo.commentId}/reply`;
+        }
+
+        const res = await InnovateAPI.apiRequest(endpoint, {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        // Handle @mentions - send notifications
+        const mentions = content.match(/@(\w+)/g);
+        if (mentions) {
+          for (const mention of mentions) {
+            const username = mention.substring(1);
+            try {
+              await InnovateAPI.apiRequest(`/posts/${postId}/mention`, {
+                method: 'POST',
+                body: JSON.stringify({ mentioned_username: username })
+              });
+            } catch (e) { /* ignore mention errors */ }
+          }
+        }
+
+        input.value = '';
+        cancelReply();
+
+        // Reload comments
+        const commentsRes = await InnovateAPI.apiRequest(`/posts/${postId}/comments`);
+        const container = document.getElementById('commentsListContainer');
+        if (container && commentsRes.comments) {
+          container.innerHTML = commentsRes.comments.map(c => renderCommentItem(c, postId)).join('');
+        }
+        
+        loadPosts(); // Refresh comment count
+      } catch (err) {
+        InnovateAPI.showAlert('Failed to post comment', 'error');
       }
     }
     

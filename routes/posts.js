@@ -1081,6 +1081,176 @@ router.put('/:postId/archive', authMiddleware, (req, res) => {
   );
 });
 
+// Unarchive post
+router.put('/:postId/unarchive', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+
+  db.run(
+    'UPDATE posts SET is_archived = 0 WHERE id = ? AND user_id = ?',
+    [postId, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error unarchiving post' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Post not found or unauthorized' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// Get archived posts for current user
+router.get('/archived/list', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  const query = `
+    SELECT p.*, u.username, u.profile_picture,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+           (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.user_id = ? AND p.is_archived = 1 AND p.is_story = 0
+    ORDER BY p.created_at DESC
+  `;
+
+  db.all(query, [userId], (err, posts) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching archived posts' });
+    }
+    posts = posts.map(post => ({
+      ...post,
+      images: post.images ? JSON.parse(post.images) : [],
+      files: post.files ? JSON.parse(post.files) : []
+    }));
+    res.json({ success: true, posts });
+  });
+});
+
+// Delete comment
+router.delete('/:postId/comments/:commentId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId, commentId } = req.params;
+
+  // Allow comment owner or post owner to delete
+  db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
+    if (err || !post) return res.status(404).json({ error: 'Post not found' });
+
+    db.get('SELECT user_id FROM post_comments WHERE id = ? AND post_id = ?', [commentId, postId], (err2, comment) => {
+      if (err2 || !comment) return res.status(404).json({ error: 'Comment not found' });
+
+      if (comment.user_id !== userId && post.user_id !== userId) {
+        return res.status(403).json({ error: 'Not authorized to delete this comment' });
+      }
+
+      db.run('DELETE FROM post_comments WHERE id = ?', [commentId], function(err3) {
+        if (err3) return res.status(500).json({ error: 'Error deleting comment' });
+        db.run('UPDATE posts SET comments_count = MAX(0, comments_count - 1) WHERE id = ?', [postId]);
+        res.json({ success: true });
+      });
+    });
+  });
+});
+
+// Reply to comment
+router.post('/:postId/comments/:commentId/reply', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId, commentId } = req.params;
+  const { content } = req.body;
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Reply content required' });
+  }
+
+  db.run(
+    'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)',
+    [postId, userId, content.trim(), commentId],
+    function(err) {
+      if (err) {
+        // If parent_id column doesn't exist, add reply inline with @mention
+        if (err.message && err.message.includes('parent_id')) {
+          db.run(
+            'INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)',
+            [postId, userId, content.trim()],
+            function(err2) {
+              if (err2) return res.status(500).json({ error: 'Error adding reply' });
+              db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
+              res.json({ success: true, commentId: this.lastID });
+            }
+          );
+          return;
+        }
+        return res.status(500).json({ error: 'Error adding reply' });
+      }
+
+      db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
+
+      // Notify the original commenter
+      db.get('SELECT user_id FROM post_comments WHERE id = ?', [commentId], (err2, parentComment) => {
+        if (parentComment && parentComment.user_id !== userId) {
+          db.run(
+            'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+            [parentComment.user_id, 'reply', 'replied to your comment', postId, userId]
+          );
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`user_${parentComment.user_id}`).emit('notification:receive', {
+              type: 'reply',
+              content: 'replied to your comment',
+              post_id: postId,
+              created_by: userId
+            });
+          }
+        }
+      });
+
+      res.json({ success: true, commentId: this.lastID });
+    }
+  );
+});
+
+// Handle @mention notifications in comments
+router.post('/:postId/mention', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+  const { mentioned_username } = req.body;
+
+  if (!mentioned_username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  db.get('SELECT id FROM users WHERE username = ?', [mentioned_username], (err, mentionedUser) => {
+    if (err || !mentionedUser) return res.status(404).json({ error: 'User not found' });
+
+    if (mentionedUser.id === userId) return res.json({ success: true }); // Don't notify self
+
+    db.get('SELECT username FROM users WHERE id = ?', [userId], (err2, sender) => {
+      db.run(
+        'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+        [mentionedUser.id, 'mention', `${sender?.username || 'Someone'} mentioned you in a comment`, postId, userId]
+      );
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${mentionedUser.id}`).emit('notification:receive', {
+          type: 'mention',
+          content: `${sender?.username || 'Someone'} mentioned you in a comment`,
+          post_id: postId,
+          created_by: userId
+        });
+      }
+
+      res.json({ success: true });
+    });
+  });
+});
+
 // Delete post
 router.delete('/:postId', authMiddleware, (req, res) => {
   const db = getDb();
