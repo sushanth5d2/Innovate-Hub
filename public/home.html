@@ -4697,6 +4697,7 @@
       try {
         const response = await InnovateAPI.apiRequest(`/posts/${postId}/comments`);
         const comments = response.comments || [];
+        const postOwnerId = response.post_user_id || null;
 
         const modal = document.createElement('div');
         modal.className = 'ig-modal-overlay';
@@ -4721,23 +4722,28 @@
           if (e.target === modal) close();
         });
 
+        // Store post owner id for use in comment rendering
+        window._commentsPostOwnerId = postOwnerId;
+        window._commentsPostId = postId;
+
         modal.innerHTML = `
           <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 80vh; overflow: hidden; position: relative; border-radius: 16px; display: flex; flex-direction: column;">
-            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2; flex-shrink: 0;">
-              Comments
-              <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
+            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; z-index: 2; flex-shrink: 0;">
+              <span></span>
+              <span style="text-align: center; font-size: 16px;">Comments</span>
+              <button type="button" aria-label="Close" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ig-primary-text); padding: 4px; justify-self: end; line-height: 1;" data-close-modal>✕</button>
             </div>
             <div id="commentsListContainer" style="flex: 1; overflow-y: auto; padding: 4px 0;">
-              ${comments.length ? comments.map(c => renderCommentItem(c, postId)).join('') : `
+              ${comments.length ? renderCommentsThreaded(comments, postId, postOwnerId) : `
                 <div style="padding: 40px 16px; color: var(--ig-secondary-text); text-align: center;">
                   <div style="font-size: 28px; margin-bottom: 8px;">💬</div>
                   No comments yet. Be the first!
                 </div>
               `}
             </div>
-            <div id="commentReplyInfo" style="display:none; padding: 8px 16px; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); font-size: 12px; color: var(--ig-secondary-text); flex-shrink: 0;">
-              Replying to <strong id="replyToUsername"></strong>
-              <button onclick="cancelReply()" style="float:right;background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:14px;">✕</button>
+            <div id="commentReplyInfo" style="display:none; padding: 8px 16px; background: rgba(0,149,246,0.1); border-top: 1px solid var(--ig-border); font-size: 13px; color: var(--ig-blue); flex-shrink: 0; display: none; align-items: center; justify-content: space-between;">
+              <span>Replying to <strong id="replyToUsername"></strong></span>
+              <button onclick="cancelReply()" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:16px;padding:4px 8px;">✕</button>
             </div>
             <div style="display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--ig-border); align-items: center; flex-shrink: 0;">
               <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
@@ -4761,33 +4767,140 @@
         modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
 
         document.body.appendChild(modal);
+
+        // Close any open comment menus when clicking inside modal
+        modal.addEventListener('click', (e) => {
+          if (!e.target.closest('.comment-3dot-menu') && !e.target.closest('.comment-3dot-btn')) {
+            document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+          }
+        });
       } catch (error) {
         InnovateAPI.showAlert('Failed to load comments', 'error');
       }
     }
 
-    function renderCommentItem(c, postId) {
+    function renderCommentsThreaded(comments, postId, postOwnerId) {
+      // Separate top-level comments and replies
+      const topLevel = comments.filter(c => !c.parent_id);
+      const repliesMap = {};
+      comments.filter(c => c.parent_id).forEach(c => {
+        if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
+        repliesMap[c.parent_id].push(c);
+      });
+
+      let html = '';
+      topLevel.forEach(c => {
+        html += renderCommentItem(c, postId, postOwnerId, false);
+        const replies = repliesMap[c.id] || [];
+        if (replies.length > 0) {
+          const hiddenCount = replies.length > 1 ? replies.length - 1 : 0;
+          html += `<div class="replies-thread" data-parent-id="${c.id}" style="margin-left: 48px; border-left: 2px solid var(--ig-border); padding-left: 8px;">`;
+          if (hiddenCount > 0) {
+            // Show toggle link + only the latest reply initially
+            html += `<button onclick="toggleReplies(${c.id})" class="toggle-replies-btn" data-toggle-replies="${c.id}" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px 12px;display:flex;align-items:center;gap:6px;">
+              <span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span>
+              View ${hiddenCount} more ${hiddenCount === 1 ? 'reply' : 'replies'}
+            </button>`;
+            // Hidden older replies
+            html += `<div id="hidden-replies-${c.id}" style="display:none;">`;
+            replies.slice(0, -1).forEach(r => {
+              html += renderCommentItem(r, postId, postOwnerId, true);
+            });
+            html += `</div>`;
+            // Latest reply always visible
+            html += renderCommentItem(replies[replies.length - 1], postId, postOwnerId, true);
+          } else {
+            // Just one reply - show it
+            html += renderCommentItem(replies[0], postId, postOwnerId, true);
+          }
+          html += `</div>`;
+        }
+      });
+      return html;
+    }
+
+    function toggleReplies(parentId) {
+      const hidden = document.getElementById(`hidden-replies-${parentId}`);
+      const btn = document.querySelector(`[data-toggle-replies="${parentId}"]`);
+      if (hidden && btn) {
+        if (hidden.style.display === 'none') {
+          hidden.style.display = 'block';
+          btn.innerHTML = `<span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span> Hide replies`;
+        } else {
+          hidden.style.display = 'none';
+          const count = hidden.children.length;
+          btn.innerHTML = `<span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span> View ${count} more ${count === 1 ? 'reply' : 'replies'}`;
+        }
+      }
+    }
+
+    function renderCommentItem(c, postId, postOwnerId, isReply) {
       const isOwn = c.user_id === user.id;
+      const isPostOwner = user.id === postOwnerId;
+      const canDelete = isOwn || isPostOwner;
       const timeAgo = typeof InnovateAPI !== 'undefined' && InnovateAPI.formatDate ? InnovateAPI.formatDate(c.created_at) : '';
       const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" style="color:var(--ig-blue);text-decoration:none;font-weight:600;">@$1</a>');
+      
+      const avatarSize = isReply ? '28px' : '36px';
+      const fontSize = isReply ? '13px' : '14px';
+      const paddingStyle = isReply ? 'padding: 8px 12px 8px 4px;' : 'padding: 12px 16px;';
+      
       return `
-        <div style="display: flex; gap: 12px; padding: 12px 16px; position: relative;" data-comment-id="${c.id}">
-          <a href="/profile/${c.user_id}" style="flex-shrink: 0;">
-            <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">
+        <div style="display: flex; gap: ${isReply ? '10px' : '12px'}; ${paddingStyle} position: relative;" data-comment-id="${c.id}">
+          <a href="/profile/${c.user_id}" style="flex-shrink: 0; text-decoration: none;">
+            <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; object-fit: cover; cursor: pointer;">
           </a>
           <div style="flex: 1; min-width: 0;">
             <div style="margin-bottom: 4px;">
-              <a href="/profile/${c.user_id}" style="font-weight: 600; text-decoration: none; color: var(--ig-primary-text); font-size: 14px;">${c.username}</a>
-              <span style="font-size: 14px; white-space: pre-wrap; word-break: break-word; margin-left: 6px;">${contentWithMentions}</span>
+              <a href="/profile/${c.user_id}" style="font-weight: 600; text-decoration: none; color: var(--ig-primary-text); font-size: ${fontSize}; cursor: pointer;">${c.username}</a>
+              <span style="font-size: ${fontSize}; white-space: pre-wrap; word-break: break-word; margin-left: 6px;">${contentWithMentions}</span>
             </div>
             <div style="display: flex; gap: 14px; font-size: 12px; color: var(--ig-secondary-text); align-items: center;">
               <span>${timeAgo}</span>
               <button onclick="replyToComment(${c.id}, '${c.username}', ${postId})" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:12px;font-weight:600;padding:0;">Reply</button>
-              ${isOwn ? `<button onclick="deleteComment(${postId}, ${c.id}, this)" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;font-weight:600;padding:0;">Delete</button>` : ''}
+            </div>
+          </div>
+          <div style="position: relative; flex-shrink: 0; align-self: flex-start; margin-top: 4px;">
+            <button class="comment-3dot-btn" onclick="event.stopPropagation(); toggleCommentMenu(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--ig-secondary-text);padding:4px;font-size:16px;line-height:1;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div class="comment-3dot-menu" id="comment-menu-${c.id}" style="display:none; position:absolute; right:0; top:100%; background:var(--ig-secondary-background); border:1px solid var(--ig-border); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.3); z-index:20; min-width:160px; overflow:hidden;">
+              <button onclick="likeComment(${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;color:var(--ig-primary-text);cursor:pointer;font-size:14px;text-align:left;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                Like
+              </button>
+              ${canDelete ? `
+                <button onclick="deleteComment(${postId}, ${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid var(--ig-border);color:#ef4444;cursor:pointer;font-size:14px;text-align:left;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                  Delete
+                </button>
+              ` : ''}
+              <button onclick="reportComment(${c.id})" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid var(--ig-border);color:var(--ig-primary-text);cursor:pointer;font-size:14px;text-align:left;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
+                Report
+              </button>
             </div>
           </div>
         </div>
       `;
+    }
+
+    function toggleCommentMenu(commentId) {
+      // Close all other menus
+      document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+      const menu = document.getElementById(`comment-menu-${commentId}`);
+      if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function likeComment(commentId, btn) {
+      // Close the menu
+      btn.closest('.comment-3dot-menu').style.display = 'none';
+      InnovateAPI.showAlert('Comment liked!', 'success');
+    }
+
+    function reportComment(commentId) {
+      document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+      InnovateAPI.showAlert('Comment reported. We will review it.', 'success');
     }
 
     let currentReplyTo = null;
@@ -4797,7 +4910,7 @@
       const replyInfo = document.getElementById('commentReplyInfo');
       const replyUser = document.getElementById('replyToUsername');
       if (replyInfo && replyUser) {
-        replyInfo.style.display = 'block';
+        replyInfo.style.display = 'flex';
         replyUser.textContent = '@' + username;
       }
       const input = document.getElementById('modalCommentInput');
@@ -4816,7 +4929,10 @@
     }
 
     async function deleteComment(postId, commentId, btn) {
-      if (!confirm('Delete this comment?')) return;
+      if (!confirm('Delete this comment?')) {
+        btn.closest('.comment-3dot-menu').style.display = 'none';
+        return;
+      }
       try {
         await InnovateAPI.apiRequest(`/posts/${postId}/comments/${commentId}`, { method: 'DELETE' });
         const commentEl = btn.closest('[data-comment-id]');
@@ -4893,7 +5009,6 @@
 
       try {
         let endpoint = `/posts/${postId}/comments`;
-        let body = { content };
 
         if (currentReplyTo && currentReplyTo.commentId) {
           endpoint = `/posts/${postId}/comments/${currentReplyTo.commentId}/reply`;
@@ -4901,7 +5016,7 @@
 
         const res = await InnovateAPI.apiRequest(endpoint, {
           method: 'POST',
-          body: JSON.stringify(body)
+          body: JSON.stringify({ content })
         });
 
         // Handle @mentions - send notifications
@@ -4924,8 +5039,13 @@
         // Reload comments
         const commentsRes = await InnovateAPI.apiRequest(`/posts/${postId}/comments`);
         const container = document.getElementById('commentsListContainer');
+        const postOwnerId = commentsRes.post_user_id || window._commentsPostOwnerId;
         if (container && commentsRes.comments) {
-          container.innerHTML = commentsRes.comments.map(c => renderCommentItem(c, postId)).join('');
+          container.innerHTML = commentsRes.comments.length ? renderCommentsThreaded(commentsRes.comments, postId, postOwnerId) : `
+            <div style="padding: 40px 16px; color: var(--ig-secondary-text); text-align: center;">
+              <div style="font-size: 28px; margin-bottom: 8px;">💬</div>
+              No comments yet. Be the first!
+            </div>`;
         }
         
         loadPosts(); // Refresh comment count
@@ -5409,6 +5529,19 @@
         
         return `
           <div class="ig-fullscreen-post" data-post-id="${post.id}" data-post-index="${idx}">
+            <div class="ig-fullscreen-bottom-info" style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border, rgba(255,255,255,0.1));">
+              <a href="/profile/${post.user_id}" class="ig-fullscreen-user" style="text-decoration:none;color:inherit;">
+                <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-fullscreen-avatar">
+                <span class="ig-fullscreen-username">${post.username}</span>
+              </a>
+              <button class="ig-fullscreen-more" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
+                <svg aria-label="More options" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+                  <circle cx="12" cy="12" r="1.5"></circle>
+                  <circle cx="6" cy="12" r="1.5"></circle>
+                  <circle cx="18" cy="12" r="1.5"></circle>
+                </svg>
+              </button>
+            </div>
             ${mediaHtml}
           
           <div class="ig-post-actions">
@@ -5458,20 +5591,6 @@
               View all ${commentsCount} comments
             </button>
           ` : ''}
-          
-          <div class="ig-fullscreen-bottom-info">
-            <div class="ig-fullscreen-user">
-              <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-fullscreen-avatar">
-              <span class="ig-fullscreen-username">${post.username}</span>
-            </div>
-            <button class="ig-fullscreen-more" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
-              <svg aria-label="More options" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-                <circle cx="12" cy="12" r="1.5"></circle>
-                <circle cx="6" cy="12" r="1.5"></circle>
-                <circle cx="18" cy="12" r="1.5"></circle>
-              </svg>
-            </button>
-          </div>
           
           <div class="ig-post-time">${InnovateAPI.formatDate(post.created_at)}</div>
           

@@ -983,6 +983,13 @@ const createTables = () => {
         }
       });
 
+      // Add parent_id column to post_comments for threaded replies
+      db.run(`ALTER TABLE post_comments ADD COLUMN parent_id INTEGER REFERENCES post_comments(id)`, (err) => {
+        if (err && !err.message.includes('duplicate column')) {
+          console.log('Note: parent_id column migration - ', err.message);
+        }
+      });
+
       // Create hashtags table
       db.run(`
         CREATE TABLE IF NOT EXISTS hashtags (

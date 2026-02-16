@@ -2194,17 +2194,41 @@
   <div class="pf-post-modal-overlay" id="pf-post-modal">
     <div class="pf-post-modal">
       <div class="pf-post-modal-header">
-        <img class="pf-post-modal-avatar" id="pf-post-avatar" src="" alt="">
-        <div>
-          <div class="pf-post-modal-username" id="pf-post-username"></div>
-          <div class="pf-post-modal-time" id="pf-post-time"></div>
+        <a id="pf-post-user-link" href="#" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
+          <img class="pf-post-modal-avatar" id="pf-post-avatar" src="" alt="">
+          <div>
+            <div class="pf-post-modal-username" id="pf-post-username"></div>
+            <div class="pf-post-modal-time" id="pf-post-time"></div>
+          </div>
+        </a>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
+          <div id="pf-post-3dot-container" style="position:relative;display:none;">
+            <button onclick="toggleProfilePostMenu()" style="background:none;border:none;cursor:pointer;color:var(--pf-text2);padding:6px;border-radius:8px;" title="More options">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+            <div id="pf-post-menu-dropdown" style="display:none;position:absolute;right:0;top:100%;background:var(--pf-card);border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:20;min-width:180px;overflow:hidden;">
+              <button onclick="handleProfileEditPost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;color:var(--pf-text);cursor:pointer;font-size:14px;text-align:left;">
+                <i class="fas fa-edit" style="width:16px;"></i> Edit
+              </button>
+              <button onclick="handleProfileArchivePost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:var(--pf-text);cursor:pointer;font-size:14px;text-align:left;">
+                <i class="fas fa-archive" style="width:16px;"></i> Archive
+              </button>
+              <button onclick="handleProfileDeletePost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:#ef4444;cursor:pointer;font-size:14px;text-align:left;">
+                <i class="fas fa-trash" style="width:16px;"></i> Delete
+              </button>
+            </div>
+          </div>
+          <button class="pf-post-modal-close" onclick="closePostModal()">&times;</button>
         </div>
-        <button class="pf-post-modal-close" onclick="closePostModal()">&times;</button>
       </div>
       <div class="pf-post-modal-images" id="pf-post-images"></div>
       <div class="pf-post-modal-content" id="pf-post-content"></div>
       <div class="pf-post-modal-actions" id="pf-post-actions"></div>
       <div class="pf-post-modal-comments" id="pf-post-comments"></div>
+      <div id="pf-post-reply-info" style="display:none;padding:8px 16px;background:rgba(102,126,234,0.1);font-size:13px;color:var(--pf-accent);align-items:center;justify-content:space-between;">
+        <span>Replying to <strong id="pf-reply-to-username"></strong></span>
+        <button onclick="cancelProfileReply()" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:16px;padding:4px 8px;">✕</button>
+      </div>
       <div class="pf-post-comment-input-row">
         <input class="pf-post-comment-input" id="pf-post-comment-input" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitPostComment()">
         <button class="pf-post-comment-send" onclick="submitPostComment()"><i class="fas fa-paper-plane"></i></button>
@@ -3157,11 +3181,26 @@
         const post = postData.post;
         const commentsData = commentsRes.ok ? await commentsRes.json() : { comments: [] };
         const comments = commentsData.comments || [];
+        const postOwnerId = commentsData.post_user_id || post.user_id;
+
+        // Store post owner id for comment rendering
+        window._profilePostOwnerId = postOwnerId;
 
         // Header
         document.getElementById('pf-post-avatar').src = post.profile_picture || defaultAvatar;
         document.getElementById('pf-post-username').textContent = post.username;
         document.getElementById('pf-post-time').textContent = formatTimeAgo(post.created_at);
+        document.getElementById('pf-post-user-link').href = `/profile/${post.user_id}`;
+
+        // Show 3-dot menu only for own posts
+        const threeDotContainer = document.getElementById('pf-post-3dot-container');
+        if (post.user_id === currentUser.id) {
+          threeDotContainer.style.display = 'block';
+        } else {
+          threeDotContainer.style.display = 'none';
+        }
+        // Close any open menu
+        document.getElementById('pf-post-menu-dropdown').style.display = 'none';
 
         // Images / Video
         const imagesDiv = document.getElementById('pf-post-images');
@@ -3198,7 +3237,7 @@
             <i class="${liked ? 'fas' : 'far'} fa-heart"></i>
             <span id="pf-post-likes-count">${post.likes_count || 0}</span>
           </button>
-          <button class="pf-post-action-btn">
+          <button class="pf-post-action-btn" onclick="document.getElementById('pf-post-comment-input').focus()">
             <i class="far fa-comment"></i>
             <span>${comments.length}</span>
           </button>
@@ -3207,8 +3246,8 @@
           </button>
         `;
 
-        // Comments
-        renderPostComments(comments);
+        // Comments - show collapsed with "View all X comments" button
+        renderPostComments(comments, postOwnerId);
 
       } catch (err) {
         console.error('Error loading post:', err);
@@ -3217,10 +3256,59 @@
       }
     }
 
+    function toggleProfilePostMenu() {
+      const menu = document.getElementById('pf-post-menu-dropdown');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function handleProfileEditPost() {
+      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
+      showToast('Edit functionality coming soon!');
+    }
+
+    async function handleProfileArchivePost() {
+      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
+      if (!confirm('Archive this post?')) return;
+      try {
+        const res = await fetch(`/api/posts/${currentViewPostId}/archive`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (res.ok) {
+          showToast('Post archived');
+          closePostModal();
+          loadRecentPosts();
+          // Update post count
+          const countEl = document.getElementById('pf-posts-count');
+          if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+        }
+      } catch (err) { showToast('Failed to archive'); }
+    }
+
+    async function handleProfileDeletePost() {
+      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
+      if (!confirm('Delete this post permanently?')) return;
+      try {
+        const res = await fetch(`/api/posts/${currentViewPostId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (res.ok) {
+          showToast('Post deleted');
+          closePostModal();
+          loadRecentPosts();
+          const countEl = document.getElementById('pf-posts-count');
+          if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+        }
+      } catch (err) { showToast('Failed to delete post'); }
+    }
+
     function closePostModal() {
       document.getElementById('pf-post-modal').classList.remove('active');
       document.body.style.overflow = '';
       currentViewPostId = null;
+      // Reset reply state
+      cancelProfileReply();
     }
 
     function slidePostCarousel(dir) {
@@ -3231,22 +3319,170 @@
       track.style.transform = `translateX(-${window._postCarouselIdx * 100}%)`;
     }
 
-    function renderPostComments(comments) {
+    let profileReplyTo = null;
+
+    function replyToProfileComment(commentId, username) {
+      profileReplyTo = { commentId, username };
+      const replyInfo = document.getElementById('pf-post-reply-info');
+      const replyUser = document.getElementById('pf-reply-to-username');
+      if (replyInfo && replyUser) {
+        replyInfo.style.display = 'flex';
+        replyUser.textContent = '@' + username;
+      }
+      const input = document.getElementById('pf-post-comment-input');
+      if (input) {
+        input.value = `@${username} `;
+        input.focus();
+      }
+    }
+
+    function cancelProfileReply() {
+      profileReplyTo = null;
+      const replyInfo = document.getElementById('pf-post-reply-info');
+      if (replyInfo) replyInfo.style.display = 'none';
+    }
+
+    function toggleProfileCommentMenu(commentId) {
+      document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
+      const menu = document.getElementById(`pf-comment-menu-${commentId}`);
+      if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function deleteProfileComment(commentId, btn) {
+      if (!confirm('Delete this comment?')) {
+        btn.closest('.pf-comment-3dot-menu').style.display = 'none';
+        return;
+      }
+      try {
+        const res = await fetch(`/api/posts/${currentViewPostId}/comments/${commentId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (res.ok) {
+          const commentEl = btn.closest('.pf-post-comment');
+          if (commentEl) commentEl.remove();
+          showToast('Comment deleted');
+        }
+      } catch (err) { showToast('Failed to delete comment'); }
+    }
+
+    function reportProfileComment(commentId) {
+      document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
+      showToast('Comment reported. We will review it.');
+    }
+
+    function renderPostComments(comments, postOwnerId) {
       const container = document.getElementById('pf-post-comments');
       if (!comments.length) {
         container.innerHTML = '<p style="color:var(--pf-text2);font-size:13px;padding:8px 0;">No comments yet</p>';
         return;
       }
-      container.innerHTML = comments.map(c => `
-        <div class="pf-post-comment">
-          <img class="pf-post-comment-avatar" src="${c.profile_picture || defaultAvatar}" alt="">
-          <div class="pf-post-comment-body">
-            <div class="pf-post-comment-user">${c.username}</div>
-            <div class="pf-post-comment-text">${c.content || ''}</div>
-            <div class="pf-post-comment-time">${formatTimeAgo(c.created_at)}</div>
-          </div>
-        </div>
-      `).join('');
+
+      // Separate top-level and replies
+      const topLevel = comments.filter(c => !c.parent_id);
+      const repliesMap = {};
+      comments.filter(c => c.parent_id).forEach(c => {
+        if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
+        repliesMap[c.parent_id].push(c);
+      });
+
+      const renderSingleComment = (c, isReply) => {
+        const isOwn = c.user_id === currentUser.id;
+        const isPostOwner = currentUser.id === postOwnerId;
+        const canDelete = isOwn || isPostOwner;
+        const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" style="color:var(--pf-accent);text-decoration:none;font-weight:600;">@$1</a>');
+        const avatarSize = isReply ? '24px' : '32px';
+        const fontSize = isReply ? '12px' : '13px';
+
+        return `
+          <div class="pf-post-comment" data-comment-id="${c.id}" style="${isReply ? 'padding: 6px 0;' : ''}">
+            <a href="/profile/${c.user_id}" style="flex-shrink:0;text-decoration:none;">
+              <img class="pf-post-comment-avatar" src="${c.profile_picture || defaultAvatar}" alt="${c.username}" style="cursor:pointer;width:${avatarSize};height:${avatarSize};">
+            </a>
+            <div class="pf-post-comment-body" style="flex:1;min-width:0;">
+              <a href="/profile/${c.user_id}" class="pf-post-comment-user" style="text-decoration:none;cursor:pointer;font-size:${fontSize};">${c.username}</a>
+              <div class="pf-post-comment-text" style="font-size:${fontSize};">${contentWithMentions}</div>
+              <div style="display:flex;gap:12px;align-items:center;margin-top:4px;">
+                <span class="pf-post-comment-time">${formatTimeAgo(c.created_at)}</span>
+                <button onclick="replyToProfileComment(${c.id}, '${c.username}')" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:11px;font-weight:600;padding:0;">Reply</button>
+              </div>
+            </div>
+            <div style="position:relative;flex-shrink:0;align-self:flex-start;margin-top:4px;">
+              <button onclick="event.stopPropagation(); toggleProfileCommentMenu(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--pf-text2);padding:4px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+              </button>
+              <div class="pf-comment-3dot-menu" id="pf-comment-menu-${c.id}" style="display:none;position:absolute;right:0;top:100%;background:var(--pf-card);border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:20;min-width:150px;overflow:hidden;">
+                <button onclick="document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none'); showToast('Comment liked!')" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;color:var(--pf-text);cursor:pointer;font-size:13px;text-align:left;">
+                  <i class="fas fa-heart" style="width:14px;"></i> Like
+                </button>
+                ${canDelete ? `
+                  <button onclick="deleteProfileComment(${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:#ef4444;cursor:pointer;font-size:13px;text-align:left;">
+                    <i class="fas fa-trash" style="width:14px;"></i> Delete
+                  </button>
+                ` : ''}
+                <button onclick="reportProfileComment(${c.id})" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:var(--pf-text);cursor:pointer;font-size:13px;text-align:left;">
+                  <i class="fas fa-flag" style="width:14px;"></i> Report
+                </button>
+              </div>
+            </div>
+          </div>`;
+      };
+
+      const renderThreaded = (commentsList) => {
+        let html = '';
+        const topLevelFiltered = commentsList.filter(c => !c.parent_id);
+        topLevelFiltered.forEach(c => {
+          html += renderSingleComment(c, false);
+          const replies = repliesMap[c.id] || [];
+          if (replies.length > 0) {
+            html += `<div style="margin-left: 40px; border-left: 2px solid rgba(255,255,255,0.08); padding-left: 8px;">`;
+            replies.forEach(r => {
+              html += renderSingleComment(r, true);
+            });
+            html += `</div>`;
+          }
+        });
+        // Also render any orphan replies (parent not in current slice)
+        const orphans = commentsList.filter(c => c.parent_id && !topLevelFiltered.find(t => t.id === c.parent_id));
+        orphans.forEach(c => { html += renderSingleComment(c, false); });
+        return html;
+      };
+
+      // Show only the latest 2 top-level comments initially, with a "View all" button if there are more
+      const showAll = topLevel.length <= 2;
+      const visibleTopLevel = showAll ? topLevel : topLevel.slice(-2);
+      const visibleComments = showAll ? comments : [...visibleTopLevel, ...visibleTopLevel.flatMap(t => repliesMap[t.id] || [])];
+
+      let html = '';
+      if (!showAll) {
+        html += `<button id="pf-view-all-comments-btn" onclick="expandAllProfileComments()" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:13px;padding:8px 0;font-weight:400;">View all ${comments.length} comments</button>`;
+        html += `<div id="pf-all-comments-container" style="display:none;">${renderThreaded(comments)}</div>`;
+        html += `<div id="pf-preview-comments-container">${renderThreaded(visibleComments)}</div>`;
+      } else {
+        html += renderThreaded(comments);
+      }
+
+      container.innerHTML = html;
+
+      // Store full comments for expanding
+      window._profileAllComments = comments;
+      window._profileCommentsPostOwnerId = postOwnerId;
+
+      // Close menus on click elsewhere
+      container.addEventListener('click', (e) => {
+        if (!e.target.closest('.pf-comment-3dot-menu') && !e.target.closest('button[onclick*="toggleProfileCommentMenu"]')) {
+          document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
+        }
+      });
+    }
+
+    function expandAllProfileComments() {
+      const btn = document.getElementById('pf-view-all-comments-btn');
+      const allContainer = document.getElementById('pf-all-comments-container');
+      const previewContainer = document.getElementById('pf-preview-comments-container');
+      if (btn) btn.style.display = 'none';
+      if (previewContainer) previewContainer.style.display = 'none';
+      if (allContainer) allContainer.style.display = 'block';
     }
 
     async function togglePostLike(postId) {
@@ -3289,7 +3525,12 @@
       if (!content) return;
 
       try {
-        const res = await fetch(`/api/posts/${currentViewPostId}/comments`, {
+        let endpoint = `/api/posts/${currentViewPostId}/comments`;
+        if (profileReplyTo && profileReplyTo.commentId) {
+          endpoint = `/api/posts/${currentViewPostId}/comments/${profileReplyTo.commentId}/reply`;
+        }
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -3299,13 +3540,14 @@
         });
         if (res.ok) {
           input.value = '';
+          cancelProfileReply();
           // Reload comments
           const commentsRes = await fetch(`/api/posts/${currentViewPostId}/comments`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
           if (commentsRes.ok) {
             const data = await commentsRes.json();
-            renderPostComments(data.comments || []);
+            renderPostComments(data.comments || [], data.post_user_id || window._profilePostOwnerId);
           }
         }
       } catch (err) { console.error('Comment error:', err); }

@@ -758,19 +758,24 @@ router.get('/:postId/comments', authMiddleware, (req, res) => {
   const db = getDb();
   const { postId } = req.params;
 
-  const query = `
-    SELECT c.*, u.username, u.profile_picture
-    FROM post_comments c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.post_id = ?
-    ORDER BY c.created_at DESC
-  `;
+  // First get the post owner
+  db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err0, post) => {
+    if (err0 || !post) return res.status(404).json({ error: 'Post not found' });
 
-  db.all(query, [postId], (err, comments) => {
-    if (err) {
-      return res.status(500).json({ error: 'Error fetching comments' });
-    }
-    res.json({ success: true, comments });
+    const query = `
+      SELECT c.*, u.username, u.profile_picture
+      FROM post_comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.post_id = ?
+      ORDER BY c.created_at ASC
+    `;
+
+    db.all(query, [postId], (err, comments) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error fetching comments' });
+      }
+      res.json({ success: true, comments, post_user_id: post.user_id });
+    });
   });
 });
 
