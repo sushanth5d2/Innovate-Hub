@@ -1639,6 +1639,19 @@ const migrateDatabase = () => {
       }
     });
 
+    // Comment likes table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS comment_likes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        comment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(comment_id, user_id),
+        FOREIGN KEY (comment_id) REFERENCES post_comments(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // Portfolio projects table
     db.run(`
       CREATE TABLE IF NOT EXISTS portfolio_projects (

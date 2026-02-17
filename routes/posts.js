@@ -63,14 +63,34 @@ router.get('/', authMiddleware, (req, res) => {
                 options: parsedOptions,
                 votes: JSON.parse(poll.votes),
                 user_voted: userVote ? parsedOptions[userVote.option_index] : null
-              }
+              },
+              recent_comments: [],
+              recent_liker: null
             };
-            processedPosts.push(processedPost);
-            pending--;
-            if (pending === 0) {
-              processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-              res.json({ success: true, posts: processedPosts });
-            }
+            // Fetch last 2 comments for inline display
+            db.all(
+              `SELECT c.id, c.content, c.created_at, c.user_id, u.username, u.profile_picture
+               FROM post_comments c JOIN users u ON c.user_id = u.id
+               WHERE c.post_id = ? AND c.parent_id IS NULL
+               ORDER BY c.created_at DESC LIMIT 2`,
+              [post.id],
+              (errC, recentComments) => {
+                processedPost.recent_comments = (recentComments || []).reverse();
+                db.get(
+                  `SELECT u.username FROM post_likes pl JOIN users u ON pl.user_id = u.id WHERE pl.post_id = ? ORDER BY pl.created_at DESC LIMIT 1`,
+                  [post.id],
+                  (errL, liker) => {
+                    processedPost.recent_liker = liker ? liker.username : null;
+                    processedPosts.push(processedPost);
+                    pending--;
+                    if (pending === 0) {
+                      processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                      res.json({ success: true, posts: processedPosts });
+                    }
+                  }
+                );
+              }
+            );
           });
           return;
         }
@@ -82,16 +102,36 @@ router.get('/', authMiddleware, (req, res) => {
           custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
           user_has_liked: post.user_has_liked > 0,
           is_saved: post.is_saved > 0,
-          poll: null
+          poll: null,
+          recent_comments: [],
+          recent_liker: null
         };
 
-        processedPosts.push(processedPost);
-        pending--;
-
-        if (pending === 0) {
-          processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          res.json({ success: true, posts: processedPosts });
-        }
+        // Fetch last 2 comments for inline display
+        db.all(
+          `SELECT c.id, c.content, c.created_at, c.user_id, u.username, u.profile_picture
+           FROM post_comments c JOIN users u ON c.user_id = u.id
+           WHERE c.post_id = ? AND c.parent_id IS NULL
+           ORDER BY c.created_at DESC LIMIT 2`,
+          [post.id],
+          (errC, recentComments) => {
+            processedPost.recent_comments = (recentComments || []).reverse();
+            // Fetch one recent liker username
+            db.get(
+              `SELECT u.username FROM post_likes pl JOIN users u ON pl.user_id = u.id WHERE pl.post_id = ? ORDER BY pl.created_at DESC LIMIT 1`,
+              [post.id],
+              (errL, liker) => {
+                processedPost.recent_liker = liker ? liker.username : null;
+                processedPosts.push(processedPost);
+                pending--;
+                if (pending === 0) {
+                  processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                  res.json({ success: true, posts: processedPosts });
+                }
+              }
+            );
+          }
+        );
       });
     });
   });
@@ -762,17 +802,31 @@ router.get('/:postId/comments', authMiddleware, (req, res) => {
   db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err0, post) => {
     if (err0 || !post) return res.status(404).json({ error: 'Post not found' });
 
+    const userId = req.user.userId;
     const query = `
-      SELECT c.*, u.username, u.profile_picture
+      SELECT c.*, u.username, u.profile_picture,
+        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id) as likes_count,
+        (SELECT COUNT(*) FROM comment_likes WHERE comment_id = c.id AND user_id = ?) as user_has_liked
       FROM post_comments c
       JOIN users u ON c.user_id = u.id
       WHERE c.post_id = ?
       ORDER BY c.created_at ASC
     `;
 
-    db.all(query, [postId], (err, comments) => {
+    db.all(query, [userId, postId], (err, comments) => {
       if (err) {
-        return res.status(500).json({ error: 'Error fetching comments' });
+        // Fallback if comment_likes table doesn't exist yet
+        const fallbackQuery = `
+          SELECT c.*, u.username, u.profile_picture, 0 as likes_count, 0 as user_has_liked
+          FROM post_comments c
+          JOIN users u ON c.user_id = u.id
+          WHERE c.post_id = ?
+          ORDER BY c.created_at ASC
+        `;
+        return db.all(fallbackQuery, [postId], (err2, comments2) => {
+          if (err2) return res.status(500).json({ error: 'Error fetching comments' });
+          res.json({ success: true, comments: comments2, post_user_id: post.user_id });
+        });
       }
       res.json({ success: true, comments, post_user_id: post.user_id });
     });
@@ -1172,39 +1226,45 @@ router.post('/:postId/comments/:commentId/reply', authMiddleware, (req, res) => 
     return res.status(400).json({ error: 'Reply content required' });
   }
 
-  db.run(
-    'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)',
-    [postId, userId, content.trim(), commentId],
-    function(err) {
-      if (err) {
-        // If parent_id column doesn't exist, add reply inline with @mention
-        if (err.message && err.message.includes('parent_id')) {
-          db.run(
-            'INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)',
-            [postId, userId, content.trim()],
-            function(err2) {
-              if (err2) return res.status(500).json({ error: 'Error adding reply' });
-              db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
-              res.json({ success: true, commentId: this.lastID });
-            }
-          );
-          return;
+  // Instagram-style: always flatten replies under the root (top-level) comment.
+  // If replying to a reply, resolve to its root parent_id.
+  db.get('SELECT id, parent_id, user_id FROM post_comments WHERE id = ?', [commentId], (errP, targetComment) => {
+    if (errP || !targetComment) return res.status(404).json({ error: 'Comment not found' });
+
+    // If the target already has a parent, use that parent (the root). Otherwise use target's own id.
+    const rootParentId = targetComment.parent_id ? targetComment.parent_id : targetComment.id;
+
+    db.run(
+      'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)',
+      [postId, userId, content.trim(), rootParentId],
+      function(err) {
+        if (err) {
+          if (err.message && err.message.includes('parent_id')) {
+            db.run(
+              'INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)',
+              [postId, userId, content.trim()],
+              function(err2) {
+                if (err2) return res.status(500).json({ error: 'Error adding reply' });
+                db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
+                res.json({ success: true, commentId: this.lastID });
+              }
+            );
+            return;
+          }
+          return res.status(500).json({ error: 'Error adding reply' });
         }
-        return res.status(500).json({ error: 'Error adding reply' });
-      }
 
-      db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
+        db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
 
-      // Notify the original commenter
-      db.get('SELECT user_id FROM post_comments WHERE id = ?', [commentId], (err2, parentComment) => {
-        if (parentComment && parentComment.user_id !== userId) {
+        // Notify the comment author being replied to
+        if (targetComment.user_id !== userId) {
           db.run(
             'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
-            [parentComment.user_id, 'reply', 'replied to your comment', postId, userId]
+            [targetComment.user_id, 'reply', 'replied to your comment', postId, userId]
           );
           const io = req.app.get('io');
           if (io) {
-            io.to(`user_${parentComment.user_id}`).emit('notification:receive', {
+            io.to(`user_${targetComment.user_id}`).emit('notification:receive', {
               type: 'reply',
               content: 'replied to your comment',
               post_id: postId,
@@ -1212,11 +1272,41 @@ router.post('/:postId/comments/:commentId/reply', authMiddleware, (req, res) => 
             });
           }
         }
-      });
 
-      res.json({ success: true, commentId: this.lastID });
+        res.json({ success: true, commentId: this.lastID });
+      }
+    );
+  });
+});
+
+// Like/unlike a comment
+router.post('/:postId/comments/:commentId/like', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { commentId } = req.params;
+
+  // Check if already liked
+  db.get('SELECT id FROM comment_likes WHERE comment_id = ? AND user_id = ?', [commentId, userId], (err, existing) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+
+    if (existing) {
+      // Unlike
+      db.run('DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?', [commentId, userId], (err2) => {
+        if (err2) return res.status(500).json({ error: 'Error unliking comment' });
+        db.get('SELECT COUNT(*) as count FROM comment_likes WHERE comment_id = ?', [commentId], (err3, row) => {
+          res.json({ success: true, liked: false, likes_count: row ? row.count : 0 });
+        });
+      });
+    } else {
+      // Like
+      db.run('INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)', [commentId, userId], (err2) => {
+        if (err2) return res.status(500).json({ error: 'Error liking comment' });
+        db.get('SELECT COUNT(*) as count FROM comment_likes WHERE comment_id = ?', [commentId], (err3, row) => {
+          res.json({ success: true, liked: true, likes_count: row ? row.count : 0 });
+        });
+      });
     }
-  );
+  });
 });
 
 // Handle @mention notifications in comments

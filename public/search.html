@@ -171,8 +171,10 @@
       try {
         const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
         const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
-        document.getElementById('bottomProfilePic').src = avatar;
-        document.getElementById('bottomProfileLink').href = `/profile/${user.id}`;
+        const profilePic = document.getElementById('bottomProfilePic');
+        const profileLink = document.getElementById('bottomProfileLink');
+        if (profilePic) profilePic.src = avatar;
+        if (profileLink) profileLink.href = `/profile/${user.id}`;
       } catch (error) {
         console.error('Error loading user info:', error);
       }

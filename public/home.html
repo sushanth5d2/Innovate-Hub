@@ -3223,8 +3223,12 @@
           </button>
         </div>
         
-        <div class="ig-post-likes">
-          <span class="ig-post-likes-count" id="likes-${post.id}" onclick="showWhoLiked(${post.id})" style="cursor: pointer;">${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</span>
+        <div class="ig-post-likes" id="likes-section-${post.id}">
+          ${likesCount > 0 ? `
+            <span class="ig-post-likes-count" id="likes-${post.id}" onclick="showWhoLiked(${post.id})" style="cursor: pointer;">
+              ${post.recent_liker ? `<span style="font-weight:400;">Liked by </span><strong>${post.recent_liker}</strong>${likesCount > 1 ? ` <span style="font-weight:400;">and </span><strong>${likesCount - 1} other${likesCount - 1 > 1 ? 's' : ''}</strong>` : ''}` : `<strong>${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</strong>`}
+            </span>
+          ` : ''}
         </div>
         
         ${post.content ? `
@@ -3242,6 +3246,13 @@
           View all ${commentsCount} comments
         </button>
         ` : ''}
+
+        ${(post.recent_comments && post.recent_comments.length > 0) ? post.recent_comments.map(rc => `
+        <div class="ig-inline-comment">
+          <span class="ig-inline-comment-user">${rc.username}</span>
+          <span class="ig-inline-comment-text">${rc.content}</span>
+        </div>
+        `).join('') : ''}
         
         ${post.poll ? (() => {
           const votesObj = post.poll.votes;
@@ -3292,7 +3303,7 @@
         ` : ''}
 
         ${post.custom_button ? `
-        <button class="cb-post-button" onclick='openCustomButtonModal(${post.id}, ${post.user_id}, ${JSON.stringify(JSON.stringify(post.custom_button))})'>
+        <button class="cb-post-button" data-post-id="${post.id}" data-user-id="${post.user_id}" data-config="${encodeURIComponent(JSON.stringify(post.custom_button))}" onclick="openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">
           ${post.custom_button.name || 'Action'}
         </button>
         ` : ''}
@@ -3364,10 +3375,28 @@
         const svg = btn.querySelector('svg');
         svg.setAttribute('fill', isLiked ? 'none' : '#ed4956');
         
-        // Update likes count from server response
+        // Update likes count with Instagram-style format
         const likesEl = document.getElementById(`likes-${postId}`);
+        const likesSection = document.getElementById(`likes-section-${postId}`);
         if (likesEl && response.likes_count !== undefined) {
-          likesEl.textContent = `${response.likes_count} ${response.likes_count === 1 ? 'like' : 'likes'}`;
+          const count = response.likes_count;
+          if (count === 0) {
+            likesEl.innerHTML = '';
+            if (likesSection) likesSection.style.display = 'none';
+          } else {
+            if (likesSection) likesSection.style.display = '';
+            const currentUser = InnovateAPI.getCurrentUser();
+            const myUsername = currentUser ? currentUser.username : 'you';
+            if (!isLiked) {
+              // User just liked — show "Liked by you and X others"
+              likesEl.innerHTML = count === 1 
+                ? `<span style="font-weight:400;">Liked by </span><strong>${myUsername}</strong>`
+                : `<span style="font-weight:400;">Liked by </span><strong>${myUsername}</strong><span style="font-weight:400;"> and </span><strong>${count - 1} other${count > 2 ? 's' : ''}</strong>`;
+            } else {
+              // User just unliked
+              likesEl.innerHTML = `<strong>${count} ${count === 1 ? 'like' : 'likes'}</strong>`;
+            }
+          }
         }
       } catch (error) {
         console.error('Error toggling like:', error);
@@ -3486,35 +3515,29 @@
 
     // Focus comment input
     function focusComment(postId) {
-      document.getElementById(`comment-${postId}`).focus();
+      openCommentsModal(postId);
     }
 
-    // Share post
+    // Share post — Instagram-style bottom sheet
     async function sharePost(postId) {
       const url = `${window.location.origin}/post/${postId}`;
 
-      const modal = document.createElement('div');
-      modal.className = 'ig-modal-overlay';
-      modal.style.display = 'flex';
-      modal.id = 'shareModalOverlay';
+      document.getElementById('shareBottomSheet')?.remove();
+      const sheet = document.createElement('div');
+      sheet.id = 'shareBottomSheet';
+      sheet.className = 'ig-bottom-sheet-overlay';
 
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
 
       const close = () => {
         document.removeEventListener('keydown', onKeyDown);
-        document.body.style.overflow = previousOverflow;
-        modal.remove();
+        sheet.classList.add('ig-sheet-closing');
+        setTimeout(() => { document.body.style.overflow = previousOverflow; sheet.remove(); }, 280);
       };
-
-      const onKeyDown = (e) => {
-        if (e.key === 'Escape') close();
-      };
+      const onKeyDown = (e) => { if (e.key === 'Escape') close(); };
       document.addEventListener('keydown', onKeyDown);
-
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) close();
-      });
+      sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
 
       // Fetch frequent contacts
       let suggestedUsers = [];
@@ -3523,71 +3546,66 @@
         suggestedUsers = res.users || [];
       } catch (e) { /* no suggested users */ }
 
-      modal.innerHTML = `
-        <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 80vh; overflow: hidden; position: relative; border-radius: 16px; display: flex; flex-direction: column;">
-          <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2; flex-shrink: 0;">
-            Share
-            <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
+      sheet.innerHTML = `
+        <div class="ig-bottom-sheet ig-share-sheet">
+          <div class="ig-bottom-sheet-handle"><div class="ig-sheet-drag-indicator"></div></div>
+          <div class="ig-bottom-sheet-header">
+            <span class="ig-bottom-sheet-title">Share</span>
           </div>
-          <div style="padding: 12px 16px; border-bottom: 1px solid var(--ig-border); flex-shrink: 0;">
-            <input type="text" id="shareSearchInput" placeholder="Search people..." 
-              style="width: 100%; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 10px; background: var(--ig-background); color: var(--ig-primary-text); font-size: 14px; outline: none;"
+          <div class="ig-share-search">
+            <input type="text" id="shareSearchInput" placeholder="Search..."
+              class="ig-share-search-input"
               oninput="searchShareUsers(this.value, ${postId})">
           </div>
-          <div id="shareUsersContainer" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+          <div id="shareUsersContainer" class="ig-bottom-sheet-body" style="min-height: 80px; max-height: 200px;">
             ${suggestedUsers.length > 0 ? `
-              <div style="padding: 10px 16px 6px; font-size: 13px; font-weight: 600; color: var(--ig-secondary-text);">Suggested</div>
+              <div class="ig-share-section-label">Suggested</div>
               ${suggestedUsers.map(u => `
-                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
-                  <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
-                  <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
-                    ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
+                <div class="ig-share-user-row">
+                  <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" class="ig-share-user-avatar">
+                  <div class="ig-share-user-info">
+                    <div class="ig-share-username">${u.username}</div>
+                    ${u.bio ? `<div class="ig-share-user-bio">${u.bio}</div>` : ''}
                   </div>
-                  <button onclick="sendPostToUser(${u.user_id || u.id}, ${postId}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Send</button>
+                  <button onclick="sendPostToUser(${u.user_id || u.id}, ${postId}, this)" class="ig-share-send-btn">Send</button>
                 </div>
               `).join('')}
             ` : `
               <div style="padding: 20px 16px; color: var(--ig-secondary-text); text-align: center; font-size: 14px;">Search for people to share with</div>
             `}
           </div>
-          <div style="padding: 16px; border-top: 1px solid var(--ig-border); flex-shrink: 0;">
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
-              <button onclick="copyShareLink('${url}')" style="background: none; border: none; cursor: pointer; color: var(--ig-primary-text); padding: 0;">
-                <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--ig-background); border: 1px solid var(--ig-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 20px;">🔗</div>
-                <div style="font-size: 12px;">Copy Link</div>
-              </button>
-              <a href="https://wa.me/?text=${encodeURIComponent(url)}" target="_blank" style="text-decoration: none; color: var(--ig-primary-text);">
-                <div style="width: 52px; height: 52px; border-radius: 50%; background: #25d366; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
-                  <i class="fab fa-whatsapp" style="color: white;"></i>
-                </div>
-                <div style="font-size: 12px;">WhatsApp</div>
-              </a>
-              <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}" target="_blank" style="text-decoration: none; color: var(--ig-primary-text);">
-                <div style="width: 52px; height: 52px; border-radius: 50%; background: #1da1f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
-                  <i class="fab fa-twitter" style="color: white;"></i>
-                </div>
-                <div style="font-size: 12px;">Twitter</div>
-              </a>
-              <a href="mailto:?body=${encodeURIComponent(url)}" style="text-decoration: none; color: var(--ig-primary-text);">
-                <div style="width: 52px; height: 52px; border-radius: 50%; background: #ea4335; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-size: 22px;">
-                  <i class="fas fa-envelope" style="color: white;"></i>
-                </div>
-                <div style="font-size: 12px;">Email</div>
-              </a>
-            </div>
+          <div class="ig-share-actions">
+            <button onclick="copyShareLink('${url}')" class="ig-share-action-item">
+              <div class="ig-share-action-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
+              <span>Copy link</span>
+            </button>
+            <a href="https://wa.me/?text=${encodeURIComponent(url)}" target="_blank" class="ig-share-action-item">
+              <div class="ig-share-action-icon" style="background: #25d366;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
+              </div>
+              <span>WhatsApp</span>
+            </a>
+            <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}" target="_blank" class="ig-share-action-item">
+              <div class="ig-share-action-icon" style="background: #000;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              </div>
+              <span>X</span>
+            </a>
+            <a href="mailto:?body=${encodeURIComponent(url)}" class="ig-share-action-item">
+              <div class="ig-share-action-icon" style="background: #ea4335;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              </div>
+              <span>Email</span>
+            </a>
           </div>
         </div>
       `;
 
-      modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        close();
-      });
-
-      modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
-
-      document.body.appendChild(modal);
+      document.body.appendChild(sheet);
+      setupBottomSheetDrag(sheet, close);
+      requestAnimationFrame(() => sheet.classList.add('ig-sheet-open'));
     }
 
     function copyShareLink(url) {
@@ -3613,13 +3631,13 @@
           }
 
           container.innerHTML = users.map(u => `
-            <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
-              <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
-              <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
-                ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
+            <div class="ig-share-user-row">
+              <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" class="ig-share-user-avatar">
+              <div class="ig-share-user-info">
+                <div class="ig-share-username">${u.username}</div>
+                ${u.bio ? `<div class="ig-share-user-bio">${u.bio}</div>` : ''}
               </div>
-              <button onclick="sendPostToUser(${u.id}, ${postId}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Send</button>
+              <button onclick="sendPostToUser(${u.id}, ${postId}, this)" class="ig-share-send-btn">Send</button>
             </div>
           `).join('');
         } catch (err) {
@@ -4716,6 +4734,97 @@
       });
     }
     
+    // ====== Generic Bottom Sheet Drag Utility ======
+    // Supports: drag down to dismiss, drag up to expand, touch + mouse
+    function setupBottomSheetDrag(overlayEl, closeFn) {
+      const sheetEl = overlayEl.querySelector('.ig-bottom-sheet, .ig-comments-sheet');
+      const handle = overlayEl.querySelector('.ig-bottom-sheet-handle, .ig-comments-sheet-handle');
+      if (!sheetEl || !handle) return;
+
+      let startY = 0, currentDelta = 0, isDragging = false;
+      const DISMISS_THRESHOLD = 120;
+      const EXPAND_THRESHOLD = -50;
+
+      function isDesktop() {
+        return window.innerWidth >= 768;
+      }
+
+      function onStart(clientY) {
+        startY = clientY;
+        currentDelta = 0;
+        isDragging = true;
+        sheetEl.style.transition = 'none';
+      }
+
+      function onMove(clientY) {
+        if (!isDragging) return;
+        currentDelta = clientY - startY;
+        if (currentDelta > 0) {
+          // Dragging down — translate sheet down
+          const isDesktopCentered = isDesktop();
+          sheetEl.style.transform = isDesktopCentered
+            ? `translate(-50%, ${currentDelta}px)`
+            : `translateY(${currentDelta}px)`;
+        }
+      }
+
+      function getBaseTransform() {
+        return isDesktop() ? 'translate(-50%, 0)' : 'translateY(0)';
+      }
+
+      function onEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        sheetEl.style.transition = '';
+
+        if (currentDelta > DISMISS_THRESHOLD) {
+          closeFn();
+        } else if (currentDelta < EXPAND_THRESHOLD) {
+          sheetEl.classList.add('ig-sheet-expanded');
+          sheetEl.style.transform = getBaseTransform();
+        } else {
+          sheetEl.style.transform = getBaseTransform();
+        }
+        currentDelta = 0;
+      }
+
+      // Touch events
+      handle.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
+      handle.addEventListener('touchmove', (e) => onMove(e.touches[0].clientY), { passive: true });
+      handle.addEventListener('touchend', () => onEnd());
+
+      // Mouse events (desktop drag)
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        onStart(e.clientY);
+        const onMouseMove = (ev) => onMove(ev.clientY);
+        const onMouseUp = () => {
+          onEnd();
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      // Double-click handle to toggle expand (great for desktop)
+      handle.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        if (sheetEl.classList.contains('ig-sheet-expanded')) {
+          sheetEl.classList.remove('ig-sheet-expanded');
+        } else {
+          sheetEl.classList.add('ig-sheet-expanded');
+        }
+      });
+    }
+
+    // Toggle expand/collapse for any bottom sheet (called from expand button)
+    function toggleSheetExpand(btn) {
+      const sheetEl = btn.closest('.ig-comments-sheet, .ig-bottom-sheet');
+      if (!sheetEl) return;
+      sheetEl.classList.toggle('ig-sheet-expanded');
+    }
+
     // Show who liked modal
     async function showWhoLiked(postId) {
       try {
@@ -4726,46 +4835,44 @@
           return;
         }
         
-        const modal = document.createElement('div');
-        modal.className = 'ig-modal-overlay';
-        modal.style.display = 'flex';
+        document.getElementById('likesBottomSheet')?.remove();
+        const sheet = document.createElement('div');
+        sheet.id = 'likesBottomSheet';
+        sheet.className = 'ig-bottom-sheet-overlay';
 
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
         const close = () => {
           document.removeEventListener('keydown', onKeyDown);
-          document.body.style.overflow = previousOverflow;
-          modal.remove();
+          sheet.classList.add('ig-sheet-closing');
+          setTimeout(() => { document.body.style.overflow = previousOverflow; sheet.remove(); }, 280);
         };
-
-        const onKeyDown = (e) => {
-          if (e.key === 'Escape') close();
-        };
+        const onKeyDown = (e) => { if (e.key === 'Escape') close(); };
         document.addEventListener('keydown', onKeyDown);
+        sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
 
-        modal.addEventListener('click', (e) => {
-          if (e.target === modal) close();
-        });
-
-        modal.innerHTML = `
-          <div class="ig-modal" style="max-width: 400px; max-height: 500px; overflow: hidden; position: relative; border-radius: 16px;">
-            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 2;">
-              Likes
-              <button type="button" aria-label="Close" style="position: absolute; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--ig-secondary-text); padding: 6px;" data-close-modal>×</button>
+        sheet.innerHTML = `
+          <div class="ig-bottom-sheet">
+            <div class="ig-bottom-sheet-handle"><div class="ig-sheet-drag-indicator"></div></div>
+            <div class="ig-bottom-sheet-header">
+              <span class="ig-bottom-sheet-title">Likes</span>
+              <button class="ig-sheet-expand-btn" onclick="toggleSheetExpand(this)" title="Expand">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
             </div>
-            <div style="padding: 4px 0; max-height: 420px; overflow-y: auto;">
+            <div class="ig-bottom-sheet-body">
               ${response.likes.map(u => `
-                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px;">
-                  <a href="/profile/${u.user_id}" style="flex-shrink: 0;">
-                    <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border);">
+                <div class="ig-likes-user-row">
+                  <a href="/profile/${u.user_id}" class="ig-likes-avatar-link">
+                    <img src="${InnovateAPI.getUserAvatar(u.profile_picture)}" alt="${u.username}" class="ig-likes-avatar">
                   </a>
-                  <a href="/profile/${u.user_id}" style="flex: 1; min-width: 0; text-decoration: none; color: inherit;">
-                    <div style="font-weight: 600; font-size: 14px;">${u.username}</div>
-                    ${u.bio ? `<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${u.bio}</div>` : ''}
+                  <a href="/profile/${u.user_id}" class="ig-likes-user-info">
+                    <div class="ig-likes-username">${u.username}</div>
+                    ${u.bio ? `<div class="ig-likes-bio">${u.bio}</div>` : ''}
                   </a>
                   ${u.user_id !== user.id ? `
-                    <button onclick="followFromLikes(${u.user_id}, this)" style="background: var(--ig-blue); color: white; border: none; padding: 7px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0;">Follow</button>
+                    <button onclick="followFromLikes(${u.user_id}, this)" class="ig-likes-follow-btn">Follow</button>
                   ` : ''}
                 </div>
               `).join('')}
@@ -4773,15 +4880,9 @@
           </div>
         `;
 
-        modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
-          e.preventDefault();
-          close();
-        });
-
-        // Prevent clicks inside modal from closing it
-        modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
-
-        document.body.appendChild(modal);
+        document.body.appendChild(sheet);
+        setupBottomSheetDrag(sheet, close);
+        requestAnimationFrame(() => sheet.classList.add('ig-sheet-open'));
       } catch (error) {
         InnovateAPI.showAlert('Failed to load likes', 'error');
       }
@@ -4799,25 +4900,30 @@
       }
     }
 
-    // View all comments modal
+    // View all comments — Instagram-style bottom sheet
     async function openCommentsModal(postId) {
       try {
         const response = await InnovateAPI.apiRequest(`/posts/${postId}/comments`);
         const comments = response.comments || [];
         const postOwnerId = response.post_user_id || null;
 
-        const modal = document.createElement('div');
-        modal.className = 'ig-modal-overlay';
-        modal.style.display = 'flex';
-        modal.id = 'commentsModalOverlay';
+        // Remove any existing comments sheet
+        document.getElementById('commentsBottomSheet')?.remove();
+
+        const sheet = document.createElement('div');
+        sheet.id = 'commentsBottomSheet';
+        sheet.className = 'ig-comments-sheet-overlay';
 
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
         const close = () => {
           document.removeEventListener('keydown', onKeyDown);
-          document.body.style.overflow = previousOverflow;
-          modal.remove();
+          sheet.classList.add('ig-sheet-closing');
+          setTimeout(() => {
+            document.body.style.overflow = previousOverflow;
+            sheet.remove();
+          }, 280);
         };
 
         const onKeyDown = (e) => {
@@ -4825,74 +4931,96 @@
         };
         document.addEventListener('keydown', onKeyDown);
 
-        modal.addEventListener('click', (e) => {
-          if (e.target === modal) close();
+        sheet.addEventListener('click', (e) => {
+          if (e.target === sheet) close();
         });
 
         // Store post owner id for use in comment rendering
         window._commentsPostOwnerId = postOwnerId;
         window._commentsPostId = postId;
 
-        modal.innerHTML = `
-          <div class="ig-modal" style="max-width: 480px; width: 90vw; max-height: 80vh; overflow: hidden; position: relative; border-radius: 16px; display: flex; flex-direction: column;">
-            <div style="position: sticky; top: 0; background: var(--ig-secondary-background); border-bottom: 1px solid var(--ig-border); padding: 14px 16px; font-weight: 600; display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; z-index: 2; flex-shrink: 0;">
-              <span></span>
-              <span style="text-align: center; font-size: 16px;">Comments</span>
-              <button type="button" aria-label="Close" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ig-primary-text); padding: 4px; justify-self: end; line-height: 1;" data-close-modal>✕</button>
+        sheet.innerHTML = `
+          <div class="ig-comments-sheet">
+            <div class="ig-comments-sheet-handle">
+              <div class="ig-sheet-drag-indicator"></div>
             </div>
-            <div id="commentsListContainer" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+            <div class="ig-comments-sheet-header">
+              <span class="ig-comments-sheet-title">Comments</span>
+              <button class="ig-sheet-expand-btn" onclick="toggleSheetExpand(this)" title="Expand">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+            <div class="ig-comments-sheet-body" id="commentsListContainer">
               ${comments.length ? renderCommentsThreaded(comments, postId, postOwnerId) : `
-                <div style="padding: 40px 16px; color: var(--ig-secondary-text); text-align: center;">
+                <div class="ig-comments-empty">
                   <div style="font-size: 28px; margin-bottom: 8px;">💬</div>
                   No comments yet. Be the first!
                 </div>
               `}
             </div>
-            <div id="commentReplyInfo" style="display:none; padding: 8px 16px; background: rgba(0,149,246,0.1); border-top: 1px solid var(--ig-border); font-size: 13px; color: var(--ig-blue); flex-shrink: 0; display: none; align-items: center; justify-content: space-between;">
+            <div id="commentReplyInfo" class="ig-comments-reply-info" style="display:none;">
               <span>Replying to <strong id="replyToUsername"></strong></span>
               <button onclick="cancelReply()" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:16px;padding:4px 8px;">✕</button>
             </div>
-            <div style="display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--ig-border); align-items: center; flex-shrink: 0;">
-              <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">
+            <div class="ig-comments-sheet-input">
+              <img src="${InnovateAPI.getUserAvatar(user.profile_picture)}" class="ig-comments-input-avatar">
               <div style="flex: 1; position: relative;">
-                <input type="text" id="modalCommentInput" placeholder="Add a comment..." 
-                  style="width: 100%; padding: 10px 14px; border: 1px solid var(--ig-border); border-radius: 20px; background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none;"
+                <input type="text" id="modalCommentInput" placeholder="Add a comment..."
+                  class="ig-comments-input-field"
                   onkeydown="if(event.key==='Enter')submitModalComment(${postId})"
                   oninput="handleCommentMention(this)">
-                <div id="mentionDropdown" style="display:none; position:absolute; bottom:100%; left:0; right:0; max-height:150px; overflow-y:auto; background:var(--ig-secondary-background); border:1px solid var(--ig-border); border-radius:12px; margin-bottom:4px; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:10;"></div>
+                <div id="mentionDropdown" class="ig-mention-dropdown"></div>
               </div>
-              <button onclick="submitModalComment(${postId})" style="background: none; border: none; color: var(--ig-blue); font-weight: 600; font-size: 14px; cursor: pointer; padding: 8px; flex-shrink: 0;">Post</button>
+              <button onclick="submitModalComment(${postId})" class="ig-comments-post-btn">Post</button>
             </div>
           </div>
         `;
 
-        modal.querySelector('[data-close-modal]')?.addEventListener('click', (e) => {
-          e.preventDefault();
-          close();
+        document.body.appendChild(sheet);
+
+        // Animate in
+        requestAnimationFrame(() => {
+          sheet.classList.add('ig-sheet-open');
         });
 
-        modal.querySelector('.ig-modal')?.addEventListener('click', (e) => e.stopPropagation());
+        // Setup drag to close/expand (uses shared utility)
+        setupBottomSheetDrag(sheet, close);
 
-        document.body.appendChild(modal);
-
-        // Close any open comment menus when clicking inside modal
-        modal.addEventListener('click', (e) => {
-          if (!e.target.closest('.comment-3dot-menu') && !e.target.closest('.comment-3dot-btn')) {
-            document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+        // Close any open comment menus when clicking inside sheet
+        sheet.addEventListener('click', (e) => {
+          if (!e.target.closest('.ig-comment-actions-menu') && !e.target.closest('.ig-comment-more-btn')) {
+            document.querySelectorAll('.comment-3dot-menu').forEach(m => m.classList.remove('ig-menu-visible'));
           }
         });
+
+        // Focus the input
+        setTimeout(() => {
+          document.getElementById('modalCommentInput')?.focus();
+        }, 350);
       } catch (error) {
         InnovateAPI.showAlert('Failed to load comments', 'error');
       }
     }
 
     function renderCommentsThreaded(comments, postId, postOwnerId) {
-      // Separate top-level comments and replies
+      // Build a lookup of all comment IDs for resolving root parents
+      const commentById = {};
+      comments.forEach(c => { commentById[c.id] = c; });
+
       const topLevel = comments.filter(c => !c.parent_id);
+      const topLevelIds = new Set(topLevel.map(c => c.id));
+
+      // Flatten all replies under the root top-level comment (Instagram-style)
       const repliesMap = {};
       comments.filter(c => c.parent_id).forEach(c => {
-        if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
-        repliesMap[c.parent_id].push(c);
+        // Resolve to root: if parent_id points to another reply, walk up to the top-level
+        let rootId = c.parent_id;
+        if (!topLevelIds.has(rootId)) {
+          const parent = commentById[rootId];
+          if (parent && parent.parent_id) rootId = parent.parent_id;
+        }
+        if (!repliesMap[rootId]) repliesMap[rootId] = [];
+        repliesMap[rootId].push(c);
       });
 
       let html = '';
@@ -4900,16 +5028,13 @@
         html += renderCommentItem(c, postId, postOwnerId, false);
         const replies = repliesMap[c.id] || [];
         if (replies.length > 0) {
-          const hiddenCount = replies.length > 1 ? replies.length - 1 : 0;
-          html += `<div class="replies-thread" data-parent-id="${c.id}" style="margin-left: 48px; border-left: 2px solid var(--ig-border); padding-left: 8px;">`;
-          if (hiddenCount > 0) {
-            // Show toggle link + only the latest reply initially
-            html += `<button onclick="toggleReplies(${c.id})" class="toggle-replies-btn" data-toggle-replies="${c.id}" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:12px;font-weight:600;padding:6px 0 4px 12px;display:flex;align-items:center;gap:6px;">
-              <span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span>
-              View ${hiddenCount} more ${hiddenCount === 1 ? 'reply' : 'replies'}
+          html += `<div class="ig-comment-replies-thread" data-parent-id="${c.id}">`;
+          if (replies.length > 1) {
+            html += `<button onclick="toggleReplies(${c.id})" class="ig-comment-view-replies-btn" data-toggle-replies="${c.id}">
+              <span class="ig-comment-replies-line"></span>
+              View ${replies.length - 1} more ${replies.length - 1 === 1 ? 'reply' : 'replies'}
             </button>`;
-            // Hidden older replies
-            html += `<div id="hidden-replies-${c.id}" style="display:none;">`;
+            html += `<div class="ig-comment-hidden-replies" id="hidden-replies-${c.id}">`;
             replies.slice(0, -1).forEach(r => {
               html += renderCommentItem(r, postId, postOwnerId, true);
             });
@@ -4917,7 +5042,6 @@
             // Latest reply always visible
             html += renderCommentItem(replies[replies.length - 1], postId, postOwnerId, true);
           } else {
-            // Just one reply - show it
             html += renderCommentItem(replies[0], postId, postOwnerId, true);
           }
           html += `</div>`;
@@ -4930,13 +5054,14 @@
       const hidden = document.getElementById(`hidden-replies-${parentId}`);
       const btn = document.querySelector(`[data-toggle-replies="${parentId}"]`);
       if (hidden && btn) {
-        if (hidden.style.display === 'none') {
-          hidden.style.display = 'block';
-          btn.innerHTML = `<span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span> Hide replies`;
+        const isHidden = !hidden.classList.contains('ig-replies-visible');
+        if (isHidden) {
+          hidden.classList.add('ig-replies-visible');
+          btn.innerHTML = `<span class="ig-comment-replies-line"></span> Hide replies`;
         } else {
-          hidden.style.display = 'none';
-          const count = hidden.children.length;
-          btn.innerHTML = `<span style="display:inline-block;width:24px;height:1px;background:var(--ig-secondary-text);"></span> View ${count} more ${count === 1 ? 'reply' : 'replies'}`;
+          hidden.classList.remove('ig-replies-visible');
+          const count = hidden.querySelectorAll('.ig-comment-row').length;
+          btn.innerHTML = `<span class="ig-comment-replies-line"></span> View ${count} more ${count === 1 ? 'reply' : 'replies'}`;
         }
       }
     }
@@ -4946,67 +5071,100 @@
       const isPostOwner = user.id === postOwnerId;
       const canDelete = isOwn || isPostOwner;
       const timeAgo = typeof InnovateAPI !== 'undefined' && InnovateAPI.formatDate ? InnovateAPI.formatDate(c.created_at) : '';
-      const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" style="color:var(--ig-blue);text-decoration:none;font-weight:600;">@$1</a>');
-      
-      const avatarSize = isReply ? '28px' : '36px';
-      const fontSize = isReply ? '13px' : '14px';
-      const paddingStyle = isReply ? 'padding: 8px 12px 8px 4px;' : 'padding: 12px 16px;';
+      const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" class="ig-comment-mention">@$1</a>');
+      const likesCount = c.likes_count || 0;
+      const hasLiked = c.user_has_liked > 0;
       
       return `
-        <div style="display: flex; gap: ${isReply ? '10px' : '12px'}; ${paddingStyle} position: relative;" data-comment-id="${c.id}">
-          <a href="/profile/${c.user_id}" style="flex-shrink: 0; text-decoration: none;">
-            <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" style="width: ${avatarSize}; height: ${avatarSize}; border-radius: 50%; object-fit: cover; cursor: pointer;">
+        <div class="ig-comment-row ${isReply ? 'ig-comment-reply' : ''}" data-comment-id="${c.id}">
+          <a href="/profile/${c.user_id}" class="ig-comment-avatar-link">
+            <img src="${InnovateAPI.getUserAvatar(c.profile_picture)}" alt="${c.username}" class="ig-comment-avatar ${isReply ? 'ig-comment-avatar-sm' : ''}">
           </a>
-          <div style="flex: 1; min-width: 0;">
-            <div style="margin-bottom: 4px;">
-              <a href="/profile/${c.user_id}" style="font-weight: 600; text-decoration: none; color: var(--ig-primary-text); font-size: ${fontSize}; cursor: pointer;">${c.username}</a>
-              <span style="font-size: ${fontSize}; white-space: pre-wrap; word-break: break-word; margin-left: 6px;">${contentWithMentions}</span>
+          <div class="ig-comment-body">
+            <div class="ig-comment-text">
+              <a href="/profile/${c.user_id}" class="ig-comment-username">${c.username}</a>
+              <span class="ig-comment-content">${contentWithMentions}</span>
             </div>
-            <div style="display: flex; gap: 14px; font-size: 12px; color: var(--ig-secondary-text); align-items: center;">
-              <span>${timeAgo}</span>
-              <button onclick="replyToComment(${c.id}, '${c.username}', ${postId})" style="background:none;border:none;color:var(--ig-secondary-text);cursor:pointer;font-size:12px;font-weight:600;padding:0;">Reply</button>
-            </div>
-          </div>
-          <div style="position: relative; flex-shrink: 0; align-self: flex-start; margin-top: 4px;">
-            <button class="comment-3dot-btn" onclick="event.stopPropagation(); toggleCommentMenu(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--ig-secondary-text);padding:4px;font-size:16px;line-height:1;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-            </button>
-            <div class="comment-3dot-menu" id="comment-menu-${c.id}" style="display:none; position:absolute; right:0; top:100%; background:var(--ig-secondary-background); border:1px solid var(--ig-border); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.3); z-index:20; min-width:160px; overflow:hidden;">
-              <button onclick="likeComment(${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;color:var(--ig-primary-text);cursor:pointer;font-size:14px;text-align:left;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                Like
+            <div class="ig-comment-meta">
+              <span class="ig-comment-time">${timeAgo}</span>
+              ${likesCount > 0 ? `<button class="ig-comment-meta-btn" onclick="showWhoLikedComment(${c.id})">${likesCount} ${likesCount === 1 ? 'like' : 'likes'}</button>` : ''}
+              <button class="ig-comment-meta-btn" onclick="replyToComment(${c.id}, '${c.username}', ${postId})">Reply</button>
+              <button class="ig-comment-meta-btn ig-comment-more-btn" onclick="event.stopPropagation(); toggleCommentMenu(${c.id})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="4" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="12" r="2.5"/></svg>
               </button>
+            </div>
+            <div class="comment-3dot-menu ig-comment-actions-menu" id="comment-menu-${c.id}">
               ${canDelete ? `
-                <button onclick="deleteComment(${postId}, ${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid var(--ig-border);color:#ef4444;cursor:pointer;font-size:14px;text-align:left;">
+                <button onclick="deleteComment(${postId}, ${c.id}, this)" class="ig-comment-action-item ig-comment-action-danger">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                   Delete
                 </button>
               ` : ''}
-              <button onclick="reportComment(${c.id})" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid var(--ig-border);color:var(--ig-primary-text);cursor:pointer;font-size:14px;text-align:left;">
+              <button onclick="reportComment(${c.id})" class="ig-comment-action-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
                 Report
               </button>
             </div>
           </div>
+          <button class="ig-comment-like-btn ${hasLiked ? 'ig-comment-liked' : ''}" onclick="likeComment(${c.id}, this, ${postId})" data-comment-id="${c.id}">
+            <svg viewBox="0 0 24 24" width="14" height="14">
+              <path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/>
+            </svg>
+          </button>
         </div>
       `;
     }
 
     function toggleCommentMenu(commentId) {
-      // Close all other menus
-      document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+      document.querySelectorAll('.comment-3dot-menu').forEach(m => {
+        if (m.id !== `comment-menu-${commentId}`) m.classList.remove('ig-menu-visible');
+      });
       const menu = document.getElementById(`comment-menu-${commentId}`);
-      if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      if (menu) menu.classList.toggle('ig-menu-visible');
     }
 
-    function likeComment(commentId, btn) {
-      // Close the menu
-      btn.closest('.comment-3dot-menu').style.display = 'none';
-      InnovateAPI.showAlert('Comment liked!', 'success');
+    async function likeComment(commentId, btn, postId) {
+      try {
+        const res = await InnovateAPI.apiRequest(`/posts/${postId}/comments/${commentId}/like`, { method: 'POST' });
+        if (res.liked) {
+          btn.classList.add('ig-comment-liked');
+        } else {
+          btn.classList.remove('ig-comment-liked');
+        }
+        // Update likes count in the meta area
+        const commentRow = btn.closest('.ig-comment-row');
+        if (commentRow) {
+          const meta = commentRow.querySelector('.ig-comment-meta');
+          const existingLikeCount = meta.querySelector('.ig-comment-likes-count-btn');
+          if (res.likes_count > 0) {
+            if (existingLikeCount) {
+              existingLikeCount.textContent = `${res.likes_count} ${res.likes_count === 1 ? 'like' : 'likes'}`;
+            } else {
+              const timeEl = meta.querySelector('.ig-comment-time');
+              if (timeEl) {
+                const likeBtn = document.createElement('button');
+                likeBtn.className = 'ig-comment-meta-btn ig-comment-likes-count-btn';
+                likeBtn.textContent = `${res.likes_count} ${res.likes_count === 1 ? 'like' : 'likes'}`;
+                likeBtn.onclick = () => showWhoLikedComment(commentId);
+                timeEl.after(likeBtn);
+              }
+            }
+          } else if (existingLikeCount) {
+            existingLikeCount.remove();
+          }
+        }
+      } catch (err) {
+        InnovateAPI.showAlert('Failed to like comment', 'error');
+      }
+    }
+
+    function showWhoLikedComment(commentId) {
+      // For now, just show info
+      InnovateAPI.showAlert('Comment liked!', 'info');
     }
 
     function reportComment(commentId) {
-      document.querySelectorAll('.comment-3dot-menu').forEach(m => m.style.display = 'none');
+      document.querySelectorAll('.comment-3dot-menu').forEach(m => m.classList.remove('ig-menu-visible'));
       InnovateAPI.showAlert('Comment reported. We will review it.', 'success');
     }
 
@@ -5037,7 +5195,7 @@
 
     async function deleteComment(postId, commentId, btn) {
       if (!confirm('Delete this comment?')) {
-        btn.closest('.comment-3dot-menu').style.display = 'none';
+        btn.closest('.comment-3dot-menu')?.classList.remove('ig-menu-visible');
         return;
       }
       try {
@@ -5149,7 +5307,7 @@
         const postOwnerId = commentsRes.post_user_id || window._commentsPostOwnerId;
         if (container && commentsRes.comments) {
           container.innerHTML = commentsRes.comments.length ? renderCommentsThreaded(commentsRes.comments, postId, postOwnerId) : `
-            <div style="padding: 40px 16px; color: var(--ig-secondary-text); text-align: center;">
+            <div class="ig-comments-empty">
               <div style="font-size: 28px; margin-bottom: 8px;">💬</div>
               No comments yet. Be the first!
             </div>`;
@@ -5644,7 +5802,7 @@
         // Caption (truncated for reels overlay)
         const captionText = post.content || '';
         const truncatedCaption = captionText.length > 100 ? captionText.substring(0, 100) + '...' : captionText;
-        const escapedCaption = captionText.replace(/'/g, "\\'").replace(/\n/g, ' ');
+        const encodedCaption = encodeURIComponent(captionText);
         
         // Build poll HTML if present
         let pollHtml = '';
@@ -5679,7 +5837,7 @@
         let customBtnHtml = '';
         if (post.custom_button) {
           customBtnHtml = `
-            <button class="ig-reels-custom-btn" onclick="event.stopPropagation(); openCustomButtonModal(${post.id}, ${post.user_id}, ${JSON.stringify(JSON.stringify(post.custom_button))})">
+            <button class="ig-reels-custom-btn" data-post-id="${post.id}" data-user-id="${post.user_id}" data-config="${encodeURIComponent(JSON.stringify(post.custom_button))}" onclick="event.stopPropagation(); openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">
               ${post.custom_button.name || 'Action'}
             </button>`;
         }
@@ -5723,7 +5881,7 @@
             <div class="ig-reels-actions">
               <button class="ig-reels-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLikeReel(${post.id}, this)" data-post-id="${post.id}">
                 <svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>
-                <span class="ig-reels-action-count" id="reel-likes-${post.id}">${formatCount(likesCount)}</span>
+                <span class="ig-reels-action-count ig-reels-likes-label" id="reel-likes-${post.id}" onclick="event.stopPropagation(); showWhoLiked(${post.id})">${formatCount(likesCount)}</span>
               </button>
               
               <button class="ig-reels-action-btn" onclick="openCommentsModal(${post.id})">
@@ -5757,7 +5915,7 @@
               </div>
               ${captionText ? `
                 <div class="ig-reels-caption" id="reel-caption-${post.id}">${linkifyCaption(truncatedCaption)}</div>
-                ${captionText.length > 100 ? `<button class="ig-reels-caption-more" onclick="expandReelCaption(${post.id}, '${escapedCaption}')">more</button>` : ''}
+                ${captionText.length > 100 ? `<button class="ig-reels-caption-more" data-full-caption="${encodedCaption}" onclick="expandReelCaption(${post.id}, decodeURIComponent(this.dataset.fullCaption))">more</button>` : ''}
               ` : ''}
               
               ${hasFeatures ? `<div class="ig-reels-features">
@@ -5909,7 +6067,18 @@
         }
         const feedLikes = document.getElementById(`likes-${postId}`);
         if (feedLikes && response.likes_count !== undefined) {
-          feedLikes.textContent = `${response.likes_count} ${response.likes_count === 1 ? 'like' : 'likes'}`;
+          const count = response.likes_count;
+          const currentUser = InnovateAPI.getCurrentUser();
+          const myUsername = currentUser ? currentUser.username : 'you';
+          if (!isLiked && count > 0) {
+            feedLikes.innerHTML = count === 1 
+              ? `<span style="font-weight:400;">Liked by </span><strong>${myUsername}</strong>`
+              : `<span style="font-weight:400;">Liked by </span><strong>${myUsername}</strong><span style="font-weight:400;"> and </span><strong>${count - 1} other${count > 2 ? 's' : ''}</strong>`;
+          } else if (count > 0) {
+            feedLikes.innerHTML = `<strong>${count} ${count === 1 ? 'like' : 'likes'}</strong>`;
+          } else {
+            feedLikes.innerHTML = '';
+          }
         }
       } catch (error) {
         console.error('Error toggling like:', error);

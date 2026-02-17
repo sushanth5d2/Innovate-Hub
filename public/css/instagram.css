@@ -643,13 +643,17 @@ body {
 
 .ig-post-likes {
   padding: 0 16px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .ig-post-likes-count {
   font-size: 14px;
-  font-weight: 600;
   color: var(--ig-primary-text);
+  font-weight: 400;
+}
+
+.ig-post-likes-count strong {
+  font-weight: 600;
 }
 
 .ig-post-caption {
@@ -2795,4 +2799,822 @@ body:has(.ig-reels-page) .ig-bottom-nav {
   color: var(--ig-blue);
   text-decoration: none;
   font-weight: 600;
+}
+
+/* ========== Instagram-style Inline Comments in Feed ========== */
+.ig-inline-comment {
+  padding: 0 16px 2px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ig-inline-comment-user {
+  font-weight: 600;
+  color: var(--ig-primary-text);
+  margin-right: 6px;
+  cursor: pointer;
+}
+
+.ig-inline-comment-text {
+  color: var(--ig-primary-text);
+}
+
+/* ========== Instagram-style Bottom Sheet Comments ========== */
+.ig-comments-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  z-index: 10000;
+  transition: background 0.3s ease;
+}
+
+.ig-comments-sheet-overlay.ig-sheet-open {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.ig-comments-sheet-overlay.ig-sheet-closing {
+  background: rgba(0, 0, 0, 0);
+}
+
+.ig-comments-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 70vh;
+  background: var(--ig-secondary-background);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), max-height 0.3s ease;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.ig-sheet-open .ig-comments-sheet {
+  transform: translateY(0);
+}
+
+.ig-sheet-closing .ig-comments-sheet {
+  transform: translateY(100%);
+}
+
+.ig-comments-sheet-handle {
+  padding: 12px 0 4px;
+  display: flex;
+  justify-content: center;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.ig-sheet-drag-indicator {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ig-secondary-text);
+  opacity: 0.4;
+}
+
+.ig-comments-sheet-header {
+  padding: 4px 16px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--ig-border);
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Expand/collapse toggle button in header */
+.ig-sheet-expand-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ig-secondary-text);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.3s;
+}
+
+.ig-sheet-expand-btn:hover {
+  background: var(--ig-hover-overlay, rgba(255,255,255,0.1));
+}
+
+.ig-sheet-expanded .ig-sheet-expand-btn svg {
+  transform: rotate(180deg);
+}
+
+.ig-comments-sheet-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ig-primary-text);
+}
+
+.ig-comments-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.ig-comments-empty {
+  padding: 40px 16px;
+  color: var(--ig-secondary-text);
+  text-align: center;
+}
+
+.ig-comments-reply-info {
+  padding: 8px 16px;
+  background: rgba(0, 149, 246, 0.1);
+  border-top: 1px solid var(--ig-border);
+  font-size: 13px;
+  color: var(--ig-blue);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ig-comments-sheet-input {
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ig-border);
+  align-items: center;
+  flex-shrink: 0;
+  background: var(--ig-secondary-background);
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.ig-comments-input-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.ig-comments-input-field {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ig-border);
+  border-radius: 22px;
+  background: var(--ig-background);
+  color: var(--ig-primary-text);
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+
+.ig-comments-input-field:focus {
+  border-color: var(--ig-blue);
+}
+
+.ig-comments-input-field::placeholder {
+  color: var(--ig-secondary-text);
+}
+
+.ig-comments-post-btn {
+  background: none;
+  border: none;
+  color: var(--ig-blue);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.ig-comments-post-btn:hover {
+  opacity: 1;
+}
+
+.ig-mention-dropdown {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  background: var(--ig-secondary-background);
+  border: 1px solid var(--ig-border);
+  border-radius: 12px;
+  margin-bottom: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+/* ========== Instagram-style Likes Display ========== */
+.ig-post-likes {
+  padding: 0 16px;
+  margin-bottom: 6px;
+  min-height: 0;
+}
+
+.ig-post-likes-count {
+  font-size: 14px;
+  color: var(--ig-primary-text);
+}
+
+.ig-post-likes-count strong {
+  font-weight: 600;
+}
+
+/* ========== Desktop adaptations ========== */
+@media (min-width: 768px) {
+  .ig-comments-sheet {
+    max-width: 480px;
+    left: 50%;
+    transform: translate(-50%, 100%);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .ig-sheet-open .ig-comments-sheet {
+    transform: translate(-50%, 0);
+  }
+
+  .ig-sheet-closing .ig-comments-sheet {
+    transform: translate(-50%, 100%);
+  }
+}
+
+/* ========================================================================
+   Generic Bottom Sheet (Likes, Share, etc.)
+   ======================================================================== */
+.ig-bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  z-index: 10000;
+  transition: background 0.3s ease;
+}
+
+.ig-bottom-sheet-overlay.ig-sheet-open {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.ig-bottom-sheet-overlay.ig-sheet-closing {
+  background: rgba(0, 0, 0, 0);
+}
+
+.ig-bottom-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 75vh;
+  background: var(--ig-secondary-background);
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), max-height 0.3s ease;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.ig-sheet-open .ig-bottom-sheet {
+  transform: translateY(0);
+}
+
+.ig-sheet-closing .ig-bottom-sheet {
+  transform: translateY(100%);
+}
+
+.ig-sheet-expanded .ig-sheet-expand-btn svg {
+  transform: rotate(180deg);
+}
+
+/* Expanded state */
+.ig-bottom-sheet.ig-sheet-expanded {
+  max-height: 95vh !important;
+}
+
+.ig-comments-sheet.ig-sheet-expanded {
+  max-height: 95vh !important;
+}
+
+.ig-bottom-sheet-handle {
+  padding: 12px 0 4px;
+  display: flex;
+  justify-content: center;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.ig-bottom-sheet-header {
+  padding: 4px 16px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--ig-border);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.ig-bottom-sheet-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ig-primary-text);
+}
+
+.ig-bottom-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ========== Likes Bottom Sheet ========== */
+.ig-likes-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.ig-likes-avatar-link {
+  flex-shrink: 0;
+}
+
+.ig-likes-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.ig-likes-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ig-likes-username {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ig-primary-text);
+  text-decoration: none;
+  display: block;
+}
+
+.ig-likes-username:hover {
+  text-decoration: underline;
+}
+
+.ig-likes-bio {
+  font-size: 12px;
+  color: var(--ig-secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ig-likes-follow-btn {
+  background: var(--ig-blue);
+  color: white;
+  border: none;
+  padding: 7px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.ig-likes-follow-btn:hover {
+  opacity: 0.85;
+}
+
+.ig-likes-follow-btn.following {
+  background: var(--ig-secondary-background);
+  color: var(--ig-primary-text);
+  border: 1px solid var(--ig-border);
+}
+
+/* ========== Share Bottom Sheet ========== */
+.ig-share-sheet {
+  max-height: 80vh;
+}
+
+.ig-share-search {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ig-border);
+  flex-shrink: 0;
+}
+
+.ig-share-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ig-border);
+  border-radius: 10px;
+  background: var(--ig-background);
+  color: var(--ig-primary-text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.ig-share-search-input:focus {
+  border-color: var(--ig-blue);
+}
+
+.ig-share-search-input::placeholder {
+  color: var(--ig-secondary-text);
+}
+
+.ig-share-section-label {
+  padding: 10px 16px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ig-secondary-text);
+}
+
+.ig-share-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.ig-share-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.ig-share-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ig-share-username {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ig-primary-text);
+}
+
+.ig-share-user-bio {
+  font-size: 12px;
+  color: var(--ig-secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ig-share-send-btn {
+  background: var(--ig-blue);
+  color: white;
+  border: none;
+  padding: 7px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.ig-share-send-btn:hover {
+  opacity: 0.85;
+}
+
+.ig-share-actions {
+  padding: 16px;
+  border-top: 1px solid var(--ig-border);
+  flex-shrink: 0;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.ig-share-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--ig-primary-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  min-width: 60px;
+  padding: 0;
+}
+
+.ig-share-action-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--ig-background);
+  border: 1px solid var(--ig-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ig-primary-text);
+}
+
+/* ========== Desktop adaptations for generic bottom sheet ========== */
+@media (min-width: 768px) {
+  .ig-bottom-sheet {
+    max-width: 480px;
+    left: 50%;
+    transform: translate(-50%, 100%);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .ig-sheet-open .ig-bottom-sheet {
+    transform: translate(-50%, 0);
+  }
+
+  .ig-sheet-closing .ig-bottom-sheet {
+    transform: translate(-50%, 100%);
+  }
+}
+
+/* ========================================================================
+   Instagram-style Comments
+   ======================================================================== */
+
+/* Comment row — main layout */
+.ig-comment-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  position: relative;
+  align-items: flex-start;
+}
+
+.ig-comment-row.ig-comment-reply {
+  gap: 10px;
+  padding: 8px 16px 8px 12px;
+}
+
+/* Avatar */
+.ig-comment-avatar-link {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.ig-comment-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+}
+
+.ig-comment-avatar.ig-comment-avatar-sm {
+  width: 28px;
+  height: 28px;
+}
+
+/* Comment body */
+.ig-comment-body {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.ig-comment-text {
+  margin-bottom: 4px;
+  line-height: 1.4;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.ig-comment-reply .ig-comment-text {
+  font-size: 13px;
+}
+
+.ig-comment-username {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ig-primary-text);
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.ig-comment-username:hover {
+  text-decoration: underline;
+}
+
+.ig-comment-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ig-primary-text);
+}
+
+.ig-comment-mention {
+  color: var(--ig-blue);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Meta row — time, likes count, reply btn, more */
+.ig-comment-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--ig-secondary-text);
+  align-items: center;
+  margin-top: 2px;
+}
+
+.ig-comment-time {
+  color: var(--ig-secondary-text);
+}
+
+.ig-comment-meta-btn {
+  background: none;
+  border: none;
+  color: var(--ig-secondary-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  line-height: 1;
+}
+
+.ig-comment-meta-btn:hover {
+  color: var(--ig-primary-text);
+}
+
+.ig-comment-more-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 2px;
+}
+
+.ig-comment-row:hover .ig-comment-more-btn {
+  opacity: 1;
+}
+
+/* Heart like button on right side of comment (Instagram style) */
+.ig-comment-like-btn {
+  flex-shrink: 0;
+  align-self: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--ig-secondary-text);
+  margin-top: 4px;
+  transition: transform 0.15s;
+}
+
+.ig-comment-like-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  display: block;
+}
+
+.ig-comment-like-btn.ig-comment-liked {
+  color: #ed4956;
+}
+
+.ig-comment-like-btn.ig-comment-liked svg {
+  fill: #ed4956;
+  stroke: #ed4956;
+}
+
+.ig-comment-like-btn:active {
+  transform: scale(1.3);
+}
+
+/* 3-dot actions menu */
+.ig-comment-actions-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--ig-secondary-background);
+  border: 1px solid var(--ig-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+.ig-comment-actions-menu.ig-menu-visible {
+  display: block;
+}
+
+.ig-comment-action-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--ig-border);
+  color: var(--ig-primary-text);
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.ig-comment-action-item:first-child {
+  border-top: none;
+}
+
+.ig-comment-action-item:hover {
+  background: var(--ig-hover-overlay);
+}
+
+.ig-comment-action-item.ig-comment-action-danger {
+  color: #ef4444;
+}
+
+/* Reply thread */
+.ig-comment-replies-thread {
+  margin-left: 48px;
+  position: relative;
+}
+
+.ig-comment-reply .ig-comment-replies-thread {
+  margin-left: 38px;
+}
+
+/* View replies button */
+.ig-comment-view-replies-btn {
+  background: none;
+  border: none;
+  color: var(--ig-secondary-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 0 4px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ig-comment-view-replies-btn:hover {
+  color: var(--ig-primary-text);
+}
+
+.ig-comment-replies-line {
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--ig-secondary-text);
+}
+
+/* Hidden replies container */
+.ig-comment-hidden-replies {
+  display: none;
+}
+
+.ig-comment-hidden-replies.ig-replies-visible {
+  display: block;
+}
+
+/* Fullscreen likes label */
+.ig-reels-likes-label {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.2s;
+}
+
+.ig-reels-likes-label:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Desktop expanded bottom sheets */
+@media (min-width: 768px) {
+  .ig-comments-sheet.ig-sheet-expanded {
+    max-height: 95vh !important;
+  }
+
+  .ig-bottom-sheet.ig-sheet-expanded {
+    max-height: 95vh !important;
+  }
 }
