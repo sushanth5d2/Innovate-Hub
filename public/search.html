@@ -84,10 +84,12 @@
     <div class="ig-search-tabs">
       <div class="ig-search-tab active" id="usersTab" onclick="switchTab('users')">Users</div>
       <div class="ig-search-tab" id="communitiesTab" onclick="switchTab('communities')">Communities</div>
+      <div class="ig-search-tab" id="reelsTab" onclick="switchTab('reels')">Reels</div>
     </div>
 
     <div id="usersResults" class="ig-settings-section"></div>
     <div id="communitiesResults" class="ig-settings-section" style="display: none;"></div>
+    <div id="reelsResults" class="ig-settings-section" style="display: none;"></div>
   </main>
 
   <!-- Bottom Navigation -->
@@ -122,18 +124,18 @@
       </svg>
       <span class="ig-bottom-nav-label">Create</span>
     </a>
+    <a href="/search" class="ig-bottom-nav-item active">
+      <svg aria-label="Explore" viewBox="0 0 24 24" width="24">
+        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Explore</span>
+    </a>
     <a href="/social-service" class="ig-bottom-nav-item">
       <svg aria-label="Social Service" viewBox="0 0 24 24" width="24">
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="ig-bottom-nav-label">Service</span>
-    </a>
-    <a href="/search" class="ig-bottom-nav-item active">
-      <svg aria-label="Search" viewBox="0 0 24 24" width="24">
-        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <span class="ig-bottom-nav-label">Search</span>
     </a>
     <a href="#" class="ig-bottom-nav-item" id="profileNavLink" onclick="navigateToProfile(event)">
       <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
@@ -182,9 +184,16 @@
       
       document.getElementById('usersTab').classList.toggle('active', tab === 'users');
       document.getElementById('communitiesTab').classList.toggle('active', tab === 'communities');
+      document.getElementById('reelsTab').classList.toggle('active', tab === 'reels');
       
       document.getElementById('usersResults').style.display = tab === 'users' ? 'block' : 'none';
       document.getElementById('communitiesResults').style.display = tab === 'communities' ? 'block' : 'none';
+      document.getElementById('reelsResults').style.display = tab === 'reels' ? 'block' : 'none';
+      
+      if (tab === 'reels') {
+        loadReels();
+        return;
+      }
       
       const query = document.getElementById('searchInput').value.trim();
       if (query) {
@@ -304,6 +313,56 @@
     if (queryParam) {
       document.getElementById('searchInput').value = queryParam;
       search(queryParam);
+    }
+
+    // Load Reels (video posts)
+    async function loadReels() {
+      const container = document.getElementById('reelsResults');
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ig-secondary-text);">Loading reels...</div>';
+      try {
+        const data = await InnovateAPI.apiRequest('/posts');
+        const videoPosts = (data.posts || []).filter(p => p.video_url);
+        
+        if (videoPosts.length === 0) {
+          container.innerHTML = `
+            <div style="text-align:center;padding:60px 20px;color:var(--ig-secondary-text);">
+              <div style="font-size:48px;margin-bottom:16px;">🎬</div>
+              <div style="font-size:16px;">No reels yet</div>
+              <div style="font-size:13px;margin-top:8px;">Post a video to create the first reel!</div>
+            </div>`;
+          return;
+        }
+        
+        container.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;"></div>';
+        const grid = container.firstElementChild;
+        
+        videoPosts.forEach((post, idx) => {
+          const thumb = document.createElement('div');
+          thumb.style.cssText = 'position:relative;aspect-ratio:9/16;background:#1a1a1a;cursor:pointer;overflow:hidden;border-radius:4px;';
+          thumb.innerHTML = `
+            <video src="${post.video_url}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>
+            <div style="position:absolute;bottom:8px;left:8px;display:flex;align-items:center;gap:4px;color:#fff;font-size:13px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.6);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              ${post.likes_count || 0}
+            </div>
+            <div style="position:absolute;top:8px;right:8px;color:#fff;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;">Reel</div>`;
+          thumb.onclick = () => {
+            window.location.href = '/home';
+            // Store in sessionStorage so home page can open it
+            sessionStorage.setItem('openReelIndex', idx);
+            sessionStorage.setItem('openReelPosts', JSON.stringify(videoPosts));
+          };
+          grid.appendChild(thumb);
+        });
+      } catch (error) {
+        console.error('Error loading reels:', error);
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ig-secondary-text);">Error loading reels</div>';
+      }
+    }
+
+    // Auto-show reels tab if URL has #reels
+    if (window.location.hash === '#reels') {
+      switchTab('reels');
     }
 
     // Initialize
