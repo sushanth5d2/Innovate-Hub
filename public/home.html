@@ -8,15 +8,21 @@
 </head>
 <body>
   <!-- Top Navigation -->
-  <nav class="ig-top-nav">
+  <nav class="ig-top-nav ig-home-nav">
     <div class="ig-nav-container">
-      <a href="/home" class="ig-logo">Innovate</a>
-      
-      <div class="ig-search-box">
-        <input type="text" class="ig-search-input" placeholder="Search" id="searchInput">
+      <div class="ig-nav-left">
+        <a href="/home" class="ig-logo">Innovate</a>
+        <svg class="ig-logo-dropdown" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-      
+
       <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/notifications'">
+          <svg aria-label="Notifications" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938m0-2a6.04 6.04 0 0 0-4.797 2.127 6.052 6.052 0 0 0-4.787-2.127A6.985 6.985 0 0 0 .5 9.122c0 3.61 2.55 5.827 5.015 7.97.283.246.569.494.853.747l1.027.918a44.998 44.998 0 0 0 3.518 3.018 2 2 0 0 0 2.174 0 45.263 45.263 0 0 0 3.626-3.115l.922-.824c.293-.26.59-.519.885-.774 2.334-2.025 4.98-4.32 4.98-7.94a6.985 6.985 0 0 0-6.708-7.218Z"></path>
+          </svg>
+          <span class="ig-notification-dot" id="notificationDot" style="display: none;"></span>
+        </div>
+
         <div class="ig-nav-icon" onclick="window.location.href='/messages'">
           <svg aria-label="Messenger" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
             <path d="M12.003 2.001a9.705 9.705 0 1 1 0 19.4 10.876 10.876 0 0 1-2.895-.384.798.798 0 0 0-.533.04l-1.984.876a.801.801 0 0 1-1.123-.708l-.054-1.78a.806.806 0 0 0-.27-.569 9.49 9.49 0 0 1-3.14-7.175 9.65 9.65 0 0 1 10-9.7Z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="1.739"></path>
@@ -24,21 +30,17 @@
           </svg>
           <span class="ig-notification-dot" id="messageDot" style="display: none;"></span>
         </div>
-        
-        <div class="ig-nav-icon" onclick="window.location.href='/notifications'">
-          <svg aria-label="Notifications" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938m0-2a6.04 6.04 0 0 0-4.797 2.127 6.052 6.052 0 0 0-4.787-2.127A6.985 6.985 0 0 0 .5 9.122c0 3.61 2.55 5.827 5.015 7.97.283.246.569.494.853.747l1.027.918a44.998 44.998 0 0 0 3.518 3.018 2 2 0 0 0 2.174 0 45.263 45.263 0 0 0 3.626-3.115l.922-.824c.293-.26.59-.519.885-.774 2.334-2.025 4.98-4.32 4.98-7.94a6.985 6.985 0 0 0-6.708-7.218Z"></path>
-          </svg>
-          <span class="ig-notification-dot" id="notificationDot" style="display: none;"></span>
-        </div>
       </div>
     </div>
   </nav>
 
+  <!-- Hidden search input for JS compatibility -->
+  <input type="text" id="searchInput" style="display:none;">
+
   <!-- Main Content -->
   <main class="ig-main">
     <!-- Stories -->
-    <div class="ig-stories">
+    <div class="ig-stories ig-stories-flush">
       <div class="ig-stories-scroll" id="storiesContainer">
         <div class="ig-story ig-add-story" onclick="openCreateStoryModal()">
           <div class="ig-story-ring">
@@ -3175,12 +3177,28 @@
         attachmentsHtml = '';
       }
       
+      // Short time ago for header (Instagram: "2h" not "2h ago")
+      const timeShort = (() => {
+        if (!post.created_at) return '';
+        let ds = post.created_at;
+        if (ds.includes(' ') && !ds.includes('T') && !ds.includes('Z')) ds = ds.replace(' ','T') + 'Z';
+        const diff = Date.now() - new Date(ds).getTime();
+        const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), d = Math.floor(diff / 86400000), w = Math.floor(d / 7);
+        if (m < 1) return 'now';
+        if (m < 60) return m + 'm';
+        if (h < 24) return h + 'h';
+        if (d < 7) return d + 'd';
+        return w + 'w';
+      })();
+
       postEl.innerHTML = `
         <div class="ig-post-header">
           <a href="/profile/${post.user_id}" class="ig-post-user">
             <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-post-avatar">
             <div class="ig-post-info">
-              <div class="ig-post-username">${post.username}</div>
+              <span class="ig-post-username">${post.username}</span>
+              <span class="ig-post-header-dot">·</span>
+              <span class="ig-post-header-time">${timeShort}</span>
             </div>
           </a>
           <button class="ig-post-menu" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
@@ -3203,13 +3221,13 @@
             </button>
             
             <button class="ig-action-btn" onclick="focusComment(${post.id})">
-              <svg aria-label="Comment" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+              <svg aria-label="Comment" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
                 <path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" fill="none" stroke-linejoin="round"></path>
               </svg>
             </button>
             
             <button class="ig-action-btn" onclick="sharePost(${post.id})">
-              <svg aria-label="Share" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+              <svg aria-label="Share" fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
                 <line fill="none" stroke-linejoin="round" x1="22" x2="9.218" y1="3" y2="10.083"></line>
                 <polygon fill="none" points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke-linejoin="round"></polygon>
               </svg>
@@ -3217,7 +3235,7 @@
           </div>
           
           <button class="ig-action-btn ${isSaved ? 'saved' : ''}" onclick="toggleSave(${post.id})">
-            <svg aria-label="Save" fill="${isSaved ? '#262626' : 'none'}" height="24" viewBox="0 0 24 24" width="24" stroke="#262626" stroke-width="2">
+            <svg aria-label="Save" fill="${isSaved ? 'currentColor' : 'none'}" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
               <polygon fill="none" points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke-linecap="round" stroke-linejoin="round"></polygon>
             </svg>
           </button>
@@ -3308,41 +3326,11 @@
         </button>
         ` : ''}
         
-        <div class="ig-post-time">${InnovateAPI.formatDate(post.created_at)}</div>
-        
-        <div class="ig-add-comment">
-          <input type="text" class="ig-add-comment-input" placeholder="Add a comment..." id="comment-${post.id}">
-          <button class="ig-post-comment-btn" id="comment-btn-${post.id}">Post</button>
-        </div>
+        <div class="ig-post-separator"></div>
       `;
       
-      // Add comment input handler
+      // Post element setup
       setTimeout(() => {
-        const commentInput = document.getElementById(`comment-${post.id}`);
-        const commentBtn = document.getElementById(`comment-btn-${post.id}`);
-        
-        if (commentInput && commentBtn) {
-          commentInput.addEventListener('input', () => {
-            commentBtn.classList.toggle('active', commentInput.value.trim().length > 0);
-          });
-          
-          commentBtn.addEventListener('click', () => {
-            if (commentInput.value.trim()) {
-              addComment(post.id, commentInput.value.trim());
-              commentInput.value = '';
-              commentBtn.classList.remove('active');
-            }
-          });
-          
-          commentInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && commentInput.value.trim()) {
-              addComment(post.id, commentInput.value.trim());
-              commentInput.value = '';
-              commentBtn.classList.remove('active');
-            }
-          });
-        }
-
         // Attachment click handlers (open PDF in-app)
         postEl.querySelectorAll('.ig-attachment-item').forEach((btn) => {
           btn.addEventListener('click', (e) => {
@@ -4595,6 +4583,93 @@
         }
       }
     });
+
+    // === Instagram-style scroll-to-hide top nav ===
+    (function() {
+      let lastScrollY = 0;
+      let ticking = false;
+      const topNav = document.querySelector('.ig-top-nav');
+      if (topNav) {
+        window.addEventListener('scroll', () => {
+          if (!ticking) {
+            window.requestAnimationFrame(() => {
+              const currentY = window.scrollY;
+              if (currentY > lastScrollY && currentY > 60) {
+                // Scrolling down — hide
+                topNav.classList.add('ig-nav-hidden');
+              } else {
+                // Scrolling up — show
+                topNav.classList.remove('ig-nav-hidden');
+              }
+              lastScrollY = currentY;
+              ticking = false;
+            });
+            ticking = true;
+          }
+        }, { passive: true });
+      }
+    })();
+
+    // === Feed dropdown toggle (For You / Following) ===
+    (function() {
+      const navLeft = document.querySelector('.ig-nav-left');
+      if (!navLeft) return;
+      navLeft.style.cursor = 'pointer';
+      navLeft.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Remove existing dropdown if open
+        const existing = document.getElementById('igFeedDropdown');
+        if (existing) { existing.remove(); return; }
+
+        const dd = document.createElement('div');
+        dd.id = 'igFeedDropdown';
+        dd.className = 'ig-feed-dropdown';
+        const currentFeed = sessionStorage.getItem('feedType') || 'foryou';
+        dd.innerHTML = `
+          <div class="ig-feed-dd-item ${currentFeed === 'foryou' ? 'active' : ''}" data-feed="foryou">
+            <span>For You</span>
+            ${currentFeed === 'foryou' ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="var(--ig-primary-text)" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
+          </div>
+          <div class="ig-feed-dd-item ${currentFeed === 'following' ? 'active' : ''}" data-feed="following">
+            <span>Following</span>
+            ${currentFeed === 'following' ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="var(--ig-primary-text)" stroke="none"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ''}
+          </div>
+        `;
+        document.body.appendChild(dd);
+
+        // Position it below the logo
+        const rect = navLeft.getBoundingClientRect();
+        dd.style.top = (rect.bottom + 8) + 'px';
+        dd.style.left = rect.left + 'px';
+
+        dd.querySelectorAll('.ig-feed-dd-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const feedType = item.dataset.feed;
+            sessionStorage.setItem('feedType', feedType);
+            dd.remove();
+            // Update chevron direction
+            const chevron = document.querySelector('.ig-logo-dropdown');
+            if (chevron) chevron.classList.remove('ig-chevron-open');
+            loadPosts();
+          });
+        });
+
+        // Rotate chevron
+        const chevron = document.querySelector('.ig-logo-dropdown');
+        if (chevron) chevron.classList.add('ig-chevron-open');
+
+        // Close on outside click
+        setTimeout(() => {
+          document.addEventListener('click', function closeDd(ev) {
+            if (!dd.contains(ev.target) && !navLeft.contains(ev.target)) {
+              dd.remove();
+              if (chevron) chevron.classList.remove('ig-chevron-open');
+              document.removeEventListener('click', closeDd);
+            }
+          });
+        }, 10);
+      });
+    })();
 
     // Initialize
     loadUserAvatar();
@@ -6487,6 +6562,35 @@
       const config = typeof configJson === 'string' ? JSON.parse(configJson) : configJson;
       const currentUser = InnovateAPI.getCurrentUser();
       const isOwnPost = currentUser && currentUser.id == postUserId;
+
+      // === Direct-open shortcut ===
+      // If only Register link is configured, open it directly
+      const hasContact = config.contact_me && config.contact_me.enabled && (
+        (config.contact_me.links && config.contact_me.links.length) ||
+        (config.contact_me.emails && config.contact_me.emails.length) ||
+        (config.contact_me.phones && config.contact_me.phones.length)
+      );
+      const hasRegister = config.register && config.register.enabled && config.register.link;
+      const hasDM = config.dm && config.dm.enabled && !isOwnPost;
+      const hasHireMe = config.hire_me && config.hire_me.enabled && !isOwnPost;
+      const enabledCount = [hasContact, hasRegister, hasDM, hasHireMe].filter(Boolean).length;
+
+      // If only one action enabled, open it directly
+      if (enabledCount === 1) {
+        if (hasRegister) {
+          window.open(config.register.link, '_blank', 'noopener');
+          return;
+        }
+        if (hasContact) {
+          const c = config.contact_me;
+          // If only one contact method, open directly
+          const allItems = [...(c.links||[]), ...(c.emails||[]).map(e=>'mailto:'+e), ...(c.phones||[]).map(p=>'tel:'+p)];
+          if (allItems.length === 1) {
+            window.open(allItems[0], '_blank', 'noopener');
+            return;
+          }
+        }
+      }
 
       // Remove any existing modal
       document.getElementById('cbActionModal')?.remove();
