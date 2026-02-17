@@ -92,7 +92,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 52428800 // 50MB default (increased for documents/videos)
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 104857600 // 100MB default (for video reels up to 120s)
   },
   fileFilter: fileFilter
 });

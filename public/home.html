@@ -149,8 +149,20 @@
         <button class="cp-header-btn" onclick="closeCreatePostModal()">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <h2 class="cp-header-title">Create new post</h2>
-        <button class="cp-share-btn" onclick="submitPost()" id="cpShareBtn">Share</button>
+        <h2 class="cp-header-title" id="cpHeaderTitle">Create new post</h2>
+        <button class="cp-share-btn" onclick="submitCreateContent()" id="cpShareBtn">Share</button>
+      </div>
+
+      <!-- Tab Switcher (Post / Reel) -->
+      <div class="cr-tab-bar">
+        <button class="cr-tab active" data-tab="post" onclick="switchCreateTab('post')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Post
+        </button>
+        <button class="cr-tab" data-tab="reel" onclick="switchCreateTab('reel')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
+          Reel
+        </button>
       </div>
 
       <!-- Body -->
@@ -186,38 +198,158 @@
           <div id="trendingList" class="cp-trending-list" style="display: none;"></div>
         </div>
 
-        <!-- Media Preview -->
-        <div id="imagePreview" class="cp-media-grid"></div>
+        <!-- ===== POST-SPECIFIC MEDIA (shown when Post tab active) ===== -->
+        <div id="crPostMedia" class="cr-media-section">
+          <!-- Media Preview -->
+          <div id="imagePreview" class="cp-media-grid"></div>
 
-        <!-- Files Preview -->
-        <div id="postFilesList" class="cp-files-list"></div>
+          <!-- Files Preview -->
+          <div id="postFilesList" class="cp-files-list"></div>
 
-        <!-- Media Upload Drop Zone -->
-        <div id="cpDropZone" class="cp-drop-zone" style="display: none;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          <p>Drag photos and videos here</p>
+          <!-- Media Upload Drop Zone -->
+          <div id="cpDropZone" class="cp-drop-zone" style="display: none;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p>Drag photos and videos here</p>
+          </div>
+
+          <!-- Upload Toolbar -->
+          <div class="cp-toolbar">
+            <label class="cp-tool-btn" title="Photos & Videos">
+              <input type="file" id="postImages" accept="image/*,video/*" multiple style="display: none;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span class="cp-tool-label">Photo/Video</span>
+            </label>
+            <label class="cp-tool-btn" title="Attach Files">
+              <input type="file" id="postFiles" accept=".pdf,.doc,.docx,.txt,.zip,.xls,.xlsx,.ppt,.pptx" multiple style="display: none;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              <span class="cp-tool-label">Files</span>
+            </label>
+            <button class="cp-tool-btn" onclick="togglePollCreation()" title="Create Poll" id="pollToggleBtn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+              <span class="cp-tool-label">Poll</span>
+            </button>
+            <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Post" id="scheduleToggleBtn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span class="cp-tool-label">Schedule</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Upload Toolbar -->
-        <div class="cp-toolbar">
-          <label class="cp-tool-btn" title="Photos & Videos">
-            <input type="file" id="postImages" accept="image/*,video/*" multiple style="display: none;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <span class="cp-tool-label">Photo/Video</span>
-          </label>
-          <label class="cp-tool-btn" title="Attach Files">
-            <input type="file" id="postFiles" accept=".pdf,.doc,.docx,.txt,.zip,.xls,.xlsx,.ppt,.pptx" multiple style="display: none;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-            <span class="cp-tool-label">Files</span>
-          </label>
-          <button class="cp-tool-btn" onclick="togglePollCreation()" title="Create Poll" id="pollToggleBtn">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
-            <span class="cp-tool-label">Poll</span>
-          </button>
-          <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Post" id="scheduleToggleBtn">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span class="cp-tool-label">Schedule</span>
-          </button>
+        <!-- ===== REEL-SPECIFIC MEDIA (shown when Reel tab active) ===== -->
+        <div id="crReelMedia" class="cr-media-section" style="display: none;">
+          <!-- Reel Video Upload Zone -->
+          <div id="crReelUploadZone" class="cr-reel-upload-zone">
+            <input type="file" id="reelVideoInput" accept="video/*" style="display:none;" onchange="onReelVideoSelected(event)">
+            <div class="cr-reel-upload-placeholder" id="crReelPlaceholder" onclick="document.getElementById('reelVideoInput').click()">
+              <div class="cr-reel-upload-icon">
+                <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="1.2">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18"/>
+                  <line x1="7" y1="2" x2="7" y2="22"/>
+                  <line x1="17" y1="2" x2="17" y2="22"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <line x1="2" y1="7" x2="7" y2="7"/>
+                  <line x1="2" y1="17" x2="7" y2="17"/>
+                  <line x1="17" y1="7" x2="22" y2="7"/>
+                  <line x1="17" y1="17" x2="22" y2="17"/>
+                </svg>
+              </div>
+              <p class="cr-reel-upload-text">Tap to upload a video</p>
+              <p class="cr-reel-upload-hint">MP4, MOV, WebM · No time limit</p>
+            </div>
+          </div>
+
+          <!-- Reel Video Preview (hidden until video selected) -->
+          <div id="crReelPreview" class="cr-reel-preview" style="display: none;">
+            <div class="cr-reel-video-wrap">
+              <video id="crReelVideo" class="cr-reel-video" playsinline></video>
+              <div class="cr-reel-play-overlay" id="crReelPlayOverlay" onclick="toggleReelPlayback()">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <div class="cr-reel-duration" id="crReelDuration">0:00</div>
+              <button class="cr-reel-change-btn" onclick="changeReelVideo()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+                Change
+              </button>
+            </div>
+
+            <!-- Trim Controls -->
+            <div class="cr-trim-section">
+              <div class="cr-trim-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                <span>Trim Video</span>
+              </div>
+              <div class="cr-trim-timeline" id="crTrimTimeline">
+                <canvas id="crTrimCanvas" class="cr-trim-canvas" height="48"></canvas>
+                <div class="cr-trim-handle cr-trim-start" id="crTrimStart"></div>
+                <div class="cr-trim-handle cr-trim-end" id="crTrimEnd"></div>
+                <div class="cr-trim-progress" id="crTrimProgress"></div>
+              </div>
+              <div class="cr-trim-times">
+                <span id="crTrimStartTime">0:00</span>
+                <span id="crTrimDurationLabel">Duration: 0:00</span>
+                <span id="crTrimEndTime">0:00</span>
+              </div>
+            </div>
+
+            <!-- Cover Frame Selector -->
+            <div class="cr-cover-section">
+              <div class="cr-cover-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Cover</span>
+              </div>
+              <div class="cr-cover-thumbnails" id="crCoverThumbnails"></div>
+              <div class="cr-cover-preview">
+                <canvas id="crCoverCanvas" class="cr-cover-canvas" width="120" height="213"></canvas>
+                <p class="cr-cover-hint">Tap a frame above to set as cover</p>
+              </div>
+            </div>
+
+            <!-- Audio Section -->
+            <div class="cr-audio-section">
+              <div class="cr-audio-header" onclick="toggleReelAudio()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                <span>Audio</span>
+                <svg class="cr-audio-chevron" id="crAudioChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div id="crAudioOptions" class="cr-audio-options" style="display:none;">
+                <label class="cp-toggle-row" style="padding: 8px 0;">
+                  <div class="cp-toggle-info">
+                    <span style="font-size: 13px;">🔇 Mute original audio</span>
+                  </div>
+                  <div class="cp-switch">
+                    <input type="checkbox" id="crMuteAudio">
+                    <span class="cp-switch-slider"></span>
+                  </div>
+                </label>
+                <div class="cr-audio-volume" id="crVolumeSection">
+                  <label class="cb-field-label">Volume</label>
+                  <input type="range" id="crAudioVolume" class="cr-volume-slider" min="0" max="100" value="100">
+                  <span id="crVolumeLabel" class="cr-volume-label">100%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reel Toolbar -->
+          <div class="cp-toolbar">
+            <label class="cp-tool-btn cr-reel-upload-btn" title="Upload Video" onclick="document.getElementById('reelVideoInput').click()">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="2" width="20" height="20" rx="2.18"/>
+                <line x1="7" y1="2" x2="7" y2="22"/>
+                <line x1="17" y1="2" x2="17" y2="22"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+              </svg>
+              <span class="cp-tool-label">Video</span>
+            </label>
+            <button class="cp-tool-btn" onclick="togglePollCreation()" title="Create Poll">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+              <span class="cp-tool-label">Poll</span>
+            </button>
+            <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Reel">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span class="cp-tool-label">Schedule</span>
+            </button>
+          </div>
         </div>
 
         <!-- Poll Creation Section -->
@@ -482,6 +614,254 @@
     .cp-share-btn.cp-sharing {
       color: var(--ig-secondary-text);
       pointer-events: none;
+    }
+
+    /* ===== Post/Reel Tab Bar ===== */
+    .cr-tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--ig-border);
+      background: var(--ig-primary-background);
+    }
+    .cr-tab {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 0;
+      background: none; border: none;
+      color: var(--ig-secondary-text);
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+    .cr-tab:hover { color: var(--ig-primary-text); }
+    .cr-tab.active { color: var(--ig-primary-text); }
+    .cr-tab.active::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--ig-primary-text);
+      border-radius: 2px 2px 0 0;
+    }
+    .cr-tab svg { flex-shrink: 0; }
+
+    /* ===== Reel Creation Styles ===== */
+    .cr-media-section { }
+
+    /* Upload zone */
+    .cr-reel-upload-zone { padding: 0 16px; }
+    .cr-reel-upload-placeholder {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 40px 20px;
+      border: 2px dashed var(--ig-border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 8px 0;
+    }
+    .cr-reel-upload-placeholder:hover {
+      border-color: var(--ig-blue);
+      background: rgba(0,149,246,0.03);
+    }
+    .cr-reel-upload-icon { margin-bottom: 12px; opacity: 0.6; }
+    .cr-reel-upload-text {
+      font-size: 16px; font-weight: 600;
+      color: var(--ig-primary-text);
+      margin: 0 0 4px;
+    }
+    .cr-reel-upload-hint {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      margin: 0;
+    }
+
+    /* Video preview */
+    .cr-reel-preview { padding: 0 16px; }
+    .cr-reel-video-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      max-height: 320px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cr-reel-video {
+      width: 100%; max-height: 320px;
+      object-fit: contain;
+      display: block;
+    }
+    .cr-reel-play-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.25);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .cr-reel-video-wrap:hover .cr-reel-play-overlay { opacity: 1; }
+    .cr-reel-play-overlay.cr-paused { opacity: 1; }
+    .cr-reel-duration {
+      position: absolute; bottom: 8px; right: 8px;
+      background: rgba(0,0,0,0.7);
+      color: #fff; font-size: 12px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px;
+    }
+    .cr-reel-change-btn {
+      position: absolute; top: 8px; right: 8px;
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(0,0,0,0.6);
+      color: #fff; border: none;
+      font-size: 12px; font-weight: 600;
+      padding: 6px 10px; border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cr-reel-change-btn:hover { background: rgba(0,0,0,0.8); }
+
+    /* Trim section */
+    .cr-trim-section {
+      margin: 12px 0;
+      background: var(--ig-secondary-background);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .cr-trim-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 10px;
+    }
+    .cr-trim-timeline {
+      position: relative;
+      height: 48px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--ig-border);
+      cursor: pointer;
+    }
+    .cr-trim-canvas {
+      width: 100%; height: 48px;
+      display: block;
+    }
+    .cr-trim-handle {
+      position: absolute; top: 0; bottom: 0;
+      width: 14px;
+      background: var(--ig-blue);
+      cursor: ew-resize;
+      z-index: 2;
+      border-radius: 3px;
+      opacity: 0.9;
+    }
+    .cr-trim-handle::after {
+      content: '';
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px; height: 18px;
+      background: #fff;
+      border-radius: 1px;
+    }
+    .cr-trim-start { left: 0; border-radius: 6px 3px 3px 6px; }
+    .cr-trim-end { right: 0; border-radius: 3px 6px 6px 3px; }
+    .cr-trim-progress {
+      position: absolute; top: 0; bottom: 0;
+      width: 2px; background: #fff;
+      z-index: 3;
+      pointer-events: none;
+      left: 0;
+    }
+    .cr-trim-times {
+      display: flex; justify-content: space-between;
+      font-size: 11px;
+      color: var(--ig-secondary-text);
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Cover selector */
+    .cr-cover-section {
+      margin: 12px 0;
+      background: var(--ig-secondary-background);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .cr-cover-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600;
+      color: var(--ig-primary-text);
+      margin-bottom: 10px;
+    }
+    .cr-cover-thumbnails {
+      display: flex; gap: 4px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      scrollbar-width: thin;
+    }
+    .cr-cover-thumbnails canvas {
+      width: 56px; height: 100px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+    .cr-cover-thumbnails canvas.cr-cover-selected {
+      border-color: var(--ig-blue);
+    }
+    .cr-cover-preview {
+      display: flex; align-items: center; gap: 12px;
+      margin-top: 8px;
+    }
+    .cr-cover-canvas {
+      border-radius: 8px;
+      background: #000;
+      object-fit: cover;
+    }
+    .cr-cover-hint {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      margin: 0;
+    }
+
+    /* Audio section */
+    .cr-audio-section {
+      margin: 12px 0;
+      background: var(--ig-secondary-background);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .cr-audio-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 600;
+      color: var(--ig-primary-text);
+      cursor: pointer;
+    }
+    .cr-audio-chevron { margin-left: auto; transition: transform 0.3s; }
+    .cr-audio-chevron.cr-open { transform: rotate(180deg); }
+    .cr-audio-options { padding-top: 8px; }
+    .cr-audio-volume {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0 4px;
+    }
+    .cr-volume-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: var(--ig-border);
+      border-radius: 2px;
+      outline: none;
+    }
+    .cr-volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--ig-blue);
+      cursor: pointer;
+    }
+    .cr-volume-label {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      min-width: 36px;
+      text-align: right;
     }
 
     /* Body */
@@ -1012,6 +1392,10 @@
       .cp-container { max-width: 100%; max-height: 100vh; border-radius: 0; height: 100%; }
       .cp-overlay { padding: 0; }
       .cp-media-grid { grid-template-columns: repeat(3, 1fr); }
+      .cr-reel-video-wrap { max-height: 240px; }
+      .cr-reel-video { max-height: 240px; }
+      .cr-cover-thumbnails canvas { width: 44px; height: 78px; }
+      .cr-tab { font-size: 13px; padding: 10px 0; }
     }
 
     /* ===== Story Creation Modal ===== */
@@ -3702,6 +4086,10 @@
       const modal = document.getElementById('createPostModal');
       modal.style.display = 'flex';
       
+      // Reset to Post tab
+      switchCreateTab('post');
+      resetReelFields();
+
       // Reset all fields
       document.getElementById('postContent').value = '';
       document.getElementById('imagePreview').innerHTML = '';
@@ -3764,6 +4152,534 @@
     function closeCreatePostModal(event) {
       if (!event || event.target.classList.contains('cp-overlay')) {
         document.getElementById('createPostModal').style.display = 'none';
+      }
+    }
+
+    // ===== Create Tab Switching (Post / Reel) =====
+    let activeCreateTab = 'post';
+    let reelVideoFile = null;
+    let reelTrimStart = 0;
+    let reelTrimEnd = 1; // fraction 0-1
+    let reelCoverTime = 0;
+    let reelDuration = 0;
+
+    function switchCreateTab(tab) {
+      if (tab === activeCreateTab) return;
+      activeCreateTab = tab;
+
+      // Update tab buttons
+      document.querySelectorAll('.cr-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+
+      // Toggle media sections
+      const postMedia = document.getElementById('crPostMedia');
+      const reelMedia = document.getElementById('crReelMedia');
+      if (postMedia) postMedia.style.display = tab === 'post' ? '' : 'none';
+      if (reelMedia) reelMedia.style.display = tab === 'reel' ? '' : 'none';
+
+      // Update header title
+      const title = document.getElementById('cpHeaderTitle');
+      if (title) title.textContent = tab === 'reel' ? 'Create new reel' : 'Create new post';
+    }
+
+    function submitCreateContent() {
+      if (activeCreateTab === 'reel') {
+        submitReel();
+      } else {
+        submitPost();
+      }
+    }
+
+    // ===== Reel Video Handling =====
+    function onReelVideoSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('video/')) {
+        InnovateAPI.showAlert('Please select a video file', 'error');
+        return;
+      }
+
+      reelVideoFile = file;
+      const video = document.getElementById('crReelVideo');
+      const url = URL.createObjectURL(file);
+      video.src = url;
+
+      video.onloadedmetadata = () => {
+        reelDuration = video.duration;
+        reelTrimStart = 0;
+        reelTrimEnd = 1;
+        reelCoverTime = 0;
+
+        // Show preview, hide placeholder
+        document.getElementById('crReelPlaceholder').style.display = 'none';
+        document.getElementById('crReelPreview').style.display = '';
+        document.getElementById('crReelDuration').textContent = formatReelTime(reelDuration);
+        // Show file size info
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        const sizeInfo = sizeMB > 50 ? ` · ${sizeMB}MB (will compress)` : ` · ${sizeMB}MB`;
+        document.getElementById('crReelDuration').textContent = formatReelTime(reelDuration) + sizeInfo;
+        document.getElementById('crTrimEndTime').textContent = formatReelTime(reelDuration);
+        document.getElementById('crTrimStartTime').textContent = '0:00';
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(reelDuration);
+
+        // Reset trim handles
+        const startHandle = document.getElementById('crTrimStart');
+        const endHandle = document.getElementById('crTrimEnd');
+        if (startHandle) startHandle.style.left = '0px';
+        if (endHandle) endHandle.style.right = '0px';
+
+        // Generate thumbnails
+        generateTrimThumbnails(video);
+        generateCoverThumbnails(video);
+
+        // Set initial cover
+        updateCoverFrame(0);
+      };
+
+      video.onended = () => {
+        document.getElementById('crReelPlayOverlay').classList.add('cr-paused');
+      };
+    }
+
+    function toggleReelPlayback() {
+      const video = document.getElementById('crReelVideo');
+      const overlay = document.getElementById('crReelPlayOverlay');
+      if (video.paused) {
+        video.play();
+        overlay.classList.remove('cr-paused');
+      } else {
+        video.pause();
+        overlay.classList.add('cr-paused');
+      }
+    }
+
+    function changeReelVideo() {
+      const video = document.getElementById('crReelVideo');
+      if (video) { video.pause(); video.src = ''; }
+      reelVideoFile = null;
+      reelDuration = 0;
+      document.getElementById('crReelPreview').style.display = 'none';
+      document.getElementById('crReelPlaceholder').style.display = '';
+      document.getElementById('reelVideoInput').value = '';
+      document.getElementById('reelVideoInput').click();
+    }
+
+    function formatReelTime(seconds) {
+      if (!seconds || isNaN(seconds)) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    // ===== Trim Timeline Thumbnails =====
+    function generateTrimThumbnails(videoEl) {
+      const canvas = document.getElementById('crTrimCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const numFrames = 10;
+      const frameWidth = canvas.width / numFrames;
+      canvas.width = canvas.offsetWidth * 2; // retina
+      canvas.height = 96;
+      const fw = canvas.width / numFrames;
+      const fh = canvas.height;
+      let framesLoaded = 0;
+
+      const tempVideo = document.createElement('video');
+      tempVideo.src = videoEl.src;
+      tempVideo.muted = true;
+      tempVideo.preload = 'auto';
+
+      function drawFrame(idx) {
+        const time = (idx / numFrames) * reelDuration;
+        tempVideo.currentTime = time;
+      }
+
+      tempVideo.onseeked = () => {
+        ctx.drawImage(tempVideo, framesLoaded * fw, 0, fw, fh);
+        framesLoaded++;
+        if (framesLoaded < numFrames) {
+          drawFrame(framesLoaded);
+        }
+      };
+
+      tempVideo.onloadeddata = () => drawFrame(0);
+    }
+
+    // ===== Cover Frame Thumbnails =====
+    function generateCoverThumbnails(videoEl) {
+      const container = document.getElementById('crCoverThumbnails');
+      if (!container) return;
+      container.innerHTML = '';
+      const numFrames = 8;
+      const tempVideo = document.createElement('video');
+      tempVideo.src = videoEl.src;
+      tempVideo.muted = true;
+      tempVideo.preload = 'auto';
+      let currentIdx = 0;
+
+      function createThumb(idx) {
+        const time = (idx / (numFrames - 1)) * reelDuration;
+        tempVideo.currentTime = Math.min(time, reelDuration - 0.1);
+      }
+
+      tempVideo.onseeked = () => {
+        const c = document.createElement('canvas');
+        c.width = 112;
+        c.height = 200;
+        const cx = c.getContext('2d');
+        // Draw video frame covering the canvas (crop to fit 9:16)
+        const vw = tempVideo.videoWidth;
+        const vh = tempVideo.videoHeight;
+        const scale = Math.max(c.width / vw, c.height / vh);
+        const sw = c.width / scale;
+        const sh = c.height / scale;
+        const sx = (vw - sw) / 2;
+        const sy = (vh - sh) / 2;
+        cx.drawImage(tempVideo, sx, sy, sw, sh, 0, 0, c.width, c.height);
+
+        if (currentIdx === 0) c.classList.add('cr-cover-selected');
+        c.dataset.time = tempVideo.currentTime;
+        c.onclick = () => selectCoverFrame(c);
+        container.appendChild(c);
+        currentIdx++;
+        if (currentIdx < numFrames) {
+          createThumb(currentIdx);
+        }
+      };
+
+      tempVideo.onloadeddata = () => createThumb(0);
+    }
+
+    function selectCoverFrame(canvasEl) {
+      // Deselect all
+      document.querySelectorAll('.cr-cover-thumbnails canvas').forEach(c => c.classList.remove('cr-cover-selected'));
+      canvasEl.classList.add('cr-cover-selected');
+      reelCoverTime = parseFloat(canvasEl.dataset.time) || 0;
+      updateCoverFrame(reelCoverTime);
+    }
+
+    function updateCoverFrame(time) {
+      const coverCanvas = document.getElementById('crCoverCanvas');
+      if (!coverCanvas) return;
+      const video = document.getElementById('crReelVideo');
+      if (!video || !video.src) return;
+
+      const tempVideo = document.createElement('video');
+      tempVideo.src = video.src;
+      tempVideo.muted = true;
+      tempVideo.currentTime = time;
+      tempVideo.onseeked = () => {
+        const ctx = coverCanvas.getContext('2d');
+        const vw = tempVideo.videoWidth;
+        const vh = tempVideo.videoHeight;
+        const scale = Math.max(coverCanvas.width / vw, coverCanvas.height / vh);
+        const sw = coverCanvas.width / scale;
+        const sh = coverCanvas.height / scale;
+        const sx = (vw - sw) / 2;
+        const sy = (vh - sh) / 2;
+        ctx.drawImage(tempVideo, sx, sy, sw, sh, 0, 0, coverCanvas.width, coverCanvas.height);
+      };
+    }
+
+    // ===== Trim Handle Dragging =====
+    (function setupTrimHandles() {
+      let dragging = null; // 'start' or 'end'
+
+      document.addEventListener('mousedown', (e) => {
+        if (e.target.id === 'crTrimStart') dragging = 'start';
+        else if (e.target.id === 'crTrimEnd') dragging = 'end';
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const timeline = document.getElementById('crTrimTimeline');
+        if (!timeline) return;
+        const rect = timeline.getBoundingClientRect();
+        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+        const frac = x / rect.width;
+
+        if (dragging === 'start') {
+          reelTrimStart = Math.min(frac, reelTrimEnd - 0.05);
+          document.getElementById('crTrimStart').style.left = (reelTrimStart * 100) + '%';
+          document.getElementById('crTrimStartTime').textContent = formatReelTime(reelTrimStart * reelDuration);
+        } else {
+          reelTrimEnd = Math.max(frac, reelTrimStart + 0.05);
+          document.getElementById('crTrimEnd').style.left = (reelTrimEnd * 100 - 3) + '%';
+          document.getElementById('crTrimEndTime').textContent = formatReelTime(reelTrimEnd * reelDuration);
+        }
+
+        const trimDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(trimDuration);
+      });
+
+      document.addEventListener('mouseup', () => { dragging = null; });
+
+      // Touch support
+      document.addEventListener('touchstart', (e) => {
+        if (e.target.id === 'crTrimStart') dragging = 'start';
+        else if (e.target.id === 'crTrimEnd') dragging = 'end';
+      }, { passive: true });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        const touch = e.touches[0];
+        const timeline = document.getElementById('crTrimTimeline');
+        if (!timeline) return;
+        const rect = timeline.getBoundingClientRect();
+        const x = Math.max(0, Math.min(touch.clientX - rect.left, rect.width));
+        const frac = x / rect.width;
+
+        if (dragging === 'start') {
+          reelTrimStart = Math.min(frac, reelTrimEnd - 0.05);
+          document.getElementById('crTrimStart').style.left = (reelTrimStart * 100) + '%';
+          document.getElementById('crTrimStartTime').textContent = formatReelTime(reelTrimStart * reelDuration);
+        } else {
+          reelTrimEnd = Math.max(frac, reelTrimStart + 0.05);
+          document.getElementById('crTrimEnd').style.left = (reelTrimEnd * 100 - 3) + '%';
+          document.getElementById('crTrimEndTime').textContent = formatReelTime(reelTrimEnd * reelDuration);
+        }
+
+        const trimDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(trimDuration);
+      }, { passive: true });
+
+      document.addEventListener('touchend', () => { dragging = null; }, { passive: true });
+    })();
+
+    // ===== Reel Audio Toggle =====
+    function toggleReelAudio() {
+      const opts = document.getElementById('crAudioOptions');
+      const chevron = document.getElementById('crAudioChevron');
+      if (!opts) return;
+      const showing = opts.style.display === 'none';
+      opts.style.display = showing ? '' : 'none';
+      chevron?.classList.toggle('cr-open', showing);
+    }
+
+    // Volume slider
+    document.getElementById('crAudioVolume')?.addEventListener('input', function() {
+      document.getElementById('crVolumeLabel').textContent = this.value + '%';
+      const video = document.getElementById('crReelVideo');
+      if (video) video.volume = this.value / 100;
+    });
+
+    // Mute toggle
+    document.getElementById('crMuteAudio')?.addEventListener('change', function() {
+      const video = document.getElementById('crReelVideo');
+      const volSection = document.getElementById('crVolumeSection');
+      if (video) video.muted = this.checked;
+      if (volSection) volSection.style.display = this.checked ? 'none' : '';
+    });
+
+    // ===== Reset Reel Fields =====
+    function resetReelFields() {
+      reelVideoFile = null;
+      reelDuration = 0;
+      reelTrimStart = 0;
+      reelTrimEnd = 1;
+      reelCoverTime = 0;
+      const video = document.getElementById('crReelVideo');
+      if (video) { video.pause(); video.src = ''; }
+      const preview = document.getElementById('crReelPreview');
+      if (preview) preview.style.display = 'none';
+      const placeholder = document.getElementById('crReelPlaceholder');
+      if (placeholder) placeholder.style.display = '';
+      const input = document.getElementById('reelVideoInput');
+      if (input) input.value = '';
+      const thumbs = document.getElementById('crCoverThumbnails');
+      if (thumbs) thumbs.innerHTML = '';
+      const audioOpts = document.getElementById('crAudioOptions');
+      if (audioOpts) audioOpts.style.display = 'none';
+      const muteCheck = document.getElementById('crMuteAudio');
+      if (muteCheck) muteCheck.checked = false;
+      const volSlider = document.getElementById('crAudioVolume');
+      if (volSlider) volSlider.value = 100;
+      const volLabel = document.getElementById('crVolumeLabel');
+      if (volLabel) volLabel.textContent = '100%';
+      const volSection = document.getElementById('crVolumeSection');
+      if (volSection) volSection.style.display = '';
+    }
+
+    // ===== Submit Reel =====
+    // ===== Chunked Video Upload =====
+    // Splits large videos into chunks to bypass proxy limits
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk (proxy limit ~10MB)
+    const PARALLEL_UPLOADS = 6; // upload 6 chunks simultaneously
+
+    async function uploadVideoChunked(file, onProgress) {
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+      // 1. Init upload session
+      const initRes = await InnovateAPI.apiRequest('/posts/upload/init', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          totalChunks
+        })
+      });
+      const { uploadId } = initRes;
+
+      // 2. Upload chunks in parallel batches
+      let completed = 0;
+      for (let batch = 0; batch < totalChunks; batch += PARALLEL_UPLOADS) {
+        const promises = [];
+        for (let j = 0; j < PARALLEL_UPLOADS && (batch + j) < totalChunks; j++) {
+          const i = batch + j;
+          const start = i * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+
+          const chunkForm = new FormData();
+          chunkForm.append('uploadId', uploadId);
+          chunkForm.append('chunkIndex', i.toString());
+          chunkForm.append('chunk', chunk, `chunk_${i}`);
+
+          promises.push(
+            InnovateAPI.apiRequest('/posts/upload/chunk', {
+              method: 'POST',
+              body: chunkForm,
+              headers: {}
+            }).then(() => {
+              completed++;
+              if (onProgress) onProgress(completed, totalChunks);
+            })
+          );
+        }
+        await Promise.all(promises);
+      }
+
+      // 3. Finalize — assemble chunks on server
+      const finalRes = await InnovateAPI.apiRequest('/posts/upload/finalize', {
+        method: 'POST',
+        body: JSON.stringify({ uploadId })
+      });
+
+      return finalRes.filePath;
+    }
+
+    async function submitReel() {
+      const shareBtn = document.getElementById('cpShareBtn');
+      const content = document.getElementById('postContent').value;
+      const scheduleTime = document.getElementById('scheduleTime')?.value;
+      const enableContact = document.getElementById('enableContact')?.checked;
+      const enableInterested = document.getElementById('enableInterested')?.checked;
+
+      if (!reelVideoFile) {
+        InnovateAPI.showAlert('Please upload a video for your reel', 'error');
+        return;
+      }
+
+      // Calculate trimmed duration
+      const trimmedDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
+
+      shareBtn.disabled = true;
+      shareBtn.classList.add('cp-sharing');
+
+      try {
+        let videoPath;
+        const sizeMB = reelVideoFile.size / (1024 * 1024);
+
+        if (sizeMB > 4) {
+          // Large file → chunked upload
+          shareBtn.textContent = 'Uploading 0%...';
+          videoPath = await uploadVideoChunked(reelVideoFile, (done, total) => {
+            const pct = Math.round((done / total) * 100);
+            shareBtn.textContent = `Uploading ${pct}%...`;
+          });
+        } else {
+          // Small file → direct upload via FormData
+          shareBtn.textContent = 'Uploading...';
+          videoPath = null; // will be handled by multer below
+        }
+
+        shareBtn.textContent = 'Sharing...';
+
+        const formData = new FormData();
+        formData.append('content', content);
+        formData.append('is_reel', '1');
+
+        if (videoPath) {
+          // Video already uploaded via chunks
+          formData.append('chunked_video_path', videoPath);
+        } else {
+          // Small video — attach directly
+          formData.append('video', reelVideoFile);
+        }
+
+        // Trim info
+        const trimStartSec = reelTrimStart * reelDuration;
+        const trimEndSec = reelTrimEnd * reelDuration;
+        formData.append('trim_start', trimStartSec.toFixed(2));
+        formData.append('trim_end', trimEndSec.toFixed(2));
+        formData.append('cover_time', reelCoverTime.toFixed(2));
+
+        // Audio
+        const muted = document.getElementById('crMuteAudio')?.checked;
+        const volume = document.getElementById('crAudioVolume')?.value || '100';
+        formData.append('audio_muted', muted ? '1' : '0');
+        formData.append('audio_volume', volume);
+
+        // Hashtags
+        const hashtags = content.match(/#[\w]+/g);
+        if (hashtags) {
+          formData.append('hashtags', JSON.stringify(hashtags.map(h => h.substring(1))));
+        }
+
+        // Poll
+        const pollSection = document.getElementById('pollSection');
+        if (pollSection && pollSection.style.display !== 'none') {
+          const pollQuestion = document.getElementById('pollQuestion')?.value;
+          const pollOptions = Array.from(document.querySelectorAll('#pollSection .poll-option'))
+            .map(input => input.value).filter(val => val.trim());
+          const pollExpiry = document.getElementById('pollExpiry')?.value;
+
+          if (pollQuestion && pollOptions.length >= 2) {
+            formData.append('poll_question', pollQuestion);
+            formData.append('poll_options', JSON.stringify(pollOptions));
+            if (pollExpiry) formData.append('poll_expiry', pollExpiry);
+          } else if (pollQuestion || pollOptions.length > 0) {
+            shareBtn.disabled = false;
+            shareBtn.classList.remove('cp-sharing');
+            shareBtn.textContent = 'Share';
+            InnovateAPI.showAlert('Poll needs a question and at least 2 options', 'error');
+            return;
+          }
+        }
+
+        // Schedule
+        if (scheduleTime) formData.append('scheduled_at', scheduleTime);
+
+        // Action buttons
+        formData.append('enable_contact', enableContact ? '1' : '0');
+        formData.append('enable_interested', enableInterested ? '1' : '0');
+
+        // Custom button
+        const customButtonData = collectCustomButtonData();
+        if (customButtonData) formData.append('custom_button', JSON.stringify(customButtonData));
+
+        // Comment to DM
+        const commentDMData = collectCommentDMData();
+        if (commentDMData) formData.append('comment_to_dm', JSON.stringify(commentDMData));
+
+        await InnovateAPI.apiRequest('/posts', {
+          method: 'POST',
+          body: formData,
+          headers: {}
+        });
+
+        InnovateAPI.showAlert(scheduleTime ? 'Reel scheduled!' : 'Reel shared!', 'success');
+        document.getElementById('createPostModal').style.display = 'none';
+        resetReelFields();
+        loadPosts();
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to create reel', 'error');
+      } finally {
+        shareBtn.disabled = false;
+        shareBtn.classList.remove('cp-sharing');
+        shareBtn.textContent = 'Share';
       }
     }
 
@@ -4306,11 +5222,6 @@
         video.preload = 'metadata';
         video.onloadedmetadata = function() {
           window.URL.revokeObjectURL(video.src);
-          if (video.duration > 120) {
-            InnovateAPI.showAlert('Video must be 120 seconds or less', 'error');
-            e.target.value = '';
-            return;
-          }
           
           video.src = URL.createObjectURL(file);
           video.controls = true;

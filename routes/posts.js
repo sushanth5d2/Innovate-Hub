@@ -3,6 +3,119 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { getDb } = require('../config/database');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+
+// Lightweight multer for chunk uploads — no logging, writes to temp
+const chunkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, path.join(__dirname, '..', 'uploads', 'temp')),
+    filename: (req, file, cb) => cb(null, 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2))
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB per chunk max
+});
+
+// ===== Chunked Upload Endpoints =====
+// For large video files that exceed proxy limits
+
+// Initialize a chunked upload session
+router.post('/upload/init', authMiddleware, (req, res) => {
+  const { fileName, fileSize, mimeType, totalChunks } = req.body;
+  if (!fileName || !totalChunks) {
+    return res.status(400).json({ error: 'fileName and totalChunks required' });
+  }
+  const uploadId = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
+  fs.mkdirSync(tempDir, { recursive: true });
+
+  const meta = { fileName, fileSize, mimeType, totalChunks: parseInt(totalChunks), receivedChunks: 0, userId: req.user.userId };
+  fs.writeFileSync(path.join(tempDir, 'meta.json'), JSON.stringify(meta));
+
+  res.json({ uploadId });
+});
+
+// Upload a single chunk — uses lightweight multer
+router.post('/upload/chunk', authMiddleware, chunkUpload.single('chunk'), (req, res) => {
+  const { uploadId, chunkIndex } = req.body;
+  if (!uploadId || chunkIndex === undefined) {
+    return res.status(400).json({ error: 'uploadId and chunkIndex required' });
+  }
+
+  const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
+  const metaPath = path.join(tempDir, 'meta.json');
+  if (!fs.existsSync(metaPath)) {
+    return res.status(404).json({ error: 'Upload session not found' });
+  }
+
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  if (meta.userId !== req.user.userId) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  if (req.file) {
+    const chunkPath = path.join(tempDir, `chunk_${chunkIndex}`);
+    fs.renameSync(req.file.path, chunkPath);
+    meta.receivedChunks++;
+    fs.writeFileSync(metaPath, JSON.stringify(meta));
+  }
+
+  res.json({ received: meta.receivedChunks, total: meta.totalChunks });
+});
+
+// Finalize: assemble chunks into final file
+router.post('/upload/finalize', authMiddleware, (req, res) => {
+  const { uploadId } = req.body;
+  if (!uploadId) {
+    return res.status(400).json({ error: 'uploadId required' });
+  }
+
+  const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
+  const metaPath = path.join(tempDir, 'meta.json');
+  if (!fs.existsSync(metaPath)) {
+    return res.status(404).json({ error: 'Upload session not found' });
+  }
+
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+  if (meta.userId !== req.user.userId) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  // Assemble all chunks
+  const ext = path.extname(meta.fileName) || '.mp4';
+  const finalName = Date.now() + '-' + Math.round(Math.random() * 1E9) + ext;
+  const finalPath = path.join(__dirname, '..', 'uploads', 'images', finalName);
+
+  try {
+    const writeStream = fs.createWriteStream(finalPath);
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkPath = path.join(tempDir, `chunk_${i}`);
+      if (!fs.existsSync(chunkPath)) {
+        writeStream.close();
+        fs.unlinkSync(finalPath);
+        return res.status(400).json({ error: `Missing chunk ${i}` });
+      }
+      const data = fs.readFileSync(chunkPath);
+      writeStream.write(data);
+    }
+    writeStream.end();
+
+    writeStream.on('finish', () => {
+      // Clean up temp directory
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch(e) { /* ignore cleanup errors */ }
+
+      res.json({ filePath: `/uploads/images/${finalName}` });
+    });
+
+    writeStream.on('error', (err) => {
+      res.status(500).json({ error: 'Failed to assemble file' });
+    });
+  } catch(err) {
+    res.status(500).json({ error: 'Failed to assemble file' });
+  }
+});
 
 // Get all posts (home feed)
 router.get('/', authMiddleware, (req, res) => {
@@ -209,16 +322,27 @@ router.get('/trending-hashtags', authMiddleware, (req, res) => {
 });
 
 // Create post
-router.post('/', authMiddleware, upload.fields([
-  { name: 'images', maxCount: 10 },
-  { name: 'files', maxCount: 5 },
-  { name: 'video', maxCount: 1 }
-]), (req, res) => {
+router.post('/', authMiddleware, (req, res, next) => {
+  upload.fields([
+    { name: 'images', maxCount: 10 },
+    { name: 'files', maxCount: 5 },
+    { name: 'video', maxCount: 1 }
+  ])(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Maximum size is 100MB.' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload error' });
+    }
+    next();
+  });
+}, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { 
     content, 
     is_story, 
+    is_reel,
     scheduled_at, 
     video_url,
     hashtags,
@@ -234,6 +358,11 @@ router.post('/', authMiddleware, upload.fields([
   let images = [];
   let files = [];
   let videoPath = video_url || null;
+
+  // If video was uploaded via chunked upload, use that path
+  if (req.body.chunked_video_path) {
+    videoPath = req.body.chunked_video_path;
+  }
 
   if (req.files) {
     if (req.files.images) {
@@ -260,8 +389,8 @@ router.post('/', authMiddleware, upload.fields([
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_reel, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -273,6 +402,7 @@ router.post('/', authMiddleware, upload.fields([
       JSON.stringify(files),
       videoPath,
       is_story === 'true' || is_story === true ? 1 : 0,
+      is_reel === 'true' || is_reel === true || is_reel === '1' ? 1 : 0,
       scheduled_at || null,
       expires_at,
       hashtags || null,
