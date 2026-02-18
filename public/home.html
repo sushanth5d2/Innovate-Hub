@@ -88,7 +88,7 @@
       </svg>
       <span class="ig-bottom-nav-label">Create</span>
     </button>
-    <a href="/search" class="ig-bottom-nav-item" id="searchReelsTab">
+    <a href="/search" class="ig-bottom-nav-item" id="searchCreatorSeriesTab">
       <svg aria-label="Explore" viewBox="0 0 24 24" width="24">
         <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -119,26 +119,26 @@
       }
     }
     
-    // Open Reels from sessionStorage (when navigating from search/explore page)
-    function checkOpenReelFromSession() {
-      const reelPosts = sessionStorage.getItem('openReelPosts');
-      const reelIndex = sessionStorage.getItem('openReelIndex');
-      if (reelPosts && reelIndex !== null) {
-        sessionStorage.removeItem('openReelPosts');
-        sessionStorage.removeItem('openReelIndex');
+    // Open Creator Series from sessionStorage (when navigating from search/explore page)
+    function checkOpenCreatorSeriesFromSession() {
+      const creatorSeriesPosts = sessionStorage.getItem('openCreatorSeriesPosts');
+      const creatorSeriesIndex = sessionStorage.getItem('openCreatorSeriesIndex');
+      if (creatorSeriesPosts && creatorSeriesIndex !== null) {
+        sessionStorage.removeItem('openCreatorSeriesPosts');
+        sessionStorage.removeItem('openCreatorSeriesIndex');
         try {
-          const posts = JSON.parse(reelPosts);
+          const posts = JSON.parse(creatorSeriesPosts);
           setTimeout(() => {
-            openFullScreenPost(parseInt(reelIndex) || 0, posts);
+            openFullScreenPost(parseInt(creatorSeriesIndex) || 0, posts);
             setTimeout(() => {
               const header = document.querySelector('.ig-fullscreen-header span');
-              if (header) header.textContent = 'Reels';
+              if (header) header.textContent = 'Creator Series';
             }, 50);
           }, 500);
-        } catch(e) { console.error('Error opening reel:', e); }
+        } catch(e) { console.error('Error opening creator series:', e); }
       }
     }
-    window.addEventListener('load', checkOpenReelFromSession);
+    window.addEventListener('load', checkOpenCreatorSeriesFromSession);
   </script>
 
   <!-- Create Post Modal - Instagram Style -->
@@ -153,15 +153,15 @@
         <button class="cp-share-btn" onclick="submitCreateContent()" id="cpShareBtn">Share</button>
       </div>
 
-      <!-- Tab Switcher (Post / Reel) -->
+      <!-- Tab Switcher (Post / Creator Series) -->
       <div class="cr-tab-bar">
         <button class="cr-tab active" data-tab="post" onclick="switchCreateTab('post')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           Post
         </button>
-        <button class="cr-tab" data-tab="reel" onclick="switchCreateTab('reel')">
+        <button class="cr-tab" data-tab="creatorSeries" onclick="switchCreateTab('creatorSeries')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
-          Reel
+          Creator Series
         </button>
       </div>
 
@@ -235,13 +235,13 @@
           </div>
         </div>
 
-        <!-- ===== REEL-SPECIFIC MEDIA (shown when Reel tab active) ===== -->
-        <div id="crReelMedia" class="cr-media-section" style="display: none;">
-          <!-- Reel Video Upload Zone -->
-          <div id="crReelUploadZone" class="cr-reel-upload-zone">
-            <input type="file" id="reelVideoInput" accept="video/*" style="display:none;" onchange="onReelVideoSelected(event)">
-            <div class="cr-reel-upload-placeholder" id="crReelPlaceholder" onclick="document.getElementById('reelVideoInput').click()">
-              <div class="cr-reel-upload-icon">
+        <!-- ===== CREATOR SERIES-SPECIFIC MEDIA (shown when Creator Series tab active) ===== -->
+        <div id="crCreatorSeriesMedia" class="cr-media-section" style="display: none;">
+          <!-- Creator Series Video Upload Zone -->
+          <div id="crCreatorSeriesUploadZone" class="cr-cseries-upload-zone">
+            <input type="file" id="creatorSeriesVideoInput" accept="video/*" style="display:none;" onchange="onCreatorSeriesVideoSelected(event)">
+            <div class="cr-cseries-upload-placeholder" id="crCreatorSeriesPlaceholder" onclick="document.getElementById('creatorSeriesVideoInput').click()">
+              <div class="cr-cseries-upload-icon">
                 <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="1.2">
                   <rect x="2" y="2" width="20" height="20" rx="2.18"/>
                   <line x1="7" y1="2" x2="7" y2="22"/>
@@ -253,20 +253,20 @@
                   <line x1="17" y1="17" x2="22" y2="17"/>
                 </svg>
               </div>
-              <p class="cr-reel-upload-text">Tap to upload a video</p>
-              <p class="cr-reel-upload-hint">MP4, MOV, WebM · No time limit</p>
+              <p class="cr-cseries-upload-text">Tap to upload a video</p>
+              <p class="cr-cseries-upload-hint">MP4, MOV, WebM · No time limit</p>
             </div>
           </div>
 
-          <!-- Reel Video Preview (hidden until video selected) -->
-          <div id="crReelPreview" class="cr-reel-preview" style="display: none;">
-            <div class="cr-reel-video-wrap">
-              <video id="crReelVideo" class="cr-reel-video" playsinline></video>
-              <div class="cr-reel-play-overlay" id="crReelPlayOverlay" onclick="toggleReelPlayback()">
+          <!-- Creator Series Video Preview (hidden until video selected) -->
+          <div id="crCreatorSeriesPreview" class="cr-cseries-preview" style="display: none;">
+            <div class="cr-cseries-video-wrap">
+              <video id="crCreatorSeriesVideo" class="cr-cseries-video" playsinline></video>
+              <div class="cr-cseries-play-overlay" id="crCreatorSeriesPlayOverlay" onclick="toggleCreatorSeriesPlayback()">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
-              <div class="cr-reel-duration" id="crReelDuration">0:00</div>
-              <button class="cr-reel-change-btn" onclick="changeReelVideo()">
+              <div class="cr-cseries-duration" id="crCreatorSeriesDuration">0:00</div>
+              <button class="cr-cseries-change-btn" onclick="changeCreatorSeriesVideo()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
                 Change
               </button>
@@ -306,7 +306,7 @@
 
             <!-- Audio Section -->
             <div class="cr-audio-section">
-              <div class="cr-audio-header" onclick="toggleReelAudio()">
+              <div class="cr-audio-header" onclick="toggleCreatorSeriesAudio()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 <span>Audio</span>
                 <svg class="cr-audio-chevron" id="crAudioChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -330,9 +330,9 @@
             </div>
           </div>
 
-          <!-- Reel Toolbar -->
+          <!-- Creator Series Toolbar -->
           <div class="cp-toolbar">
-            <label class="cp-tool-btn cr-reel-upload-btn" title="Upload Video" onclick="document.getElementById('reelVideoInput').click()">
+            <label class="cp-tool-btn cr-cseries-upload-btn" title="Upload Video" onclick="document.getElementById('creatorSeriesVideoInput').click()">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <rect x="2" y="2" width="20" height="20" rx="2.18"/>
                 <line x1="7" y1="2" x2="7" y2="22"/>
@@ -345,7 +345,7 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
               <span class="cp-tool-label">Poll</span>
             </button>
-            <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Reel">
+            <button class="cp-tool-btn" onclick="toggleSchedule()" title="Schedule Creator Series">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span class="cp-tool-label">Schedule</span>
             </button>
@@ -616,7 +616,7 @@
       pointer-events: none;
     }
 
-    /* ===== Post/Reel Tab Bar ===== */
+    /* ===== Post/Creator Series Tab Bar ===== */
     .cr-tab-bar {
       display: flex;
       border-bottom: 1px solid var(--ig-border);
@@ -644,12 +644,12 @@
     }
     .cr-tab svg { flex-shrink: 0; }
 
-    /* ===== Reel Creation Styles ===== */
+    /* ===== Creator Series Creation Styles ===== */
     .cr-media-section { }
 
     /* Upload zone */
-    .cr-reel-upload-zone { padding: 0 16px; }
-    .cr-reel-upload-placeholder {
+    .cr-cseries-upload-zone { padding: 0 16px; }
+    .cr-cseries-upload-placeholder {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 40px 20px;
       border: 2px dashed var(--ig-border);
@@ -658,25 +658,25 @@
       transition: all 0.2s;
       margin: 8px 0;
     }
-    .cr-reel-upload-placeholder:hover {
+    .cr-cseries-upload-placeholder:hover {
       border-color: var(--ig-blue);
       background: rgba(0,149,246,0.03);
     }
-    .cr-reel-upload-icon { margin-bottom: 12px; opacity: 0.6; }
-    .cr-reel-upload-text {
+    .cr-cseries-upload-icon { margin-bottom: 12px; opacity: 0.6; }
+    .cr-cseries-upload-text {
       font-size: 16px; font-weight: 600;
       color: var(--ig-primary-text);
       margin: 0 0 4px;
     }
-    .cr-reel-upload-hint {
+    .cr-cseries-upload-hint {
       font-size: 12px;
       color: var(--ig-secondary-text);
       margin: 0;
     }
 
     /* Video preview */
-    .cr-reel-preview { padding: 0 16px; }
-    .cr-reel-video-wrap {
+    .cr-cseries-preview { padding: 0 16px; }
+    .cr-cseries-video-wrap {
       position: relative;
       border-radius: 12px;
       overflow: hidden;
@@ -684,12 +684,12 @@
       max-height: 320px;
       display: flex; align-items: center; justify-content: center;
     }
-    .cr-reel-video {
+    .cr-cseries-video {
       width: 100%; max-height: 320px;
       object-fit: contain;
       display: block;
     }
-    .cr-reel-play-overlay {
+    .cr-cseries-play-overlay {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.25);
@@ -697,15 +697,15 @@
       opacity: 0;
       transition: opacity 0.2s;
     }
-    .cr-reel-video-wrap:hover .cr-reel-play-overlay { opacity: 1; }
-    .cr-reel-play-overlay.cr-paused { opacity: 1; }
-    .cr-reel-duration {
+    .cr-cseries-video-wrap:hover .cr-cseries-play-overlay { opacity: 1; }
+    .cr-cseries-play-overlay.cr-paused { opacity: 1; }
+    .cr-cseries-duration {
       position: absolute; bottom: 8px; right: 8px;
       background: rgba(0,0,0,0.7);
       color: #fff; font-size: 12px; font-weight: 600;
       padding: 2px 8px; border-radius: 4px;
     }
-    .cr-reel-change-btn {
+    .cr-cseries-change-btn {
       position: absolute; top: 8px; right: 8px;
       display: flex; align-items: center; gap: 4px;
       background: rgba(0,0,0,0.6);
@@ -715,7 +715,7 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .cr-reel-change-btn:hover { background: rgba(0,0,0,0.8); }
+    .cr-cseries-change-btn:hover { background: rgba(0,0,0,0.8); }
 
     /* Trim section */
     .cr-trim-section {
@@ -1392,8 +1392,8 @@
       .cp-container { max-width: 100%; max-height: 100vh; border-radius: 0; height: 100%; }
       .cp-overlay { padding: 0; }
       .cp-media-grid { grid-template-columns: repeat(3, 1fr); }
-      .cr-reel-video-wrap { max-height: 240px; }
-      .cr-reel-video { max-height: 240px; }
+      .cr-cseries-video-wrap { max-height: 240px; }
+      .cr-cseries-video { max-height: 240px; }
       .cr-cover-thumbnails canvas { width: 44px; height: 78px; }
       .cr-tab { font-size: 13px; padding: 10px 0; }
     }
@@ -3534,18 +3534,18 @@
       
       // Handle media (images or video)
       let mediaHtml = '';
-      const isReel = post.is_reel || post.video_url; // treat all video posts as reels for now
+      const isCreatorSeries = post.is_creator_series || post.video_url; // treat all video posts as creator series for now
       if (post.video_url) {
-        if (isReel) {
-          // Reel: clicking opens full-screen viewer, no inline play/pause
+        if (isCreatorSeries) {
+          // Creator Series: clicking opens full-screen viewer, no inline play/pause
           mediaHtml = `
-            <div class="ig-post-video-container ig-feed-reel" data-post-id="${post.id}">
+            <div class="ig-post-video-container ig-feed-cseries" data-post-id="${post.id}">
               <video src="${post.video_url}" class="ig-post-image" playsinline loop muted preload="metadata"></video>
-              <div class="ig-reel-badge">
+              <div class="ig-cseries-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Reel
+                Creator Series
               </div>
-              <div class="ig-feed-reel-play-icon">
+              <div class="ig-feed-cseries-play-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
               <button class="ig-video-sound-btn" onclick="toggleVideoSound(this, event)">
@@ -3705,7 +3705,7 @@
           const totalVotes = typeof votesObj === 'object' && !Array.isArray(votesObj) ? Object.values(votesObj).reduce((a, b) => a + b, 0) : (Array.isArray(votesObj) ? votesObj.reduce((a, b) => a + b, 0) : 0);
           const userVoted = post.poll.user_voted || null;
           return `
-        <div class="ig-poll" style="margin: 12px 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;" onclick="event.stopPropagation()">
+        <div class="ig-poll" data-post-id="${post.id}" style="margin: 12px 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;" onclick="event.stopPropagation()">
           <div style="font-weight: 600; margin-bottom: 12px;">${post.poll.question}</div>
           ${post.poll.options.map((option, idx) => {
             const voteCount = typeof votesObj === 'object' && !Array.isArray(votesObj) ? (votesObj[option] || 0) : (Array.isArray(votesObj) ? (votesObj[idx] || 0) : 0);
@@ -3854,16 +3854,47 @@
       }
     }
 
-    // Video sound toggle
+    // Global mute state — shared across all videos (feed + fullscreen)
+    window._globalMuted = true; // Start muted (autoplay requires muted)
+
+    function getMutedIconSvg(size) {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`;
+    }
+    function getUnmutedIconSvg(size) {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+    }
+
+    // Apply global mute state to ALL videos on the page
+    function applyGlobalMuteState() {
+      // Feed videos
+      document.querySelectorAll('.ig-post-video-container video').forEach(v => {
+        v.muted = window._globalMuted;
+      });
+      // Fullscreen videos
+      document.querySelectorAll('.ig-fullscreen-post video').forEach(v => {
+        v.muted = window._globalMuted;
+      });
+      // Update all feed sound button icons
+      document.querySelectorAll('.ig-video-sound-btn').forEach(btn => {
+        btn.innerHTML = window._globalMuted ? getMutedIconSvg(16) : getUnmutedIconSvg(16);
+      });
+      // Update all fullscreen mute button icons
+      document.querySelectorAll('.ig-cseries-mute-btn').forEach(btn => {
+        const mutedIcon = btn.querySelector('.muted-icon');
+        const unmutedIcon = btn.querySelector('.unmuted-icon');
+        if (mutedIcon && unmutedIcon) {
+          mutedIcon.style.display = window._globalMuted ? '' : 'none';
+          unmutedIcon.style.display = window._globalMuted ? 'none' : '';
+        }
+      });
+    }
+
+    // Video sound toggle (feed videos)
     function toggleVideoSound(btn, event) {
       event.preventDefault();
       event.stopPropagation();
-      const video = btn.closest('.ig-post-video-container')?.querySelector('video');
-      if (!video) return;
-      video.muted = !video.muted;
-      btn.innerHTML = video.muted 
-        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+      window._globalMuted = !window._globalMuted;
+      applyGlobalMuteState();
     }
 
     // Auto-play videos when they come into view
@@ -3922,10 +3953,71 @@
         });
         if (response.success) {
           InnovateAPI.showAlert('Vote recorded!', 'success');
-          loadPosts(); // Refresh to show updated percentages
+
+          // Update poll UI in-place (works in both feed and fullscreen)
+          if (response.votes) {
+            const pollData = { votes: response.votes };
+            // Update all poll containers for this post (feed + fullscreen)
+            document.querySelectorAll(`.ig-poll[data-post-id="${postId}"], .ig-cseries-poll[data-post-id="${postId}"]`).forEach(pollEl => {
+              updatePollUI(pollEl, pollData, option);
+            });
+            // Also update in fullScreenPosts array so re-renders stay correct
+            if (fullScreenPosts) {
+              const fsPost = fullScreenPosts.find(p => p.id === postId);
+              if (fsPost && fsPost.poll) {
+                fsPost.poll.user_voted = option;
+                fsPost.poll.votes = response.votes;
+              }
+            }
+          }
+
+          loadPosts(); // Also refresh feed in background
         }
       } catch (error) {
         InnovateAPI.showAlert(error.message || 'Failed to vote', 'error');
+      }
+    }
+
+    // Update poll UI in-place without full reload
+    function updatePollUI(pollEl, pollData, votedOption) {
+      const votes = pollData.votes || {};
+      const totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
+      const options = pollEl.querySelectorAll('.poll-option');
+      options.forEach(optEl => {
+        const labelSpans = optEl.querySelectorAll('.poll-option-label span');
+        if (labelSpans.length < 2) return;
+        const optionText = labelSpans[0].textContent.replace(/^✓\s*/, '').trim();
+        const voteCount = votes[optionText] || 0;
+        const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+        const isSelected = optionText === votedOption;
+
+        // Update bar width
+        const bar = optEl.querySelector('.poll-bar');
+        if (bar) {
+          bar.style.width = percentage + '%';
+          bar.style.opacity = isSelected ? '0.35' : '';
+        }
+
+        // Update label
+        labelSpans[0].textContent = (isSelected ? '✓ ' : '') + optionText;
+        labelSpans[1].textContent = percentage + '%';
+
+        // Update voted class
+        optEl.classList.toggle('poll-voted', isSelected);
+      });
+
+      // Update vote count text
+      const voteInfo = pollEl.querySelector('div:last-child');
+      if (voteInfo) {
+        const countSpan = voteInfo.querySelector('span:first-child');
+        if (countSpan) countSpan.textContent = totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '');
+        // Add "You voted" if not present
+        if (!voteInfo.querySelector('span[style*="color:var(--ig-blue)"]')) {
+          const youVoted = document.createElement('span');
+          youVoted.style.color = 'var(--ig-blue)';
+          youVoted.textContent = 'You voted';
+          voteInfo.appendChild(youVoted);
+        }
       }
     }
 
@@ -4132,7 +4224,7 @@
       
       // Reset to Post tab
       switchCreateTab('post');
-      resetReelFields();
+      resetCreatorSeriesFields();
 
       // Reset all fields
       document.getElementById('postContent').value = '';
@@ -4199,13 +4291,13 @@
       }
     }
 
-    // ===== Create Tab Switching (Post / Reel) =====
+    // ===== Create Tab Switching (Post / Creator Series) =====
     let activeCreateTab = 'post';
-    let reelVideoFile = null;
-    let reelTrimStart = 0;
-    let reelTrimEnd = 1; // fraction 0-1
-    let reelCoverTime = 0;
-    let reelDuration = 0;
+    let creatorSeriesVideoFile = null;
+    let creatorSeriesTrimStart = 0;
+    let creatorSeriesTrimEnd = 1; // fraction 0-1
+    let creatorSeriesCoverTime = 0;
+    let creatorSeriesDuration = 0;
 
     function switchCreateTab(tab) {
       if (tab === activeCreateTab) return;
@@ -4218,25 +4310,25 @@
 
       // Toggle media sections
       const postMedia = document.getElementById('crPostMedia');
-      const reelMedia = document.getElementById('crReelMedia');
+      const creatorSeriesMedia = document.getElementById('crCreatorSeriesMedia');
       if (postMedia) postMedia.style.display = tab === 'post' ? '' : 'none';
-      if (reelMedia) reelMedia.style.display = tab === 'reel' ? '' : 'none';
+      if (creatorSeriesMedia) creatorSeriesMedia.style.display = tab === 'creatorSeries' ? '' : 'none';
 
       // Update header title
       const title = document.getElementById('cpHeaderTitle');
-      if (title) title.textContent = tab === 'reel' ? 'Create new reel' : 'Create new post';
+      if (title) title.textContent = tab === 'creatorSeries' ? 'Create new creator series' : 'Create new post';
     }
 
     function submitCreateContent() {
-      if (activeCreateTab === 'reel') {
-        submitReel();
+      if (activeCreateTab === 'creatorSeries') {
+        submitCreatorSeries();
       } else {
         submitPost();
       }
     }
 
-    // ===== Reel Video Handling =====
-    function onReelVideoSelected(event) {
+    // ===== Creator Series Video Handling =====
+    function onCreatorSeriesVideoSelected(event) {
       const file = event.target.files[0];
       if (!file) return;
       if (!file.type.startsWith('video/')) {
@@ -4244,28 +4336,28 @@
         return;
       }
 
-      reelVideoFile = file;
-      const video = document.getElementById('crReelVideo');
+      creatorSeriesVideoFile = file;
+      const video = document.getElementById('crCreatorSeriesVideo');
       const url = URL.createObjectURL(file);
       video.src = url;
 
       video.onloadedmetadata = () => {
-        reelDuration = video.duration;
-        reelTrimStart = 0;
-        reelTrimEnd = 1;
-        reelCoverTime = 0;
+        creatorSeriesDuration = video.duration;
+        creatorSeriesTrimStart = 0;
+        creatorSeriesTrimEnd = 1;
+        creatorSeriesCoverTime = 0;
 
         // Show preview, hide placeholder
-        document.getElementById('crReelPlaceholder').style.display = 'none';
-        document.getElementById('crReelPreview').style.display = '';
-        document.getElementById('crReelDuration').textContent = formatReelTime(reelDuration);
+        document.getElementById('crCreatorSeriesPlaceholder').style.display = 'none';
+        document.getElementById('crCreatorSeriesPreview').style.display = '';
+        document.getElementById('crCreatorSeriesDuration').textContent = formatCreatorSeriesTime(creatorSeriesDuration);
         // Show file size info
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
         const sizeInfo = sizeMB > 50 ? ` · ${sizeMB}MB (will compress)` : ` · ${sizeMB}MB`;
-        document.getElementById('crReelDuration').textContent = formatReelTime(reelDuration) + sizeInfo;
-        document.getElementById('crTrimEndTime').textContent = formatReelTime(reelDuration);
+        document.getElementById('crCreatorSeriesDuration').textContent = formatCreatorSeriesTime(creatorSeriesDuration) + sizeInfo;
+        document.getElementById('crTrimEndTime').textContent = formatCreatorSeriesTime(creatorSeriesDuration);
         document.getElementById('crTrimStartTime').textContent = '0:00';
-        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(reelDuration);
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatCreatorSeriesTime(creatorSeriesDuration);
 
         // Reset trim handles
         const startHandle = document.getElementById('crTrimStart');
@@ -4282,13 +4374,13 @@
       };
 
       video.onended = () => {
-        document.getElementById('crReelPlayOverlay').classList.add('cr-paused');
+        document.getElementById('crCreatorSeriesPlayOverlay').classList.add('cr-paused');
       };
     }
 
-    function toggleReelPlayback() {
-      const video = document.getElementById('crReelVideo');
-      const overlay = document.getElementById('crReelPlayOverlay');
+    function toggleCreatorSeriesPlayback() {
+      const video = document.getElementById('crCreatorSeriesVideo');
+      const overlay = document.getElementById('crCreatorSeriesPlayOverlay');
       if (video.paused) {
         video.play();
         overlay.classList.remove('cr-paused');
@@ -4298,18 +4390,18 @@
       }
     }
 
-    function changeReelVideo() {
-      const video = document.getElementById('crReelVideo');
+    function changeCreatorSeriesVideo() {
+      const video = document.getElementById('crCreatorSeriesVideo');
       if (video) { video.pause(); video.src = ''; }
-      reelVideoFile = null;
-      reelDuration = 0;
-      document.getElementById('crReelPreview').style.display = 'none';
-      document.getElementById('crReelPlaceholder').style.display = '';
-      document.getElementById('reelVideoInput').value = '';
-      document.getElementById('reelVideoInput').click();
+      creatorSeriesVideoFile = null;
+      creatorSeriesDuration = 0;
+      document.getElementById('crCreatorSeriesPreview').style.display = 'none';
+      document.getElementById('crCreatorSeriesPlaceholder').style.display = '';
+      document.getElementById('creatorSeriesVideoInput').value = '';
+      document.getElementById('creatorSeriesVideoInput').click();
     }
 
-    function formatReelTime(seconds) {
+    function formatCreatorSeriesTime(seconds) {
       if (!seconds || isNaN(seconds)) return '0:00';
       const m = Math.floor(seconds / 60);
       const s = Math.floor(seconds % 60);
@@ -4335,7 +4427,7 @@
       tempVideo.preload = 'auto';
 
       function drawFrame(idx) {
-        const time = (idx / numFrames) * reelDuration;
+        const time = (idx / numFrames) * creatorSeriesDuration;
         tempVideo.currentTime = time;
       }
 
@@ -4363,8 +4455,8 @@
       let currentIdx = 0;
 
       function createThumb(idx) {
-        const time = (idx / (numFrames - 1)) * reelDuration;
-        tempVideo.currentTime = Math.min(time, reelDuration - 0.1);
+        const time = (idx / (numFrames - 1)) * creatorSeriesDuration;
+        tempVideo.currentTime = Math.min(time, creatorSeriesDuration - 0.1);
       }
 
       tempVideo.onseeked = () => {
@@ -4399,14 +4491,14 @@
       // Deselect all
       document.querySelectorAll('.cr-cover-thumbnails canvas').forEach(c => c.classList.remove('cr-cover-selected'));
       canvasEl.classList.add('cr-cover-selected');
-      reelCoverTime = parseFloat(canvasEl.dataset.time) || 0;
-      updateCoverFrame(reelCoverTime);
+      creatorSeriesCoverTime = parseFloat(canvasEl.dataset.time) || 0;
+      updateCoverFrame(creatorSeriesCoverTime);
     }
 
     function updateCoverFrame(time) {
       const coverCanvas = document.getElementById('crCoverCanvas');
       if (!coverCanvas) return;
-      const video = document.getElementById('crReelVideo');
+      const video = document.getElementById('crCreatorSeriesVideo');
       if (!video || !video.src) return;
 
       const tempVideo = document.createElement('video');
@@ -4444,17 +4536,17 @@
         const frac = x / rect.width;
 
         if (dragging === 'start') {
-          reelTrimStart = Math.min(frac, reelTrimEnd - 0.05);
-          document.getElementById('crTrimStart').style.left = (reelTrimStart * 100) + '%';
-          document.getElementById('crTrimStartTime').textContent = formatReelTime(reelTrimStart * reelDuration);
+          creatorSeriesTrimStart = Math.min(frac, creatorSeriesTrimEnd - 0.05);
+          document.getElementById('crTrimStart').style.left = (creatorSeriesTrimStart * 100) + '%';
+          document.getElementById('crTrimStartTime').textContent = formatCreatorSeriesTime(creatorSeriesTrimStart * creatorSeriesDuration);
         } else {
-          reelTrimEnd = Math.max(frac, reelTrimStart + 0.05);
-          document.getElementById('crTrimEnd').style.left = (reelTrimEnd * 100 - 3) + '%';
-          document.getElementById('crTrimEndTime').textContent = formatReelTime(reelTrimEnd * reelDuration);
+          creatorSeriesTrimEnd = Math.max(frac, creatorSeriesTrimStart + 0.05);
+          document.getElementById('crTrimEnd').style.left = (creatorSeriesTrimEnd * 100 - 3) + '%';
+          document.getElementById('crTrimEndTime').textContent = formatCreatorSeriesTime(creatorSeriesTrimEnd * creatorSeriesDuration);
         }
 
-        const trimDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
-        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(trimDuration);
+        const trimDuration = (creatorSeriesTrimEnd - creatorSeriesTrimStart) * creatorSeriesDuration;
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatCreatorSeriesTime(trimDuration);
       });
 
       document.addEventListener('mouseup', () => { dragging = null; });
@@ -4475,24 +4567,24 @@
         const frac = x / rect.width;
 
         if (dragging === 'start') {
-          reelTrimStart = Math.min(frac, reelTrimEnd - 0.05);
-          document.getElementById('crTrimStart').style.left = (reelTrimStart * 100) + '%';
-          document.getElementById('crTrimStartTime').textContent = formatReelTime(reelTrimStart * reelDuration);
+          creatorSeriesTrimStart = Math.min(frac, creatorSeriesTrimEnd - 0.05);
+          document.getElementById('crTrimStart').style.left = (creatorSeriesTrimStart * 100) + '%';
+          document.getElementById('crTrimStartTime').textContent = formatCreatorSeriesTime(creatorSeriesTrimStart * creatorSeriesDuration);
         } else {
-          reelTrimEnd = Math.max(frac, reelTrimStart + 0.05);
-          document.getElementById('crTrimEnd').style.left = (reelTrimEnd * 100 - 3) + '%';
-          document.getElementById('crTrimEndTime').textContent = formatReelTime(reelTrimEnd * reelDuration);
+          creatorSeriesTrimEnd = Math.max(frac, creatorSeriesTrimStart + 0.05);
+          document.getElementById('crTrimEnd').style.left = (creatorSeriesTrimEnd * 100 - 3) + '%';
+          document.getElementById('crTrimEndTime').textContent = formatCreatorSeriesTime(creatorSeriesTrimEnd * creatorSeriesDuration);
         }
 
-        const trimDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
-        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatReelTime(trimDuration);
+        const trimDuration = (creatorSeriesTrimEnd - creatorSeriesTrimStart) * creatorSeriesDuration;
+        document.getElementById('crTrimDurationLabel').textContent = 'Duration: ' + formatCreatorSeriesTime(trimDuration);
       }, { passive: true });
 
       document.addEventListener('touchend', () => { dragging = null; }, { passive: true });
     })();
 
-    // ===== Reel Audio Toggle =====
-    function toggleReelAudio() {
+    // ===== Creator Series Audio Toggle =====
+    function toggleCreatorSeriesAudio() {
       const opts = document.getElementById('crAudioOptions');
       const chevron = document.getElementById('crAudioChevron');
       if (!opts) return;
@@ -4504,32 +4596,32 @@
     // Volume slider
     document.getElementById('crAudioVolume')?.addEventListener('input', function() {
       document.getElementById('crVolumeLabel').textContent = this.value + '%';
-      const video = document.getElementById('crReelVideo');
+      const video = document.getElementById('crCreatorSeriesVideo');
       if (video) video.volume = this.value / 100;
     });
 
     // Mute toggle
     document.getElementById('crMuteAudio')?.addEventListener('change', function() {
-      const video = document.getElementById('crReelVideo');
+      const video = document.getElementById('crCreatorSeriesVideo');
       const volSection = document.getElementById('crVolumeSection');
       if (video) video.muted = this.checked;
       if (volSection) volSection.style.display = this.checked ? 'none' : '';
     });
 
-    // ===== Reset Reel Fields =====
-    function resetReelFields() {
-      reelVideoFile = null;
-      reelDuration = 0;
-      reelTrimStart = 0;
-      reelTrimEnd = 1;
-      reelCoverTime = 0;
-      const video = document.getElementById('crReelVideo');
+    // ===== Reset Creator Series Fields =====
+    function resetCreatorSeriesFields() {
+      creatorSeriesVideoFile = null;
+      creatorSeriesDuration = 0;
+      creatorSeriesTrimStart = 0;
+      creatorSeriesTrimEnd = 1;
+      creatorSeriesCoverTime = 0;
+      const video = document.getElementById('crCreatorSeriesVideo');
       if (video) { video.pause(); video.src = ''; }
-      const preview = document.getElementById('crReelPreview');
+      const preview = document.getElementById('crCreatorSeriesPreview');
       if (preview) preview.style.display = 'none';
-      const placeholder = document.getElementById('crReelPlaceholder');
+      const placeholder = document.getElementById('crCreatorSeriesPlaceholder');
       if (placeholder) placeholder.style.display = '';
-      const input = document.getElementById('reelVideoInput');
+      const input = document.getElementById('creatorSeriesVideoInput');
       if (input) input.value = '';
       const thumbs = document.getElementById('crCoverThumbnails');
       if (thumbs) thumbs.innerHTML = '';
@@ -4545,7 +4637,7 @@
       if (volSection) volSection.style.display = '';
     }
 
-    // ===== Submit Reel =====
+    // ===== Submit Creator Series =====
     // ===== Chunked Video Upload =====
     // Splits large videos into chunks to bypass proxy limits
     const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk (proxy limit ~10MB)
@@ -4604,32 +4696,32 @@
       return finalRes.filePath;
     }
 
-    async function submitReel() {
+    async function submitCreatorSeries() {
       const shareBtn = document.getElementById('cpShareBtn');
       const content = document.getElementById('postContent').value;
       const scheduleTime = document.getElementById('scheduleTime')?.value;
       const enableContact = document.getElementById('enableContact')?.checked;
       const enableInterested = document.getElementById('enableInterested')?.checked;
 
-      if (!reelVideoFile) {
-        InnovateAPI.showAlert('Please upload a video for your reel', 'error');
+      if (!creatorSeriesVideoFile) {
+        InnovateAPI.showAlert('Please upload a video for your creator series', 'error');
         return;
       }
 
       // Calculate trimmed duration
-      const trimmedDuration = (reelTrimEnd - reelTrimStart) * reelDuration;
+      const trimmedDuration = (creatorSeriesTrimEnd - creatorSeriesTrimStart) * creatorSeriesDuration;
 
       shareBtn.disabled = true;
       shareBtn.classList.add('cp-sharing');
 
       try {
         let videoPath;
-        const sizeMB = reelVideoFile.size / (1024 * 1024);
+        const sizeMB = creatorSeriesVideoFile.size / (1024 * 1024);
 
         if (sizeMB > 4) {
           // Large file → chunked upload
           shareBtn.textContent = 'Uploading 0%...';
-          videoPath = await uploadVideoChunked(reelVideoFile, (done, total) => {
+          videoPath = await uploadVideoChunked(creatorSeriesVideoFile, (done, total) => {
             const pct = Math.round((done / total) * 100);
             shareBtn.textContent = `Uploading ${pct}%...`;
           });
@@ -4643,22 +4735,22 @@
 
         const formData = new FormData();
         formData.append('content', content);
-        formData.append('is_reel', '1');
+        formData.append('is_creator_series', '1');
 
         if (videoPath) {
           // Video already uploaded via chunks
           formData.append('chunked_video_path', videoPath);
         } else {
           // Small video — attach directly
-          formData.append('video', reelVideoFile);
+          formData.append('video', creatorSeriesVideoFile);
         }
 
         // Trim info
-        const trimStartSec = reelTrimStart * reelDuration;
-        const trimEndSec = reelTrimEnd * reelDuration;
+        const trimStartSec = creatorSeriesTrimStart * creatorSeriesDuration;
+        const trimEndSec = creatorSeriesTrimEnd * creatorSeriesDuration;
         formData.append('trim_start', trimStartSec.toFixed(2));
         formData.append('trim_end', trimEndSec.toFixed(2));
-        formData.append('cover_time', reelCoverTime.toFixed(2));
+        formData.append('cover_time', creatorSeriesCoverTime.toFixed(2));
 
         // Audio
         const muted = document.getElementById('crMuteAudio')?.checked;
@@ -4714,12 +4806,12 @@
           headers: {}
         });
 
-        InnovateAPI.showAlert(scheduleTime ? 'Reel scheduled!' : 'Reel shared!', 'success');
+        InnovateAPI.showAlert(scheduleTime ? 'Creator Series scheduled!' : 'Creator Series shared!', 'success');
         document.getElementById('createPostModal').style.display = 'none';
-        resetReelFields();
+        resetCreatorSeriesFields();
         loadPosts();
       } catch (error) {
-        InnovateAPI.showAlert(error.message || 'Failed to create reel', 'error');
+        InnovateAPI.showAlert(error.message || 'Failed to create creator series', 'error');
       } finally {
         shareBtn.disabled = false;
         shareBtn.classList.remove('cp-sharing');
@@ -6751,8 +6843,8 @@
         v.muted = true;
       });
       
-      // Determine header text: "Reels" if the clicked post is a reel, else "Posts"
-      const headerText = (posts[index] && posts[index].video_url) ? 'Reels' : 'Posts';
+      // Determine header text: "Creator Series" if the clicked post is a creator series, else "Posts"
+      const headerText = (posts[index] && posts[index].video_url) ? 'Creator Series' : 'Posts';
       
       const viewer = document.createElement('div');
       viewer.id = 'fullScreenPostViewer';
@@ -6765,12 +6857,7 @@
             </svg>
           </button>
           <span style="color:#fff;font-weight:600;font-size:16px;text-shadow:0 1px 3px rgba(0,0,0,0.5);">${headerText}</span>
-          <button class="ig-fullscreen-camera" style="margin-left: auto;">
-            <svg aria-label="Camera" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-              <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23h-.005A2.31 2.31 0 0 1 3.54 6.175L1.945 4.581a.75.75 0 0 1 1.06-1.06l1.595 1.594a.767.767 0 0 0 .544.226.767.767 0 0 0 .543-.226L7.281 3.52a.75.75 0 0 1 1.061 1.06L6.827 6.175Z" fill-rule="evenodd"></path>
-              <path d="M2.25 12a9.75 9.75 0 1 1 19.5 0 9.75 9.75 0 0 1-19.5 0Zm9.75-8.25a8.25 8.25 0 1 0 0 16.5 8.25 8.25 0 0 0 0-16.5Zm0 12.5a4.25 4.25 0 1 1 0-8.5 4.25 4.25 0 0 1 0 8.5Zm0-1.5a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5Z"></path>
-            </svg>
-          </button>
+          <div style="margin-left:auto;width:24px;"></div>
         </div>
         <div class="ig-fullscreen-content" id="fullScreenContent"></div>
       `;
@@ -6779,7 +6866,7 @@
       document.body.style.overflow = 'hidden';
       
       renderFullScreenPost(currentFullScreenIndex);
-      setupReelsVideoAutoplay();
+      setupCreatorSeriesVideoAutoplay();
     }
     
     function formatCount(n) {
@@ -6794,7 +6881,7 @@
       
       currentFullScreenIndex = index;
       
-      // Render all posts for smooth scrolling — Reels style
+      // Render all posts for smooth scrolling — Creator Series style
       content.innerHTML = fullScreenPosts.map((post, idx) => {
         const isLiked = post.user_has_liked || false;
         const isSaved = post.is_saved || false;
@@ -6806,24 +6893,24 @@
         if (post.video_url) {
           // Only preload first 3 videos for faster initial load on mobile
           const shouldPreload = idx <= index + 2;
-          mediaHtml = `<div class="ig-reels-media" ondblclick="doubleTapLikeReel(${post.id}, event)">
+          mediaHtml = `<div class="ig-cseries-media" ondblclick="doubleTapLikeCreatorSeries(${post.id}, event)">
             <video src="${shouldPreload ? post.video_url : ''}" ${shouldPreload ? '' : `data-src="${post.video_url}"`} playsinline loop preload="${shouldPreload ? 'auto' : 'none'}" data-post-id="${post.id}" poster="${post.images && post.images[0] ? post.images[0] : ''}"></video>
-            <div class="ig-reels-loading-spinner" id="reel-spinner-${post.id}">
-              <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:reelSpin 0.8s linear infinite;"></div>
+            <div class="ig-cseries-loading-spinner" id="cseries-spinner-${post.id}">
+              <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:cseriesSpin 0.8s linear infinite;"></div>
             </div>
-            <div class="ig-reels-tap-zone" onclick="handleReelTap(this, event)">
-              <div class="ig-reels-pause-indicator">
+            <div class="ig-cseries-tap-zone" onclick="handleCreatorSeriesTap(this, event)">
+              <div class="ig-cseries-pause-indicator">
                 <svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
             </div>
           </div>`;
         } else if (post.images && post.images.length > 0) {
           if (post.images.length === 1) {
-            mediaHtml = `<div class="ig-reels-media" ondblclick="doubleTapLikeReel(${post.id}, event)">
+            mediaHtml = `<div class="ig-cseries-media" ondblclick="doubleTapLikeCreatorSeries(${post.id}, event)">
               <img src="${post.images[0]}" alt="Post">
             </div>`;
           } else {
-            mediaHtml = `<div class="ig-reels-media" ondblclick="doubleTapLikeReel(${post.id}, event)">
+            mediaHtml = `<div class="ig-cseries-media" ondblclick="doubleTapLikeCreatorSeries(${post.id}, event)">
               <div class="ig-carousel" id="fs-carousel-${post.id}" style="width:100%;height:100%;">
                 <div class="ig-carousel-inner" id="carousel-inner-fs-carousel-${post.id}" style="height:100%;">
                   ${post.images.map((img, imgIdx) => `
@@ -6842,17 +6929,17 @@
           }
         } else {
           // Text-only post with gradient background
-          mediaHtml = `<div class="ig-reels-media" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);display:flex;align-items:center;justify-content:center;padding:40px;">
+          mediaHtml = `<div class="ig-cseries-media" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);display:flex;align-items:center;justify-content:center;padding:40px;">
             <p style="color:#fff;font-size:22px;font-weight:600;text-align:center;text-shadow:0 2px 8px rgba(0,0,0,0.3);max-width:80%;">${(post.content || '').substring(0, 200)}</p>
           </div>`;
         }
         
-        // Caption (1-line collapsed for reels overlay, Instagram style)
+        // Caption (1-line collapsed for creator series overlay, Instagram style)
         const captionText = post.content || '';
         const encodedCaption = encodeURIComponent(captionText);
         
-        // Time ago for reel details
-        const reelTimeShort = (() => {
+        // Time ago for creator series details
+        const cseriesTimeShort = (() => {
           if (!post.created_at) return '';
           let ds = post.created_at;
           if (ds.includes(' ') && !ds.includes('T') && !ds.includes('Z')) ds = ds.replace(' ','T') + 'Z';
@@ -6872,7 +6959,7 @@
           const totalVotes = typeof votesObj === 'object' && !Array.isArray(votesObj) ? Object.values(votesObj).reduce((a, b) => a + b, 0) : (Array.isArray(votesObj) ? votesObj.reduce((a, b) => a + b, 0) : 0);
           const userVoted = post.poll.user_voted || null;
           pollHtml = `
-            <div class="ig-reels-poll" onclick="event.stopPropagation()">
+            <div class="ig-cseries-poll" data-post-id="${post.id}" onclick="event.stopPropagation()">
               <div class="poll-question">${post.poll.question}</div>
               ${post.poll.options.map((option, oIdx) => {
                 const voteCount = typeof votesObj === 'object' && !Array.isArray(votesObj) ? (votesObj[option] || 0) : (Array.isArray(votesObj) ? (votesObj[oIdx] || 0) : 0);
@@ -6898,7 +6985,7 @@
         let customBtnHtml = '';
         if (post.custom_button) {
           customBtnHtml = `
-            <button class="ig-reels-custom-btn" data-post-id="${post.id}" data-user-id="${post.user_id}" data-config="${encodeURIComponent(JSON.stringify(post.custom_button))}" onclick="event.stopPropagation(); openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">
+            <button class="ig-cseries-custom-btn" data-post-id="${post.id}" data-user-id="${post.user_id}" data-config="${encodeURIComponent(JSON.stringify(post.custom_button))}" onclick="event.stopPropagation(); openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">
               ${post.custom_button.name || 'Action'}
             </button>`;
         }
@@ -6907,7 +6994,7 @@
         let contactBtnsHtml = '';
         if (post.enable_contact || post.enable_interested) {
           contactBtnsHtml = `
-            <div class="ig-reels-contact-btns" onclick="event.stopPropagation()">
+            <div class="ig-cseries-contact-btns" onclick="event.stopPropagation()">
               ${post.enable_contact ? `<button onclick="handleContactMe(${post.id})">📞 Contact Me</button>` : ''}
               ${post.enable_interested ? `<button onclick="handleInterested(${post.id})">⭐ Interested</button>` : ''}
             </div>`;
@@ -6938,32 +7025,32 @@
           <div class="ig-fullscreen-post" data-post-id="${post.id}" data-post-index="${idx}">
             ${mediaHtml}
             
-            <!-- Right-side action buttons (Instagram Reels style) -->
-            <div class="ig-reels-actions">
-              <button class="ig-reels-mute-btn" onclick="event.stopPropagation(); toggleReelMute(this)">
-                <svg class="unmuted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                <svg class="muted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="display:none;"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+            <!-- Right-side action buttons (Creator Series style) -->
+            <div class="ig-cseries-actions">
+              <button class="ig-cseries-mute-btn" onclick="event.stopPropagation(); toggleCreatorSeriesMute(this)">
+                <svg class="unmuted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="${window._globalMuted ? 'display:none;' : ''}"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <svg class="muted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="${window._globalMuted ? '' : 'display:none;'}"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
               </button>
               
-              <button class="ig-reels-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLikeReel(${post.id}, this)" data-post-id="${post.id}">
+              <button class="ig-cseries-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLikeCreatorSeries(${post.id}, this)" data-post-id="${post.id}">
                 <svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>
-                <span class="ig-reels-action-count ig-reels-likes-label" id="reel-likes-${post.id}" onclick="event.stopPropagation(); showWhoLiked(${post.id})">${formatCount(likesCount)}</span>
+                <span class="ig-cseries-action-count ig-cseries-likes-label" id="cseries-likes-${post.id}" onclick="event.stopPropagation(); showWhoLiked(${post.id})">${formatCount(likesCount)}</span>
               </button>
               
-              <button class="ig-reels-action-btn" onclick="openCommentsModal(${post.id})">
+              <button class="ig-cseries-action-btn" onclick="openCommentsModal(${post.id})">
                 <svg viewBox="0 0 24 24"><path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" stroke-linejoin="round"/></svg>
-                <span class="ig-reels-action-count" id="reel-comments-${post.id}">${formatCount(commentsCount)}</span>
+                <span class="ig-cseries-action-count" id="cseries-comments-${post.id}">${formatCount(commentsCount)}</span>
               </button>
               
-              <button class="ig-reels-action-btn" onclick="sharePost(${post.id})">
+              <button class="ig-cseries-action-btn" onclick="sharePost(${post.id})">
                 <svg viewBox="0 0 24 24"><line x1="22" x2="9.218" y1="3" y2="10.083" stroke-linejoin="round"/><polygon points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke-linejoin="round"/></svg>
               </button>
               
-              <button class="ig-reels-action-btn ${isSaved ? 'saved' : ''}" onclick="toggleSaveReel(${post.id}, this)">
+              <button class="ig-cseries-action-btn ${isSaved ? 'saved' : ''}" onclick="toggleSaveCreatorSeries(${post.id}, this)">
                 <svg viewBox="0 0 24 24"><polygon points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               
-              <button class="ig-reels-action-btn" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
+              <button class="ig-cseries-action-btn" onclick="openPostActionsMenu(${post.id}, ${post.user_id})">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff" stroke="none">
                   <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
                 </svg>
@@ -6971,30 +7058,30 @@
             </div>
             
             <!-- Bottom overlay info -->
-            <div class="ig-reels-bottom">
-              <div class="ig-reels-user-row">
+            <div class="ig-cseries-bottom">
+              <div class="ig-cseries-user-row">
                 <a href="/profile/${post.user_id}" style="display:flex;align-items:center;gap:8px;text-decoration:none;">
-                  <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-reels-avatar">
-                  <span class="ig-reels-username">${post.username}</span>
+                  <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-cseries-avatar">
+                  <span class="ig-cseries-username">${post.username}</span>
                 </a>
-                <button class="ig-reels-follow-btn" onclick="followUserFromReel(${post.user_id}, this)">Follow</button>
+                <button class="ig-cseries-follow-btn" onclick="followUserFromCreatorSeries(${post.user_id}, this)">Follow</button>
               </div>
               ${captionText ? `
-                <div class="ig-reels-caption" id="reel-caption-${post.id}">${linkifyCaption(captionText)}</div>
-                <button class="ig-reels-caption-more" data-full-caption="${encodedCaption}" onclick="expandReelCaption(${post.id})">... more</button>
+                <div class="ig-cseries-caption" id="cseries-caption-${post.id}">${linkifyCaption(captionText)}</div>
+                <button class="ig-cseries-caption-more" data-full-caption="${encodedCaption}" onclick="expandCreatorSeriesCaption(${post.id})">... more</button>
               ` : ''}
               
-              <div class="ig-reels-details" id="reel-details-${post.id}">
-                ${reelTimeShort ? `<div class="ig-reels-time">${reelTimeShort}</div>` : ''}
+              <div class="ig-cseries-details" id="cseries-details-${post.id}">
+                ${cseriesTimeShort ? `<div class="ig-cseries-time">${cseriesTimeShort}</div>` : ''}
                 
-                ${hasFeatures ? `<div class="ig-reels-features" style="margin-top:6px;">
+                ${hasFeatures ? `<div class="ig-cseries-features" style="margin-top:6px;">
                   ${pollHtml}
                   ${customBtnHtml}
                   ${contactBtnsHtml}
                   ${attachHtml}
                 </div>` : ''}
                 
-                <div class="ig-reels-music">
+                <div class="ig-cseries-music">
                   <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>
                   <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${post.username} · Original audio</span>
                 </div>
@@ -7003,9 +7090,9 @@
             
             <!-- Video progress bar -->
             ${post.video_url ? `
-            <div class="ig-reels-progress-bar-container" data-post-id="${post.id}" onclick="seekReelVideo(this, event)">
-              <div class="ig-reels-progress-track">
-                <div class="ig-reels-progress-fill" id="reel-progress-${post.id}"></div>
+            <div class="ig-cseries-progress-bar-container" data-post-id="${post.id}" onclick="seekCreatorSeriesVideo(this, event)">
+              <div class="ig-cseries-progress-track">
+                <div class="ig-cseries-progress-fill" id="cseries-progress-${post.id}"></div>
               </div>
             </div>` : ''}
 
@@ -7029,24 +7116,24 @@
         });
         
         // Setup video autoplay with intersection observer
-        setupReelsVideoAutoplay();
+        setupCreatorSeriesVideoAutoplay();
       }, 100);
     }
     
-    // Reels-style video autoplay in fullscreen
-    function setupReelsVideoAutoplay() {
+    // Creator Series-style video autoplay in fullscreen
+    function setupCreatorSeriesVideoAutoplay() {
       const content = document.getElementById('fullScreenContent');
       if (!content) return;
       
       // Disconnect previous observer if any
-      if (window._reelsObserver) window._reelsObserver.disconnect();
+      if (window._cseriesObserver) window._cseriesObserver.disconnect();
       // Stop previous progress tracker
-      if (window._reelsProgressRAF) cancelAnimationFrame(window._reelsProgressRAF);
+      if (window._cseriesProgressRAF) cancelAnimationFrame(window._cseriesProgressRAF);
       
       // Hide spinner when video is ready to play
       content.querySelectorAll('.ig-fullscreen-post video').forEach(v => {
         const postId = v.dataset.postId;
-        const spinner = document.getElementById(`reel-spinner-${postId}`);
+        const spinner = document.getElementById(`cseries-spinner-${postId}`);
         if (spinner) {
           const hideSpinner = () => spinner.classList.add('hidden');
           v.addEventListener('canplay', hideSpinner, { once: true });
@@ -7066,44 +7153,45 @@
               video.preload = 'auto';
               video.load();
               const postId = video.dataset.postId;
-              const spinner = document.getElementById(`reel-spinner-${postId}`);
+              const spinner = document.getElementById(`cseries-spinner-${postId}`);
               if (spinner) spinner.classList.remove('hidden');
             }
-            // Unmute for audio in fullscreen and play
-            video.muted = false;
+            // Apply global mute state and play
+            video.muted = window._globalMuted;
             video.volume = 1;
             video.play().catch(() => {
               // If autoplay with audio fails (browser policy), try muted
               video.muted = true;
+              window._globalMuted = true;
+              applyGlobalMuteState();
               video.play().catch(() => {});
             });
           } else {
             video.pause();
-            video.muted = true;
           }
         });
       }, { threshold: [0.6], root: content });
       
-      window._reelsObserver = observer;
+      window._cseriesObserver = observer;
       content.querySelectorAll('.ig-fullscreen-post video').forEach(v => observer.observe(v));
       
       // Start progress bar updater
       function updateProgressBars() {
         content.querySelectorAll('.ig-fullscreen-post video').forEach(v => {
           const postId = v.dataset.postId;
-          const fill = document.getElementById(`reel-progress-${postId}`);
+          const fill = document.getElementById(`cseries-progress-${postId}`);
           if (fill && v.duration && !isNaN(v.duration)) {
             const pct = (v.currentTime / v.duration) * 100;
             fill.style.width = pct + '%';
           }
         });
-        window._reelsProgressRAF = requestAnimationFrame(updateProgressBars);
+        window._cseriesProgressRAF = requestAnimationFrame(updateProgressBars);
       }
       updateProgressBars();
     }
     
-    // Seek reel video via progress bar click/drag
-    function seekReelVideo(container, event) {
+    // Seek creator series video via progress bar click/drag
+    function seekCreatorSeriesVideo(container, event) {
       event.stopPropagation();
       const postId = container.dataset.postId;
       const post = container.closest('.ig-fullscreen-post');
@@ -7118,14 +7206,14 @@
     
     // Enable drag-to-seek on progress bar
     document.addEventListener('pointerdown', (e) => {
-      const container = e.target.closest('.ig-reels-progress-bar-container');
+      const container = e.target.closest('.ig-cseries-progress-bar-container');
       if (!container) return;
       e.preventDefault();
-      seekReelVideo(container, e);
+      seekCreatorSeriesVideo(container, e);
       
       const onMove = (me) => {
         me.preventDefault();
-        seekReelVideo(container, me);
+        seekCreatorSeriesVideo(container, me);
       };
       const onUp = () => {
         document.removeEventListener('pointermove', onMove);
@@ -7135,45 +7223,35 @@
       document.addEventListener('pointerup', onUp);
     });
     
-    // Toggle mute/unmute in fullscreen reel
-    function toggleReelMute(btn) {
-      const video = btn.closest('.ig-fullscreen-post').querySelector('video');
-      if (!video) return;
-      video.muted = !video.muted;
-      const mutedIcon = btn.querySelector('.muted-icon');
-      const unmutedIcon = btn.querySelector('.unmuted-icon');
-      if (video.muted) {
-        mutedIcon.style.display = '';
-        unmutedIcon.style.display = 'none';
-      } else {
-        mutedIcon.style.display = 'none';
-        unmutedIcon.style.display = '';
-      }
+    // Toggle mute/unmute in fullscreen creator series — applies globally
+    function toggleCreatorSeriesMute(btn) {
+      window._globalMuted = !window._globalMuted;
+      applyGlobalMuteState();
     }
     
-    // Handle tap on reel video in fullscreen — center tap pauses, double-tap likes
-    let _reelTapTimer = null;
-    function handleReelTap(tapZone, event) {
+    // Handle tap on creator series video in fullscreen — center tap pauses, double-tap likes
+    let _cseriesTapTimer = null;
+    function handleCreatorSeriesTap(tapZone, event) {
       event.preventDefault();
       event.stopPropagation();
       
-      const video = tapZone.closest('.ig-reels-media').querySelector('video');
+      const video = tapZone.closest('.ig-cseries-media').querySelector('video');
       if (!video) return;
       
       // Handle as single tap (with delay to detect double-tap)
-      if (_reelTapTimer) {
+      if (_cseriesTapTimer) {
         // Double-tap detected — trigger like
-        clearTimeout(_reelTapTimer);
-        _reelTapTimer = null;
+        clearTimeout(_cseriesTapTimer);
+        _cseriesTapTimer = null;
         const postId = video.dataset.postId;
-        if (postId) doubleTapLikeReel(parseInt(postId), event);
+        if (postId) doubleTapLikeCreatorSeries(parseInt(postId), event);
         return;
       }
       
-      _reelTapTimer = setTimeout(() => {
-        _reelTapTimer = null;
+      _cseriesTapTimer = setTimeout(() => {
+        _cseriesTapTimer = null;
         // Single tap — toggle play/pause
-        const indicator = tapZone.querySelector('.ig-reels-pause-indicator');
+        const indicator = tapZone.querySelector('.ig-cseries-pause-indicator');
         if (video.paused) {
           video.play().catch(() => {});
           // Show play icon briefly
@@ -7195,7 +7273,7 @@
     }
     
     // Legacy toggle (unused now but kept for compatibility)
-    function toggleReelVideo(videoEl, event) {
+    function toggleCreatorSeriesVideo(videoEl, event) {
       event.preventDefault();
       event.stopPropagation();
       if (videoEl.paused) {
@@ -7205,8 +7283,8 @@
       }
     }
     
-    // Add comment from fullscreen Reels view
-    async function addReelComment(postId, inputEl) {
+    // Add comment from fullscreen Creator Series view
+    async function addCreatorSeriesComment(postId, inputEl) {
       const text = inputEl.value.trim();
       if (!text) return;
       try {
@@ -7218,7 +7296,7 @@
         inputEl.nextElementSibling?.classList.remove('active');
         InnovateAPI.showAlert('Comment added!', 'success');
         // Update comment count in the action button
-        const countEl = document.getElementById(`reel-comments-${postId}`);
+        const countEl = document.getElementById(`cseries-comments-${postId}`);
         if (countEl) {
           const current = parseInt(countEl.textContent) || 0;
           countEl.textContent = formatCount(current + 1);
@@ -7230,29 +7308,29 @@
       }
     }
     
-    // Double-tap like in reel with big heart animation
-    let reelLastTap = 0;
-    function doubleTapLikeReel(postId, event) {
+    // Double-tap like in creator series with big heart animation
+    let cseriesLastTap = 0;
+    function doubleTapLikeCreatorSeries(postId, event) {
       event.preventDefault();
       event.stopPropagation();
       const now = Date.now();
-      if (now - reelLastTap < 500) {
+      if (now - cseriesLastTap < 500) {
         const post = event.currentTarget.closest('.ig-fullscreen-post');
         if (!post) return;
         const heart = document.createElement('div');
-        heart.className = 'ig-reels-heart-anim';
+        heart.className = 'ig-cseries-heart-anim';
         heart.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>';
         post.appendChild(heart);
         setTimeout(() => heart.remove(), 900);
-        toggleLikeReel(postId);
+        toggleLikeCreatorSeries(postId);
       }
-      reelLastTap = now;
+      cseriesLastTap = now;
     }
     
-    // Toggle like in Reels view
-    async function toggleLikeReel(postId, btn) {
+    // Toggle like in Creator Series view
+    async function toggleLikeCreatorSeries(postId, btn) {
       try {
-        if (!btn) btn = document.querySelector(`.ig-reels-action-btn[data-post-id="${postId}"]`);
+        if (!btn) btn = document.querySelector(`.ig-cseries-action-btn[data-post-id="${postId}"]`);
         const isLiked = btn.classList.contains('liked');
         
         const response = await InnovateAPI.apiRequest(`/posts/${postId}/like`, { method: 'POST' });
@@ -7264,7 +7342,7 @@
           svg.style.stroke = isLiked ? '#fff' : '#ed4956';
         }
         
-        const countEl = document.getElementById(`reel-likes-${postId}`);
+        const countEl = document.getElementById(`cseries-likes-${postId}`);
         if (countEl && response.likes_count !== undefined) {
           countEl.textContent = formatCount(response.likes_count);
         }
@@ -7297,8 +7375,8 @@
       }
     }
     
-    // Toggle save in Reels view
-    async function toggleSaveReel(postId, btn) {
+    // Toggle save in Creator Series view
+    async function toggleSaveCreatorSeries(postId, btn) {
       try {
         await InnovateAPI.apiRequest(`/posts/${postId}/save`, { method: 'POST' });
         btn.classList.toggle('saved');
@@ -7311,11 +7389,11 @@
       }
     }
     
-    // Expand/collapse caption + details in Reels view (Instagram-style)
-    function expandReelCaption(postId) {
-      const captionEl = document.getElementById(`reel-caption-${postId}`);
-      const detailsEl = document.getElementById(`reel-details-${postId}`);
-      const moreBtn = captionEl?.parentElement?.querySelector('.ig-reels-caption-more');
+    // Expand/collapse caption + details in Creator Series view (Instagram-style)
+    function expandCreatorSeriesCaption(postId) {
+      const captionEl = document.getElementById(`cseries-caption-${postId}`);
+      const detailsEl = document.getElementById(`cseries-details-${postId}`);
+      const moreBtn = captionEl?.parentElement?.querySelector('.ig-cseries-caption-more');
       if (!captionEl) return;
       
       const isExpanded = captionEl.classList.contains('expanded');
@@ -7336,8 +7414,8 @@
       }
     }
     
-    // Follow user from reel
-    async function followUserFromReel(userId, btn) {
+    // Follow user from creator series
+    async function followUserFromCreatorSeries(userId, btn) {
       try {
         await InnovateAPI.apiRequest(`/users/${userId}/follow`, { method: 'POST' });
         btn.textContent = 'Following';
@@ -7352,15 +7430,15 @@
     function closeFullScreenPost() {
       const viewer = document.getElementById('fullScreenPostViewer');
       if (viewer) {
-        // Disconnect reels observer
-        if (window._reelsObserver) {
-          window._reelsObserver.disconnect();
-          window._reelsObserver = null;
+        // Disconnect creator series observer
+        if (window._cseriesObserver) {
+          window._cseriesObserver.disconnect();
+          window._cseriesObserver = null;
         }
         // Stop progress bar updater
-        if (window._reelsProgressRAF) {
-          cancelAnimationFrame(window._reelsProgressRAF);
-          window._reelsProgressRAF = null;
+        if (window._cseriesProgressRAF) {
+          cancelAnimationFrame(window._cseriesProgressRAF);
+          window._cseriesProgressRAF = null;
         }
         // Pause and mute all fullscreen videos
         viewer.querySelectorAll('video').forEach(v => {
@@ -7395,13 +7473,13 @@
     
     // Fullscreen actions (legacy wrappers)
     async function toggleLikeFullScreen(postId) {
-      const btn = document.querySelector(`.ig-reels-action-btn[data-post-id="${postId}"]`);
-      await toggleLikeReel(postId, btn);
+      const btn = document.querySelector(`.ig-cseries-action-btn[data-post-id="${postId}"]`);
+      await toggleLikeCreatorSeries(postId, btn);
     }
     
     async function toggleSaveFullScreen(postId) {
-      const btn = document.querySelector(`.ig-fullscreen-post[data-post-id="${postId}"] .ig-reels-action-btn.saved, .ig-fullscreen-post[data-post-id="${postId}"] .ig-reels-action-btn:nth-child(4)`);
-      if (btn) await toggleSaveReel(postId, btn);
+      const btn = document.querySelector(`.ig-fullscreen-post[data-post-id="${postId}"] .ig-cseries-action-btn.saved, .ig-fullscreen-post[data-post-id="${postId}"] .ig-cseries-action-btn:nth-child(4)`);
+      if (btn) await toggleSaveCreatorSeries(postId, btn);
       else await toggleSave(postId);
     }
     

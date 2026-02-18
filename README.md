@@ -381,7 +381,7 @@ Innovate-Hub/
 - Community moderation tools
 - Analytics dashboard
 - AR filters (Instagram-style)
-- Reels/short videos
+- Creator Series/short videos
 - Shopping integration
 
 ## Contributing

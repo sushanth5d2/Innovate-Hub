@@ -540,7 +540,7 @@ These pages still use the old design and can be updated:
 - `/events` - Events page
 
 ### Future Enhancements
-1. **Reels/Videos**: Instagram-style video player
+1. **Creator Series/Videos**: Instagram-style video player
 2. **Live Streaming**: Go live feature
 3. **Shopping**: Product tags in posts
 4. **Music Integration**: Add music to stories

@@ -1652,10 +1652,10 @@ const migrateDatabase = () => {
       )
     `);
 
-    // Add is_reel column to posts
-    db.run(`ALTER TABLE posts ADD COLUMN is_reel BOOLEAN DEFAULT 0`, (err) => {
+    // Add is_creator_series column to posts
+    db.run(`ALTER TABLE posts ADD COLUMN is_creator_series BOOLEAN DEFAULT 0`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
-        console.log('Note: is_reel column migration - ', err ? err.message : 'ok');
+        console.log('Note: is_creator_series column migration - ', err ? err.message : 'ok');
       }
     });
 

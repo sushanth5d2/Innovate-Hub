@@ -138,7 +138,14 @@ router.get('/', authMiddleware, (req, res) => {
       AND (p.scheduled_at IS NULL OR p.scheduled_at <= CURRENT_TIMESTAMP)
       AND b1.id IS NULL
       AND b2.id IS NULL
-    ORDER BY p.created_at DESC
+    ORDER BY (
+      (ABS(RANDOM()) % 1000) / 1000.0
+      + CASE WHEN p.created_at >= datetime('now', '-1 day') THEN 0.3
+             WHEN p.created_at >= datetime('now', '-3 days') THEN 0.15
+             ELSE 0 END
+      + (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) * 0.05
+      + (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) * 0.08
+    ) DESC
     LIMIT 50
   `;
 
@@ -342,7 +349,7 @@ router.post('/', authMiddleware, (req, res, next) => {
   const { 
     content, 
     is_story, 
-    is_reel,
+    is_creator_series,
     scheduled_at, 
     video_url,
     hashtags,
@@ -406,7 +413,7 @@ router.post('/', authMiddleware, (req, res, next) => {
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_reel, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_creator_series, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -419,7 +426,7 @@ router.post('/', authMiddleware, (req, res, next) => {
       JSON.stringify(files),
       videoPath,
       is_story === 'true' || is_story === true ? 1 : 0,
-      is_reel === 'true' || is_reel === true || is_reel === '1' ? 1 : 0,
+      is_creator_series === 'true' || is_creator_series === true || is_creator_series === '1' ? 1 : 0,
       scheduled_at || null,
       expires_at,
       hashtags || null,
