@@ -3549,9 +3549,10 @@
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.85)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
               <button class="ig-video-sound-btn" onclick="toggleVideoSound(this, event)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-                  <path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-                </svg>
+                ${window._globalMuted
+                  ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
+                  : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>'
+                }
               </button>
             </div>`;
         } else {
@@ -3564,9 +3565,10 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
               <button class="ig-video-sound-btn" onclick="toggleVideoSound(this, event)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
-                  <path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-                </svg>
+                ${window._globalMuted
+                  ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
+                  : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>'
+                }
               </button>
             </div>`;
         }
@@ -3855,7 +3857,8 @@
     }
 
     // Global mute state — shared across all videos (feed + fullscreen)
-    window._globalMuted = true; // Start muted (autoplay requires muted)
+    // Browsers enforce muted autoplay — start muted (same as Instagram)
+    window._globalMuted = true;
 
     function getMutedIconSvg(size) {
       return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`;
@@ -3903,7 +3906,11 @@
         entries.forEach(entry => {
           const video = entry.target;
           if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
-            video.play().catch(() => {});
+            video.muted = window._globalMuted;
+            video.play().catch(() => {
+              video.muted = true;
+              video.play().catch(() => {});
+            });
             video.closest('.ig-post-video-container')?.classList.remove('paused');
           } else {
             video.pause();
@@ -7160,10 +7167,8 @@
             video.muted = window._globalMuted;
             video.volume = 1;
             video.play().catch(() => {
-              // If autoplay with audio fails (browser policy), try muted
+              // If autoplay with audio fails (browser policy), try muted silently
               video.muted = true;
-              window._globalMuted = true;
-              applyGlobalMuteState();
               video.play().catch(() => {});
             });
           } else {
