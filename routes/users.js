@@ -12,7 +12,7 @@ router.get('/:userId', authMiddleware, (req, res) => {
 
   const query = `
     SELECT 
-      u.id, u.username, u.email, u.bio, u.skills, u.interests, 
+      u.id, u.username, u.email, u.bio, u.skills, u.interests, u.fullname,
       u.favorite_teams, u.profile_picture, u.created_at,
       (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_archived = 0) as post_count,
       (SELECT COUNT(*) FROM followers WHERE following_id = u.id) as followers_count,
@@ -175,7 +175,7 @@ router.post('/profile-picture', authMiddleware, upload.single('profile_picture')
 router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
-  const { bio, skills, interests, favorite_teams } = req.body;
+  const { bio, skills, interests, favorite_teams, fullname, username } = req.body;
 
   let profile_picture = null;
   if (req.file) {
@@ -187,12 +187,17 @@ router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => 
   const interestsArray = typeof interests === 'string' ? JSON.parse(interests) : interests;
   const teamsArray = typeof favorite_teams === 'string' ? JSON.parse(favorite_teams) : favorite_teams;
 
-  let query = `UPDATE users SET bio = ?, skills = ?, interests = ?, favorite_teams = ?, updated_at = CURRENT_TIMESTAMP`;
-  let params = [bio, JSON.stringify(skillsArray), JSON.stringify(interestsArray), JSON.stringify(teamsArray)];
+  let query = `UPDATE users SET bio = ?, skills = ?, interests = ?, favorite_teams = ?, fullname = ?, updated_at = CURRENT_TIMESTAMP`;
+  let params = [bio, JSON.stringify(skillsArray), JSON.stringify(interestsArray), JSON.stringify(teamsArray), fullname || ''];
 
   if (profile_picture) {
     query += `, profile_picture = ?`;
     params.push(profile_picture);
+  }
+
+  if (username && username.trim()) {
+    query += `, username = ?`;
+    params.push(username.trim());
   }
 
   query += ` WHERE id = ?`;

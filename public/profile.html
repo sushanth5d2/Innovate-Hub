@@ -6,6 +6,7 @@
   <title>Profile - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Macondo&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <style>
     /* ===== 3D Portfolio — Trending Animated Dark Style ===== */
@@ -139,24 +140,36 @@
       border-color: var(--pf-accent);
     }
 
-    /* ===== Hero Section ===== */
+    /* ===== Hero Section — Portfolio Style ===== */
     .pf-hero {
-      text-align: center;
-      padding: 40px 0 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 48px;
+      padding: 60px 0 60px;
       position: relative;
+      text-align: left;
+    }
+
+    .pf-hero-left {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pf-hero-right {
+      flex-shrink: 0;
     }
 
     .pf-hero-avatar-wrap {
       position: relative;
-      width: 130px;
-      height: 130px;
-      margin: 0 auto 24px;
+      width: 260px;
+      height: 300px;
     }
 
     .pf-hero-avatar {
-      width: 130px;
-      height: 130px;
-      border-radius: 30px;
+      width: 260px;
+      height: 300px;
+      border-radius: 24px;
       object-fit: cover;
       border: 3px solid transparent;
       background: linear-gradient(var(--pf-bg), var(--pf-bg)) padding-box,
@@ -167,49 +180,77 @@
     }
 
     .pf-hero-avatar:hover {
-      transform: scale(1.08) rotateY(10deg);
+      transform: scale(1.04) rotateY(5deg);
     }
 
     .pf-hero-avatar-glow {
       position: absolute;
-      inset: -8px;
-      border-radius: 34px;
+      inset: -12px;
+      border-radius: 30px;
       background: linear-gradient(135deg, var(--pf-accent), var(--pf-accent2));
-      opacity: 0.3;
-      filter: blur(20px);
+      opacity: 0.25;
+      filter: blur(30px);
       z-index: 1;
       animation: pfPulse 3s ease-in-out infinite;
     }
 
     @keyframes pfPulse {
       0%, 100% { opacity: 0.2; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(1.05); }
+      50% { opacity: 0.35; transform: scale(1.05); }
+    }
+
+    /* "HEY, I am" label */
+    .pf-hero-greeting {
+      font-size: 18px;
+      color: var(--pf-text2);
+      font-weight: 400;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
     }
 
     .pf-hero-name {
-      font-size: 36px;
-      font-weight: 800;
+      font-family: 'Macondo', cursive;
+      font-size: 52px;
+      font-weight: 400;
       margin-bottom: 8px;
-      background: linear-gradient(135deg, #fff, #c8cfe8);
+      line-height: 1.15;
+      letter-spacing: 1px;
+    }
+
+    .pf-hero-name .pf-name-hey {
+      background: linear-gradient(135deg, var(--pf-accent), var(--pf-accent2));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: -0.5px;
+    }
+
+    .pf-hero-name .pf-name-iam {
+      background: linear-gradient(135deg, var(--pf-accent), var(--pf-accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .pf-hero-name .pf-name-user {
+      background: linear-gradient(135deg, var(--pf-accent), var(--pf-accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+      font-size: 58px;
     }
 
     .pf-hero-title {
       font-size: 16px;
       color: var(--pf-accent);
       font-weight: 500;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
       letter-spacing: 1px;
     }
 
     .pf-hero-bio {
-      font-size: 15px;
+      font-size: 16px;
       color: var(--pf-text2);
-      max-width: 500px;
-      margin: 0 auto 28px;
-      line-height: 1.6;
+      max-width: 520px;
+      margin: 0 0 28px;
+      line-height: 1.7;
     }
 
     /* ===== Stats Row ===== */
@@ -826,7 +867,24 @@
 
     /* ===== Responsive ===== */
     @media (max-width: 768px) {
-      .pf-hero-name { font-size: 26px; }
+      .pf-hero {
+        flex-direction: column-reverse;
+        text-align: center;
+        gap: 28px;
+        padding: 30px 0 40px;
+      }
+      .pf-hero-left { width: 100%; }
+      .pf-hero-bio { margin: 0 auto 28px; }
+      .pf-hero-avatar-wrap {
+        width: 180px;
+        height: 210px;
+      }
+      .pf-hero-avatar {
+        width: 180px;
+        height: 210px;
+      }
+      .pf-hero-name { font-size: 32px; }
+      .pf-hero-name .pf-name-user { font-size: 36px; }
       .pf-stats-row { gap: 16px; flex-wrap: wrap; }
       .pf-stat-card { padding: 16px 20px; min-width: 90px; }
       .pf-stat-number { font-size: 22px; }
@@ -1052,7 +1110,7 @@
     /* ===== Profile Action Buttons ===== */
     .pf-action-buttons {
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 12px;
       margin-bottom: 48px;
       flex-wrap: wrap;
@@ -1120,7 +1178,7 @@
     .pf-avatar-upload-overlay {
       position: absolute;
       inset: 0;
-      border-radius: 30px;
+      border-radius: 24px;
       background: rgba(0,0,0,0.5);
       display: flex;
       align-items: center;
@@ -1819,21 +1877,29 @@
       </div>
     </nav>
 
-    <!-- Hero Section -->
+    <!-- Hero Section — Portfolio Style -->
     <section class="pf-hero pf-reveal">
-      <div class="pf-hero-avatar-wrap" id="pf-avatar-wrap" onclick="handleAvatarClick()">
-        <div class="pf-hero-avatar-glow"></div>
-        <img id="pf-avatar" class="pf-hero-avatar" src="" alt="Avatar">
-        <div class="pf-avatar-upload-overlay" id="pf-avatar-overlay" style="display:none;">
-          <i class="fas fa-camera"></i>
+      <div class="pf-hero-left">
+        <h1 id="pf-name" class="pf-hero-name">
+          <span class="pf-name-hey">HEY</span><span class="pf-name-iam"> , I am </span><br>
+          <span class="pf-name-user" id="pf-name-user"></span>
+        </h1>
+        <div id="pf-title" class="pf-hero-title"></div>
+        <p id="pf-bio" class="pf-hero-bio"></p>
+
+        <!-- Action Buttons (dynamic: Edit Profile/Settings for own, Follow/Message for others) -->
+        <div class="pf-action-buttons" id="pf-action-buttons"></div>
+      </div>
+
+      <div class="pf-hero-right">
+        <div class="pf-hero-avatar-wrap" id="pf-avatar-wrap" onclick="handleAvatarClick()">
+          <div class="pf-hero-avatar-glow"></div>
+          <img id="pf-avatar" class="pf-hero-avatar" src="" alt="Avatar">
+          <div class="pf-avatar-upload-overlay" id="pf-avatar-overlay" style="display:none;">
+            <i class="fas fa-camera"></i>
+          </div>
         </div>
       </div>
-      <h1 id="pf-name" class="pf-hero-name"></h1>
-      <div id="pf-title" class="pf-hero-title"></div>
-      <p id="pf-bio" class="pf-hero-bio"></p>
-
-      <!-- Action Buttons (dynamic: Edit Profile/Settings for own, Follow/Message for others) -->
-      <div class="pf-action-buttons" id="pf-action-buttons"></div>
     </section>
 
     <!-- Stats -->
@@ -1970,10 +2036,15 @@
             <i class="fas fa-image"></i> Change Profile Photo
           </div>
         </div>
-        <!-- Name -->
+        <!-- Full Name -->
         <div class="pf-form-group">
-          <label>Display Name</label>
-          <input type="text" class="pf-form-input" id="pf-edit-fullname" placeholder="Your name">
+          <label>Full Name</label>
+          <input type="text" class="pf-form-input" id="pf-edit-fullname" placeholder="Your full name">
+        </div>
+        <!-- Username -->
+        <div class="pf-form-group">
+          <label>Username</label>
+          <input type="text" class="pf-form-input" id="pf-edit-username" placeholder="Your username">
         </div>
         <!-- Bio -->
         <div class="pf-form-group">
@@ -2335,7 +2406,7 @@
 
         // Populate hero
         document.getElementById('pf-avatar').src = user.profile_picture || defaultAvatar;
-        document.getElementById('pf-name').textContent = user.username;
+        document.getElementById('pf-name-user').textContent = user.fullname || user.username;
         document.getElementById('pf-title').textContent = skills.length > 0 ? skills.slice(0, 3).join(' • ') : 'Innovate Hub Member';
         document.getElementById('pf-bio').textContent = user.bio || 'Building amazing things on Innovate Hub';
 
@@ -2616,7 +2687,8 @@
       const teams = Array.isArray(user.favorite_teams) ? user.favorite_teams : (user.favorite_teams ? JSON.parse(user.favorite_teams) : []);
 
       document.getElementById('pf-edit-avatar').src = user.profile_picture || defaultAvatar;
-      document.getElementById('pf-edit-fullname').value = user.username || '';
+      document.getElementById('pf-edit-fullname').value = user.fullname || '';
+      document.getElementById('pf-edit-username').value = user.username || '';
       document.getElementById('pf-edit-bio').value = user.bio || '';
       document.getElementById('pf-edit-skills').value = skills.join(', ');
       document.getElementById('pf-edit-interests').value = interests.join(', ');
@@ -2640,6 +2712,8 @@
     async function saveEditProfile() {
       try {
         const formData = new FormData();
+        formData.append('fullname', document.getElementById('pf-edit-fullname').value);
+        formData.append('username', document.getElementById('pf-edit-username').value);
         formData.append('bio', document.getElementById('pf-edit-bio').value);
         formData.append('skills', JSON.stringify(
           document.getElementById('pf-edit-skills').value.split(',').map(s => s.trim()).filter(s => s)
