@@ -2113,11 +2113,11 @@ body {
 .ig-reels-actions {
   position: absolute;
   right: 8px;
-  bottom: 100px;
+  bottom: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   z-index: 15;
   max-width: 50px;
 }
@@ -2167,28 +2167,30 @@ body {
 /* Bottom overlay info (Reels-style) */
 .ig-reels-bottom {
   position: absolute;
-  bottom: 0;
+  bottom: 2px;
   left: 0;
   right: 56px;
-  padding: 12px 14px;
-  padding-bottom: 16px;
-  background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+  padding: 0 12px;
+  padding-bottom: 6px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
   z-index: 15;
-  max-height: 55vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  pointer-events: none;
+}
+
+.ig-reels-bottom > * {
+  pointer-events: auto;
 }
 
 .ig-reels-user-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .ig-reels-avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #fff;
@@ -2220,42 +2222,67 @@ body {
 
 .ig-reels-caption {
   color: #fff;
-  font-size: 14px;
-  line-height: 1.4;
-  max-height: 60px;
+  font-size: 13px;
+  line-height: 1.35;
+  max-height: 1.35em;
   overflow: hidden;
   text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-  margin-bottom: 8px;
+  margin-bottom: 0;
   transition: max-height 0.3s ease;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .ig-reels-caption.expanded {
-  max-height: 300px;
+  max-height: none;
   overflow-y: auto;
+  white-space: normal;
+  text-overflow: unset;
 }
 
 .ig-reels-caption-more {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.7);
-  font-size: 14px;
-  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   padding: 0;
-  margin-top: 2px;
+  margin: 2px 0 0 0;
+  display: inline;
+}
+
+/* Collapsible details section (music, time, features) shown on expand */
+.ig-reels-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.ig-reels-details.expanded {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .ig-reels-music {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
+  margin-top: 6px;
 }
 
 .ig-reels-music svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.ig-reels-time {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  margin-top: 4px;
 }
 
 /* Progress bars at top */
@@ -2381,27 +2408,76 @@ body:has(.ig-reels-page) .ig-bottom-nav {
   display: none;
 }
 
-/* Mute/unmute button in fullscreen reels */
-.ig-reels-mute-btn {
+/* Loading spinner for reel videos */
+.ig-reels-loading-spinner {
   position: absolute;
-  bottom: 80px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  pointer-events: none;
+}
+
+.ig-reels-loading-spinner.hidden {
+  display: none;
+}
+
+@keyframes reelSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Mute/unmute button in fullscreen reels — sits atop actions column */
+.ig-reels-mute-btn {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.5);
+  background: rgba(38,38,38,0.7);
   border: none;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 18;
   transition: transform 0.15s;
 }
 
 .ig-reels-mute-btn:active {
   transform: scale(0.9);
+}
+
+/* Video progress bar at bottom of fullscreen reel */
+.ig-reels-progress-bar-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 18px;
+  z-index: 25;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+}
+
+.ig-reels-progress-track {
+  width: 100%;
+  height: 2px;
+  background: rgba(255,255,255,0.25);
+  position: relative;
+  transition: height 0.15s;
+}
+
+.ig-reels-progress-bar-container:hover .ig-reels-progress-track,
+.ig-reels-progress-bar-container:active .ig-reels-progress-track {
+  height: 4px;
+}
+
+.ig-reels-progress-fill {
+  height: 100%;
+  background: #fff;
+  width: 0%;
+  border-radius: 0 1px 1px 0;
+  transition: none;
+  pointer-events: none;
 }
 
 /* Fullscreen embedded features */

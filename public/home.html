@@ -6804,17 +6804,18 @@
         // Handle media — fills the background
         let mediaHtml = '';
         if (post.video_url) {
+          // Only preload first 3 videos for faster initial load on mobile
+          const shouldPreload = idx <= index + 2;
           mediaHtml = `<div class="ig-reels-media" ondblclick="doubleTapLikeReel(${post.id}, event)">
-            <video src="${post.video_url}" playsinline loop preload="auto" data-post-id="${post.id}"></video>
+            <video src="${shouldPreload ? post.video_url : ''}" ${shouldPreload ? '' : `data-src="${post.video_url}"`} playsinline loop preload="${shouldPreload ? 'auto' : 'none'}" data-post-id="${post.id}" poster="${post.images && post.images[0] ? post.images[0] : ''}"></video>
+            <div class="ig-reels-loading-spinner" id="reel-spinner-${post.id}">
+              <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:reelSpin 0.8s linear infinite;"></div>
+            </div>
             <div class="ig-reels-tap-zone" onclick="handleReelTap(this, event)">
               <div class="ig-reels-pause-indicator">
                 <svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               </div>
             </div>
-            <button class="ig-reels-mute-btn" onclick="event.stopPropagation(); toggleReelMute(this)">
-              <svg class="unmuted-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-              <svg class="muted-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="display:none;"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-            </button>
           </div>`;
         } else if (post.images && post.images.length > 0) {
           if (post.images.length === 1) {
@@ -6846,10 +6847,23 @@
           </div>`;
         }
         
-        // Caption (truncated for reels overlay)
+        // Caption (1-line collapsed for reels overlay, Instagram style)
         const captionText = post.content || '';
-        const truncatedCaption = captionText.length > 100 ? captionText.substring(0, 100) + '...' : captionText;
         const encodedCaption = encodeURIComponent(captionText);
+        
+        // Time ago for reel details
+        const reelTimeShort = (() => {
+          if (!post.created_at) return '';
+          let ds = post.created_at;
+          if (ds.includes(' ') && !ds.includes('T') && !ds.includes('Z')) ds = ds.replace(' ','T') + 'Z';
+          const diff = Date.now() - new Date(ds).getTime();
+          const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), d = Math.floor(diff / 86400000), w = Math.floor(d / 7);
+          if (m < 1) return 'Just now';
+          if (m < 60) return m + ' minutes ago';
+          if (h < 24) return h + ' hours ago';
+          if (d < 7) return d + ' days ago';
+          return w + ' weeks ago';
+        })();
         
         // Build poll HTML if present
         let pollHtml = '';
@@ -6926,6 +6940,11 @@
             
             <!-- Right-side action buttons (Instagram Reels style) -->
             <div class="ig-reels-actions">
+              <button class="ig-reels-mute-btn" onclick="event.stopPropagation(); toggleReelMute(this)">
+                <svg class="unmuted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <svg class="muted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="display:none;"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+              </button>
+              
               <button class="ig-reels-action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLikeReel(${post.id}, this)" data-post-id="${post.id}">
                 <svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>
                 <span class="ig-reels-action-count ig-reels-likes-label" id="reel-likes-${post.id}" onclick="event.stopPropagation(); showWhoLiked(${post.id})">${formatCount(likesCount)}</span>
@@ -6954,31 +6973,41 @@
             <!-- Bottom overlay info -->
             <div class="ig-reels-bottom">
               <div class="ig-reels-user-row">
-                <a href="/profile/${post.user_id}" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+                <a href="/profile/${post.user_id}" style="display:flex;align-items:center;gap:8px;text-decoration:none;">
                   <img src="${InnovateAPI.getUserAvatar(post.profile_picture)}" alt="${post.username}" class="ig-reels-avatar">
                   <span class="ig-reels-username">${post.username}</span>
                 </a>
                 <button class="ig-reels-follow-btn" onclick="followUserFromReel(${post.user_id}, this)">Follow</button>
               </div>
               ${captionText ? `
-                <div class="ig-reels-caption" id="reel-caption-${post.id}">${linkifyCaption(truncatedCaption)}</div>
-                ${captionText.length > 100 ? `<button class="ig-reels-caption-more" data-full-caption="${encodedCaption}" onclick="expandReelCaption(${post.id}, decodeURIComponent(this.dataset.fullCaption))">more</button>` : ''}
+                <div class="ig-reels-caption" id="reel-caption-${post.id}">${linkifyCaption(captionText)}</div>
+                <button class="ig-reels-caption-more" data-full-caption="${encodedCaption}" onclick="expandReelCaption(${post.id})">... more</button>
               ` : ''}
               
-              ${hasFeatures ? `<div class="ig-reels-features">
-                ${pollHtml}
-                ${customBtnHtml}
-                ${contactBtnsHtml}
-                ${attachHtml}
-              </div>` : ''}
-              
-              <div class="ig-reels-music">
-                <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${post.username} · Original audio</span>
+              <div class="ig-reels-details" id="reel-details-${post.id}">
+                ${reelTimeShort ? `<div class="ig-reels-time">${reelTimeShort}</div>` : ''}
+                
+                ${hasFeatures ? `<div class="ig-reels-features" style="margin-top:6px;">
+                  ${pollHtml}
+                  ${customBtnHtml}
+                  ${contactBtnsHtml}
+                  ${attachHtml}
+                </div>` : ''}
+                
+                <div class="ig-reels-music">
+                  <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>
+                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${post.username} · Original audio</span>
+                </div>
               </div>
-              <div class="ig-reels-time">${InnovateAPI.formatDate(post.created_at)}</div>
             </div>
             
+            <!-- Video progress bar -->
+            ${post.video_url ? `
+            <div class="ig-reels-progress-bar-container" data-post-id="${post.id}" onclick="seekReelVideo(this, event)">
+              <div class="ig-reels-progress-track">
+                <div class="ig-reels-progress-fill" id="reel-progress-${post.id}"></div>
+              </div>
+            </div>` : ''}
 
           </div>
         `;
@@ -7011,11 +7040,35 @@
       
       // Disconnect previous observer if any
       if (window._reelsObserver) window._reelsObserver.disconnect();
+      // Stop previous progress tracker
+      if (window._reelsProgressRAF) cancelAnimationFrame(window._reelsProgressRAF);
+      
+      // Hide spinner when video is ready to play
+      content.querySelectorAll('.ig-fullscreen-post video').forEach(v => {
+        const postId = v.dataset.postId;
+        const spinner = document.getElementById(`reel-spinner-${postId}`);
+        if (spinner) {
+          const hideSpinner = () => spinner.classList.add('hidden');
+          v.addEventListener('canplay', hideSpinner, { once: true });
+          v.addEventListener('playing', hideSpinner, { once: true });
+          // If already ready
+          if (v.readyState >= 3) hideSpinner();
+        }
+      });
       
       const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           const video = entry.target;
           if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+            // Lazy load video source if not yet loaded
+            if (!video.src && video.dataset.src) {
+              video.src = video.dataset.src;
+              video.preload = 'auto';
+              video.load();
+              const postId = video.dataset.postId;
+              const spinner = document.getElementById(`reel-spinner-${postId}`);
+              if (spinner) spinner.classList.remove('hidden');
+            }
             // Unmute for audio in fullscreen and play
             video.muted = false;
             video.volume = 1;
@@ -7033,11 +7086,58 @@
       
       window._reelsObserver = observer;
       content.querySelectorAll('.ig-fullscreen-post video').forEach(v => observer.observe(v));
+      
+      // Start progress bar updater
+      function updateProgressBars() {
+        content.querySelectorAll('.ig-fullscreen-post video').forEach(v => {
+          const postId = v.dataset.postId;
+          const fill = document.getElementById(`reel-progress-${postId}`);
+          if (fill && v.duration && !isNaN(v.duration)) {
+            const pct = (v.currentTime / v.duration) * 100;
+            fill.style.width = pct + '%';
+          }
+        });
+        window._reelsProgressRAF = requestAnimationFrame(updateProgressBars);
+      }
+      updateProgressBars();
     }
+    
+    // Seek reel video via progress bar click/drag
+    function seekReelVideo(container, event) {
+      event.stopPropagation();
+      const postId = container.dataset.postId;
+      const post = container.closest('.ig-fullscreen-post');
+      const video = post ? post.querySelector('video') : null;
+      if (!video || !video.duration) return;
+      
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, x / rect.width));
+      video.currentTime = pct * video.duration;
+    }
+    
+    // Enable drag-to-seek on progress bar
+    document.addEventListener('pointerdown', (e) => {
+      const container = e.target.closest('.ig-reels-progress-bar-container');
+      if (!container) return;
+      e.preventDefault();
+      seekReelVideo(container, e);
+      
+      const onMove = (me) => {
+        me.preventDefault();
+        seekReelVideo(container, me);
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
     
     // Toggle mute/unmute in fullscreen reel
     function toggleReelMute(btn) {
-      const video = btn.closest('.ig-reels-media').querySelector('video');
+      const video = btn.closest('.ig-fullscreen-post').querySelector('video');
       if (!video) return;
       video.muted = !video.muted;
       const mutedIcon = btn.querySelector('.muted-icon');
@@ -7211,20 +7311,28 @@
       }
     }
     
-    // Expand/collapse caption in Reels view
-    function expandReelCaption(postId, fullText) {
+    // Expand/collapse caption + details in Reels view (Instagram-style)
+    function expandReelCaption(postId) {
       const captionEl = document.getElementById(`reel-caption-${postId}`);
-      const moreBtn = captionEl?.nextElementSibling;
+      const detailsEl = document.getElementById(`reel-details-${postId}`);
+      const moreBtn = captionEl?.parentElement?.querySelector('.ig-reels-caption-more');
       if (!captionEl) return;
       
-      if (captionEl.classList.contains('expanded')) {
+      const isExpanded = captionEl.classList.contains('expanded');
+      
+      if (isExpanded) {
         captionEl.classList.remove('expanded');
-        captionEl.innerHTML = linkifyCaption(fullText.substring(0, 80) + '...');
-        if (moreBtn) moreBtn.textContent = 'more';
+        if (detailsEl) detailsEl.classList.remove('expanded');
+        if (moreBtn) {
+          moreBtn.textContent = '... more';
+          moreBtn.style.display = '';
+        }
       } else {
         captionEl.classList.add('expanded');
-        captionEl.innerHTML = linkifyCaption(fullText);
-        if (moreBtn) moreBtn.textContent = 'less';
+        if (detailsEl) detailsEl.classList.add('expanded');
+        if (moreBtn) {
+          moreBtn.textContent = 'less';
+        }
       }
     }
     
@@ -7248,6 +7356,11 @@
         if (window._reelsObserver) {
           window._reelsObserver.disconnect();
           window._reelsObserver = null;
+        }
+        // Stop progress bar updater
+        if (window._reelsProgressRAF) {
+          cancelAnimationFrame(window._reelsProgressRAF);
+          window._reelsProgressRAF = null;
         }
         // Pause and mute all fullscreen videos
         viewer.querySelectorAll('video').forEach(v => {
