@@ -692,6 +692,67 @@ body {
   z-index: 5;
 }
 
+/* Feed reel — play icon overlay (non-interactive, just visual indicator) */
+.ig-feed-reel {
+  cursor: pointer;
+}
+
+.ig-feed-reel-play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 5;
+}
+
+.ig-feed-reel.paused .ig-feed-reel-play-icon {
+  opacity: 1;
+}
+
+/* Fullscreen reel tap zone — transparent overlay for play/pause */
+.ig-reels-tap-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.ig-reels-pause-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  background: rgba(0,0,0,0.35);
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ig-reels-pause-indicator.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: reelPauseFlash 0.6s ease-in-out forwards;
+}
+
+@keyframes reelPauseFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
+
 .ig-post-actions {
   display: flex;
   align-items: center;
@@ -2002,7 +2063,7 @@ body {
 }
 
 .ig-fullscreen-post .ig-reels-media video {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 /* Carousel inside fullscreen */
@@ -2052,7 +2113,7 @@ body {
 .ig-reels-actions {
   position: absolute;
   right: 8px;
-  bottom: 140px;
+  bottom: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2110,7 +2171,7 @@ body {
   left: 0;
   right: 56px;
   padding: 12px 14px;
-  padding-bottom: 60px;
+  padding-bottom: 16px;
   background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
   z-index: 15;
   max-height: 55vh;
@@ -2315,53 +2376,32 @@ body:has(.ig-reels-page) .ig-bottom-nav {
   display: none;
 }
 
-/* Fullscreen comment input bar at bottom */
+/* Fullscreen comment input bar at bottom — hidden by default */
 .ig-reels-comment-bar {
+  display: none;
+}
+
+/* Mute/unmute button in fullscreen reels */
+.ig-reels-mute-btn {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 80px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: #fff;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: rgba(0,0,0,0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  z-index: 20;
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-
-.ig-reels-comment-bar input {
-  flex: 1;
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 20px;
-  padding: 8px 16px;
-  color: #fff;
-  font-size: 14px;
-  outline: none;
-}
-
-.ig-reels-comment-bar input::placeholder {
-  color: rgba(255,255,255,0.5);
-}
-
-.ig-reels-comment-bar button {
-  background: none;
-  border: none;
-  color: var(--ig-blue, #0095f6);
-  font-weight: 600;
-  font-size: 14px;
+  justify-content: center;
   cursor: pointer;
-  padding: 4px 8px;
-  white-space: nowrap;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  z-index: 18;
+  transition: transform 0.15s;
 }
 
-.ig-reels-comment-bar button.active {
-  opacity: 1;
+.ig-reels-mute-btn:active {
+  transform: scale(0.9);
 }
 
 /* Fullscreen embedded features */

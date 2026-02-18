@@ -352,12 +352,14 @@ router.post('/', authMiddleware, (req, res, next) => {
     poll_options,
     poll_expiry,
     custom_button,
-    comment_to_dm
+    comment_to_dm,
+    existing_images,
+    existing_video
   } = req.body;
 
   let images = [];
   let files = [];
-  let videoPath = video_url || null;
+  let videoPath = video_url || existing_video || null;
 
   // If video was uploaded via chunked upload, use that path
   if (req.body.chunked_video_path) {
@@ -378,6 +380,14 @@ router.post('/', authMiddleware, (req, res, next) => {
     if (req.files.video && req.files.video[0]) {
       videoPath = `/uploads/images/${req.files.video[0].filename}`;
     }
+  }
+
+  // Repost: use existing images/video from original post
+  if (existing_images && images.length === 0) {
+    try {
+      const parsed = JSON.parse(existing_images);
+      if (Array.isArray(parsed)) images = parsed;
+    } catch (e) { /* ignore parse errors */ }
   }
 
   // Calculate expiry for stories (24 hours)
