@@ -38,7 +38,7 @@ const storage = multer.diskStorage({
     } else if (req.path.includes('communit') || req.originalUrl.includes('communit') || req.path.includes('groups')) { // matches communities, community-groups, and groups
       uploadPath = './uploads/community';
       console.log('Using community folder (from path)');
-    } else if (file.mimetype.startsWith('image/')) {
+    } else if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       uploadPath = './uploads/images';
       console.log('Using images folder (generic)');
     }

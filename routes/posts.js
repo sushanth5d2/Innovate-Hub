@@ -379,6 +379,13 @@ router.post('/', authMiddleware, (req, res, next) => {
     }
     if (req.files.video && req.files.video[0]) {
       videoPath = `/uploads/images/${req.files.video[0].filename}`;
+      // Fix: if multer saved to files/ folder (for video mimetype), move to images/
+      const actualPath = req.files.video[0].path;
+      const expectedDir = path.join(__dirname, '..', 'uploads', 'images');
+      if (!actualPath.includes('/uploads/images/') && !actualPath.includes('\\uploads\\images\\')) {
+        const newPath = path.join(expectedDir, req.files.video[0].filename);
+        try { fs.renameSync(actualPath, newPath); } catch(e) { console.error('Failed to move video:', e); }
+      }
     }
   }
 
