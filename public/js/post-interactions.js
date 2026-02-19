@@ -217,7 +217,7 @@ const PostInteractions = (function () {
       var user = getUser();
       var userAvatar = user
         ? InnovateAPI.getUserAvatar(user.profile_picture)
-        : '/img/default-avatar.png';
+        : '/images/default-avatar.svg';
 
       var inputId = p ? p + 'ModalCommentInput' : 'modalCommentInput';
       var replyInfoId = p ? p + 'CommentReplyInfo' : 'commentReplyInfo';
@@ -1034,11 +1034,21 @@ const PostInteractions = (function () {
 
   /**
    * Open edit post modal with post data.
+   * Now delegates to PostModal (unified Create/Edit modal).
    */
   function handleEditPost() {
     closePostActionsModal();
-
     var postId = currentPostIdForActions;
+    // Use unified PostModal if available
+    if (typeof PostModal !== 'undefined' && PostModal.openEdit) {
+      PostModal.openEdit(postId);
+      return;
+    }
+    // Fallback: legacy edit modal code below
+    _legacyHandleEditPost(postId);
+  }
+
+  function _legacyHandleEditPost(postId) {
     editPostData = null;
     editNewImages = [];
     editNewFiles = [];
@@ -1061,7 +1071,7 @@ const PostInteractions = (function () {
       if (user) {
         var avatar = el('editUserAvatar');
         var username = el('editUsername');
-        if (avatar) avatar.src = user.profile_picture || '/img/default-avatar.png';
+        if (avatar) avatar.src = user.profile_picture || '/images/default-avatar.svg';
         if (username) username.textContent = user.username || 'You';
       }
 
@@ -1203,7 +1213,7 @@ const PostInteractions = (function () {
       if (user) {
         var av = el('editUserAvatar');
         var un = el('editUsername');
-        if (av) av.src = user.profile_picture || '/img/default-avatar.png';
+        if (av) av.src = user.profile_picture || '/images/default-avatar.svg';
         if (un) un.textContent = user.username || 'You';
       }
 

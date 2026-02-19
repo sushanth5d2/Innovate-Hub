@@ -862,15 +862,12 @@ const PostRenderer = (function () {
     var observerKey = idPrefix === 'pf-' ? 'pf' : 'cseries';
     var obKey = '_' + observerKey + 'Observer';
     var rafKey = '_' + observerKey + 'ProgressRAF';
-    var spinnerPrefix = idPrefix || 'cseries-';
-    // For home the spinner id is "cseries-spinner-{id}", for profile "pf-spinner-{id}"
-    // The actual prefix in the HTML id is `${idPrefix}spinner-{id}` if idPrefix,
-    // or `cseries-spinner-{id}` if empty prefix.
+    // HTML generates ids as: idPrefix + 'spinner-' + postId  (e.g. "spinner-123" or "pf-spinner-123")
     var spinnerId = function (postId) {
-      return idPrefix ? (idPrefix + 'spinner-' + postId) : ('cseries-spinner-' + postId);
+      return idPrefix + 'spinner-' + postId;
     };
     var progressId = function (postId) {
-      return idPrefix ? (idPrefix + 'progress-' + postId) : ('cseries-progress-' + postId);
+      return idPrefix + 'progress-' + postId;
     };
 
     // Disconnect previous
@@ -883,9 +880,11 @@ const PostRenderer = (function () {
       var spinner = document.getElementById(spinnerId(postId));
       if (spinner) {
         var hide = function () { spinner.classList.add('hidden'); };
-        v.addEventListener('canplay', hide, { once: true });
-        v.addEventListener('playing', hide, { once: true });
-        if (v.readyState >= 3) hide();
+        v.addEventListener('canplay', hide);
+        v.addEventListener('playing', hide);
+        v.addEventListener('loadeddata', hide);
+        // If the video already has data or is already playing, hide immediately
+        if (v.readyState >= 2 || !v.paused) hide();
       }
     });
 
@@ -904,9 +903,18 @@ const PostRenderer = (function () {
           }
           video.muted = window._globalMuted;
           video.volume = 1;
-          video.play().catch(function () {
+          video.play().then(function () {
+            // Hide spinner on successful play
+            var pid2 = video.dataset.postId;
+            var sp2 = document.getElementById(spinnerId(pid2));
+            if (sp2) sp2.classList.add('hidden');
+          }).catch(function () {
             video.muted = true;
-            video.play().catch(function () {});
+            video.play().then(function () {
+              var pid3 = video.dataset.postId;
+              var sp3 = document.getElementById(spinnerId(pid3));
+              if (sp3) sp3.classList.add('hidden');
+            }).catch(function () {});
           });
         } else {
           video.pause();
