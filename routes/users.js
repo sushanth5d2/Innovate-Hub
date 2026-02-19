@@ -46,9 +46,14 @@ router.get('/:userId', authMiddleware, (req, res) => {
 router.get('/:userId/posts', authMiddleware, (req, res) => {
   const db = getDb();
   const { userId } = req.params;
+  const currentUserId = req.user.userId;
 
   const query = `
     SELECT p.*, u.username, u.profile_picture,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+           (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+           (SELECT COUNT(*) FROM saved_posts WHERE post_id = p.id AND user_id = ?) as is_saved,
            (SELECT COUNT(*) FROM post_interactions WHERE post_id = p.id AND type = 'interested') as interested_count
     FROM posts p
     JOIN users u ON p.user_id = u.id
@@ -57,18 +62,66 @@ router.get('/:userId/posts', authMiddleware, (req, res) => {
     LIMIT 50
   `;
 
-  db.all(query, [userId], (err, posts) => {
+  db.all(query, [currentUserId, currentUserId, userId], (err, posts) => {
     if (err) {
       return res.status(500).json({ error: 'Error fetching posts' });
     }
 
-    posts = posts.map(post => ({
-      ...post,
-      images: post.images ? JSON.parse(post.images) : [],
-      files: post.files ? JSON.parse(post.files) : []
-    }));
+    // Process posts with poll data (matching home feed behavior)
+    const processedPosts = [];
+    let pending = posts.length;
 
-    res.json({ success: true, posts });
+    if (posts.length === 0) {
+      return res.json({ success: true, posts: [] });
+    }
+
+    posts.forEach(post => {
+      db.get('SELECT * FROM polls WHERE post_id = ?', [post.id], (err, poll) => {
+        if (poll) {
+          db.get('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, currentUserId], (err2, userVote) => {
+            const parsedOptions = JSON.parse(poll.options);
+            const processedPost = {
+              ...post,
+              images: post.images ? JSON.parse(post.images) : [],
+              files: post.files ? JSON.parse(post.files) : [],
+              hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+              custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+              user_has_liked: post.user_has_liked > 0,
+              is_saved: post.is_saved > 0,
+              poll: {
+                ...poll,
+                options: parsedOptions,
+                votes: JSON.parse(poll.votes),
+                user_voted: userVote ? parsedOptions[userVote.option_index] : null
+              }
+            };
+            processedPosts.push(processedPost);
+            pending--;
+            if (pending === 0) {
+              processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              res.json({ success: true, posts: processedPosts });
+            }
+          });
+          return;
+        }
+        const processedPost = {
+          ...post,
+          images: post.images ? JSON.parse(post.images) : [],
+          files: post.files ? JSON.parse(post.files) : [],
+          hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+          custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+          user_has_liked: post.user_has_liked > 0,
+          is_saved: post.is_saved > 0,
+          poll: null
+        };
+        processedPosts.push(processedPost);
+        pending--;
+        if (pending === 0) {
+          processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          res.json({ success: true, posts: processedPosts });
+        }
+      });
+    });
   });
 });
 
@@ -83,7 +136,11 @@ router.get('/:userId/saved', authMiddleware, (req, res) => {
   }
 
   const query = `
-    SELECT p.*, u.username, u.profile_picture, sp.created_at as saved_at
+    SELECT p.*, u.username, u.profile_picture, sp.created_at as saved_at,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+           (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+           1 as is_saved
     FROM saved_posts sp
     JOIN posts p ON sp.post_id = p.id
     JOIN users u ON p.user_id = u.id
@@ -91,18 +148,66 @@ router.get('/:userId/saved', authMiddleware, (req, res) => {
     ORDER BY sp.created_at DESC
   `;
 
-  db.all(query, [userId], (err, posts) => {
+  db.all(query, [userId, userId], (err, posts) => {
     if (err) {
       return res.status(500).json({ error: 'Error fetching saved posts' });
     }
 
-    posts = posts.map(post => ({
-      ...post,
-      images: post.images ? JSON.parse(post.images) : [],
-      files: post.files ? JSON.parse(post.files) : []
-    }));
+    // Process posts with poll data (matching home feed behavior)
+    const processedPosts = [];
+    let pending = posts.length;
 
-    res.json({ success: true, posts });
+    if (posts.length === 0) {
+      return res.json({ success: true, posts: [] });
+    }
+
+    posts.forEach(post => {
+      db.get('SELECT * FROM polls WHERE post_id = ?', [post.id], (err, poll) => {
+        if (poll) {
+          db.get('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, userId], (err2, userVote) => {
+            const parsedOptions = JSON.parse(poll.options);
+            const processedPost = {
+              ...post,
+              images: post.images ? JSON.parse(post.images) : [],
+              files: post.files ? JSON.parse(post.files) : [],
+              hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+              custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+              user_has_liked: post.user_has_liked > 0,
+              is_saved: true,
+              poll: {
+                ...poll,
+                options: parsedOptions,
+                votes: JSON.parse(poll.votes),
+                user_voted: userVote ? parsedOptions[userVote.option_index] : null
+              }
+            };
+            processedPosts.push(processedPost);
+            pending--;
+            if (pending === 0) {
+              processedPosts.sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at));
+              res.json({ success: true, posts: processedPosts });
+            }
+          });
+          return;
+        }
+        const processedPost = {
+          ...post,
+          images: post.images ? JSON.parse(post.images) : [],
+          files: post.files ? JSON.parse(post.files) : [],
+          hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+          custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+          user_has_liked: post.user_has_liked > 0,
+          is_saved: true,
+          poll: null
+        };
+        processedPosts.push(processedPost);
+        pending--;
+        if (pending === 0) {
+          processedPosts.sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at));
+          res.json({ success: true, posts: processedPosts });
+        }
+      });
+    });
   });
 });
 

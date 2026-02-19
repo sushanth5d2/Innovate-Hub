@@ -928,6 +928,17 @@ const PostInteractions = (function () {
     var user = getUser();
     var currentUserId = user ? user.id : null;
 
+    // Detect if this is a Creator Series (video) post
+    var postEl = document.querySelector('.ig-post[data-post-id="' + postId + '"], .ig-fullscreen-post[data-post-id="' + postId + '"]');
+    var isCreatorSeries = postEl ? !!postEl.querySelector('video') : !!document.querySelector('.ig-fullscreen-viewer');
+    var editLabel = isCreatorSeries ? 'Edit Creator Series' : 'Edit Post';
+
+    // Update the edit button label in owner actions
+    if (ownerActions) {
+      var editItem = ownerActions.querySelector('.post-action-item:first-child span');
+      if (editItem) editItem.textContent = editLabel;
+    }
+
     if (ownerId === currentUserId) {
       if (viewerActions) viewerActions.style.display = 'none';
       if (ownerActions) ownerActions.style.display = 'block';
@@ -1054,35 +1065,62 @@ const PostInteractions = (function () {
         if (username) username.textContent = user.username || 'You';
       }
 
-      // Show existing media
-      var existingMedia = el('editExistingMedia');
       var p = getPrefix();
-      existingMedia.innerHTML = images.map(function (img, idx) {
-        var itemId = p ? p + 'EditMedia-' + idx : 'editMedia-' + idx;
-        return '<div class="media-preview-item" id="' + itemId + '">' +
-          '<img src="' + img + '" alt="Image ' + (idx + 1) + '">' +
-          '<button class="media-preview-remove" onclick="removeEditMedia(' + idx + ')" title="Remove">&times;</button>' +
-          '</div>';
-      }).join('');
+      var isCreatorSeries = !!post.video_url;
 
-      // Show existing files
-      var existingFiles = el('editExistingFiles');
-      existingFiles.innerHTML = files.map(function (f, idx) {
-        var name = f.name || 'File';
-        var size = f.size ? (f.size / 1024).toFixed(1) + ' KB' : '';
-        var itemId = p ? p + 'EditFile-' + idx : 'editFile-' + idx;
-        return '<div class="file-preview-item" id="' + itemId + '">' +
-          '<span>📄</span>' +
-          '<div style="flex: 1; min-width: 0;">' +
-          '<div style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + name + '</div>' +
-          (size ? '<div style="font-size: 11px; color: var(--ig-secondary-text);">' + size + '</div>' : '') +
-          '</div>' +
-          '<button class="file-preview-remove" onclick="removeEditFile(' + idx + ')" title="Remove">&times;</button>' +
-          '</div>';
-      }).join('');
+      // Toggle Post vs Creator Series mode in edit modal
+      var postMediaSection = el('editPostMediaSection');
+      var csSection = el('editCreatorSeriesSection');
 
-      // Clear new media previews
-      el('editNewMedia').innerHTML = '';
+      if (isCreatorSeries) {
+        // === Creator Series mode ===
+        if (postMediaSection) postMediaSection.style.display = 'none';
+        if (csSection) csSection.style.display = '';
+
+        // Load video with full trim/cover/audio preview
+        var csVideo = el('editCreatorSeriesVideo');
+        if (csVideo) {
+          initEditCSPreview(csVideo, post.video_url, null);
+        }
+
+        // Clear post-mode sections
+        el('editExistingMedia').innerHTML = '';
+        el('editExistingFiles').innerHTML = '';
+        el('editNewMedia').innerHTML = '';
+      } else {
+        // === Post mode ===
+        if (postMediaSection) postMediaSection.style.display = '';
+        if (csSection) csSection.style.display = 'none';
+
+        // Show existing images
+        var existingMedia = el('editExistingMedia');
+        existingMedia.innerHTML = images.map(function (img, idx) {
+          var itemId = p ? p + 'EditMedia-' + idx : 'editMedia-' + idx;
+          return '<div class="media-preview-item" id="' + itemId + '">' +
+            '<img src="' + img + '" alt="Image ' + (idx + 1) + '">' +
+            '<button class="media-preview-remove" onclick="removeEditMedia(' + idx + ')" title="Remove">&times;</button>' +
+            '</div>';
+        }).join('');
+
+        // Show existing files
+        var existingFiles = el('editExistingFiles');
+        existingFiles.innerHTML = files.map(function (f, idx) {
+          var name = f.name || 'File';
+          var size = f.size ? (f.size / 1024).toFixed(1) + ' KB' : '';
+          var itemId = p ? p + 'EditFile-' + idx : 'editFile-' + idx;
+          return '<div class="file-preview-item" id="' + itemId + '">' +
+            '<span>📄</span>' +
+            '<div style="flex: 1; min-width: 0;">' +
+            '<div style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + name + '</div>' +
+            (size ? '<div style="font-size: 11px; color: var(--ig-secondary-text);">' + size + '</div>' : '') +
+            '</div>' +
+            '<button class="file-preview-remove" onclick="removeEditFile(' + idx + ')" title="Remove">&times;</button>' +
+            '</div>';
+        }).join('');
+
+        // Clear new media previews
+        el('editNewMedia').innerHTML = '';
+      }
 
       // Pre-fill poll if exists
       var pollSection = el('editPollSection');
@@ -1142,6 +1180,11 @@ const PostInteractions = (function () {
 
       // Load trending hashtags for the edit modal
       loadEditTrendingHashtags();
+
+      // Set modal title based on post type (Creator Series vs regular)
+      var isCreatorSeries = !!post.video_url;
+      var titleEl = el('editPostModal').querySelector('.cp-header-title');
+      if (titleEl) titleEl.textContent = isCreatorSeries ? 'Edit Creator Series' : 'Edit Post';
 
       // Show modal
       el('editPostModal').style.display = 'flex';
@@ -1239,7 +1282,8 @@ const PostInteractions = (function () {
     var enableInterested = el('editEnableInterested').checked;
 
     if (!content && !editNewImages.filter(Boolean).length &&
-        !(editPostData && editPostData.images && editPostData.images.filter(Boolean).length)) {
+        !(editPostData && editPostData.images && editPostData.images.filter(Boolean).length) &&
+        !(editPostData && editPostData.video_url)) {
       InnovateAPI.showAlert('Post must have content or media', 'error');
       return;
     }
@@ -1357,6 +1401,320 @@ const PostInteractions = (function () {
   }
 
   // --- Edit modal toggle helpers ---
+
+  // ===== Edit Creator Series — shared trim/cover/audio state =====
+  var editCsTrimStart = 0;
+  var editCsTrimEnd = 1;
+  var editCsCoverTime = 0;
+  var editCsDuration = 0;
+
+  function formatCSTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    var m = Math.floor(seconds / 60);
+    var s = Math.floor(seconds % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  /** Resolve edit CS element IDs using the prefix system */
+  function csEl(id) {
+    var p = getPrefix();
+    if (p) {
+      return document.getElementById(p + 'EditCs' + id.charAt(0).toUpperCase() + id.slice(1));
+    }
+    return document.getElementById('editCs' + id.charAt(0).toUpperCase() + id.slice(1));
+  }
+
+  /**
+   * Initialize the Creator Series edit preview with trim, cover, audio.
+   * Called from handleEditPost when post.video_url exists, and from onEditCSVideoChanged.
+   */
+  function initEditCSPreview(videoEl, videoSrc, fileSize) {
+    editCsTrimStart = 0;
+    editCsTrimEnd = 1;
+    editCsCoverTime = 0;
+
+    videoEl.src = videoSrc;
+    videoEl.onloadedmetadata = function() {
+      editCsDuration = videoEl.duration;
+
+      // Duration label
+      var durEl = el('editCreatorSeriesDuration');
+      var durText = formatCSTime(editCsDuration);
+      if (fileSize) {
+        var sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+        durText += ' \u00B7 ' + sizeMB + 'MB';
+      }
+      if (durEl) durEl.textContent = durText;
+
+      // Reset trim handles and labels
+      var trimStart = csEl('trimStart');
+      var trimEnd = csEl('trimEnd');
+      if (trimStart) trimStart.style.left = '0px';
+      if (trimEnd) trimEnd.style.right = '0px';
+      var startTime = csEl('trimStartTime');
+      var endTime = csEl('trimEndTime');
+      var durLabel = csEl('trimDurationLabel');
+      if (startTime) startTime.textContent = '0:00';
+      if (endTime) endTime.textContent = formatCSTime(editCsDuration);
+      if (durLabel) durLabel.textContent = 'Duration: ' + formatCSTime(editCsDuration);
+
+      // Generate thumbnails
+      generateEditCSTrimThumbnails(videoEl);
+      generateEditCSCoverThumbnails(videoEl);
+      updateEditCSCoverFrame(0);
+    };
+
+    videoEl.onended = function() {
+      var overlay = csEl('playOverlay') || el('editCsPlayOverlay');
+      if (overlay) overlay.classList.add('cr-paused');
+    };
+
+    // Setup audio controls
+    var volSlider = csEl('audioVolume');
+    var volLabel = csEl('volumeLabel');
+    if (volSlider) {
+      volSlider.value = 100;
+      volSlider.oninput = function() {
+        if (volLabel) volLabel.textContent = this.value + '%';
+        videoEl.volume = this.value / 100;
+      };
+    }
+    if (volLabel) volLabel.textContent = '100%';
+
+    var muteCheck = csEl('muteAudio');
+    var volSection = csEl('volumeSection');
+    if (muteCheck) {
+      muteCheck.checked = false;
+      muteCheck.onchange = function() {
+        videoEl.muted = this.checked;
+        if (volSection) volSection.style.display = this.checked ? 'none' : '';
+      };
+    }
+    if (volSection) volSection.style.display = '';
+
+    // Audio section collapsed
+    var audioOpts = csEl('audioOptions');
+    var audioChevron = csEl('audioChevron');
+    if (audioOpts) audioOpts.style.display = 'none';
+    if (audioChevron) audioChevron.classList.remove('cr-open');
+  }
+
+  /**
+   * Handle changing the video when editing a Creator Series.
+   */
+  function onEditCSVideoChanged(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      InnovateAPI.showAlert('Please select a video file', 'error');
+      return;
+    }
+
+    // Store the new video file so submitEditPost sends it
+    editNewImages = [file];
+
+    // Preview the new video with full trim/cover/audio
+    var csVideo = el('editCreatorSeriesVideo');
+    if (csVideo) {
+      var url = URL.createObjectURL(file);
+      initEditCSPreview(csVideo, url, file.size);
+    }
+  }
+
+  /** Toggle play/pause on the edit Creator Series video */
+  function toggleEditCSPlayback() {
+    var video = el('editCreatorSeriesVideo');
+    var p = getPrefix();
+    var overlayId = p ? p + 'EditCsPlayOverlay' : 'editCsPlayOverlay';
+    var overlay = document.getElementById(overlayId);
+    if (!video) return;
+    if (video.paused) {
+      video.play();
+      if (overlay) overlay.classList.remove('cr-paused');
+    } else {
+      video.pause();
+      if (overlay) overlay.classList.add('cr-paused');
+    }
+  }
+
+  /** Toggle audio section in edit CS */
+  function toggleEditCSAudio() {
+    var opts = csEl('audioOptions');
+    var chevron = csEl('audioChevron');
+    if (!opts) return;
+    var showing = opts.style.display === 'none';
+    opts.style.display = showing ? '' : 'none';
+    if (chevron) chevron.classList.toggle('cr-open', showing);
+  }
+
+  /** Generate trim timeline thumbnails */
+  function generateEditCSTrimThumbnails(videoEl) {
+    var canvas = csEl('trimCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var numFrames = 10;
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = 96;
+    var fw = canvas.width / numFrames;
+    var fh = canvas.height;
+    var framesLoaded = 0;
+
+    var tempVideo = document.createElement('video');
+    tempVideo.src = videoEl.src;
+    tempVideo.muted = true;
+    tempVideo.preload = 'auto';
+    tempVideo.crossOrigin = 'anonymous';
+
+    tempVideo.onseeked = function() {
+      ctx.drawImage(tempVideo, framesLoaded * fw, 0, fw, fh);
+      framesLoaded++;
+      if (framesLoaded < numFrames) {
+        tempVideo.currentTime = (framesLoaded / numFrames) * editCsDuration;
+      }
+    };
+
+    tempVideo.onloadeddata = function() {
+      tempVideo.currentTime = 0;
+    };
+  }
+
+  /** Generate cover frame thumbnails */
+  function generateEditCSCoverThumbnails(videoEl) {
+    var container = csEl('coverThumbnails');
+    if (!container) return;
+    container.innerHTML = '';
+    var numFrames = 8;
+    var tempVideo = document.createElement('video');
+    tempVideo.src = videoEl.src;
+    tempVideo.muted = true;
+    tempVideo.preload = 'auto';
+    tempVideo.crossOrigin = 'anonymous';
+    var currentIdx = 0;
+
+    tempVideo.onseeked = function() {
+      var c = document.createElement('canvas');
+      c.width = 112;
+      c.height = 200;
+      var cx = c.getContext('2d');
+      var vw = tempVideo.videoWidth;
+      var vh = tempVideo.videoHeight;
+      var scale = Math.max(c.width / vw, c.height / vh);
+      var sw = c.width / scale;
+      var sh = c.height / scale;
+      var sx = (vw - sw) / 2;
+      var sy = (vh - sh) / 2;
+      cx.drawImage(tempVideo, sx, sy, sw, sh, 0, 0, c.width, c.height);
+
+      if (currentIdx === 0) c.classList.add('cr-cover-selected');
+      c.dataset.time = tempVideo.currentTime;
+      c.onclick = function() { selectEditCSCoverFrame(c); };
+      container.appendChild(c);
+      currentIdx++;
+      if (currentIdx < numFrames) {
+        var nextTime = (currentIdx / (numFrames - 1)) * editCsDuration;
+        tempVideo.currentTime = Math.min(nextTime, editCsDuration - 0.1);
+      }
+    };
+
+    tempVideo.onloadeddata = function() {
+      tempVideo.currentTime = 0;
+    };
+  }
+
+  function selectEditCSCoverFrame(canvasEl) {
+    var container = csEl('coverThumbnails');
+    if (container) {
+      var all = container.querySelectorAll('canvas');
+      for (var i = 0; i < all.length; i++) all[i].classList.remove('cr-cover-selected');
+    }
+    canvasEl.classList.add('cr-cover-selected');
+    editCsCoverTime = parseFloat(canvasEl.dataset.time) || 0;
+    updateEditCSCoverFrame(editCsCoverTime);
+  }
+
+  function updateEditCSCoverFrame(time) {
+    var coverCanvas = csEl('coverCanvas');
+    if (!coverCanvas) return;
+    var video = el('editCreatorSeriesVideo');
+    if (!video || !video.src) return;
+
+    var tempVideo = document.createElement('video');
+    tempVideo.src = video.src;
+    tempVideo.muted = true;
+    tempVideo.crossOrigin = 'anonymous';
+    tempVideo.currentTime = time;
+    tempVideo.onseeked = function() {
+      var ctx = coverCanvas.getContext('2d');
+      var vw = tempVideo.videoWidth;
+      var vh = tempVideo.videoHeight;
+      var scale = Math.max(coverCanvas.width / vw, coverCanvas.height / vh);
+      var sw = coverCanvas.width / scale;
+      var sh = coverCanvas.height / scale;
+      var sx = (vw - sw) / 2;
+      var sy = (vh - sh) / 2;
+      ctx.drawImage(tempVideo, sx, sy, sw, sh, 0, 0, coverCanvas.width, coverCanvas.height);
+    };
+  }
+
+  // ===== Edit CS Trim Handle Dragging =====
+  (function setupEditCSTrimHandles() {
+    var dragging = null;
+
+    function getHandleIds() {
+      // Detect which prefix is active based on which section is visible
+      var pfSection = document.getElementById('pfEditCreatorSeriesSection');
+      if (pfSection && pfSection.style.display !== 'none') {
+        return { start: 'pfEditCsTrimStart', end: 'pfEditCsTrimEnd', timeline: 'pfEditCsTrimTimeline',
+                 startTime: 'pfEditCsTrimStartTime', endTime: 'pfEditCsTrimEndTime', durLabel: 'pfEditCsTrimDurationLabel' };
+      }
+      return { start: 'editCsTrimStart', end: 'editCsTrimEnd', timeline: 'editCsTrimTimeline',
+               startTime: 'editCsTrimStartTime', endTime: 'editCsTrimEndTime', durLabel: 'editCsTrimDurationLabel' };
+    }
+
+    function handleDrag(clientX) {
+      if (!dragging) return;
+      var ids = getHandleIds();
+      var timeline = document.getElementById(ids.timeline);
+      if (!timeline) return;
+      var rect = timeline.getBoundingClientRect();
+      var x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      var frac = x / rect.width;
+
+      if (dragging === 'start') {
+        editCsTrimStart = Math.min(frac, editCsTrimEnd - 0.05);
+        var h = document.getElementById(ids.start);
+        if (h) h.style.left = (editCsTrimStart * 100) + '%';
+        var st = document.getElementById(ids.startTime);
+        if (st) st.textContent = formatCSTime(editCsTrimStart * editCsDuration);
+      } else {
+        editCsTrimEnd = Math.max(frac, editCsTrimStart + 0.05);
+        var h2 = document.getElementById(ids.end);
+        if (h2) h2.style.left = (editCsTrimEnd * 100 - 3) + '%';
+        var et = document.getElementById(ids.endTime);
+        if (et) et.textContent = formatCSTime(editCsTrimEnd * editCsDuration);
+      }
+
+      var dl = document.getElementById(ids.durLabel);
+      if (dl) dl.textContent = 'Duration: ' + formatCSTime((editCsTrimEnd - editCsTrimStart) * editCsDuration);
+    }
+
+    document.addEventListener('mousedown', function(e) {
+      if (e.target.id === 'editCsTrimStart' || e.target.id === 'pfEditCsTrimStart') dragging = 'start';
+      else if (e.target.id === 'editCsTrimEnd' || e.target.id === 'pfEditCsTrimEnd') dragging = 'end';
+    });
+    document.addEventListener('mousemove', function(e) { handleDrag(e.clientX); });
+    document.addEventListener('mouseup', function() { dragging = null; });
+
+    document.addEventListener('touchstart', function(e) {
+      if (e.target.id === 'editCsTrimStart' || e.target.id === 'pfEditCsTrimStart') dragging = 'start';
+      else if (e.target.id === 'editCsTrimEnd' || e.target.id === 'pfEditCsTrimEnd') dragging = 'end';
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e) {
+      if (!dragging) return;
+      handleDrag(e.touches[0].clientX);
+    }, { passive: true });
+    document.addEventListener('touchend', function() { dragging = null; }, { passive: true });
+  })();
 
   function toggleEditPoll() {
     var section = el('editPollSection');
@@ -1998,6 +2356,10 @@ const PostInteractions = (function () {
     removeEditFile: removeEditFile,
     previewEditMedia: previewEditMedia,
     previewEditFiles: previewEditFiles,
+    onEditCSVideoChanged: onEditCSVideoChanged,
+    toggleEditCSPlayback: toggleEditCSPlayback,
+    toggleEditCSAudio: toggleEditCSAudio,
+    selectEditCSCoverFrame: selectEditCSCoverFrame,
 
     // Custom button & Comment-to-DM
     toggleEditCBSection: toggleEditCBSection,
@@ -2046,6 +2408,9 @@ const PostInteractions = (function () {
     'toggleEditTrendingHashtags', 'loadEditTrendingHashtags',
     'removeEditMedia', 'removeEditFile',
     'previewEditMedia', 'previewEditFiles',
+    'onEditCSVideoChanged',
+    'toggleEditCSPlayback', 'toggleEditCSAudio',
+    'selectEditCSCoverFrame',
     'toggleEditCBSection', 'addEditCBField', 'addEditCBCustomField',
     'addEditCDMItem', 'collectEditCustomButtonData', 'getEditMultiFieldValues',
     'collectEditCommentDMData', 'prefillEditCustomButton',
