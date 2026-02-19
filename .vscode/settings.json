@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /workspaces/Innovate-Hub && node -e \"\n// Quick syntax check - ensure the shared JS file parses correctly\ntry \\{\n  require\\('fs'\\)\\.readFileSync\\('public/js/post-interactions\\.js', 'utf8'\\);\n  new \\(require\\('vm'\\)\\.Script\\)\\(require\\('fs'\\)\\.readFileSync\\('public/js/post-interactions\\.js', 'utf8'\\)\\);\n  console\\.log\\('post-interactions\\.js: Syntax OK'\\);\n\\} catch\\(e\\) \\{\n  console\\.error\\('post-interactions\\.js: SYNTAX ERROR:', e\\.message\\);\n\\}\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

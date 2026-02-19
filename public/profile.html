@@ -199,6 +199,14 @@
       50% { opacity: 0.35; transform: scale(1.05); }
     }
 
+    /* Instagram double-tap heart animation */
+    @keyframes igHeartPop {
+      0% { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+      30% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+      50% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+    }
+
     /* "HEY, I am" label */
     .pf-hero-greeting {
       font-size: 18px;
@@ -553,59 +561,199 @@
       color: var(--pf-text);
     }
 
-    /* ===== Activity / Posts Timeline ===== */
-    .pf-activity-section {
+    /* ===== Instagram-Style Profile Posts Section ===== */
+    .pf-ig-posts-section {
       margin-bottom: 60px;
     }
 
-    .pf-activity-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 20px;
-    }
-
-    .pf-activity-card {
-      background: var(--pf-card-bg);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--pf-border);
-      border-radius: 16px;
-      overflow: hidden;
-      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      cursor: pointer;
-    }
-
-    .pf-activity-card:hover {
-      transform: translateY(-8px);
-      border-color: rgba(102, 126, 234, 0.3);
-      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-    }
-
-    .pf-activity-img {
-      width: 100%;
-      aspect-ratio: 4/3;
-      object-fit: cover;
-    }
-
-    .pf-activity-body {
-      padding: 16px;
-    }
-
-    .pf-activity-text {
-      font-size: 14px;
-      color: var(--pf-text);
-      line-height: 1.5;
-      margin-bottom: 8px;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .pf-activity-meta {
-      font-size: 12px;
-      color: var(--pf-text2);
+    /* Tab Bar */
+    .pf-ig-tabs {
       display: flex;
-      gap: 12px;
+      justify-content: center;
+      border-top: 1px solid var(--pf-border);
+      margin-bottom: 0;
+    }
+
+    .pf-ig-tab {
+      flex: 1;
+      max-width: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px 0;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--pf-text2);
+      border-top: 2px solid transparent;
+      margin-top: -1px;
+      transition: all 0.2s ease;
+      background: none;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .pf-ig-tab:hover {
+      color: var(--pf-text);
+    }
+
+    .pf-ig-tab.active {
+      color: var(--pf-text);
+      border-top-color: var(--pf-text);
+    }
+
+    .pf-ig-tab svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* 3-Column Square Grid */
+    .pf-ig-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .pf-ig-grid-item {
+      position: relative;
+      aspect-ratio: 1;
+      cursor: pointer;
+      overflow: hidden;
+      background: var(--pf-card-bg);
+    }
+
+    .pf-ig-grid-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.2s;
+    }
+
+    .pf-ig-grid-item:hover img {
+      opacity: 0.7;
+    }
+
+    /* Hover overlay with likes/comments */
+    .pf-ig-grid-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: rgba(0,0,0,0.35);
+      opacity: 0;
+      transition: opacity 0.2s;
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .pf-ig-grid-item:hover .pf-ig-grid-overlay {
+      opacity: 1;
+    }
+
+    .pf-ig-grid-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pf-ig-grid-stat i {
+      font-size: 18px;
+    }
+
+    /* Text-only post in grid */
+    .pf-ig-grid-text {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-size: 13px;
+      color: var(--pf-text);
+      text-align: center;
+      line-height: 1.4;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+    }
+
+    /* Multi-image / carousel indicator */
+    .pf-ig-grid-multi {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      color: white;
+      font-size: 16px;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+      z-index: 2;
+    }
+
+    /* Video / Reel indicator */
+    .pf-ig-grid-video {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      color: white;
+      font-size: 18px;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+      z-index: 2;
+    }
+
+    /* Empty state for grid */
+    .pf-ig-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--pf-text2);
+    }
+
+    .pf-ig-empty-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid var(--pf-text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+
+    .pf-ig-empty-icon i {
+      font-size: 28px;
+      opacity: 0.5;
+    }
+
+    .pf-ig-empty h3 {
+      font-size: 22px;
+      font-weight: 300;
+      color: var(--pf-text);
+      margin-bottom: 8px;
+    }
+
+    .pf-ig-empty p {
+      font-size: 14px;
+    }
+
+    /* Pinned post badge */
+    .pf-ig-grid-pinned {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     /* ===== Contact / Social Links ===== */
@@ -890,7 +1038,7 @@
       .pf-stat-number { font-size: 22px; }
       .pf-projects-grid { grid-template-columns: 1fr; }
       .pf-interests-grid { grid-template-columns: repeat(2, 1fr); }
-      .pf-activity-grid { grid-template-columns: 1fr; }
+      .pf-ig-grid { gap: 1px; }
       .pf-container { padding: 12px; }
     }
 
@@ -900,206 +1048,234 @@
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-    /* ===== Post Detail Modal ===== */
-    .pf-post-modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 10000;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(8px);
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-    }
-    .pf-post-modal-overlay.active { display: flex; }
-    .pf-post-modal {
-      background: var(--pf-card);
+    /* ===== Post Actions Modal (matches home feed exactly) ===== */
+    .post-actions-sheet {
+      width: 400px;
+      max-width: 92vw;
+      background: var(--ig-primary-background);
       border-radius: 16px;
-      max-width: 600px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-      border: 1px solid rgba(255,255,255,0.08);
-      animation: pfModalIn 0.3s ease;
+      overflow: hidden;
+      animation: slideUp 0.25s ease;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
-    .pf-post-modal-header {
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .post-actions-header {
+      text-align: center;
+      padding: 16px 16px 0;
+    }
+    .post-actions-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--ig-border);
+      border-radius: 4px;
+      margin: 0 auto 12px;
+    }
+    .post-actions-list {
+      padding: 4px 0 8px;
+    }
+    .post-action-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      gap: 14px;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: background 0.15s;
+      color: var(--ig-primary-text);
+      font-size: 15px;
     }
-    .pf-post-modal-avatar {
+    .post-action-item:hover {
+      background: var(--ig-hover);
+    }
+    .post-action-item .action-icon {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      object-fit: cover;
-    }
-    .pf-post-modal-username {
-      font-weight: 600;
-      color: var(--pf-text);
-      font-size: 14px;
-    }
-    .pf-post-modal-time {
-      font-size: 12px;
-      color: var(--pf-text2);
-    }
-    .pf-post-modal-close {
-      margin-left: auto;
-      background: none;
-      border: none;
-      color: var(--pf-text2);
-      font-size: 22px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .pf-post-modal-close:hover { color: var(--pf-text); background: rgba(255,255,255,0.08); }
-    .pf-post-modal-images {
-      width: 100%;
-      position: relative;
-    }
-    .pf-post-modal-images img {
-      width: 100%;
-      display: block;
-      max-height: 500px;
-      object-fit: cover;
-    }
-    .pf-post-modal-images video {
-      width: 100%;
-      display: block;
-      max-height: 500px;
-      background: #000;
-    }
-    .pf-post-modal-carousel {
-      position: relative;
-      overflow: hidden;
-    }
-    .pf-post-modal-carousel-track {
-      display: flex;
-      transition: transform 0.3s ease;
-    }
-    .pf-post-modal-carousel-track img {
-      min-width: 100%;
-      flex-shrink: 0;
-    }
-    .pf-post-carousel-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      cursor: pointer;
-      font-size: 14px;
-      z-index: 2;
-    }
-    .pf-post-carousel-btn.prev { left: 8px; }
-    .pf-post-carousel-btn.next { right: 8px; }
-    .pf-post-modal-content {
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--pf-text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .pf-post-modal-actions {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }
-    .pf-post-action-btn {
-      background: none;
-      border: none;
-      color: var(--pf-text2);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 14px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      transition: all 0.2s;
-    }
-    .pf-post-action-btn:hover { background: rgba(255,255,255,0.06); color: var(--pf-text); }
-    .pf-post-action-btn.liked { color: #ef4444; }
-    .pf-post-modal-comments {
-      padding: 0 16px 16px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    .pf-post-comment {
-      display: flex;
-      gap: 10px;
-      padding: 10px 0;
-      border-top: 1px solid rgba(255,255,255,0.04);
-    }
-    .pf-post-comment-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-    .pf-post-comment-body {
-      flex: 1;
-    }
-    .pf-post-comment-user {
-      font-weight: 600;
-      font-size: 13px;
-      color: var(--pf-text);
-      margin-bottom: 2px;
-    }
-    .pf-post-comment-text {
-      font-size: 13px;
-      color: var(--pf-text2);
-      line-height: 1.4;
-    }
-    .pf-post-comment-time {
-      font-size: 11px;
-      color: var(--pf-text2);
-      opacity: 0.7;
-      margin-top: 2px;
-    }
-    .pf-post-comment-input-row {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-    }
-    .pf-post-comment-input {
-      flex: 1;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
-      padding: 8px 16px;
-      color: var(--pf-text);
-      font-size: 13px;
-      outline: none;
-    }
-    .pf-post-comment-input:focus { border-color: var(--pf-accent); }
-    .pf-post-comment-send {
-      background: var(--pf-accent);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 36px;
-      height: 36px;
-      cursor: pointer;
-      font-size: 14px;
+      background: var(--ig-secondary-background);
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
-    .pf-post-comment-send:hover { opacity: 0.85; }
+    .post-action-item .action-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+    .post-action-item.danger {
+      color: #ed4956;
+    }
+    .post-action-item.danger .action-icon {
+      background: rgba(237,73,86,0.1);
+    }
+    .post-actions-cancel {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      text-align: center;
+      border: none;
+      border-top: 1px solid var(--ig-border);
+      background: none;
+      color: var(--ig-primary-text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .post-actions-cancel:hover { background: var(--ig-hover); }
+
+    /* ===== Reminder Modal Header ===== */
+    .ig-modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--ig-border);
+      font-weight: 600;
+      text-align: center;
+      color: var(--ig-primary-text);
+    }
+
+    /* ===== Edit Post Modal — exact copy from home feed cp-* system ===== */
+    .cp-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 10002;
+      display: flex; align-items: center; justify-content: center;
+      animation: cpFadeIn 0.2s ease;
+      padding: 16px;
+    }
+    @keyframes cpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes cpSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .cp-container {
+      background: var(--ig-primary-background);
+      border-radius: 16px;
+      width: 100%; max-width: 520px; max-height: 90vh;
+      display: flex; flex-direction: column;
+      animation: cpSlideUp 0.3s ease;
+      overflow: hidden;
+      border: 1px solid var(--ig-border);
+    }
+    .cp-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ig-border);
+      min-height: 52px;
+    }
+    .cp-header-btn {
+      background: none; border: none; color: var(--ig-primary-text);
+      cursor: pointer; padding: 4px; display: flex; align-items: center;
+      border-radius: 50%; transition: background 0.2s;
+    }
+    .cp-header-btn:hover { background: var(--ig-hover); }
+    .cp-header-title { font-size: 16px; font-weight: 600; color: var(--ig-primary-text); margin: 0; }
+    .cp-share-btn {
+      background: none; border: none; color: var(--ig-blue);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      padding: 8px 16px; border-radius: 8px; transition: all 0.2s;
+    }
+    .cp-share-btn:hover { background: rgba(0,149,246,0.1); }
+    .cp-share-btn:disabled { opacity: 0.4; cursor: default; }
+    .cp-share-btn.cp-sharing { color: var(--ig-secondary-text); pointer-events: none; }
+    .cp-body { overflow-y: auto; flex: 1; padding: 0; scrollbar-width: thin; }
+    .cp-user-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px 6px; }
+    .cp-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--ig-border); }
+    .cp-username { font-size: 14px; font-weight: 600; color: var(--ig-primary-text); }
+    .cp-caption-wrap { padding: 4px 16px 8px; position: relative; }
+    .cp-caption {
+      width: 100%; border: none; outline: none; resize: none;
+      font-size: 15px; line-height: 1.5; color: var(--ig-primary-text);
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 80px;
+    }
+    .cp-caption::placeholder { color: var(--ig-secondary-text); }
+    .cp-char-count { text-align: right; font-size: 12px; color: var(--ig-tertiary-text); padding-top: 4px; }
+    .cp-hashtag-suggestions { padding: 0 16px 8px; }
+    .cp-hashtag-header { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ig-secondary-text); margin-bottom: 8px; }
+    .cp-hashtag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cp-hashtag-chip {
+      padding: 6px 14px; background: rgba(0,149,246,0.1); color: var(--ig-blue);
+      border: 1px solid rgba(0,149,246,0.2); border-radius: 20px;
+      font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; user-select: none;
+    }
+    .cp-hashtag-chip:hover { background: rgba(0,149,246,0.2); border-color: var(--ig-blue); transform: translateY(-1px); }
+    .cp-hashtag-chip.cp-hashtag-added { background: var(--ig-blue); color: white; border-color: var(--ig-blue); }
+    .cp-trending-section { padding: 0 16px 8px; }
+    .cp-trending-header { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ig-secondary-text); cursor: pointer; padding: 6px 0; user-select: none; }
+    .cp-trending-chevron { margin-left: auto; transition: transform 0.3s; }
+    .cp-trending-chevron.cp-open { transform: rotate(180deg); }
+    .cp-trending-list { margin-top: 6px; }
+    .cp-trending-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    .cp-trending-item:hover { background: var(--ig-hover); }
+    .cp-trending-tag { font-size: 14px; font-weight: 500; color: var(--ig-primary-text); }
+    .cp-trending-count { font-size: 12px; color: var(--ig-secondary-text); }
+    .cp-media-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 4px; padding: 0 16px;
+    }
+    .cp-media-grid:empty { display: none; }
+    .media-preview-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--ig-secondary-background); }
+    .media-preview-item img, .media-preview-item video { width: 100%; height: 100%; object-fit: cover; }
+    .media-preview-remove {
+      position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.75); color: white;
+      border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px); transition: transform 0.2s, background 0.2s;
+    }
+    .media-preview-remove:hover { background: var(--ig-error); transform: scale(1.1); }
+    .cp-files-list { padding: 0 16px; }
+    .cp-files-list:empty { display: none; }
+    .file-preview-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 4px; background: var(--ig-secondary-background); border-radius: 10px; border: 1px solid var(--ig-border); }
+    .file-preview-item span:first-child { font-size: 20px; }
+    .file-preview-remove { margin-left: auto; background: none; border: none; color: var(--ig-error); cursor: pointer; font-size: 20px; padding: 2px 6px; border-radius: 4px; transition: background 0.2s; }
+    .file-preview-remove:hover { background: rgba(237,73,86,0.1); }
+    .cp-toolbar {
+      display: flex; gap: 0; padding: 8px 8px;
+      border-top: 1px solid var(--ig-border); border-bottom: 1px solid var(--ig-border); margin-top: 8px;
+    }
+    .cp-tool-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 4px; background: none; border: none;
+      color: var(--ig-primary-text); cursor: pointer; border-radius: 10px; transition: all 0.2s;
+      font-size: inherit; font-family: inherit;
+    }
+    .cp-tool-btn:hover { background: var(--ig-hover); }
+    .cp-tool-btn.cp-tool-active { color: var(--ig-blue); background: rgba(0,149,246,0.08); }
+    .cp-tool-label { font-size: 11px; color: var(--ig-secondary-text); font-weight: 500; }
+    .cp-tool-btn:hover .cp-tool-label, .cp-tool-btn.cp-tool-active .cp-tool-label { color: var(--ig-blue); }
+    .cp-section { margin: 0 16px 8px; padding: 14px; background: var(--ig-secondary-background); border-radius: 12px; border: 1px solid var(--ig-border); }
+    .cp-section-header { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ig-primary-text); margin-bottom: 12px; }
+    .cp-section-close { margin-left: auto; background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 22px; line-height: 1; padding: 0 4px; border-radius: 50%; transition: color 0.2s; }
+    .cp-section-close:hover { color: var(--ig-error); }
+    .cp-input { width: 100%; padding: 10px 12px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); font-size: 14px; outline: none; transition: border-color 0.2s; }
+    .cp-input:focus { border-color: var(--ig-blue); }
+    .cp-input::placeholder { color: var(--ig-tertiary-text); }
+    .cp-poll-options { margin: 10px 0; }
+    .cp-poll-option-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .cp-poll-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .cp-add-option-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--ig-blue); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 0; transition: opacity 0.2s; }
+    .cp-add-option-btn:hover { opacity: 0.7; }
+    .cp-poll-expiry { display: flex; align-items: center; gap: 8px; padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--ig-border); }
+    .cp-datetime-input { flex: 1; padding: 8px 10px; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; color: var(--ig-primary-text); font-size: 13px; outline: none; }
+    .cp-datetime-input:focus { border-color: var(--ig-blue); }
+    .cp-expiry-label { font-size: 13px; color: var(--ig-secondary-text); white-space: nowrap; }
+    .cp-schedule-picker { margin-top: 4px; }
+    .cp-schedule-hint { margin-top: 8px; font-size: 12px; color: var(--ig-secondary-text); }
+    .cp-advanced-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; color: var(--ig-secondary-text); font-size: 14px; border-top: 1px solid var(--ig-border); user-select: none; transition: color 0.2s; }
+    .cp-advanced-toggle:hover { color: var(--ig-primary-text); }
+    .cp-advanced-toggle svg { transition: transform 0.3s; }
+    .cp-advanced-toggle.cp-open svg { transform: rotate(180deg); }
+    .cp-advanced { padding: 0 16px 12px; }
+    .cp-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; cursor: pointer; border-bottom: 1px solid var(--ig-border); }
+    .cp-toggle-row:last-child { border-bottom: none; }
+    .cp-toggle-info { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ig-primary-text); }
+    .cp-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .cp-switch input { opacity: 0; width: 0; height: 0; }
+    .cp-switch-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--ig-border); border-radius: 24px; cursor: pointer; transition: all 0.3s; }
+    .cp-switch-slider::before { content: ''; position: absolute; width: 20px; height: 20px; left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: all 0.3s; }
+    .cp-switch input:checked + .cp-switch-slider { background: var(--ig-blue); }
+    .cp-switch input:checked + .cp-switch-slider::before { transform: translateX(20px); }
+    @media (max-width: 540px) {
+      .cp-container { max-width: 100%; max-height: 100vh; border-radius: 0; height: 100%; }
+      .cp-overlay { padding: 0; }
+      .cp-media-grid { grid-template-columns: repeat(3, 1fr); }
+    }
 
     /* ===== Mouse 3D tilt for cards ===== */
     .pf-3d-tilt {
@@ -1851,8 +2027,14 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 2px;
       }
+      .pf-ig-grid { gap: 1px; }
+      .pf-ig-tabs { gap: 0; }
+      .pf-ig-tab { font-size: 11px; letter-spacing: 0.5px; }
+      .pf-ig-grid-overlay { font-size: 13px; gap: 12px; }
+      .pf-ig-grid-stat i { font-size: 14px; }
     }
   </style>
+  <link rel="stylesheet" href="/css/post-interactions.css">
 </head>
 <body>
   <!-- Animated Background -->
@@ -1961,16 +2143,25 @@
       <div class="pf-interests-grid" id="pf-interests-grid"></div>
     </section>
 
-    <!-- Recent Activity / Posts -->
-    <section class="pf-activity-section pf-reveal" id="pf-activity-section">
-      <div class="pf-section-title">
-        <div class="pf-section-icon"><i class="fas fa-fire"></i></div>
-        <div>
-          <h2>Recent Activity</h2>
-          <span>Latest posts & updates</span>
-        </div>
+    <!-- Instagram-Style Posts Grid -->
+    <section class="pf-ig-posts-section pf-reveal" id="pf-ig-posts-section">
+      <!-- Tab Bar -->
+      <div class="pf-ig-tabs">
+        <button class="pf-ig-tab active" id="pf-ig-tab-posts" onclick="switchIgTab('posts')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Posts
+        </button>
+        <button class="pf-ig-tab" id="pf-ig-tab-reels" onclick="switchIgTab('reels')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="4"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="8" y1="2" x2="8" y2="8"/><line x1="16" y1="2" x2="16" y2="8"/><polygon points="10,12 10,19 16,15.5" fill="currentColor" stroke="none"/></svg>
+          Reels
+        </button>
+        <button class="pf-ig-tab" id="pf-ig-tab-tagged" onclick="switchIgTab('tagged')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Tagged
+        </button>
       </div>
-      <div class="pf-activity-grid" id="pf-activity-grid"></div>
+      <!-- Posts Grid -->
+      <div class="pf-ig-grid" id="pf-ig-grid"></div>
     </section>
 
     <!-- Footer -->
@@ -2261,54 +2452,236 @@
     </div>
   </div>
 
-  <!-- Post Detail Modal -->
-  <div class="pf-post-modal-overlay" id="pf-post-modal">
-    <div class="pf-post-modal">
-      <div class="pf-post-modal-header">
-        <a id="pf-post-user-link" href="#" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
-          <img class="pf-post-modal-avatar" id="pf-post-avatar" src="" alt="">
-          <div>
-            <div class="pf-post-modal-username" id="pf-post-username"></div>
-            <div class="pf-post-modal-time" id="pf-post-time"></div>
-          </div>
-        </a>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-          <div id="pf-post-3dot-container" style="position:relative;display:none;">
-            <button onclick="toggleProfilePostMenu()" style="background:none;border:none;cursor:pointer;color:var(--pf-text2);padding:6px;border-radius:8px;" title="More options">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-            </button>
-            <div id="pf-post-menu-dropdown" style="display:none;position:absolute;right:0;top:100%;background:var(--pf-card);border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:20;min-width:180px;overflow:hidden;">
-              <button onclick="handleProfileEditPost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;color:var(--pf-text);cursor:pointer;font-size:14px;text-align:left;">
-                <i class="fas fa-edit" style="width:16px;"></i> Edit
-              </button>
-              <button onclick="handleProfileArchivePost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:var(--pf-text);cursor:pointer;font-size:14px;text-align:left;">
-                <i class="fas fa-archive" style="width:16px;"></i> Archive
-              </button>
-              <button onclick="handleProfileDeletePost()" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:#ef4444;cursor:pointer;font-size:14px;text-align:left;">
-                <i class="fas fa-trash" style="width:16px;"></i> Delete
-              </button>
+  <!-- Fullscreen Post/Reel Viewer (dynamically filled by JS, matches home feed ig-fullscreen-viewer) -->
+  <div id="pf-fullscreen-anchor"></div>
+
+  <!-- Post Actions Bottom Sheet (exact home feed structure) -->
+  <div id="pfPostActionsModal" class="ig-modal-overlay" style="display: none;" onclick="closePfPostActions(event)">
+    <div class="post-actions-sheet" onclick="event.stopPropagation()">
+      <div class="post-actions-header">
+        <div class="post-actions-handle"></div>
+      </div>
+      
+      <div id="pfPostActionsViewer" style="display: none;">
+        <div class="post-actions-list">
+          <div class="post-action-item" onclick="pfHandleRepost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
             </div>
+            <span>Repost</span>
           </div>
-          <button class="pf-post-modal-close" onclick="closePostModal()">&times;</button>
+          
+          <div class="post-action-item" onclick="pfHandleGentleReminder()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            </div>
+            <span>Gentle Reminder</span>
+          </div>
+          
+          <div class="post-action-item danger" onclick="pfHandleReport()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/></svg>
+            </div>
+            <span>Report</span>
+          </div>
         </div>
       </div>
-      <div class="pf-post-modal-images" id="pf-post-images"></div>
-      <div class="pf-post-modal-content" id="pf-post-content"></div>
-      <div class="pf-post-modal-actions" id="pf-post-actions"></div>
-      <div class="pf-post-modal-comments" id="pf-post-comments"></div>
-      <div id="pf-post-reply-info" style="display:none;padding:8px 16px;background:rgba(102,126,234,0.1);font-size:13px;color:var(--pf-accent);align-items:center;justify-content:space-between;">
-        <span>Replying to <strong id="pf-reply-to-username"></strong></span>
-        <button onclick="cancelProfileReply()" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:16px;padding:4px 8px;">✕</button>
+      
+      <div id="pfPostActionsOwner" style="display: none;">
+        <div class="post-actions-list">
+          <div class="post-action-item" onclick="pfHandleEditPost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </div>
+            <span>Edit Post</span>
+          </div>
+          
+          <div class="post-action-item" onclick="pfHandleArchivePost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>
+            </div>
+            <span>Archive</span>
+          </div>
+          
+          <div class="post-action-item danger" onclick="pfHandleDeletePost()">
+            <div class="action-icon">
+              <svg fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </div>
+            <span>Delete</span>
+          </div>
+        </div>
       </div>
-      <div class="pf-post-comment-input-row">
-        <input class="pf-post-comment-input" id="pf-post-comment-input" placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitPostComment()">
-        <button class="pf-post-comment-send" onclick="submitPostComment()"><i class="fas fa-paper-plane"></i></button>
+      
+      <button class="post-actions-cancel" onclick="closePfPostActions()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Gentle Reminder Modal (matches home feed) -->
+  <div id="pfReminderModal" class="ig-modal-overlay" style="display: none;" onclick="pfCloseReminderModal(event)">
+    <div class="ig-modal" onclick="event.stopPropagation()">
+      <div class="ig-modal-header">Set Gentle Reminder</div>
+      <div style="padding: 20px;">
+        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--ig-primary-text);">Date & Time</label>
+        <input type="datetime-local" id="pfReminderDate" class="ig-chat-input" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px;">
+        
+        <label style="display: block; margin: 16px 0 8px; font-weight: 500; color: var(--ig-primary-text);">Message (Optional)</label>
+        <textarea id="pfReminderMessage" class="ig-chat-input" placeholder="Add a note for this reminder..." rows="3" style="width: 100%; padding: 10px; border: 1px solid var(--ig-border); border-radius: 8px; resize: vertical;"></textarea>
+      </div>
+      <div class="ig-modal-item" onclick="pfSubmitReminder()" style="color: var(--ig-blue); font-weight: 600;">
+        Set Reminder
+      </div>
+      <div class="ig-modal-item" onclick="pfCloseReminderModal()">
+        Cancel
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Post Modal (exact copy from home feed) -->
+  <div id="pfEditPostModal" class="cp-overlay" style="display: none;" onclick="pfCloseEditModal(event)">
+    <div class="cp-container" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="cp-header">
+        <button class="cp-header-btn" onclick="pfCloseEditModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <h2 class="cp-header-title">Edit Post</h2>
+        <button class="cp-share-btn" onclick="pfSubmitEditPost()" id="pfEditShareBtn">Save</button>
+      </div>
+
+      <!-- Body -->
+      <div class="cp-body">
+        <!-- User Info Row -->
+        <div class="cp-user-row">
+          <img id="pfEditUserAvatar" src="" alt="" class="cp-avatar">
+          <span class="cp-username" id="pfEditUsername"></span>
+        </div>
+
+        <!-- Caption -->
+        <div class="cp-caption-wrap">
+          <textarea id="pfEditPostContent" class="cp-caption" placeholder="Write the content or caption..." rows="4" oninput="pfOnEditCaptionInput(this)"></textarea>
+          <div class="cp-char-count"><span id="pfEditCharCount">0</span> / 2,200</div>
+        </div>
+
+        <!-- Hashtag Suggestions -->
+        <div id="pfEditHashtagSuggestions" class="cp-hashtag-suggestions" style="display: none;">
+          <div class="cp-hashtag-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+            <span>Suggested Hashtags</span>
+          </div>
+          <div id="pfEditHashtagList" class="cp-hashtag-list"></div>
+        </div>
+
+        <!-- Trending Hashtags -->
+        <div id="pfEditTrendingHashtags" class="cp-trending-section">
+          <div class="cp-trending-header" onclick="pfToggleEditTrendingHashtags()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span>Trending</span>
+            <svg class="cp-trending-chevron" id="pfEditTrendingChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div id="pfEditTrendingList" class="cp-trending-list" style="display: none;"></div>
+        </div>
+
+        <!-- Existing Media Preview -->
+        <div id="pfEditExistingMedia" class="cp-media-grid"></div>
+
+        <!-- New Media Preview -->
+        <div id="pfEditNewMedia" class="cp-media-grid"></div>
+
+        <!-- Existing Files -->
+        <div id="pfEditExistingFiles" class="cp-files-list"></div>
+
+        <!-- Upload Toolbar -->
+        <div class="cp-toolbar">
+          <label class="cp-tool-btn" title="Add Photos & Videos">
+            <input type="file" id="pfEditPostImages" accept="image/*,video/*" multiple style="display: none;" onchange="pfPreviewEditMedia(this)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="cp-tool-label">Photo/Video</span>
+          </label>
+          <label class="cp-tool-btn" title="Attach Files">
+            <input type="file" id="pfEditPostFiles" accept=".pdf,.doc,.docx,.txt,.zip,.xls,.xlsx,.ppt,.pptx" multiple style="display: none;" onchange="pfPreviewEditFiles(this)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+            <span class="cp-tool-label">Files</span>
+          </label>
+          <button class="cp-tool-btn" onclick="pfToggleEditPoll()" title="Create Poll" id="pfEditPollToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span class="cp-tool-label">Poll</span>
+          </button>
+          <button class="cp-tool-btn" onclick="pfToggleEditSchedule()" title="Schedule Post" id="pfEditScheduleToggleBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="cp-tool-label">Schedule</span>
+          </button>
+        </div>
+
+        <!-- Poll Section -->
+        <div id="pfEditPollSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>
+            <span>Create Poll</span>
+            <button class="cp-section-close" onclick="pfToggleEditPoll()">×</button>
+          </div>
+          <input type="text" id="pfEditPollQuestion" class="cp-input" placeholder="Ask a question...">
+          <div id="pfEditPollOptions" class="cp-poll-options">
+            <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background: #0095f6;"></span><input type="text" class="pf-edit-poll-option cp-input" placeholder="Option 1"></div>
+            <div class="cp-poll-option-row"><span class="cp-poll-dot" style="background: #e1306c;"></span><input type="text" class="pf-edit-poll-option cp-input" placeholder="Option 2"></div>
+          </div>
+          <button class="cp-add-option-btn" onclick="pfAddEditPollOption()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add option
+          </button>
+          <div class="cp-poll-expiry">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <input type="datetime-local" id="pfEditPollExpiry" class="cp-datetime-input">
+            <span class="cp-expiry-label">Poll ends</span>
+          </div>
+        </div>
+
+        <!-- Schedule Section -->
+        <div id="pfEditScheduleSection" class="cp-section" style="display: none;">
+          <div class="cp-section-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Schedule Post</span>
+            <button class="cp-section-close" onclick="pfToggleEditSchedule()">×</button>
+          </div>
+          <div class="cp-schedule-picker">
+            <input type="datetime-local" id="pfEditScheduleTime" class="cp-datetime-input">
+            <p class="cp-schedule-hint">Your post will be published at the scheduled time</p>
+          </div>
+        </div>
+
+        <!-- Advanced Options -->
+        <div class="cp-advanced-toggle" onclick="pfToggleEditAdvancedOptions()">
+          <span>Advanced options</span>
+          <svg id="pfEditAdvancedChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="pfEditAdvancedOptions" class="cp-advanced" style="display: none;">
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+              <span>Contact Me Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="pfEditEnableContact">
+              <span class="cp-switch-slider"></span>
+            </div>
+          </label>
+          <label class="cp-toggle-row">
+            <div class="cp-toggle-info">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>I'm Interested Button</span>
+            </div>
+            <div class="cp-switch">
+              <input type="checkbox" id="pfEditEnableInterested">
+              <span class="cp-switch-slider"></span>
+            </div>
+          </label>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
+  <script src="/js/post-interactions.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
   <script>
     // ===== Portfolio Page Logic =====
@@ -2320,6 +2693,14 @@
     const viewUserId = pathParam && /^\d+$/.test(pathParam) ? parseInt(pathParam) : null;
     const viewUsernameFromPath = pathParam && !/^\d+$/.test(pathParam) ? pathParam : null;
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    // Initialize shared post interactions module
+    PostInteractions.init({
+      getUser: () => currentUser,
+      refreshPosts: () => typeof loadRecentPosts === 'function' && loadRecentPosts(),
+      prefix: 'pf'
+    });
+
     let portfolioUserId = null;
     let isOwnPortfolio = false;
     let portfolioProjects = [];
@@ -3237,395 +3618,480 @@
 
     let currentViewPostId = null;
 
-    async function viewPost(postId) {
-      currentViewPostId = postId;
-      const modal = document.getElementById('pf-post-modal');
-      modal.classList.add('active');
+    // Global mute state (shared across feed)
+    if (typeof window._globalMuted === 'undefined') window._globalMuted = true;
+
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ===== FULLSCREEN POST / REEL VIEWER (matches home feed ig-fullscreen-viewer) =====
+    function viewPost(postId) {
+      var allPosts = allProfilePosts;
+      var clickedPost = allPosts.find(function(p) { return p.id === postId; });
+
+      // If on reels tab or clicked a video, filter to videos only
+      var feedPosts;
+      if (currentIgTab === 'reels' || (clickedPost && clickedPost.video_url)) {
+        feedPosts = allPosts.filter(function(p) { return p.video_url; });
+      } else {
+        feedPosts = allPosts.filter(function(p) { return !p.video_url; });
+        if (feedPosts.length === 0) feedPosts = allPosts;
+      }
+
+      var startIdx = feedPosts.findIndex(function(p) { return p.id === postId; });
+      if (startIdx === -1) startIdx = 0;
+
+      // Reorder so clicked post is first
+      var orderedPosts = feedPosts.slice(startIdx).concat(feedPosts.slice(0, startIdx));
+      openProfileFullScreen(orderedPosts, 0);
+    }
+
+    function openProfileFullScreen(posts, startIndex) {
+      // Remove existing viewer
+      var existing = document.getElementById('pfFullScreenViewer');
+      if (existing) existing.remove();
+
+      var headerText = (posts[startIndex] && posts[startIndex].video_url) ? 'Reels' : 'Posts';
+
+      var viewer = document.createElement('div');
+      viewer.id = 'pfFullScreenViewer';
+      viewer.className = 'ig-fullscreen-viewer';
+      viewer.innerHTML = '<div class="ig-fullscreen-header">'
+        + '<button class="ig-fullscreen-back" onclick="closeProfileFullScreen()">'
+        + '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+        + '</button>'
+        + '<span style="color:#fff;font-weight:600;font-size:16px;text-shadow:0 1px 3px rgba(0,0,0,0.5);">' + headerText + '</span>'
+        + '<div style="margin-left:auto;width:24px;"></div>'
+        + '</div>'
+        + '<div class="ig-fullscreen-content" id="pfFullScreenContent"></div>';
+
+      document.body.appendChild(viewer);
       document.body.style.overflow = 'hidden';
 
-      try {
-        const [postRes, commentsRes] = await Promise.all([
-          fetch(`/api/posts/${postId}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
-          fetch(`/api/posts/${postId}/comments`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
-        ]);
+      renderProfileFullScreenPosts(posts, startIndex);
+    }
 
-        if (!postRes.ok) { showToast('Post not found'); closePostModal(); return; }
+    function renderProfileFullScreenPosts(posts, startIndex) {
+      var content = document.getElementById('pfFullScreenContent');
+      if (!content || !posts.length) return;
 
-        const postData = await postRes.json();
-        const post = postData.post;
-        const commentsData = commentsRes.ok ? await commentsRes.json() : { comments: [] };
-        const comments = commentsData.comments || [];
-        const postOwnerId = commentsData.post_user_id || post.user_id;
+      content.innerHTML = posts.map(function(post, idx) {
+        var isLiked = post.user_has_liked > 0;
+        var isSaved = post.is_saved > 0;
+        var likesCount = post.likes_count || 0;
+        var commentsCount = post.comments_count || 0;
+        var username = post.username || (portfolioUserData ? portfolioUserData.username : '');
+        var avatar = post.profile_picture || (portfolioUserData ? portfolioUserData.profile_picture : '') || defaultAvatar;
+        var isOwner = post.user_id === (currentUser ? currentUser.id : null);
+        var captionText = post.content || '';
 
-        // Store post owner id for comment rendering
-        window._profilePostOwnerId = postOwnerId;
+        // Time ago
+        var timeAgo = formatTimeAgo(post.created_at);
 
-        // Header
-        document.getElementById('pf-post-avatar').src = post.profile_picture || defaultAvatar;
-        document.getElementById('pf-post-username').textContent = post.username;
-        document.getElementById('pf-post-time').textContent = formatTimeAgo(post.created_at);
-        document.getElementById('pf-post-user-link').href = `/profile/${post.user_id}`;
-
-        // Show 3-dot menu only for own posts
-        const threeDotContainer = document.getElementById('pf-post-3dot-container');
-        if (post.user_id === currentUser.id) {
-          threeDotContainer.style.display = 'block';
+        // Build media
+        var mediaHtml = '';
+        if (post.video_url) {
+          var shouldPreload = idx <= startIndex + 2;
+          mediaHtml = '<div class="ig-cseries-media" ondblclick="pfDoubleTapLike(' + post.id + ', event)">'
+            + '<video ' + (shouldPreload ? 'src="' + post.video_url + '"' : 'data-src="' + post.video_url + '"')
+            + ' playsinline loop preload="' + (shouldPreload ? 'auto' : 'none') + '" data-post-id="' + post.id + '"'
+            + (post.images && post.images[0] ? ' poster="' + post.images[0] + '"' : '') + '></video>'
+            + '<div class="ig-cseries-loading-spinner" id="pf-spinner-' + post.id + '">'
+            + '<div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:cseriesSpin 0.8s linear infinite;"></div>'
+            + '</div>'
+            + '<div class="ig-cseries-tap-zone" onclick="pfHandleTap(this, event)">'
+            + '<div class="ig-cseries-pause-indicator">'
+            + '<svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+            + '</div></div></div>';
+        } else if (post.images && post.images.length > 0) {
+          if (post.images.length === 1) {
+            mediaHtml = '<div class="ig-cseries-media" ondblclick="pfDoubleTapLike(' + post.id + ', event)">'
+              + '<img src="' + post.images[0] + '" alt="Post"></div>';
+          } else {
+            // Carousel
+            var carouselId = 'pf-fs-carousel-' + post.id;
+            mediaHtml = '<div class="ig-cseries-media" ondblclick="pfDoubleTapLike(' + post.id + ', event)">'
+              + '<div style="width:100%;height:100%;position:relative;overflow:hidden;">'
+              + '<div id="' + carouselId + '-track" style="display:flex;height:100%;transition:transform 0.3s ease;">'
+              + post.images.map(function(img, imgIdx) {
+                return '<img src="' + img + '" alt="Image ' + (imgIdx+1) + '" style="width:100%;height:100%;object-fit:contain;flex-shrink:0;">';
+              }).join('')
+              + '</div>'
+              + (post.images.length > 1 ? '<button onclick="event.stopPropagation();pfFsCarousel(' + post.id + ',-1,' + post.images.length + ')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:18px;z-index:5;backdrop-filter:blur(4px);">&#8249;</button>'
+              + '<button onclick="event.stopPropagation();pfFsCarousel(' + post.id + ',1,' + post.images.length + ')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:18px;z-index:5;backdrop-filter:blur(4px);">&#8250;</button>'
+              + '<div id="' + carouselId + '-dots" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:5;">'
+              + post.images.map(function(_, di) {
+                return '<span style="width:6px;height:6px;border-radius:50%;background:' + (di === 0 ? '#fff' : 'rgba(255,255,255,0.4)') + ';transition:background 0.2s;"></span>';
+              }).join('')
+              + '</div>' : '')
+              + '</div></div>';
+          }
         } else {
-          threeDotContainer.style.display = 'none';
-        }
-        // Close any open menu
-        document.getElementById('pf-post-menu-dropdown').style.display = 'none';
-
-        // Images / Video
-        const imagesDiv = document.getElementById('pf-post-images');
-        const images = Array.isArray(post.images) ? post.images : [];
-        if (images.length > 1) {
-          let idx = 0;
-          imagesDiv.innerHTML = `
-            <div class="pf-post-modal-carousel">
-              <div class="pf-post-modal-carousel-track" id="pf-carousel-track">
-                ${images.map(img => `<img src="${img}" alt="Post" onerror="this.style.display='none'">`).join('')}
-              </div>
-              <button class="pf-post-carousel-btn prev" onclick="slidePostCarousel(-1)">&#8249;</button>
-              <button class="pf-post-carousel-btn next" onclick="slidePostCarousel(1)">&#8250;</button>
-            </div>`;
-          window._postCarouselIdx = 0;
-        } else if (images.length === 1) {
-          imagesDiv.innerHTML = `<img src="${images[0]}" alt="Post" onerror="this.style.display='none'">`;
-        } else if (post.video_url) {
-          imagesDiv.innerHTML = `<video src="${post.video_url}" controls></video>`;
-        } else {
-          imagesDiv.innerHTML = '';
+          // Text-only post
+          mediaHtml = '<div class="ig-cseries-media" style="background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);display:flex;align-items:center;justify-content:center;padding:40px;">'
+            + '<p style="color:#fff;font-size:22px;font-weight:600;text-align:center;text-shadow:0 2px 8px rgba(0,0,0,0.3);max-width:80%;">' + escapeHtml(captionText).substring(0, 200) + '</p></div>';
         }
 
-        // Content
-        document.getElementById('pf-post-content').textContent = post.content || '';
-        if (!post.content) document.getElementById('pf-post-content').style.display = 'none';
-        else document.getElementById('pf-post-content').style.display = '';
+        // Right-side action buttons
+        var actionsHtml = '<div class="ig-cseries-actions">';
 
-        // Actions
-        const liked = post.user_has_liked > 0;
-        const saved = post.is_saved > 0;
-        document.getElementById('pf-post-actions').innerHTML = `
-          <button class="pf-post-action-btn ${liked ? 'liked' : ''}" id="pf-post-like-btn" onclick="togglePostLike(${post.id})">
-            <i class="${liked ? 'fas' : 'far'} fa-heart"></i>
-            <span id="pf-post-likes-count">${post.likes_count || 0}</span>
-          </button>
-          <button class="pf-post-action-btn" onclick="document.getElementById('pf-post-comment-input').focus()">
-            <i class="far fa-comment"></i>
-            <span>${comments.length}</span>
-          </button>
-          <button class="pf-post-action-btn" onclick="togglePostSave(${post.id})" id="pf-post-save-btn">
-            <i class="${saved ? 'fas' : 'far'} fa-bookmark"></i>
-          </button>
-        `;
+        // Mute button (only for video)
+        if (post.video_url) {
+          actionsHtml += '<button class="ig-cseries-mute-btn" onclick="event.stopPropagation();pfToggleMute(this)">'
+            + '<svg class="unmuted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="' + (window._globalMuted ? 'display:none;' : '') + '"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>'
+            + '<svg class="muted-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="' + (window._globalMuted ? '' : 'display:none;') + '"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
+            + '</button>';
+        }
 
-        // Comments - show collapsed with "View all X comments" button
-        renderPostComments(comments, postOwnerId);
+        // Like
+        actionsHtml += '<button class="ig-cseries-action-btn ' + (isLiked ? 'liked' : '') + '" onclick="pfToggleLike(' + post.id + ', this)" data-post-id="' + post.id + '">'
+          + '<svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>'
+          + '<span class="ig-cseries-action-count" id="pf-likes-' + post.id + '">' + formatCompact(likesCount) + '</span></button>';
 
-      } catch (err) {
-        console.error('Error loading post:', err);
-        showToast('Error loading post');
-        closePostModal();
-      }
+        // Comment
+        actionsHtml += '<button class="ig-cseries-action-btn" onclick="pfOpenCommentsModal(' + post.id + ')">'
+          + '<svg viewBox="0 0 24 24"><path d="M20.656 17.008a9.993 9.993 0 1 0-3.59 3.615L22 22Z" stroke-linejoin="round"/></svg>'
+          + '<span class="ig-cseries-action-count">' + formatCompact(commentsCount) + '</span></button>';
+
+        // Share
+        actionsHtml += '<button class="ig-cseries-action-btn" onclick="pfSharePost(' + post.id + ')">'
+          + '<svg viewBox="0 0 24 24"><line x1="22" x2="9.218" y1="3" y2="10.083" stroke-linejoin="round"/><polygon points="11.698 20.334 22 3.001 2 3.001 9.218 10.084 11.698 20.334" stroke-linejoin="round"/></svg></button>';
+
+        // Save
+        actionsHtml += '<button class="ig-cseries-action-btn ' + (isSaved ? 'saved' : '') + '" onclick="pfToggleSave(' + post.id + ', this)">'
+          + '<svg viewBox="0 0 24 24"><polygon points="20 21 12 13.44 4 21 4 3 20 3 20 21" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+
+        // 3-dot menu
+        actionsHtml += '<button class="ig-cseries-action-btn" onclick="openPfPostActions(' + post.id + ', ' + post.user_id + ')">'
+          + '<svg viewBox="0 0 24 24" width="24" height="24" fill="#fff" stroke="none"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>';
+
+        actionsHtml += '</div>';
+
+        // Bottom overlay
+        var bottomHtml = '<div class="ig-cseries-bottom">'
+          + '<div class="ig-cseries-user-row">'
+          + '<a href="/profile/' + post.user_id + '" style="display:flex;align-items:center;gap:8px;text-decoration:none;">'
+          + '<img src="' + avatar + '" alt="' + username + '" class="ig-cseries-avatar" onerror="this.src=\'' + defaultAvatar + '\'">'
+          + '<span class="ig-cseries-username">' + username + '</span></a>'
+          + (!isOwner ? '<button class="ig-cseries-follow-btn" onclick="pfFollowUser(' + post.user_id + ', this)">Follow</button>' : '')
+          + '</div>';
+
+        if (captionText) {
+          bottomHtml += '<div class="ig-cseries-caption" id="pf-caption-' + post.id + '">' + escapeHtml(captionText) + '</div>'
+            + '<button class="ig-cseries-caption-more" onclick="pfExpandCaption(' + post.id + ')">... more</button>';
+        }
+
+        bottomHtml += '<div class="ig-cseries-details" id="pf-details-' + post.id + '">'
+          + (timeAgo ? '<div class="ig-cseries-time">' + timeAgo + '</div>' : '')
+          + '<div class="ig-cseries-music"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>'
+          + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + username + ' · Original audio</span></div>'
+          + '</div></div>';
+
+        // Progress bar for video
+        var progressHtml = '';
+        if (post.video_url) {
+          progressHtml = '<div class="ig-cseries-progress-bar-container" data-post-id="' + post.id + '" onclick="pfSeekVideo(this, event)">'
+            + '<div class="ig-cseries-progress-track"><div class="ig-cseries-progress-fill" id="pf-progress-' + post.id + '"></div></div></div>';
+        }
+
+        return '<div class="ig-fullscreen-post" data-post-id="' + post.id + '" data-post-index="' + idx + '">'
+          + mediaHtml + actionsHtml + bottomHtml + progressHtml + '</div>';
+      }).join('');
+
+      // Scroll to selected post and setup autoplay
+      setTimeout(function() {
+        var allPostEls = content.querySelectorAll('.ig-fullscreen-post');
+        if (allPostEls[startIndex]) {
+          allPostEls[startIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
+        }
+        pfSetupVideoAutoplay();
+      }, 100);
     }
 
-    function toggleProfilePostMenu() {
-      const menu = document.getElementById('pf-post-menu-dropdown');
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    }
-
-    async function handleProfileEditPost() {
-      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
-      showToast('Edit functionality coming soon!');
-    }
-
-    async function handleProfileArchivePost() {
-      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
-      if (!confirm('Archive this post?')) return;
-      try {
-        const res = await fetch(`/api/posts/${currentViewPostId}/archive`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    // Carousel navigation in fullscreen
+    var pfFsCarouselIdx = {};
+    function pfFsCarousel(postId, dir, total) {
+      if (!pfFsCarouselIdx[postId]) pfFsCarouselIdx[postId] = 0;
+      pfFsCarouselIdx[postId] = Math.max(0, Math.min(total - 1, pfFsCarouselIdx[postId] + dir));
+      var track = document.getElementById('pf-fs-carousel-' + postId + '-track');
+      if (track) track.style.transform = 'translateX(-' + (pfFsCarouselIdx[postId] * 100) + '%)';
+      var dots = document.getElementById('pf-fs-carousel-' + postId + '-dots');
+      if (dots) {
+        Array.from(dots.children).forEach(function(dot, i) {
+          dot.style.background = i === pfFsCarouselIdx[postId] ? '#fff' : 'rgba(255,255,255,0.4)';
         });
-        if (res.ok) {
-          showToast('Post archived');
-          closePostModal();
-          loadRecentPosts();
-          // Update post count
-          const countEl = document.getElementById('pf-posts-count');
-          if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+      }
+    }
+
+    // Close fullscreen viewer
+    function closeProfileFullScreen() {
+      var viewer = document.getElementById('pfFullScreenViewer');
+      if (viewer) {
+        if (window._pfObserver) { window._pfObserver.disconnect(); window._pfObserver = null; }
+        if (window._pfProgressRAF) { cancelAnimationFrame(window._pfProgressRAF); window._pfProgressRAF = null; }
+        viewer.querySelectorAll('video').forEach(function(v) { v.pause(); v.muted = true; });
+        viewer.remove();
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Video autoplay with IntersectionObserver
+    function pfSetupVideoAutoplay() {
+      var content = document.getElementById('pfFullScreenContent');
+      if (!content) return;
+
+      if (window._pfObserver) window._pfObserver.disconnect();
+      if (window._pfProgressRAF) cancelAnimationFrame(window._pfProgressRAF);
+
+      // Hide spinner when ready
+      content.querySelectorAll('.ig-fullscreen-post video').forEach(function(v) {
+        var postId = v.dataset.postId;
+        var spinner = document.getElementById('pf-spinner-' + postId);
+        if (spinner) {
+          var hide = function() { spinner.classList.add('hidden'); };
+          v.addEventListener('canplay', hide, { once: true });
+          v.addEventListener('playing', hide, { once: true });
+          if (v.readyState >= 3) hide();
         }
-      } catch (err) { showToast('Failed to archive'); }
-    }
-
-    async function handleProfileDeletePost() {
-      document.getElementById('pf-post-menu-dropdown').style.display = 'none';
-      if (!confirm('Delete this post permanently?')) return;
-      try {
-        const res = await fetch(`/api/posts/${currentViewPostId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) {
-          showToast('Post deleted');
-          closePostModal();
-          loadRecentPosts();
-          const countEl = document.getElementById('pf-posts-count');
-          if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
-        }
-      } catch (err) { showToast('Failed to delete post'); }
-    }
-
-    function closePostModal() {
-      document.getElementById('pf-post-modal').classList.remove('active');
-      document.body.style.overflow = '';
-      currentViewPostId = null;
-      // Reset reply state
-      cancelProfileReply();
-    }
-
-    function slidePostCarousel(dir) {
-      const track = document.getElementById('pf-carousel-track');
-      if (!track) return;
-      const total = track.children.length;
-      window._postCarouselIdx = Math.max(0, Math.min(total - 1, (window._postCarouselIdx || 0) + dir));
-      track.style.transform = `translateX(-${window._postCarouselIdx * 100}%)`;
-    }
-
-    let profileReplyTo = null;
-
-    function replyToProfileComment(commentId, username) {
-      profileReplyTo = { commentId, username };
-      const replyInfo = document.getElementById('pf-post-reply-info');
-      const replyUser = document.getElementById('pf-reply-to-username');
-      if (replyInfo && replyUser) {
-        replyInfo.style.display = 'flex';
-        replyUser.textContent = '@' + username;
-      }
-      const input = document.getElementById('pf-post-comment-input');
-      if (input) {
-        input.value = `@${username} `;
-        input.focus();
-      }
-    }
-
-    function cancelProfileReply() {
-      profileReplyTo = null;
-      const replyInfo = document.getElementById('pf-post-reply-info');
-      if (replyInfo) replyInfo.style.display = 'none';
-    }
-
-    function toggleProfileCommentMenu(commentId) {
-      document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
-      const menu = document.getElementById(`pf-comment-menu-${commentId}`);
-      if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    }
-
-    async function deleteProfileComment(commentId, btn) {
-      if (!confirm('Delete this comment?')) {
-        btn.closest('.pf-comment-3dot-menu').style.display = 'none';
-        return;
-      }
-      try {
-        const res = await fetch(`/api/posts/${currentViewPostId}/comments/${commentId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) {
-          const commentEl = btn.closest('.pf-post-comment');
-          if (commentEl) commentEl.remove();
-          showToast('Comment deleted');
-        }
-      } catch (err) { showToast('Failed to delete comment'); }
-    }
-
-    function reportProfileComment(commentId) {
-      document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
-      showToast('Comment reported. We will review it.');
-    }
-
-    function renderPostComments(comments, postOwnerId) {
-      const container = document.getElementById('pf-post-comments');
-      if (!comments.length) {
-        container.innerHTML = '<p style="color:var(--pf-text2);font-size:13px;padding:8px 0;">No comments yet</p>';
-        return;
-      }
-
-      // Separate top-level and replies
-      const topLevel = comments.filter(c => !c.parent_id);
-      const repliesMap = {};
-      comments.filter(c => c.parent_id).forEach(c => {
-        if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
-        repliesMap[c.parent_id].push(c);
       });
 
-      const renderSingleComment = (c, isReply) => {
-        const isOwn = c.user_id === currentUser.id;
-        const isPostOwner = currentUser.id === postOwnerId;
-        const canDelete = isOwn || isPostOwner;
-        const contentWithMentions = (c.content || '').replace(/@(\w+)/g, '<a href="/profile/$1" style="color:var(--pf-accent);text-decoration:none;font-weight:600;">@$1</a>');
-        const avatarSize = isReply ? '24px' : '32px';
-        const fontSize = isReply ? '12px' : '13px';
-
-        return `
-          <div class="pf-post-comment" data-comment-id="${c.id}" style="${isReply ? 'padding: 6px 0;' : ''}">
-            <a href="/profile/${c.user_id}" style="flex-shrink:0;text-decoration:none;">
-              <img class="pf-post-comment-avatar" src="${c.profile_picture || defaultAvatar}" alt="${c.username}" style="cursor:pointer;width:${avatarSize};height:${avatarSize};">
-            </a>
-            <div class="pf-post-comment-body" style="flex:1;min-width:0;">
-              <a href="/profile/${c.user_id}" class="pf-post-comment-user" style="text-decoration:none;cursor:pointer;font-size:${fontSize};">${c.username}</a>
-              <div class="pf-post-comment-text" style="font-size:${fontSize};">${contentWithMentions}</div>
-              <div style="display:flex;gap:12px;align-items:center;margin-top:4px;">
-                <span class="pf-post-comment-time">${formatTimeAgo(c.created_at)}</span>
-                <button onclick="replyToProfileComment(${c.id}, '${c.username}')" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:11px;font-weight:600;padding:0;">Reply</button>
-              </div>
-            </div>
-            <div style="position:relative;flex-shrink:0;align-self:flex-start;margin-top:4px;">
-              <button onclick="event.stopPropagation(); toggleProfileCommentMenu(${c.id})" style="background:none;border:none;cursor:pointer;color:var(--pf-text2);padding:4px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-              </button>
-              <div class="pf-comment-3dot-menu" id="pf-comment-menu-${c.id}" style="display:none;position:absolute;right:0;top:100%;background:var(--pf-card);border:1px solid rgba(255,255,255,0.1);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:20;min-width:150px;overflow:hidden;">
-                <button onclick="document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none'); showToast('Comment liked!')" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;color:var(--pf-text);cursor:pointer;font-size:13px;text-align:left;">
-                  <i class="fas fa-heart" style="width:14px;"></i> Like
-                </button>
-                ${canDelete ? `
-                  <button onclick="deleteProfileComment(${c.id}, this)" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:#ef4444;cursor:pointer;font-size:13px;text-align:left;">
-                    <i class="fas fa-trash" style="width:14px;"></i> Delete
-                  </button>
-                ` : ''}
-                <button onclick="reportProfileComment(${c.id})" style="display:flex;align-items:center;gap:8px;width:100%;padding:12px 16px;background:none;border:none;border-top:1px solid rgba(255,255,255,0.06);color:var(--pf-text);cursor:pointer;font-size:13px;text-align:left;">
-                  <i class="fas fa-flag" style="width:14px;"></i> Report
-                </button>
-              </div>
-            </div>
-          </div>`;
-      };
-
-      const renderThreaded = (commentsList) => {
-        let html = '';
-        const topLevelFiltered = commentsList.filter(c => !c.parent_id);
-        topLevelFiltered.forEach(c => {
-          html += renderSingleComment(c, false);
-          const replies = repliesMap[c.id] || [];
-          if (replies.length > 0) {
-            html += `<div style="margin-left: 40px; border-left: 2px solid rgba(255,255,255,0.08); padding-left: 8px;">`;
-            replies.forEach(r => {
-              html += renderSingleComment(r, true);
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          var video = entry.target;
+          if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+            // Lazy load
+            if (!video.src && video.dataset.src) {
+              video.src = video.dataset.src;
+              video.preload = 'auto';
+              video.load();
+              var pid = video.dataset.postId;
+              var sp = document.getElementById('pf-spinner-' + pid);
+              if (sp) sp.classList.remove('hidden');
+            }
+            video.muted = window._globalMuted;
+            video.volume = 1;
+            video.play().catch(function() {
+              video.muted = true;
+              video.play().catch(function() {});
             });
-            html += `</div>`;
+          } else {
+            video.pause();
           }
         });
-        // Also render any orphan replies (parent not in current slice)
-        const orphans = commentsList.filter(c => c.parent_id && !topLevelFiltered.find(t => t.id === c.parent_id));
-        orphans.forEach(c => { html += renderSingleComment(c, false); });
-        return html;
-      };
+      }, { threshold: [0.6], root: content });
 
-      // Show only the latest 2 top-level comments initially, with a "View all" button if there are more
-      const showAll = topLevel.length <= 2;
-      const visibleTopLevel = showAll ? topLevel : topLevel.slice(-2);
-      const visibleComments = showAll ? comments : [...visibleTopLevel, ...visibleTopLevel.flatMap(t => repliesMap[t.id] || [])];
+      window._pfObserver = observer;
+      content.querySelectorAll('.ig-fullscreen-post video').forEach(function(v) { observer.observe(v); });
 
-      let html = '';
-      if (!showAll) {
-        html += `<button id="pf-view-all-comments-btn" onclick="expandAllProfileComments()" style="background:none;border:none;color:var(--pf-text2);cursor:pointer;font-size:13px;padding:8px 0;font-weight:400;">View all ${comments.length} comments</button>`;
-        html += `<div id="pf-all-comments-container" style="display:none;">${renderThreaded(comments)}</div>`;
-        html += `<div id="pf-preview-comments-container">${renderThreaded(visibleComments)}</div>`;
-      } else {
-        html += renderThreaded(comments);
+      // Progress bar updater
+      function updateProgress() {
+        content.querySelectorAll('.ig-fullscreen-post video').forEach(function(v) {
+          var pid = v.dataset.postId;
+          var fill = document.getElementById('pf-progress-' + pid);
+          if (fill && v.duration && !isNaN(v.duration)) {
+            fill.style.width = ((v.currentTime / v.duration) * 100) + '%';
+          }
+        });
+        window._pfProgressRAF = requestAnimationFrame(updateProgress);
       }
+      updateProgress();
+    }
 
-      container.innerHTML = html;
+    // Seek video via progress bar
+    function pfSeekVideo(container, event) {
+      event.stopPropagation();
+      var post = container.closest('.ig-fullscreen-post');
+      var video = post ? post.querySelector('video') : null;
+      if (!video || !video.duration) return;
+      var rect = container.getBoundingClientRect();
+      var x = event.clientX - rect.left;
+      var pct = Math.max(0, Math.min(1, x / rect.width));
+      video.currentTime = pct * video.duration;
+    }
 
-      // Store full comments for expanding
-      window._profileAllComments = comments;
-      window._profileCommentsPostOwnerId = postOwnerId;
-
-      // Close menus on click elsewhere
-      container.addEventListener('click', (e) => {
-        if (!e.target.closest('.pf-comment-3dot-menu') && !e.target.closest('button[onclick*="toggleProfileCommentMenu"]')) {
-          document.querySelectorAll('.pf-comment-3dot-menu').forEach(m => m.style.display = 'none');
+    // Mute/unmute toggle
+    function pfToggleMute(btn) {
+      window._globalMuted = !window._globalMuted;
+      // Apply to all videos in fullscreen
+      document.querySelectorAll('.ig-fullscreen-post video').forEach(function(v) {
+        v.muted = window._globalMuted;
+      });
+      // Update all mute button icons
+      document.querySelectorAll('.ig-cseries-mute-btn').forEach(function(b) {
+        var mutedIcon = b.querySelector('.muted-icon');
+        var unmutedIcon = b.querySelector('.unmuted-icon');
+        if (mutedIcon && unmutedIcon) {
+          mutedIcon.style.display = window._globalMuted ? '' : 'none';
+          unmutedIcon.style.display = window._globalMuted ? 'none' : '';
         }
       });
     }
 
-    function expandAllProfileComments() {
-      const btn = document.getElementById('pf-view-all-comments-btn');
-      const allContainer = document.getElementById('pf-all-comments-container');
-      const previewContainer = document.getElementById('pf-preview-comments-container');
-      if (btn) btn.style.display = 'none';
-      if (previewContainer) previewContainer.style.display = 'none';
-      if (allContainer) allContainer.style.display = 'block';
+    // Single tap / double-tap handler for videos
+    var _pfTapTimer = null;
+    function pfHandleTap(tapZone, event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var video = tapZone.closest('.ig-cseries-media').querySelector('video');
+      if (!video) return;
+
+      if (_pfTapTimer) {
+        clearTimeout(_pfTapTimer);
+        _pfTapTimer = null;
+        var postId = video.dataset.postId;
+        if (postId) pfDoubleTapLike(parseInt(postId), event);
+        return;
+      }
+
+      _pfTapTimer = setTimeout(function() {
+        _pfTapTimer = null;
+        var indicator = tapZone.querySelector('.ig-cseries-pause-indicator');
+        if (video.paused) {
+          video.play().catch(function() {});
+          if (indicator) {
+            indicator.innerHTML = '<svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+            indicator.classList.add('show');
+            setTimeout(function() { indicator.classList.remove('show'); }, 600);
+          }
+        } else {
+          video.pause();
+          if (indicator) {
+            indicator.innerHTML = '<svg width="60" height="60" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)"><rect x="5" y="3" width="4" height="18" rx="1"/><rect x="15" y="3" width="4" height="18" rx="1"/></svg>';
+            indicator.classList.add('show');
+            setTimeout(function() { indicator.classList.remove('show'); }, 600);
+          }
+        }
+      }, 250);
     }
 
-    async function togglePostLike(postId) {
+    // Double-tap like with heart animation
+    function pfDoubleTapLike(postId, event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var post = event.currentTarget ? event.currentTarget.closest('.ig-fullscreen-post') : null;
+      if (!post) post = document.querySelector('.ig-fullscreen-post[data-post-id="' + postId + '"]');
+      if (!post) return;
+
+      var heart = document.createElement('div');
+      heart.className = 'ig-cseries-heart-anim';
+      heart.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938Z"/></svg>';
+      post.appendChild(heart);
+      setTimeout(function() { heart.remove(); }, 900);
+
+      var btn = post.querySelector('.ig-cseries-action-btn[data-post-id="' + postId + '"]');
+      if (btn && !btn.classList.contains('liked')) {
+        pfToggleLike(postId, btn);
+      }
+    }
+
+    // Toggle like
+    async function pfToggleLike(postId, btn) {
       try {
-        const btn = document.getElementById('pf-post-like-btn');
-        const isLiked = btn.classList.contains('liked');
-        const res = await fetch(`/api/posts/${postId}/${isLiked ? 'unlike' : 'like'}`, {
+        if (!btn) btn = document.querySelector('.ig-cseries-action-btn[data-post-id="' + postId + '"]');
+        if (!btn) return;
+        var isLiked = btn.classList.contains('liked');
+        var res = await fetch('/api/posts/' + postId + '/' + (isLiked ? 'unlike' : 'like'), {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         if (res.ok) {
           btn.classList.toggle('liked');
-          const icon = btn.querySelector('i');
-          icon.className = btn.classList.contains('liked') ? 'fas fa-heart' : 'far fa-heart';
-          const countEl = document.getElementById('pf-post-likes-count');
-          countEl.textContent = parseInt(countEl.textContent) + (btn.classList.contains('liked') ? 1 : -1);
+          var svg = btn.querySelector('svg');
+          if (svg) {
+            svg.style.fill = isLiked ? 'none' : '#ed4956';
+            svg.style.stroke = isLiked ? '#fff' : '#ed4956';
+          }
+          var countEl = document.getElementById('pf-likes-' + postId);
+          if (countEl) {
+            var count = parseInt(countEl.textContent) || 0;
+            count += isLiked ? -1 : 1;
+            countEl.textContent = formatCompact(Math.max(0, count));
+          }
         }
       } catch (err) { console.error('Like error:', err); }
     }
 
-    async function togglePostSave(postId) {
+    // Toggle save
+    async function pfToggleSave(postId, btn) {
       try {
-        const btn = document.getElementById('pf-post-save-btn');
-        const isSaved = btn.querySelector('i').classList.contains('fas');
-        const res = await fetch(`/api/posts/${postId}/${isSaved ? 'unsave' : 'save'}`, {
+        var isSaved = btn.classList.contains('saved');
+        var res = await fetch('/api/posts/' + postId + '/' + (isSaved ? 'unsave' : 'save'), {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         if (res.ok) {
-          btn.querySelector('i').className = isSaved ? 'far fa-bookmark' : 'fas fa-bookmark';
-          showToast(isSaved ? 'Post unsaved' : 'Post saved');
+          btn.classList.toggle('saved');
+          var svg = btn.querySelector('svg');
+          if (svg) svg.style.fill = btn.classList.contains('saved') ? '#fff' : 'none';
+          showToast(isSaved ? 'Unsaved' : 'Saved');
         }
       } catch (err) { console.error('Save error:', err); }
     }
 
-    async function submitPostComment() {
-      if (!currentViewPostId) return;
-      const input = document.getElementById('pf-post-comment-input');
-      const content = input.value.trim();
-      if (!content) return;
+    // Share post
 
+    // ===== COMMENTS BOTTOM SHEET (matches home feed) =====
+
+
+    // Follow user
+    async function pfFollowUser(userId, btn) {
       try {
-        let endpoint = `/api/posts/${currentViewPostId}/comments`;
-        if (profileReplyTo && profileReplyTo.commentId) {
-          endpoint = `/api/posts/${currentViewPostId}/comments/${profileReplyTo.commentId}/reply`;
-        }
-
-        const res = await fetch(endpoint, {
+        var res = await fetch('/api/users/' + userId + '/follow', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ content })
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
         });
         if (res.ok) {
-          input.value = '';
-          cancelProfileReply();
-          // Reload comments
-          const commentsRes = await fetch(`/api/posts/${currentViewPostId}/comments`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (commentsRes.ok) {
-            const data = await commentsRes.json();
-            renderPostComments(data.comments || [], data.post_user_id || window._profilePostOwnerId);
-          }
+          btn.textContent = 'Following';
+          btn.style.background = 'rgba(255,255,255,0.2)';
+          btn.style.border = '1px solid rgba(255,255,255,0.4)';
+          btn.disabled = true;
         }
-      } catch (err) { console.error('Comment error:', err); }
+      } catch (err) { console.error('Follow error:', err); }
     }
+
+    // Expand/collapse caption
+    function pfExpandCaption(postId) {
+      var captionEl = document.getElementById('pf-caption-' + postId);
+      var detailsEl = document.getElementById('pf-details-' + postId);
+      var moreBtn = captionEl ? captionEl.parentElement.querySelector('.ig-cseries-caption-more') : null;
+      if (!captionEl) return;
+      var isExpanded = captionEl.classList.contains('expanded');
+      if (isExpanded) {
+        captionEl.classList.remove('expanded');
+        if (detailsEl) detailsEl.classList.remove('expanded');
+        if (moreBtn) { moreBtn.textContent = '... more'; moreBtn.style.display = ''; }
+      } else {
+        captionEl.classList.add('expanded');
+        if (detailsEl) detailsEl.classList.add('expanded');
+        if (moreBtn) moreBtn.textContent = 'less';
+      }
+    }
+
+    // ===== Post Actions Bottom Sheet (matches home feed exactly) =====
+
+
+    // --- Owner Actions (exact home feed edit system) ---
+
+
+    // ===== Drag-to-seek on progress bar =====
+    document.addEventListener('pointerdown', function(e) {
+      var container = e.target.closest('.ig-cseries-progress-bar-container');
+      if (!container || !document.getElementById('pfFullScreenViewer')) return;
+      e.preventDefault();
+      pfSeekVideo(container, e);
+      var onMove = function(me) { me.preventDefault(); pfSeekVideo(container, me); };
+      var onUp = function() { document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+
+    // Store all loaded posts for tabs
+    let allProfilePosts = [];
+    let currentIgTab = 'posts';
 
     async function loadRecentPosts() {
       try {
@@ -3634,41 +4100,65 @@
         });
         if (!res.ok) return;
         const data = await res.json();
-        const posts = (data.posts || []).slice(0, 6);
-        const grid = document.getElementById('pf-activity-grid');
-
-        if (posts.length === 0) {
-          document.getElementById('pf-activity-section').style.display = 'none';
-          return;
-        }
-
-        grid.innerHTML = posts.map(p => {
-          const images = Array.isArray(p.images) ? p.images : (p.images ? JSON.parse(p.images) : []);
-          const content = p.content || '';
-          const timeAgo = formatTimeAgo(p.created_at);
-          const likes = p.likes_count || 0;
-
-          return `<div class="pf-activity-card pf-3d-tilt" onclick="viewPost(${p.id})" style="cursor:pointer;">
-            ${images.length > 0
-              ? `<img class="pf-activity-img" src="${images[0]}" alt="Post" onerror="this.style.display='none'">`
-              : p.video_url
-                ? `<div class="pf-activity-img" style="background:linear-gradient(135deg,rgba(102,126,234,0.3),rgba(118,75,162,0.3));display:flex;align-items:center;justify-content:center;"><i class="fas fa-play-circle" style="font-size:36px;color:rgba(255,255,255,0.6);"></i></div>`
-                : ''
-            }
-            <div class="pf-activity-body">
-              <div class="pf-activity-text">${content || 'Shared a post'}</div>
-              <div class="pf-activity-meta">
-                <span><i class="fas fa-heart" style="color:#ef4444;margin-right:4px;"></i> ${likes}</span>
-                <span>${timeAgo}</span>
-              </div>
-            </div>
-          </div>`;
-        }).join('');
-
-        initTilt3D();
+        allProfilePosts = data.posts || [];
+        renderIgGrid('posts');
       } catch (err) {
         console.error('Error loading posts:', err);
       }
+    }
+
+    function switchIgTab(tab) {
+      currentIgTab = tab;
+      document.querySelectorAll('.pf-ig-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('pf-ig-tab-' + tab).classList.add('active');
+      renderIgGrid(tab);
+    }
+
+    function renderIgGrid(tab) {
+      const grid = document.getElementById('pf-ig-grid');
+      if (!grid) return;
+      let posts = [];
+
+      if (tab === 'posts') {
+        posts = allProfilePosts.filter(p => !p.video_url);
+      } else if (tab === 'reels') {
+        posts = allProfilePosts.filter(p => p.video_url);
+      } else if (tab === 'tagged') {
+        posts = [];
+      }
+
+      if (posts.length === 0) {
+        const emptyIcons = { posts: 'fa-camera', reels: 'fa-play-circle', tagged: 'fa-user-tag' };
+        const emptyTitles = { posts: 'No Posts Yet', reels: 'No Reels Yet', tagged: 'No Tagged Posts' };
+        const emptyDescs = {
+          posts: isOwnPortfolio ? 'Share photos and videos to see them here.' : 'No posts to show.',
+          reels: isOwnPortfolio ? 'Create reels to see them here.' : 'No reels to show.',
+          tagged: isOwnPortfolio ? "When people tag you in photos, they'll appear here." : 'No tagged posts.'
+        };
+        grid.innerHTML = '<div class="pf-ig-empty"><div class="pf-ig-empty-icon"><i class="fas ' + emptyIcons[tab] + '"></i></div><h3>' + emptyTitles[tab] + '</h3><p>' + emptyDescs[tab] + '</p></div>';
+        return;
+      }
+
+      grid.innerHTML = posts.map(function(p) {
+        var images = Array.isArray(p.images) ? p.images : [];
+        var likes = p.likes_count || 0;
+        var comments = p.comments_count || 0;
+        var hasMultiple = images.length > 1;
+        var hasVideo = !!p.video_url;
+
+        return '<div class="pf-ig-grid-item" onclick="viewPost(' + p.id + ')">'
+          + (images.length > 0
+            ? '<img src="' + images[0] + '" alt="Post" loading="lazy" onerror="this.style.display=\'none\'">'
+            : hasVideo
+              ? '<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;"><video src="' + p.video_url + '" style="width:100%;height:100%;object-fit:cover;" muted></video></div>'
+              : '<div class="pf-ig-grid-text">' + (p.content || 'Post').substring(0, 100) + '</div>')
+          + (hasMultiple ? '<span class="pf-ig-grid-multi"><i class="fas fa-clone"></i></span>' : '')
+          + (hasVideo ? '<span class="pf-ig-grid-video"><i class="fas fa-play"></i></span>' : '')
+          + '<div class="pf-ig-grid-overlay">'
+          + '<span class="pf-ig-grid-stat"><i class="fas fa-heart"></i> ' + likes + '</span>'
+          + '<span class="pf-ig-grid-stat"><i class="fas fa-comment"></i> ' + comments + '</span>'
+          + '</div></div>';
+      }).join('');
     }
 
     // ===== SHOW ALL POSTS (Instagram Grid) =====
@@ -3687,21 +4177,22 @@
         if (posts.length === 0) {
           body.innerHTML = `<div style="padding:48px;text-align:center;color:var(--pf-text2);"><i class="fas fa-camera" style="font-size:40px;opacity:0.2;display:block;margin-bottom:12px;"></i><h3 style="margin-bottom:8px;color:var(--pf-text);">No Posts Yet</h3><p>Posts will appear here.</p></div>`;
         } else {
-          body.innerHTML = `<div class="pf-posts-instagram-grid">${posts.map(p => {
+          body.innerHTML = `<div class="pf-ig-grid">${posts.map(p => {
             const images = Array.isArray(p.images) ? p.images : [];
             const likes = p.likes_count || 0;
             const comments = p.comments_count || 0;
-            return `<div class="pf-posts-grid-item" onclick="viewPost(${p.id})">
+            return `<div class="pf-ig-grid-item" onclick="viewPost(${p.id})">
               ${images.length > 0
-                ? `<img src="${images[0]}" alt="Post" onerror="this.style.display='none'">`
+                ? `<img src="${images[0]}" alt="Post" loading="lazy" onerror="this.style.display='none'">`
                 : p.video_url
-                  ? `<div style="width:100%;height:100%;background:linear-gradient(135deg,rgba(102,126,234,0.3),rgba(118,75,162,0.3));display:flex;align-items:center;justify-content:center;"><i class="fas fa-play-circle" style="font-size:32px;color:rgba(255,255,255,0.6);"></i></div>`
-                  : `<div class="pf-grid-text-post">${(p.content || 'Post').substring(0, 80)}</div>`
+                  ? `<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;"><i class="fas fa-play-circle" style="font-size:32px;color:rgba(255,255,255,0.6);"></i></div>`
+                  : `<div class="pf-ig-grid-text">${(p.content || 'Post').substring(0, 80)}</div>`
               }
-              ${images.length > 1 ? '<span class="pf-grid-multi-icon"><i class="fas fa-clone"></i></span>' : ''}
-              <div class="pf-grid-overlay">
-                <span class="pf-grid-stat"><i class="fas fa-heart"></i> ${likes}</span>
-                <span class="pf-grid-stat"><i class="fas fa-comment"></i> ${comments}</span>
+              ${images.length > 1 ? '<span class="pf-ig-grid-multi"><i class="fas fa-clone"></i></span>' : ''}
+              ${p.video_url ? '<span class="pf-ig-grid-video"><i class="fas fa-play"></i></span>' : ''}
+              <div class="pf-ig-grid-overlay">
+                <span class="pf-ig-grid-stat"><i class="fas fa-heart"></i> ${likes}</span>
+                <span class="pf-ig-grid-stat"><i class="fas fa-comment"></i> ${comments}</span>
               </div>
             </div>`;
           }).join('')}</div>`;
@@ -3792,20 +4283,21 @@
         if (posts.length === 0) {
           body.innerHTML = `<div style="padding:48px;text-align:center;color:var(--pf-text2);"><i class="fas fa-bookmark" style="font-size:40px;opacity:0.2;display:block;margin-bottom:12px;"></i><h3 style="margin-bottom:8px;color:var(--pf-text);">No Saved Posts</h3><p>Save posts to see them here.</p></div>`;
         } else {
-          body.innerHTML = `<div class="pf-posts-instagram-grid">${posts.map(p => {
+          body.innerHTML = `<div class="pf-ig-grid">${posts.map(p => {
             const images = Array.isArray(p.images) ? p.images : [];
             const likes = p.likes_count || 0;
             const comments = p.comments_count || 0;
-            return `<div class="pf-posts-grid-item" onclick="viewPost(${p.id})">
+            return `<div class="pf-ig-grid-item" onclick="viewPost(${p.id})">
               ${images.length > 0
-                ? `<img src="${images[0]}" alt="Post" onerror="this.style.display='none'">`
+                ? `<img src="${images[0]}" alt="Post" loading="lazy" onerror="this.style.display='none'">`
                 : p.video_url
-                  ? `<div style="width:100%;height:100%;background:linear-gradient(135deg,rgba(102,126,234,0.3),rgba(118,75,162,0.3));display:flex;align-items:center;justify-content:center;"><i class="fas fa-play-circle" style="font-size:32px;color:rgba(255,255,255,0.6);"></i></div>`
-                  : `<div class="pf-grid-text-post">${(p.content || 'Post').substring(0, 80)}</div>`
+                  ? `<div style="width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;"><i class="fas fa-play-circle" style="font-size:32px;color:rgba(255,255,255,0.6);"></i></div>`
+                  : `<div class="pf-ig-grid-text">${(p.content || 'Post').substring(0, 80)}</div>`
               }
-              <div class="pf-grid-overlay">
-                <span class="pf-grid-stat"><i class="fas fa-heart"></i> ${likes}</span>
-                <span class="pf-grid-stat"><i class="fas fa-comment"></i> ${comments}</span>
+              ${p.video_url ? '<span class="pf-ig-grid-video"><i class="fas fa-play"></i></span>' : ''}
+              <div class="pf-ig-grid-overlay">
+                <span class="pf-ig-grid-stat"><i class="fas fa-heart"></i> ${likes}</span>
+                <span class="pf-ig-grid-stat"><i class="fas fa-comment"></i> ${comments}</span>
               </div>
             </div>`;
           }).join('')}</div>`;
