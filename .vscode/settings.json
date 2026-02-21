@@ -4,6 +4,7 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "pkill": true
+        "pkill": true,
+        "cp": true
     }
 }

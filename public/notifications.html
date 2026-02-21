@@ -7,78 +7,247 @@
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* ===== NOTIFICATION ITEMS ===== */
     .ig-notification-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--ig-border);
-      cursor: pointer;
-      transition: background-color 0.2s;
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      border-bottom: 1px solid var(--ig-border); cursor: pointer; transition: background-color 0.2s;
     }
-    .ig-notification-item:hover {
-      background-color: var(--ig-hover);
-    }
-    .ig-notification-item.unread {
-      background-color: rgba(0, 149, 246, 0.05);
-    }
-    .ig-notification-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-    .ig-notification-content {
-      flex: 1;
-      min-width: 0;
-    }
-    .ig-notification-text {
-      font-size: 14px;
-      color: var(--ig-primary-text);
-      line-height: 1.4;
-    }
-    .ig-notification-username {
-      font-weight: 600;
-    }
-    .ig-notification-time {
-      font-size: 12px;
-      color: var(--ig-secondary-text);
-      margin-top: 2px;
-    }
-    .ig-notification-action {
-      flex-shrink: 0;
-    }
-    .ig-follow-btn {
-      background-color: var(--ig-blue);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 7px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .ig-follow-btn:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-    .ig-following-btn {
-      background-color: var(--ig-secondary-background);
-      color: var(--ig-primary-text);
-      border: 1px solid var(--ig-border);
-      border-radius: 8px;
-      padding: 7px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .ig-following-btn:hover {
-      background-color: var(--ig-hover);
-      transform: translateY(-1px);
-    }
+    .ig-notification-item:hover { background-color: var(--ig-hover); }
+    .ig-notification-item.unread { background-color: rgba(0, 149, 246, 0.05); }
+    .ig-notification-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .ig-notification-content { flex: 1; min-width: 0; }
+    .ig-notification-text { font-size: 14px; color: var(--ig-primary-text); line-height: 1.4; }
+    .ig-notification-username { font-weight: 600; }
+    .ig-notification-time { font-size: 12px; color: var(--ig-secondary-text); margin-top: 2px; }
+    .ig-notification-action { flex-shrink: 0; }
+    .ig-follow-btn { background-color: var(--ig-blue); color: white; border: none; border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .ig-follow-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .ig-following-btn { background-color: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .ig-following-btn:hover { background-color: var(--ig-hover); transform: translateY(-1px); }
+
+    /* ===== TABS ===== */
+    .notif-tabs { display: flex; border-bottom: 1px solid var(--ig-border); position: sticky; top: 60px; z-index: 10; background: var(--ig-background); }
+    .notif-tab-btn { flex: 1; padding: 14px 0; text-align: center; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .notif-tab-btn.active { color: var(--ig-primary-text); border-bottom-color: var(--ig-primary-text); }
+    .notif-tab-btn:hover { color: var(--ig-primary-text); }
+    .notif-tab-panel { display: none; }
+    .notif-tab-panel.active { display: block; }
+
+    /* ===== GOOGLE REMINDERS STYLE ===== */
+    .reminder-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px; }
+    .reminder-header h2 { font-size: 20px; font-weight: 700; margin: 0; }
+    .view-pills { display: flex; background: var(--ig-secondary-background); border-radius: 24px; padding: 3px; border: 1px solid var(--ig-border); }
+    .view-pill { padding: 6px 16px; border-radius: 20px; border: none; background: transparent; color: var(--ig-secondary-text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+    .view-pill.active { background: var(--ig-blue); color: white; box-shadow: 0 2px 6px rgba(0,149,246,0.3); }
+
+    /* ===== AI INPUT BAR ===== */
+    .ai-create-bar { margin: 12px 16px; background: var(--ig-secondary-background); border: 1.5px solid var(--ig-border); border-radius: 12px; display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 16px; transition: border-color 0.2s, box-shadow 0.2s; }
+    .ai-create-bar:focus-within { border-color: var(--ig-blue); box-shadow: 0 1px 8px rgba(0,149,246,0.15); }
+    .ai-create-bar input { flex: 1; border: none; background: transparent; font-size: 15px; color: var(--ig-primary-text); padding: 10px 0; outline: none; }
+    .ai-create-bar input::placeholder { color: var(--ig-secondary-text); }
+    .ai-create-bar .bar-btn { width: 38px; height: 38px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 16px; flex-shrink: 0; }
+    .ai-create-bar .bar-btn:hover { transform: scale(1.08); }
+    .ai-create-bar .btn-ai { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .ai-create-bar .btn-ai:hover { box-shadow: 0 2px 10px rgba(102,126,234,0.4); }
+    .ai-create-bar .btn-ai.loading { animation: pulse-ai 1.2s infinite; }
+    @keyframes pulse-ai { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* ===== VOICE / MIC BUTTON ===== */
+    .ai-create-bar .btn-mic { background: var(--ig-secondary-background); color: var(--ig-secondary-text); border: 1.5px solid var(--ig-border); position: relative; }
+    .ai-create-bar .btn-mic:hover { color: var(--ig-primary-text); border-color: var(--ig-primary-text); }
+    .ai-create-bar .btn-mic.recording { background: #ed4956; color: white; border-color: #ed4956; animation: mic-pulse 1.4s ease-in-out infinite; }
+    .ai-create-bar .btn-mic.recording::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2.5px solid #ed4956; animation: mic-ring 1.4s ease-out infinite; }
+    @keyframes mic-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @keyframes mic-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.5); opacity: 0; } }
+    .voice-status { margin: 0 16px 4px; padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; display: none; align-items: flex-start; gap: 10px; animation: fadeSlide 0.3s ease; flex-direction: column; }
+    .voice-status.active { display: flex; }
+    .voice-status.listening { background: rgba(237,73,86,0.1); color: #ed4956; border: 1px solid rgba(237,73,86,0.2); }
+    .voice-status.processing { background: rgba(102,126,234,0.1); color: #667eea; border: 1px solid rgba(102,126,234,0.2); }
+    .voice-status.success { background: rgba(76,175,80,0.1); color: #4caf50; border: 1px solid rgba(76,175,80,0.2); }
+    .voice-status.error { background: rgba(237,73,86,0.1); color: #ed4956; border: 1px solid rgba(237,73,86,0.2); }
+    .voice-status.confirming { background: rgba(0,149,246,0.08); color: var(--ig-primary-text); border: 1.5px solid rgba(0,149,246,0.25); }
+    .voice-status.ai-speaking { background: rgba(102,126,234,0.08); color: var(--ig-primary-text); border: 1.5px solid rgba(102,126,234,0.2); }
+    .voice-status-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .voice-wave { display: flex; gap: 3px; align-items: center; height: 18px; flex-shrink: 0; }
+    .voice-wave span { display: block; width: 3px; background: currentColor; border-radius: 2px; animation: wave 0.8s ease-in-out infinite; }
+    .voice-wave span:nth-child(1) { height: 6px; animation-delay: 0s; }
+    .voice-wave span:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+    .voice-wave span:nth-child(3) { height: 18px; animation-delay: 0.3s; }
+    .voice-wave span:nth-child(4) { height: 12px; animation-delay: 0.45s; }
+    .voice-wave span:nth-child(5) { height: 6px; animation-delay: 0.6s; }
+    @keyframes wave { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .voice-confirm-text { font-size: 14px; line-height: 1.5; color: var(--ig-primary-text); font-weight: 500; }
+    .voice-confirm-actions { display: flex; gap: 8px; margin-top: 6px; width: 100%; }
+    .voice-confirm-btn { flex: 1; padding: 10px 16px; border-radius: 10px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .voice-confirm-btn:hover { transform: translateY(-1px); }
+    .voice-confirm-btn.confirm-yes { background: linear-gradient(135deg, #0095f6, #0077cc); color: white; box-shadow: 0 3px 10px rgba(0,149,246,0.3); }
+    .voice-confirm-btn.confirm-yes:hover { box-shadow: 0 5px 16px rgba(0,149,246,0.4); }
+    .voice-confirm-btn.confirm-no { background: var(--ig-secondary-background); color: var(--ig-secondary-text); border: 1px solid var(--ig-border); }
+    .voice-confirm-btn.confirm-no:hover { color: var(--ig-primary-text); border-color: var(--ig-primary-text); }
+    .voice-confirm-btn.confirm-edit { background: var(--ig-secondary-background); color: #ff9800; border: 1px solid rgba(255,152,0,0.3); }
+    .voice-confirm-btn.confirm-edit:hover { background: rgba(255,152,0,0.1); }
+    .voice-hint { font-size: 11px; color: var(--ig-secondary-text); margin-top: 4px; font-weight: 500; font-style: italic; display: flex; align-items: center; gap: 4px; }
+    .ai-speaker-icon { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #667eea; animation: speaker-pulse 1.5s infinite; }
+    @keyframes speaker-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* ===== PRIORITY BADGES ===== */
+    .priority-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .priority-badge.p-high { background: rgba(244,67,54,0.15); color: #f44336; }
+    .priority-badge.p-medium { background: rgba(255,152,0,0.15); color: #ff9800; }
+    .priority-badge.p-low { background: rgba(0,149,246,0.1); color: #888; }
+
+    /* ===== VOICE GENDER TOGGLE ===== */
+    .voice-settings { display: flex; align-items: center; gap: 8px; margin: 0 16px 8px; }
+    .voice-gender-toggle { display: flex; background: var(--ig-secondary-background); border-radius: 20px; border: 1px solid var(--ig-border); overflow: hidden; }
+    .voice-gender-btn { padding: 5px 14px; border: none; background: transparent; color: var(--ig-secondary-text); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s; }
+    .voice-gender-btn.active { background: var(--ig-blue); color: white; }
+    .voice-gender-btn:hover:not(.active) { color: var(--ig-primary-text); }
+    .voice-settings-label { font-size: 11px; color: var(--ig-secondary-text); font-weight: 600; }
+
+    /* ===== FILTER CHIPS ===== */
+    .reminder-filters { display: flex; gap: 6px; padding: 4px 16px 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .reminder-filters::-webkit-scrollbar { display: none; }
+    .filter-chip { padding: 6px 14px; border-radius: 20px; border: 1.5px solid var(--ig-border); background: var(--ig-background); color: var(--ig-secondary-text); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+    .filter-chip.active { background: var(--ig-primary-text); color: var(--ig-background); border-color: var(--ig-primary-text); }
+    .filter-chip:hover:not(.active) { border-color: var(--ig-primary-text); color: var(--ig-primary-text); }
+
+    /* ===== COMPACT CALENDAR ===== */
+    .reminder-calendar { padding: 0 12px 8px; }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; padding: 8px; }
+    .cal-header h3 { font-size: 16px; font-weight: 700; margin: 0; }
+    .cal-nav-btn { background: none; border: none; color: var(--ig-primary-text); font-size: 18px; cursor: pointer; padding: 6px 10px; border-radius: 50%; transition: background 0.2s; }
+    .cal-nav-btn:hover { background: var(--ig-hover); }
+    .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+    .cal-weekday { font-size: 11px; font-weight: 700; color: var(--ig-secondary-text); padding: 4px 0; text-transform: uppercase; }
+    .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+    .cal-day { position: relative; text-align: center; padding: 6px 2px; font-size: 13px; border-radius: 50%; cursor: pointer; transition: all 0.15s; min-height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; aspect-ratio: 1; }
+    .cal-day:hover { background: var(--ig-hover); }
+    .cal-day.today { background: var(--ig-blue); color: white; font-weight: 700; }
+    .cal-day.selected { background: rgba(0,149,246,0.15); outline: 2px solid var(--ig-blue); font-weight: 700; }
+    .cal-day.today.selected { background: var(--ig-blue); }
+    .cal-day.other-month { color: var(--ig-secondary-text); opacity: 0.3; }
+    .cal-day.has-reminder { font-weight: 700; }
+    .cal-dots { display: flex; gap: 2px; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%); }
+    .cal-dot { width: 4px; height: 4px; border-radius: 50%; }
+
+    /* ===== GOOGLE-STYLE REMINDER CARDS ===== */
+    .reminder-section { padding: 0 16px; }
+    .date-group-label { font-size: 13px; font-weight: 700; color: var(--ig-secondary-text); padding: 12px 0 6px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .date-group-label.overdue { color: #ed4956; }
+    .date-group-label.today-label { color: var(--ig-blue); }
+
+    .g-reminder-card { display: flex; align-items: stretch; margin-bottom: 8px; border-radius: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); overflow: hidden; transition: all 0.2s; position: relative; }
+    .g-reminder-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); transform: translateY(-1px); }
+    .g-reminder-card.done { opacity: 0.5; }
+    .g-reminder-card.done .g-card-title { text-decoration: line-through; }
+    .g-card-stripe { width: 4px; flex-shrink: 0; }
+    .g-card-check { display: flex; align-items: center; padding: 12px 4px 12px 12px; flex-shrink: 0; }
+    .g-card-check input[type="checkbox"] { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; accent-color: var(--ig-blue); }
+    .g-card-body { flex: 1; padding: 12px 8px; min-width: 0; cursor: pointer; }
+    .g-card-title { font-size: 14px; font-weight: 600; color: var(--ig-primary-text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .g-card-desc { font-size: 12px; color: var(--ig-secondary-text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .g-card-meta { display: flex; gap: 10px; margin-top: 4px; font-size: 11px; color: var(--ig-secondary-text); align-items: center; flex-wrap: wrap; }
+    .g-card-meta .meta-item { display: flex; align-items: center; gap: 3px; }
+    .g-card-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .g-card-actions { display: flex; align-items: center; gap: 2px; padding: 8px 10px 8px 0; flex-shrink: 0; }
+    .g-card-btn { background: none; border: none; color: var(--ig-secondary-text); font-size: 14px; cursor: pointer; padding: 6px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+    .g-card-btn:hover { background: var(--ig-hover); color: var(--ig-primary-text); }
+    .g-card-btn.del-btn:hover { color: #ed4956; background: rgba(237,73,86,0.1); }
+
+    /* ===== DAY DETAIL ===== */
+    .day-detail { margin: 0 16px 8px; padding: 12px; border-radius: 12px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); }
+    .day-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .day-detail-header h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--ig-blue); }
+    .day-detail-close { background: none; border: none; color: var(--ig-secondary-text); font-size: 14px; cursor: pointer; padding: 4px; border-radius: 50%; }
+    .day-detail-close:hover { background: var(--ig-hover); }
+
+    /* ===== FAB ===== */
+    .reminder-fab { position: fixed; bottom: 80px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+    .fab-main { width: 56px; height: 56px; border-radius: 16px; border: none; background: var(--ig-blue); color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,149,246,0.4); display: flex; align-items: center; justify-content: center; transition: all 0.25s; }
+    .fab-main:hover { transform: scale(1.05); box-shadow: 0 6px 24px rgba(0,149,246,0.5); }
+    .fab-main:active { transform: scale(0.95); }
+    .fab-label { position: absolute; right: 66px; top: 50%; transform: translateY(-50%); background: var(--ig-primary-text); color: var(--ig-background); padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .fab-main:hover .fab-label { opacity: 1; }
+
+    /* ===== CREATE MODAL ===== */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 1000; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .modal-overlay.active { display: flex; }
+    @media (min-width: 480px) { .modal-overlay.active { align-items: center; } }
+    .create-modal { background: #1a1a2e; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; box-shadow: 0 -4px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+    @media (min-width: 480px) { .create-modal { border-radius: 20px; box-shadow: 0 8px 40px rgba(0,0,0,0.6); } }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 10px auto 0; }
+    .modal-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 4px; }
+    .modal-top h3 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #f5f5f5; }
+    .modal-top .close-x { background: rgba(255,255,255,0.1); border: none; font-size: 20px; color: #aaa; cursor: pointer; padding: 6px 8px; border-radius: 50%; transition: all 0.2s; }
+    .modal-top .close-x:hover { background: rgba(255,255,255,0.2); color: white; }
+    .modal-body { padding: 8px 20px 24px; }
+    .modal-field { margin-bottom: 18px; }
+    .modal-field label { display: block; font-size: 12px; font-weight: 700; color: #8899a6; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+    .modal-field input, .modal-field textarea, .modal-field select { width: 100%; padding: 12px 14px; border: 1.5px solid rgba(255,255,255,0.12); border-radius: 10px; font-size: 15px; background: #16213e; color: #f0f0f0; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+    .modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: #0095f6; box-shadow: 0 0 0 3px rgba(0,149,246,0.15); }
+    .modal-field input::placeholder, .modal-field textarea::placeholder { color: #666; }
+    .modal-field textarea { resize: vertical; min-height: 50px; font-family: inherit; }
+    .modal-field select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    .modal-field select option { background: #16213e; color: #f0f0f0; }
+    .modal-row { display: flex; gap: 10px; }
+    .modal-row .modal-field { flex: 1; }
+    .color-row { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+    .color-circle { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .color-circle:hover { transform: scale(1.2); box-shadow: 0 3px 10px rgba(0,0,0,0.4); }
+    .color-circle.selected { border-color: white; transform: scale(1.15); }
+    .color-circle.selected::after { content: '\2713'; color: white; font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+    .modal-submit { width: 100%; padding: 14px; border: none; border-radius: 12px; background: linear-gradient(135deg, #0095f6, #0077cc); color: white; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 12px; box-shadow: 0 4px 14px rgba(0,149,246,0.35); letter-spacing: 0.3px; }
+    .modal-submit:hover { background: linear-gradient(135deg, #1aa3ff, #0088e0); box-shadow: 0 6px 20px rgba(0,149,246,0.45); transform: translateY(-1px); }
+    .modal-submit:active { transform: scale(0.98) translateY(0); }
+
+    /* Light mode overrides for modal */
+    :root[data-theme='light'] .create-modal,
+    .light-theme .create-modal { background: #ffffff; border-color: #e0e0e0; }
+    :root[data-theme='light'] .modal-top h3,
+    .light-theme .modal-top h3 { color: #222; }
+    :root[data-theme='light'] .modal-field input,
+    :root[data-theme='light'] .modal-field textarea,
+    :root[data-theme='light'] .modal-field select,
+    .light-theme .modal-field input,
+    .light-theme .modal-field textarea,
+    .light-theme .modal-field select { background: #f5f5f5; color: #222; border-color: #ddd; }
+    :root[data-theme='light'] .modal-field label,
+    .light-theme .modal-field label { color: #666; }
+    :root[data-theme='light'] .modal-handle,
+    .light-theme .modal-handle { background: #ccc; }
+    :root[data-theme='light'] .modal-top,
+    .light-theme .modal-top { border-bottom-color: #eee; }
+    :root[data-theme='light'] .modal-top .close-x,
+    .light-theme .modal-top .close-x { background: #f0f0f0; color: #666; }
+    :root[data-theme='light'] .color-circle,
+    .light-theme .color-circle { box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+    :root[data-theme='light'] .color-circle.selected,
+    .light-theme .color-circle.selected { border-color: #333; }
+    :root[data-theme='light'] .modal-field select option,
+    .light-theme .modal-field select option { background: #fff; color: #222; }
+
+    /* ===== EMPTY STATE ===== */
+    .reminder-empty { text-align: center; padding: 60px 24px; }
+    .reminder-empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.3; }
+    .reminder-empty h3 { font-size: 18px; font-weight: 700; margin: 0 0 8px; color: var(--ig-primary-text); }
+    .reminder-empty p { font-size: 14px; color: var(--ig-secondary-text); margin: 0; line-height: 1.5; }
+
+    /* ===== SNOOZE MENU ===== */
+    .snooze-popup { display: none; position: absolute; right: 10px; top: 45px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; min-width: 180px; overflow: hidden; }
+    .snooze-popup.active { display: block; }
+    .snooze-option { padding: 10px 16px; font-size: 13px; color: var(--ig-primary-text); cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; }
+    .snooze-option:hover { background: var(--ig-hover); }
+    .snooze-option i { width: 16px; text-align: center; color: var(--ig-secondary-text); }
+
+    /* Toast */
+    .reminder-toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #323248; color: #f0f0f0; padding: 12px 22px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 2000; box-shadow: 0 6px 24px rgba(0,0,0,0.45); display: flex; align-items: center; gap: 10px; animation: toastIn 0.3s ease; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    @keyframes toastIn { from { transform: translateX(-50%) translateY(20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+    .toast-undo { background: #0095f6; color: white; border: none; padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: 8px; transition: background 0.2s; }
+    .toast-undo:hover { background: #1aa3ff; }
+    /* Light mode toast */
+    :root[data-theme='light'] .reminder-toast, .light-theme .reminder-toast { background: #333; color: #fff; border-color: rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
@@ -97,73 +266,244 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
-  <main class="ig-main">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-      <h2 style="font-size: 24px; font-weight: 600;">Notifications</h2>
-      <div style="display: flex; gap: 12px;">
-        <button class="ig-following-btn" onclick="markAllAsRead()">Mark all read</button>
-        <button class="ig-following-btn" onclick="clearAllNotifications()" style="color: var(--ig-error, #ed4956);">Clear</button>
+  <!-- Tabs -->
+  <div class="notif-tabs">
+    <button class="notif-tab-btn active" onclick="switchTab('notifications')" id="tabBtnNotifications">
+      <i class="fas fa-bell"></i> Notifications
+    </button>
+    <button class="notif-tab-btn" onclick="switchTab('reminders')" id="tabBtnReminders">
+      <i class="fas fa-clock"></i> Reminders
+    </button>
+  </div>
+
+  <main class="ig-main" style="padding-top: 4px; padding-bottom: 70px;">
+
+    <!-- NOTIFICATIONS TAB -->
+    <div class="notif-tab-panel active" id="panelNotifications">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 8px;">
+        <h2 style="font-size: 20px; font-weight: 600; margin: 0;">Notifications</h2>
+        <div style="display: flex; gap: 8px;">
+          <button class="ig-following-btn" onclick="markAllAsRead()" style="padding: 5px 12px; font-size: 12px;">Mark all read</button>
+          <button class="ig-following-btn" onclick="clearAllNotifications()" style="color: var(--ig-error, #ed4956); padding: 5px 12px; font-size: 12px;">Clear</button>
+        </div>
+      </div>
+      <div class="ig-settings-section">
+        <div id="notificationsList"><div class="ig-spinner"></div></div>
       </div>
     </div>
 
-    <div class="ig-settings-section">
-      <div id="notificationsList">
-        <div class="ig-spinner"></div>
+    <!-- REMINDERS TAB -->
+    <div class="notif-tab-panel" id="panelReminders">
+      <div class="reminder-header">
+        <h2>My Reminders</h2>
+        <div class="view-pills">
+          <button class="view-pill active" onclick="switchReminderView('cards')" id="viewBtnCards">
+            <i class="fas fa-list-ul"></i> List
+          </button>
+          <button class="view-pill" onclick="switchReminderView('calendar')" id="viewBtnCalendar">
+            <i class="fas fa-calendar-alt"></i> Calendar
+          </button>
+        </div>
+      </div>
+
+      <!-- AI Quick Create Bar -->
+      <div class="ai-create-bar">
+        <i class="fas fa-lightbulb" style="color: var(--ig-secondary-text); font-size: 18px;"></i>
+        <input type="text" id="aiReminderInput" placeholder='Try: "Call mom tomorrow at 5pm" or tap 🎤' onkeydown="if(event.key==='Enter')createAIReminder()">
+        <button class="bar-btn btn-mic" onclick="toggleVoiceInput()" id="micBtn" title="Speak to create reminder">
+          <i class="fas fa-microphone" id="micIcon"></i>
+        </button>
+        <button class="bar-btn btn-ai" onclick="createAIReminder()" id="aiSendBtn" title="Create with AI">
+          <i class="fas fa-wand-magic-sparkles"></i>
+        </button>
+      </div>
+      <div class="voice-status" id="voiceStatus">
+        <div class="voice-status-row">
+          <div class="voice-wave" id="voiceWave"><span></span><span></span><span></span><span></span><span></span></div>
+          <span id="voiceStatusText">Listening...</span>
+        </div>
+        <div id="voiceConfirmArea" style="display:none; width:100%;">
+          <div class="voice-confirm-text" id="voiceConfirmText"></div>
+          <div class="voice-confirm-actions">
+            <button class="voice-confirm-btn confirm-yes" onclick="voiceConfirmCreate()">
+              <i class="fas fa-check"></i> Yes, create
+            </button>
+            <button class="voice-confirm-btn confirm-edit" onclick="voiceEditBeforeCreate()">
+              <i class="fas fa-pen"></i> Edit
+            </button>
+            <button class="voice-confirm-btn confirm-no" onclick="voiceCancelCreate()">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+          </div>
+          <div class="voice-hint" id="voiceHint">
+            <i class="fas fa-microphone"></i> Say "yes" to confirm or "no" to cancel
+          </div>
+        </div>
+      </div>
+
+      <!-- Voice Settings -->
+      <div class="voice-settings" id="voiceSettings" style="display:none;">
+        <span class="voice-settings-label"><i class="fas fa-volume-up"></i> AI Voice:</span>
+        <div class="voice-gender-toggle">
+          <button class="voice-gender-btn active" onclick="setVoiceGender('female')" id="voiceFemaleBtn">
+            <i class="fas fa-venus"></i> Female
+          </button>
+          <button class="voice-gender-btn" onclick="setVoiceGender('male')" id="voiceMaleBtn">
+            <i class="fas fa-mars"></i> Male
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Chips -->
+      <div class="reminder-filters">
+        <span class="filter-chip active" onclick="filterReminders('all')" data-filter="all">All</span>
+        <span class="filter-chip" onclick="filterReminders('custom')" data-filter="custom"><i class="fas fa-bell" style="font-size:11px;"></i> Custom</span>
+        <span class="filter-chip" onclick="filterReminders('post_reminder')" data-filter="post_reminder"><i class="fas fa-image" style="font-size:11px;"></i> Posts</span>
+        <span class="filter-chip" onclick="filterReminders('birthday')" data-filter="birthday">&#127874; Birthdays</span>
+        <span class="filter-chip" onclick="filterReminders('event')" data-filter="event">&#128197; Events</span>
+        <span class="filter-chip" onclick="filterReminders('todo')" data-filter="todo">&#128203; Todos</span>
+      </div>
+
+      <!-- CALENDAR VIEW -->
+      <div id="calendarView" style="display: none;">
+        <div class="reminder-calendar">
+          <div class="cal-header">
+            <button class="cal-nav-btn" onclick="navigateMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+            <h3 id="calMonthYear"></h3>
+            <button class="cal-nav-btn" onclick="navigateMonth(1)"><i class="fas fa-chevron-right"></i></button>
+          </div>
+          <div class="cal-weekdays">
+            <div class="cal-weekday">Su</div><div class="cal-weekday">Mo</div><div class="cal-weekday">Tu</div>
+            <div class="cal-weekday">We</div><div class="cal-weekday">Th</div><div class="cal-weekday">Fr</div>
+            <div class="cal-weekday">Sa</div>
+          </div>
+          <div class="cal-days" id="calDays"></div>
+        </div>
+        <div id="dayDetail" style="display:none;">
+          <div class="day-detail">
+            <div class="day-detail-header">
+              <h4 id="dayDetailTitle">Today</h4>
+              <button class="day-detail-close" onclick="closeDayDetail()"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="dayDetailList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div id="cardsView">
+        <div class="reminder-section" id="reminderCardsList">
+          <div class="ig-spinner"></div>
+        </div>
       </div>
     </div>
   </main>
 
+  <!-- Google-style FAB -->
+  <div class="reminder-fab" id="reminderFab" style="display: none;">
+    <div style="position: relative;">
+      <button class="fab-main" onclick="openCreateModal()" aria-label="Create reminder">
+        <i class="fas fa-plus"></i>
+        <span class="fab-label">New Reminder</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Create Reminder Modal -->
+  <div class="modal-overlay" id="createModal">
+    <div class="create-modal">
+      <div class="modal-handle"></div>
+      <div class="modal-top">
+        <h3 id="modalTitle"><i class="fas fa-bell" style="color: var(--ig-blue);"></i> New Reminder</h3>
+        <button class="close-x" onclick="closeCreateModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label>What do you want to be reminded about?</label>
+          <input type="text" id="rmTitle" placeholder="e.g., Team meeting, buy groceries...">
+        </div>
+        <div class="modal-field">
+          <label>Notes (optional)</label>
+          <textarea id="rmDesc" placeholder="Add details..." rows="2"></textarea>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Date</label>
+            <input type="date" id="rmDate">
+          </div>
+          <div class="modal-field">
+            <label>Time</label>
+            <input type="time" id="rmTime" value="09:00">
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>Repeat</label>
+          <select id="rmRecurrence">
+            <option value="">Does not repeat</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+            <option value="yearly">Every year</option>
+          </select>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Priority</label>
+            <select id="rmPriority">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label>Color</label>
+          <div class="color-row" id="colorPicker">
+            <div class="color-circle selected" style="background:#0095f6;" data-color="#0095f6"></div>
+            <div class="color-circle" style="background:#4caf50;" data-color="#4caf50"></div>
+            <div class="color-circle" style="background:#ff9800;" data-color="#ff9800"></div>
+            <div class="color-circle" style="background:#e91e63;" data-color="#e91e63"></div>
+            <div class="color-circle" style="background:#9c27b0;" data-color="#9c27b0"></div>
+            <div class="color-circle" style="background:#f44336;" data-color="#f44336"></div>
+            <div class="color-circle" style="background:#00bcd4;" data-color="#00bcd4"></div>
+            <div class="color-circle" style="background:#795548;" data-color="#795548"></div>
+          </div>
+        </div>
+        </div>
+        <button class="modal-submit" id="modalSubmitBtn" onclick="submitCreateReminder()">
+          <i class="fas fa-bell"></i> Create Reminder
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Bottom Navigation -->
   <nav class="ig-bottom-nav">
     <a href="/home" class="ig-bottom-nav-item">
-      <svg aria-label="Home" viewBox="0 0 24 24" width="24">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <svg aria-label="Home" viewBox="0 0 24 24" width="24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ig-bottom-nav-label">Home</span>
     </a>
     <a href="/communities" class="ig-bottom-nav-item">
-      <svg aria-label="Communities" viewBox="0 0 24 24" width="24">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <svg aria-label="Communities" viewBox="0 0 24 24" width="24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ig-bottom-nav-label">Communities</span>
     </a>
     <a href="/events" class="ig-bottom-nav-item">
-      <svg aria-label="Events" viewBox="0 0 24 24" width="24">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
-      </svg>
+      <svg aria-label="Events" viewBox="0 0 24 24" width="24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/><line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/></svg>
       <span class="ig-bottom-nav-label">Events</span>
     </a>
     <a href="/home" class="ig-bottom-nav-item" onclick="event.preventDefault(); window.location.href='/home';">
-      <svg aria-label="Create" viewBox="0 0 24 24" width="24">
-        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-      </svg>
+      <svg aria-label="Create" viewBox="0 0 24 24" width="24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
       <span class="ig-bottom-nav-label">Create</span>
     </a>
     <a href="/social-service" class="ig-bottom-nav-item">
-      <svg aria-label="Social Service" viewBox="0 0 24 24" width="24">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <svg aria-label="Social Service" viewBox="0 0 24 24" width="24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="ig-bottom-nav-label">Service</span>
     </a>
     <a href="/search" class="ig-bottom-nav-item">
-      <svg aria-label="Search" viewBox="0 0 24 24" width="24">
-        <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+      <svg aria-label="Search" viewBox="0 0 24 24" width="24"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <span class="ig-bottom-nav-label">Search</span>
     </a>
     <a href="#" class="ig-bottom-nav-item" id="profileNavLink" onclick="navigateToProfile(event)">
-      <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
-        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
-        <path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-      </svg>
+      <svg aria-label="Profile" viewBox="0 0 24 24" width="24"><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       <span class="ig-bottom-nav-label">Profile</span>
     </a>
   </nav>
@@ -171,13 +511,10 @@
   <script>
     function navigateToProfile(e) {
       e.preventDefault();
-      const user = InnovateAPI.getCurrentUser();
-      if (user && user.id) {
-        window.location.href = `/profile/${user.id}`;
-      }
+      var u = InnovateAPI.getCurrentUser();
+      if (u && u.id) window.location.href = '/profile/' + u.id;
     }
   </script>
-
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
@@ -186,403 +523,1355 @@
     InnovateAPI.initializePage();
     InnovateAPI.initSocket();
 
-    const user = InnovateAPI.getCurrentUser();
-    const notificationsSocket = InnovateAPI.getSocket();
+    var user = InnovateAPI.getCurrentUser();
+    var notificationsSocket = InnovateAPI.getSocket();
 
-    // Load user info
-    async function loadUserInfo() {
-      try {
-        const data = await InnovateAPI.apiRequest(`/users/${user.id}`);
-        const avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
-        // This page's bottom nav uses an SVG icon (no profile image).
-        // Guard in case markup changes across pages.
-        const bottomProfilePic = document.getElementById('bottomProfilePic');
-        if (bottomProfilePic) bottomProfilePic.src = avatar;
-        const bottomProfileLink = document.getElementById('bottomProfileLink');
-        if (bottomProfileLink) bottomProfileLink.href = `/profile/${user.id}`;
-      } catch (error) {
-        console.error('Error loading user info:', error);
+    // ===================== STATE =====================
+    var currentCalMonth = new Date().getMonth();
+    var currentCalYear = new Date().getFullYear();
+    var calendarDates = {};
+    var allReminders = [];
+    var selectedDate = null;
+    var currentFilter = 'all';
+    var currentView = 'cards';
+    var selectedColor = '#0095f6';
+    var lastDismissed = null;
+    var editingReminderId = null;
+
+    // ===================== TAB SWITCHING =====================
+    function switchTab(tab) {
+      document.querySelectorAll('.notif-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.notif-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      document.getElementById('tabBtn' + capitalize(tab)).classList.add('active');
+      document.getElementById('panel' + capitalize(tab)).classList.add('active');
+      var fab = document.getElementById('reminderFab');
+      var voiceSettings = document.getElementById('voiceSettings');
+      if (tab === 'reminders') {
+        fab.style.display = 'flex';
+        if (voiceSettings) voiceSettings.style.display = 'flex';
+        loadAllReminders();
+        loadCalendarDots();
+      } else {
+        fab.style.display = 'none';
+        if (voiceSettings) voiceSettings.style.display = 'none';
+      }
+    }
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    // ===================== VIEW SWITCHING =====================
+    function switchReminderView(view) {
+      currentView = view;
+      document.getElementById('viewBtnCalendar').classList.toggle('active', view === 'calendar');
+      document.getElementById('viewBtnCards').classList.toggle('active', view === 'cards');
+      document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
+      document.getElementById('cardsView').style.display = view === 'cards' ? 'block' : 'none';
+      if (view === 'cards') renderCardView();
+      if (view === 'calendar') loadCalendarDots();
+    }
+
+    // ===================== FILTER =====================
+    function filterReminders(type) {
+      currentFilter = type;
+      document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.toggle('active', c.dataset.filter === type); });
+      if (currentView === 'cards') renderCardView();
+      if (selectedDate) loadDayDetail(selectedDate);
+    }
+
+    // ===================== LOAD ALL REMINDERS =====================
+    function loadAllReminders() {
+      InnovateAPI.apiRequest('/reminders').then(function(data) {
+        allReminders = data.reminders || [];
+        if (currentView === 'cards') renderCardView();
+      }).catch(function(error) {
+        console.error('Error loading reminders:', error);
+      });
+    }
+
+    // ===================== CALENDAR =====================
+    function loadCalendarDots() {
+      InnovateAPI.apiRequest('/reminders/calendar?month=' + (currentCalMonth + 1) + '&year=' + currentCalYear).then(function(data) {
+        calendarDates = data.dates || {};
+        renderCalendar();
+      }).catch(function(error) {
+        console.error('Error loading calendar:', error);
+        renderCalendar();
+      });
+    }
+
+    function renderCalendar() {
+      var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      document.getElementById('calMonthYear').textContent = months[currentCalMonth] + ' ' + currentCalYear;
+      var firstDay = new Date(currentCalYear, currentCalMonth, 1).getDay();
+      var daysInMonth = new Date(currentCalYear, currentCalMonth + 1, 0).getDate();
+      var prevMonthDays = new Date(currentCalYear, currentCalMonth, 0).getDate();
+      var today = new Date();
+      var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      var html = '';
+      for (var i = firstDay - 1; i >= 0; i--) {
+        html += '<div class="cal-day other-month">' + (prevMonthDays - i) + '</div>';
+      }
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dateStr = currentCalYear + '-' + String(currentCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        var isToday = dateStr === todayStr;
+        var isSelected = dateStr === selectedDate;
+        var dots = calendarDates[dateStr] || [];
+        var dotsHtml = '';
+        if (dots.length > 0) {
+          dotsHtml = '<div class="cal-dots">';
+          dots.slice(0, 3).forEach(function(dot) { dotsHtml += '<div class="cal-dot" style="background:' + dot.color + ';"></div>'; });
+          dotsHtml += '</div>';
+        }
+        html += '<div class="cal-day' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '') + (dots.length ? ' has-reminder' : '') + '" onclick="selectDate(\'' + dateStr + '\')">' + d + dotsHtml + '</div>';
+      }
+      var totalCells = firstDay + daysInMonth;
+      var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+      for (var j = 1; j <= remaining; j++) {
+        html += '<div class="cal-day other-month">' + j + '</div>';
+      }
+      document.getElementById('calDays').innerHTML = html;
+    }
+
+    function navigateMonth(delta) {
+      currentCalMonth += delta;
+      if (currentCalMonth > 11) { currentCalMonth = 0; currentCalYear++; }
+      if (currentCalMonth < 0) { currentCalMonth = 11; currentCalYear--; }
+      loadCalendarDots();
+    }
+
+    function selectDate(dateStr) {
+      selectedDate = dateStr;
+      renderCalendar();
+      loadDayDetail(dateStr);
+    }
+
+    function loadDayDetail(dateStr) {
+      document.getElementById('dayDetail').style.display = 'block';
+      var dateObj = new Date(dateStr + 'T00:00:00');
+      document.getElementById('dayDetailTitle').textContent = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      InnovateAPI.apiRequest('/reminders/date/' + dateStr).then(function(data) {
+        var reminders = data.reminders || [];
+        if (currentFilter !== 'all') reminders = reminders.filter(function(r) { return r.type === currentFilter; });
+        var listEl = document.getElementById('dayDetailList');
+        if (reminders.length === 0) {
+          listEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--ig-secondary-text); font-size: 13px;"><i class="far fa-calendar-check" style="font-size: 24px; display: block; margin-bottom: 8px; opacity: 0.4;"></i>No reminders this day<br><button onclick="openCreateModal(\'' + dateStr + '\')" style="margin-top: 8px; background: var(--ig-blue); color: white; border: none; padding: 6px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">+ Add reminder</button></div>';
+        } else {
+          listEl.innerHTML = reminders.map(function(r) { return createCardHTML(r); }).join('');
+        }
+      }).catch(function(err) {
+        document.getElementById('dayDetailList').innerHTML = '<div style="padding: 16px; text-align: center; color: var(--ig-secondary-text);">Error loading</div>';
+      });
+    }
+
+    function closeDayDetail() {
+      document.getElementById('dayDetail').style.display = 'none';
+      selectedDate = null;
+      renderCalendar();
+    }
+
+    // ===================== CARD VIEW =====================
+    function renderCardView() {
+      var container = document.getElementById('reminderCardsList');
+      var filtered = allReminders;
+      if (currentFilter !== 'all') filtered = allReminders.filter(function(r) { return r.type === currentFilter; });
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="reminder-empty"><div class="reminder-empty-icon"><i class="far fa-bell"></i></div><h3>No reminders yet</h3><p>Tap the <strong>+</strong> button or type above to create one.<br>Your reminders will appear here.</p></div>';
+        return;
+      }
+      var todayStr = getTodayStr();
+      var overdue = [], todayItems = [], upcoming = [];
+      filtered.forEach(function(r) {
+        var d = (r.reminder_date || '').split('T')[0].split(' ')[0];
+        if (r.is_dismissed) return;
+        if (d < todayStr) overdue.push(r);
+        else if (d === todayStr) todayItems.push(r);
+        else upcoming.push(r);
+      });
+      var html = '';
+      if (overdue.length > 0) {
+        html += '<div class="date-group-label overdue"><i class="fas fa-exclamation-circle"></i> Overdue</div>';
+        overdue.forEach(function(r) { html += createCardHTML(r); });
+      }
+      if (todayItems.length > 0) {
+        html += '<div class="date-group-label today-label"><i class="fas fa-sun"></i> Today</div>';
+        todayItems.forEach(function(r) { html += createCardHTML(r); });
+      }
+      if (upcoming.length > 0) {
+        var groups = {};
+        upcoming.forEach(function(r) {
+          var d = (r.reminder_date || '').split('T')[0].split(' ')[0];
+          if (!groups[d]) groups[d] = [];
+          groups[d].push(r);
+        });
+        Object.keys(groups).sort().forEach(function(date) {
+          var label = isTomorrow(date) ? 'Tomorrow' : formatDateLabel(date);
+          html += '<div class="date-group-label">' + label + '</div>';
+          groups[date].forEach(function(r) { html += createCardHTML(r); });
+        });
+      }
+      container.innerHTML = html;
+    }
+
+    function createCardHTML(r) {
+      var typeIcons = { custom: 'fas fa-bell', post_reminder: 'fas fa-image', birthday: 'fas fa-cake-candles', event: 'fas fa-calendar-check', todo: 'fas fa-list-check' };
+      var typeLabels = { custom: 'Custom', post_reminder: 'Post', birthday: 'Birthday', event: 'Event', todo: 'Todo' };
+      var icon = typeIcons[r.type] || 'fas fa-bell';
+      var color = r.color || '#0095f6';
+      var label = typeLabels[r.type] || r.type;
+      var time = r.reminder_time || '';
+      var isCustom = r.source === 'custom';
+      var isDone = r.is_dismissed || r.is_notified;
+      var priority = r.priority || 'low';
+      var priorityHTML = '';
+      if (priority === 'high') priorityHTML = '<span class="priority-badge p-high"><i class="fas fa-arrow-up" style="font-size:8px;"></i> High</span>';
+      else if (priority === 'medium') priorityHTML = '<span class="priority-badge p-medium"><i class="fas fa-minus" style="font-size:8px;"></i> Med</span>';
+      var clickAction = '';
+      if (r.type === 'post_reminder' && r.source_id) clickAction = 'onclick="window.location.href=\'/post/' + r.source_id + '\'"';
+      else if (r.type === 'event' && r.source_id) clickAction = 'onclick="window.location.href=\'/events/' + r.source_id + '\'"';
+      else if (r.type === 'birthday' && r.source_id) clickAction = 'onclick="window.location.href=\'/profile/' + r.source_id + '\'"';
+      return '<div class="g-reminder-card' + (isDone ? ' done' : '') + '" style="position: relative;">' +
+        '<div class="g-card-stripe" style="background: ' + color + ';"></div>' +
+        (isCustom ? '<div class="g-card-check"><input type="checkbox" ' + (isDone ? 'checked' : '') + ' onchange="toggleDone(' + r.id + ', this.checked)" title="Mark as done"></div>' : '') +
+        '<div class="g-card-body" ' + clickAction + '>' +
+          '<div class="g-card-title">' + escapeHtml(r.title) + '</div>' +
+          (r.description ? '<div class="g-card-desc">' + escapeHtml(r.description) + '</div>' : '') +
+          '<div class="g-card-meta">' +
+            '<span class="meta-item"><i class="far fa-clock"></i> ' + (time || 'All day') + '</span>' +
+            '<span class="g-card-tag" style="background: ' + color + '18; color: ' + color + ';">' + label + '</span>' +
+            priorityHTML +
+            (r.is_recurring ? '<span class="meta-item"><i class="fas fa-repeat"></i> Repeats</span>' : '') +
+            (r.group_name ? '<span class="meta-item"><i class="fas fa-users"></i> ' + escapeHtml(r.group_name) + '</span>' : '') +
+            (r.location ? '<span class="meta-item"><i class="fas fa-location-dot"></i> ' + escapeHtml(r.location) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="g-card-actions">' +
+          (isCustom ? '<button class="g-card-btn" onclick="event.stopPropagation(); editReminder(' + r.id + ')" title="Edit"><i class="fas fa-pen"></i></button>' : '') +
+          (isCustom ? '<button class="g-card-btn" onclick="event.stopPropagation(); showSnoozeMenu(this, ' + r.id + ')" title="Snooze"><i class="fas fa-clock-rotate-left"></i></button>' : '') +
+          (isCustom ? '<button class="g-card-btn del-btn" onclick="event.stopPropagation(); deleteReminder(' + r.id + ')" title="Delete"><i class="fas fa-trash-alt"></i></button>' :
+            r.type === 'post_reminder' ? '<button class="g-card-btn del-btn" onclick="event.stopPropagation(); deleteGentleReminder(' + r.id + ')" title="Delete"><i class="fas fa-trash-alt"></i></button>' : '') +
+        '</div>' +
+      '</div>';
+    }
+
+    // ===================== INTERACTIONS =====================
+    function toggleDone(id, done) {
+      if (done) {
+        InnovateAPI.apiRequest('/reminders/' + id + '/dismiss', { method: 'PUT' }).then(function() {
+          lastDismissed = id;
+          showToast('Reminder completed', true);
+          loadAllReminders();
+          loadCalendarDots();
+          if (selectedDate) loadDayDetail(selectedDate);
+        }).catch(function() { InnovateAPI.showAlert('Failed to update', 'error'); });
       }
     }
 
-    // Load notifications
-    async function loadNotifications() {
-      try {
-        const data = await InnovateAPI.apiRequest('/notifications');
-        const list = document.getElementById('notificationsList');
-        list.innerHTML = '';
+    function undoDismiss() {
+      if (!lastDismissed) return;
+      InnovateAPI.apiRequest('/reminders/' + lastDismissed, {
+        method: 'PUT',
+        body: JSON.stringify({ is_dismissed: false })
+      }).then(function() {
+        lastDismissed = null;
+        loadAllReminders();
+        loadCalendarDots();
+        removeToast();
+      }).catch(function() {});
+    }
 
-        if (data.notifications.length === 0) {
-          list.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);">
-              <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
-              <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No Notifications Yet</div>
-              <div style="font-size: 14px;">When someone likes or comments on your posts, you'll see it here.</div>
-            </div>
-          `;
+    function showToast(msg, withUndo) {
+      removeToast();
+      var toast = document.createElement('div');
+      toast.className = 'reminder-toast';
+      toast.id = 'activeToast';
+      toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + msg + (withUndo ? ' <button class="toast-undo" onclick="undoDismiss()">Undo</button>' : '');
+      document.body.appendChild(toast);
+      setTimeout(removeToast, 5000);
+    }
+    function removeToast() {
+      var t = document.getElementById('activeToast');
+      if (t) t.remove();
+    }
+
+    function showSnoozeMenu(btn, id) {
+      document.querySelectorAll('.snooze-popup.active').forEach(function(p) { p.remove(); });
+      var popup = document.createElement('div');
+      popup.className = 'snooze-popup active';
+      popup.innerHTML = '<div class="snooze-option" onclick="snoozeReminder(' + id + ', \'later_today\')"><i class="fas fa-sun"></i> Later today</div>' +
+        '<div class="snooze-option" onclick="snoozeReminder(' + id + ', \'tomorrow\')"><i class="fas fa-forward"></i> Tomorrow</div>' +
+        '<div class="snooze-option" onclick="snoozeReminder(' + id + ', \'next_week\')"><i class="fas fa-calendar-week"></i> Next week</div>' +
+        '<div class="snooze-option" onclick="snoozeReminder(' + id + ', \'custom\')"><i class="fas fa-calendar-alt"></i> Pick a date...</div>';
+      var card = btn.closest('.g-reminder-card');
+      card.appendChild(popup);
+      setTimeout(function() {
+        document.addEventListener('click', function closeSnooze(e) {
+          if (!popup.contains(e.target)) {
+            popup.remove();
+            document.removeEventListener('click', closeSnooze);
+          }
+        });
+      }, 10);
+    }
+
+    function snoozeReminder(id, when) {
+      document.querySelectorAll('.snooze-popup.active').forEach(function(p) { p.remove(); });
+      var now = new Date();
+      var newDate, newTime;
+      if (when === 'later_today') {
+        var later = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        newDate = later.toISOString().split('T')[0];
+        newTime = String(later.getHours()).padStart(2,'0') + ':' + String(later.getMinutes()).padStart(2,'0');
+      } else if (when === 'tomorrow') {
+        var tm = new Date(now); tm.setDate(tm.getDate() + 1);
+        newDate = tm.toISOString().split('T')[0];
+        newTime = '09:00';
+      } else if (when === 'next_week') {
+        var nw = new Date(now); nw.setDate(nw.getDate() + 7);
+        newDate = nw.toISOString().split('T')[0];
+        newTime = '09:00';
+      } else if (when === 'custom') {
+        var r = allReminders.find(function(rem) { return rem.id === id; });
+        if (r) { openCreateModal(); document.getElementById('rmTitle').value = r.title; document.getElementById('rmDesc').value = r.description || ''; document.getElementById('rmTime').value = r.reminder_time || '09:00'; }
+        return;
+      }
+      InnovateAPI.apiRequest('/reminders/' + id, {
+        method: 'PUT',
+        body: JSON.stringify({ reminder_date: newDate, reminder_time: newTime, is_notified: false })
+      }).then(function() {
+        showToast('Reminder snoozed');
+        loadAllReminders();
+        loadCalendarDots();
+      }).catch(function() { InnovateAPI.showAlert('Failed to snooze', 'error'); });
+    }
+
+    function deleteReminder(id) {
+      InnovateAPI.apiRequest('/reminders/' + id, { method: 'DELETE' }).then(function() {
+        showToast('Reminder deleted');
+        loadAllReminders();
+        loadCalendarDots();
+        if (selectedDate) loadDayDetail(selectedDate);
+      }).catch(function() { InnovateAPI.showAlert('Failed to delete', 'error'); });
+    }
+
+    function deleteGentleReminder(id) {
+      InnovateAPI.apiRequest('/events/reminders/' + id, { method: 'DELETE' }).then(function() {
+        showToast('Reminder deleted');
+        loadAllReminders();
+        loadCalendarDots();
+        if (selectedDate) loadDayDetail(selectedDate);
+      }).catch(function() { InnovateAPI.showAlert('Failed to delete', 'error'); });
+    }
+
+    // ===================== CREATE / EDIT MODAL =====================
+    function openCreateModal(presetDate) {
+      editingReminderId = null;
+      document.getElementById('modalTitle').innerHTML = '<i class="fas fa-bell" style="color: var(--ig-blue);"></i> New Reminder';
+      document.getElementById('modalSubmitBtn').innerHTML = '<i class="fas fa-bell"></i> Create Reminder';
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('rmTitle').value = '';
+      document.getElementById('rmDesc').value = '';
+      document.getElementById('rmDate').value = presetDate || new Date().toISOString().split('T')[0];
+      document.getElementById('rmTime').value = '09:00';
+      document.getElementById('rmRecurrence').value = '';
+      document.getElementById('rmPriority').value = 'low';
+      selectedColor = '#0095f6';
+      document.querySelectorAll('.color-circle').forEach(function(c) { c.classList.toggle('selected', c.dataset.color === '#0095f6'); });
+      setTimeout(function() { document.getElementById('rmTitle').focus(); }, 300);
+    }
+
+    function editReminder(id) {
+      var r = allReminders.find(function(rem) { return rem.id === id; });
+      if (!r) { InnovateAPI.showAlert('Reminder not found', 'error'); return; }
+      editingReminderId = id;
+      document.getElementById('modalTitle').innerHTML = '<i class="fas fa-pen" style="color: var(--ig-blue);"></i> Edit Reminder';
+      document.getElementById('modalSubmitBtn').innerHTML = '<i class="fas fa-check"></i> Save Changes';
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('rmTitle').value = r.title || '';
+      document.getElementById('rmDesc').value = r.description || '';
+      var dateVal = (r.reminder_date || '').split('T')[0].split(' ')[0];
+      document.getElementById('rmDate').value = dateVal || new Date().toISOString().split('T')[0];
+      document.getElementById('rmTime').value = r.reminder_time || '09:00';
+      document.getElementById('rmRecurrence').value = r.recurrence_pattern || '';
+      document.getElementById('rmPriority').value = r.priority || 'low';
+      selectedColor = r.color || '#0095f6';
+      document.querySelectorAll('.color-circle').forEach(function(c) { c.classList.toggle('selected', c.dataset.color === selectedColor); });
+      setTimeout(function() { document.getElementById('rmTitle').focus(); }, 300);
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').classList.remove('active');
+      editingReminderId = null;
+    }
+
+    document.getElementById('colorPicker').addEventListener('click', function(e) {
+      var opt = e.target.closest('.color-circle');
+      if (!opt) return;
+      selectedColor = opt.dataset.color;
+      document.querySelectorAll('.color-circle').forEach(function(c) { c.classList.toggle('selected', c === opt); });
+    });
+
+    document.getElementById('createModal').addEventListener('click', function(e) {
+      if (e.target === e.currentTarget) closeCreateModal();
+    });
+
+    function submitCreateReminder() {
+      var title = document.getElementById('rmTitle').value.trim();
+      var description = document.getElementById('rmDesc').value.trim();
+      var reminder_date = document.getElementById('rmDate').value;
+      var reminder_time = document.getElementById('rmTime').value;
+      var recurrence = document.getElementById('rmRecurrence').value;
+      var priority = document.getElementById('rmPriority').value || 'low';
+      if (!title) { InnovateAPI.showAlert('Please enter a title', 'error'); return; }
+      if (!reminder_date) { InnovateAPI.showAlert('Please pick a date', 'error'); return; }
+      var payload = { title: title, description: description, reminder_date: reminder_date, reminder_time: reminder_time, is_recurring: !!recurrence, recurrence_pattern: recurrence || null, color: selectedColor, priority: priority };
+
+      if (editingReminderId) {
+        // Update existing reminder
+        InnovateAPI.apiRequest('/reminders/' + editingReminderId, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        }).then(function() {
+          closeCreateModal();
+          showToast('Reminder updated!');
+          loadAllReminders();
+          loadCalendarDots();
+          if (selectedDate) loadDayDetail(selectedDate);
+        }).catch(function() { InnovateAPI.showAlert('Failed to update reminder', 'error'); });
+      } else {
+        // Create new reminder
+        InnovateAPI.apiRequest('/reminders', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }).then(function() {
+          closeCreateModal();
+          showToast('Reminder created!');
+          loadAllReminders();
+          loadCalendarDots();
+          if (selectedDate) loadDayDetail(selectedDate);
+        }).catch(function() { InnovateAPI.showAlert('Failed to create reminder', 'error'); });
+      }
+    }
+
+    // ===================== AI CREATE =====================
+    function createAIReminder() {
+      var input = document.getElementById('aiReminderInput');
+      var btn = document.getElementById('aiSendBtn');
+      var prompt = input.value.trim();
+      if (!prompt) return;
+      input.disabled = true;
+      btn.classList.add('loading');
+      var original = input.value;
+      input.value = 'Creating your reminder...';
+      InnovateAPI.apiRequest('/reminders/ai-create', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: prompt })
+      }).then(function(data) {
+        input.value = '';
+        showToast('"' + data.reminder.title + '" created!');
+        loadAllReminders();
+        loadCalendarDots();
+      }).catch(function() {
+        InnovateAPI.showAlert('Could not create reminder. Try the + button instead.', 'error');
+        input.value = original;
+      }).finally(function() {
+        input.disabled = false;
+        btn.classList.remove('loading');
+        input.focus();
+      });
+    }
+
+    // ===================== VOICE INPUT (Smart Conversational AI) =====================
+    var speechRecognition = null;
+    var isRecording = false;
+    var voiceState = 'idle'; // idle | listening | processing | confirming | confirm-listening | needs-info-listening | delete-listening
+    var voiceSilenceTimer = null;
+    var voiceFullTranscript = '';
+    var pendingPreview = null;
+    var pendingDeleteMatches = null; // stores delete matches for voice selection
+    var conversationContext = ''; // accumulates partial info across turns
+    var SILENCE_TIMEOUT = 4000;
+    var speechSynth = window.speechSynthesis || null;
+    var voiceGender = localStorage.getItem('voiceGender') || 'female';
+    var cachedVoices = [];
+
+    // ===== VOICE GENDER SELECTION =====
+    function setVoiceGender(gender) {
+      voiceGender = gender;
+      localStorage.setItem('voiceGender', gender);
+      document.querySelectorAll('.voice-gender-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.gender === gender);
+      });
+      // Quick demo of the selected voice
+      aiSpeak(gender === 'female' ? 'Female voice selected.' : 'Male voice selected.');
+    }
+
+    // Initialize gender buttons from saved preference
+    (function() {
+      var saved = localStorage.getItem('voiceGender') || 'female';
+      voiceGender = saved;
+      setTimeout(function() {
+        document.querySelectorAll('.voice-gender-btn').forEach(function(b) {
+          b.classList.toggle('active', b.dataset.gender === saved);
+        });
+      }, 100);
+    })();
+
+    // ===== SMART TTS VOICE PICKER =====
+    function getPreferredVoice() {
+      var voices = cachedVoices.length ? cachedVoices : (speechSynth ? speechSynth.getVoices() : []);
+      if (!voices.length) return null;
+
+      var enVoices = voices.filter(function(v) { return v.lang && v.lang.startsWith('en'); });
+      if (!enVoices.length) enVoices = voices;
+
+      // Preferred natural-sounding voice keywords (ordered by quality)
+      var naturalKeywords = ['Natural', 'Neural', 'Wavenet', 'Premium', 'Enhanced'];
+      var providerKeywords = ['Google', 'Microsoft', 'Apple'];
+
+      // Gender filtering
+      var genderKeywords = voiceGender === 'female'
+        ? ['female', 'woman', 'zira', 'samantha', 'karen', 'moira', 'fiona', 'tessa', 'veena', 'victoria', 'susan', 'hazel', 'heera', 'jenny', 'aria', 'sara']
+        : ['male', 'man', 'david', 'daniel', 'james', 'mark', 'alex', 'tom', 'guy', 'ryan', 'george', 'richard', 'roger', 'fred', 'lee'];
+
+      // Score each voice
+      var scored = enVoices.map(function(v) {
+        var name = v.name.toLowerCase();
+        var score = 0;
+
+        // Gender match (highest priority)
+        var genderMatch = genderKeywords.some(function(kw) { return name.indexOf(kw) !== -1; });
+        if (genderMatch) score += 100;
+
+        // Natural/Neural voices
+        naturalKeywords.forEach(function(kw, idx) {
+          if (name.indexOf(kw.toLowerCase()) !== -1) score += 50 - (idx * 5);
+        });
+
+        // Provider preference
+        providerKeywords.forEach(function(kw, idx) {
+          if (name.indexOf(kw.toLowerCase()) !== -1) score += 30 - (idx * 5);
+        });
+
+        // Non-local (cloud) voices tend to sound better
+        if (!v.localService) score += 10;
+
+        return { voice: v, score: score };
+      });
+
+      scored.sort(function(a, b) { return b.score - a.score; });
+      return scored.length ? scored[0].voice : null;
+    }
+
+    // ===== AI SPEAK (Human-like TTS) =====
+    function aiSpeak(text, onDone) {
+      if (!speechSynth) { if (onDone) onDone(); return; }
+      speechSynth.cancel();
+
+      var utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95; // slightly slower = more natural
+      utterance.pitch = voiceGender === 'female' ? 1.05 : 0.9;
+      utterance.volume = 1.0;
+      utterance.lang = 'en-US';
+
+      var preferred = getPreferredVoice();
+      if (preferred) utterance.voice = preferred;
+
+      utterance.onend = function() { if (onDone) onDone(); };
+      utterance.onerror = function() { if (onDone) onDone(); };
+      speechSynth.speak(utterance);
+    }
+
+    function initSpeechRecognition() {
+      var SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechAPI) return null;
+      var recognition = new SpeechAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = function() {
+        isRecording = true;
+        var btn = document.getElementById('micBtn');
+        btn.classList.add('recording');
+        document.getElementById('micIcon').className = 'fas fa-stop';
+
+        if (voiceState === 'confirm-listening') {
+          document.getElementById('aiReminderInput').placeholder = 'Say "yes" to keep or "no" to cancel...';
+          showVoiceStatus('confirming', 'Listening...');
+        } else if (voiceState === 'needs-info-listening') {
+          document.getElementById('aiReminderInput').placeholder = 'Listening for additional info...';
+          showVoiceStatus('listening', 'Listening for the missing details...');
+        } else if (voiceState === 'delete-listening') {
+          document.getElementById('aiReminderInput').placeholder = 'Say the number to delete...';
+          showVoiceStatus('listening', 'Which one should I delete?');
+        } else {
+          voiceState = 'listening';
+          document.getElementById('aiReminderInput').placeholder = 'Listening... speak your reminder';
+          showVoiceStatus('listening', 'Listening... speak naturally');
+        }
+      };
+
+      recognition.onresult = function(event) {
+        clearTimeout(voiceSilenceTimer);
+
+        var interim = '';
+        var finalParts = '';
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+          var transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) finalParts += transcript;
+          else interim += transcript;
+        }
+
+        // ---- CONFIRMATION LISTENING (for conflicts) ----
+        if (voiceState === 'confirm-listening') {
+          var heard = (finalParts + interim).toLowerCase().trim();
+          if (heard && finalParts) {
+            var yesWords = ['yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay', 'confirm', 'create', 'go ahead', 'do it', 'keep'];
+            var noWords = ['no', 'nope', 'cancel', 'stop', 'don\'t', 'never mind', 'discard', 'remove'];
+            var editWords = ['edit', 'change', 'modify', 'update', 'fix', 'different'];
+            var isYes = yesWords.some(function(w) { return heard.indexOf(w) !== -1; });
+            var isNo = noWords.some(function(w) { return heard.indexOf(w) !== -1; });
+            var isEdit = editWords.some(function(w) { return heard.indexOf(w) !== -1; });
+            stopRecording();
+            if (isYes) voiceConfirmCreate();
+            else if (isEdit) voiceEditBeforeCreate();
+            else if (isNo) voiceCancelCreate();
+            else {
+              aiSpeak('Say yes to keep it, edit to change, or no to cancel.', function() { startConfirmListening(); });
+            }
+          }
           return;
         }
 
-        data.notifications.forEach(notification => {
-          const notifEl = createNotificationElement(notification);
-          list.appendChild(notifEl);
+        // ---- DELETE LISTENING (pick which one) ----
+        if (voiceState === 'delete-listening') {
+          var dheard = (finalParts + interim).toLowerCase().trim();
+          if (dheard && finalParts) {
+            stopRecording();
+            handleDeleteSelection(dheard);
+          }
+          return;
+        }
+
+        // ---- NEEDS-INFO LISTENING ----
+        if (voiceState === 'needs-info-listening') {
+          if (finalParts) voiceFullTranscript += (voiceFullTranscript ? ' ' : '') + finalParts;
+          var input = document.getElementById('aiReminderInput');
+          input.value = voiceFullTranscript + (interim ? ' ' + interim : '');
+          input.style.fontStyle = interim ? 'italic' : 'normal';
+          voiceSilenceTimer = setTimeout(function() {
+            if (voiceFullTranscript.trim()) {
+              stopRecording();
+              // Combine with original context and re-process
+              var combined = conversationContext + '. ' + voiceFullTranscript.trim();
+              voiceFullTranscript = '';
+              processVoiceInput(combined);
+            }
+          }, SILENCE_TIMEOUT);
+          return;
+        }
+
+        // ---- NORMAL LISTENING ----
+        if (finalParts) voiceFullTranscript += (voiceFullTranscript ? ' ' : '') + finalParts;
+        var input = document.getElementById('aiReminderInput');
+        if (voiceFullTranscript || interim) {
+          input.value = voiceFullTranscript + (interim ? ' ' + interim : '');
+          input.style.fontStyle = interim ? 'italic' : 'normal';
+        }
+
+        voiceSilenceTimer = setTimeout(function() {
+          if (voiceState === 'listening' && voiceFullTranscript.trim()) {
+            stopRecording();
+            processVoiceInput(voiceFullTranscript.trim());
+          }
+        }, SILENCE_TIMEOUT);
+      };
+
+      recognition.onerror = function(event) {
+        clearTimeout(voiceSilenceTimer);
+        if (event.error === 'no-speech' && voiceFullTranscript.trim() && (voiceState === 'listening' || voiceState === 'needs-info-listening')) {
+          stopRecording();
+          var combined = voiceState === 'needs-info-listening' ? conversationContext + '. ' + voiceFullTranscript.trim() : voiceFullTranscript.trim();
+          voiceFullTranscript = '';
+          processVoiceInput(combined);
+          return;
+        }
+        if (event.error === 'aborted') { resetVoiceUI(); return; }
+        resetVoiceUI();
+        var errorMsg = 'Voice error';
+        if (event.error === 'no-speech') errorMsg = 'No speech detected. Tap the mic and try again!';
+        else if (event.error === 'audio-capture') errorMsg = 'No microphone found. Check permissions.';
+        else if (event.error === 'not-allowed') errorMsg = 'Microphone access denied. Allow mic in browser settings.';
+        else if (event.error === 'network') errorMsg = 'Network error. Check connection.';
+        showVoiceStatus('error', errorMsg);
+        hideVoiceStatus(4000);
+      };
+
+      recognition.onend = function() {
+        isRecording = false;
+        var btn = document.getElementById('micBtn');
+        btn.classList.remove('recording');
+        document.getElementById('micIcon').className = 'fas fa-microphone';
+        document.getElementById('aiReminderInput').style.fontStyle = 'normal';
+        if ((voiceState === 'listening' || voiceState === 'needs-info-listening') && voiceFullTranscript.trim()) {
+          clearTimeout(voiceSilenceTimer);
+          var combined = voiceState === 'needs-info-listening' ? conversationContext + '. ' + voiceFullTranscript.trim() : voiceFullTranscript.trim();
+          voiceFullTranscript = '';
+          processVoiceInput(combined);
+        } else if (voiceState === 'listening') {
+          resetVoiceUI();
+        }
+      };
+
+      return recognition;
+    }
+
+    function toggleVoiceInput() {
+      if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+        InnovateAPI.showAlert('Voice input is not supported in this browser. Try Chrome or Edge.', 'error');
+        return;
+      }
+
+      if (isRecording && speechRecognition) {
+        clearTimeout(voiceSilenceTimer);
+        speechRecognition.stop();
+        if (voiceState === 'listening' && voiceFullTranscript.trim()) {
+          processVoiceInput(voiceFullTranscript.trim());
+        } else if (voiceState === 'needs-info-listening' && voiceFullTranscript.trim()) {
+          var combined = conversationContext + '. ' + voiceFullTranscript.trim();
+          voiceFullTranscript = '';
+          processVoiceInput(combined);
+        } else if (voiceState === 'confirm-listening' || voiceState === 'delete-listening') {
+          isRecording = false;
+        } else {
+          resetVoiceUI();
+        }
+        return;
+      }
+
+      if (voiceState === 'confirming') { voiceCancelCreate(); return; }
+
+      if (!speechRecognition) {
+        speechRecognition = initSpeechRecognition();
+        if (!speechRecognition) {
+          InnovateAPI.showAlert('Voice input is not supported in this browser.', 'error');
+          return;
+        }
+      }
+
+      voiceFullTranscript = '';
+      voiceState = 'idle';
+      pendingPreview = null;
+      pendingDeleteMatches = null;
+      conversationContext = '';
+      document.getElementById('aiReminderInput').value = '';
+      document.getElementById('voiceConfirmArea').style.display = 'none';
+
+      try { speechRecognition.start(); } catch (e) {
+        speechRecognition.stop();
+        setTimeout(function() {
+          try { speechRecognition.start(); } catch(err) {
+            InnovateAPI.showAlert('Could not start voice input. Please try again.', 'error');
+          }
+        }, 300);
+      }
+    }
+
+    function stopRecording() {
+      clearTimeout(voiceSilenceTimer);
+      if (speechRecognition && isRecording) { try { speechRecognition.stop(); } catch(e) {} }
+      isRecording = false;
+      var btn = document.getElementById('micBtn');
+      btn.classList.remove('recording');
+      document.getElementById('micIcon').className = 'fas fa-microphone';
+    }
+
+    function resetVoiceUI() {
+      stopRecording();
+      voiceState = 'idle';
+      voiceFullTranscript = '';
+      pendingPreview = null;
+      pendingDeleteMatches = null;
+      conversationContext = '';
+      document.getElementById('aiReminderInput').placeholder = 'Try: "Call mom tomorrow at 5pm" or tap \uD83C\uDFA4';
+      document.getElementById('aiReminderInput').style.fontStyle = 'normal';
+      document.getElementById('voiceConfirmArea').style.display = 'none';
+      hideVoiceStatus(0);
+    }
+
+    // ===== PROCESS VOICE → SMART AI PREVIEW =====
+    function processVoiceInput(transcript) {
+      voiceState = 'processing';
+      showVoiceStatus('processing', 'Understanding your request...');
+      document.getElementById('aiReminderInput').value = transcript;
+      document.getElementById('aiReminderInput').style.fontStyle = 'normal';
+
+      InnovateAPI.apiRequest('/reminders/ai-preview', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: transcript })
+      }).then(function(data) {
+        if (!data.success) {
+          showVoiceStatus('error', 'Could not understand. Try again.');
+          aiSpeak('Sorry, I didn\'t understand that. Could you try again?');
+          hideVoiceStatus(4000);
+          setTimeout(function() { resetVoiceUI(); }, 4000);
+          return;
+        }
+
+        var action = data.action;
+
+        // ---- CREATE_READY: Complete sentence, auto-create ----
+        if (action === 'create_ready') {
+          pendingPreview = data.preview;
+          var spoken = data.spoken_message || 'Creating your reminder.';
+
+          // Check for conflicts
+          if (data.conflicts && data.conflicts.length > 0) {
+            // There are conflicts — warn the user and ask
+            var conflictMsg = spoken + ' But heads up, you already have ';
+            if (data.conflicts.length === 1) {
+              conflictMsg += '"' + data.conflicts[0].title + '" at ' + (data.conflicts[0].reminder_time || 'the same time') + ' on that day.';
+            } else {
+              conflictMsg += data.conflicts.length + ' other reminders around that time.';
+            }
+            conflictMsg += ' Should I still create it?';
+
+            showConflictConfirmation(conflictMsg, data.preview, data.conflicts);
+          } else {
+            // No conflicts — just create immediately
+            autoCreateReminder(data.preview, spoken);
+          }
+        }
+
+        // ---- NEEDS_INFO: Missing fields, ask for them ----
+        else if (action === 'needs_info') {
+          var question = data.spoken_message || 'What date and time should I set this for?';
+          conversationContext = transcript;
+          pendingPreview = data.preview;
+
+          showVoiceStatus('confirming', '');
+          document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(question);
+
+          aiSpeak(question, function() {
+            startNeedsInfoListening();
+          });
+        }
+
+        // ---- DELETE: Found matches to delete ----
+        else if (action === 'delete') {
+          var matches = data.matches || [];
+          if (matches.length === 1) {
+            // Single match — confirm and delete
+            var delMsg = 'I found "' + matches[0].title + '". Deleting it now.';
+            aiSpeak(delMsg);
+            deleteReminderById(matches[0].id, matches[0].title);
+          } else if (matches.length > 1) {
+            // Multiple matches — ask which one
+            pendingDeleteMatches = matches;
+            var listMsg = 'I found ' + matches.length + ' reminders that match. ';
+            matches.forEach(function(m, idx) {
+              listMsg += 'Number ' + (idx + 1) + ': "' + m.title + '" on ' + formatDateLabel(m.reminder_date) + '. ';
+            });
+            listMsg += 'Which number should I delete?';
+
+            showVoiceStatus('confirming', '');
+            document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(listMsg);
+
+            aiSpeak(listMsg, function() {
+              startDeleteListening();
+            });
+          }
+        }
+
+        // ---- DELETE_NOT_FOUND ----
+        else if (action === 'delete_not_found') {
+          var notFoundMsg = data.spoken_message || 'I couldn\'t find a matching reminder to delete.';
+          showVoiceStatus('error', 'No matching reminder found');
+          aiSpeak(notFoundMsg);
+          hideVoiceStatus(4000);
+          setTimeout(function() { resetVoiceUI(); }, 4000);
+        }
+
+        else {
+          showVoiceStatus('error', 'Could not understand. Try again.');
+          hideVoiceStatus(4000);
+          setTimeout(function() { resetVoiceUI(); }, 4000);
+        }
+
+      }).catch(function() {
+        showVoiceStatus('error', 'AI unavailable. Try typing instead.');
+        aiSpeak('Sorry, the AI service is not available right now. Try typing your reminder.');
+        hideVoiceStatus(4000);
+        setTimeout(function() { resetVoiceUI(); }, 4000);
+      });
+    }
+
+    // ===== AUTO-CREATE (no confirmation needed for complete sentences) =====
+    function autoCreateReminder(preview, spokenMsg) {
+      showVoiceStatus('processing', 'Creating...');
+      document.getElementById('voiceConfirmArea').style.display = 'none';
+
+      InnovateAPI.apiRequest('/reminders', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: preview.title,
+          description: preview.description || '',
+          reminder_date: preview.reminder_date,
+          reminder_time: preview.reminder_time,
+          color: preview.color || '#0095f6',
+          priority: preview.priority || 'low'
+        })
+      }).then(function() {
+        var confirmSpoken = spokenMsg || 'Done! Reminder created.';
+        aiSpeak(confirmSpoken);
+        showVoiceStatus('success', 'Reminder created!');
+        showToast('"' + preview.title + '" created!');
+        loadAllReminders();
+        loadCalendarDots();
+        if (selectedDate) loadDayDetail(selectedDate);
+        setTimeout(function() { resetVoiceUI(); }, 3000);
+      }).catch(function() {
+        showVoiceStatus('error', 'Failed to create. Try again.');
+        aiSpeak('Sorry, I couldn\'t create the reminder. Please try again.');
+        hideVoiceStatus(4000);
+        setTimeout(function() { resetVoiceUI(); }, 4000);
+      });
+    }
+
+    // ===== CONFLICT WARNING + CONFIRMATION =====
+    function showConflictConfirmation(message, preview, conflicts) {
+      voiceState = 'confirming';
+      var confirmArea = document.getElementById('voiceConfirmArea');
+      var confirmText = document.getElementById('voiceConfirmText');
+
+      var summary = '<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> ';
+      summary += '<strong>"' + escapeHtml(preview.title) + '"</strong>';
+      if (preview.reminder_date) summary += ' on <strong>' + formatDateLabel(preview.reminder_date) + '</strong>';
+      if (preview.reminder_time) summary += ' at <strong>' + preview.reminder_time + '</strong>';
+      summary += '<br><span style="color: #f59e0b; font-size: 12px;"><i class="fas fa-clock"></i> Conflicts with: ';
+      conflicts.forEach(function(c, idx) {
+        if (idx > 0) summary += ', ';
+        summary += '"' + escapeHtml(c.title) + '"';
+      });
+      summary += '</span>';
+
+      confirmText.innerHTML = summary;
+      confirmArea.style.display = 'block';
+      showVoiceStatus('confirming', '');
+      document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
+
+      aiSpeak(message, function() { startConfirmListening(); });
+    }
+
+    // ===== SHOW NON-CONFLICT CONFIRMATION (for needs-info resolved) =====
+    function showConfirmation(message, preview) {
+      voiceState = 'confirming';
+      var confirmArea = document.getElementById('voiceConfirmArea');
+      var confirmText = document.getElementById('voiceConfirmText');
+
+      var summary = '<strong>"' + escapeHtml(preview.title) + '"</strong>';
+      if (preview.reminder_date) summary += ' on <strong>' + formatDateLabel(preview.reminder_date) + '</strong>';
+      if (preview.reminder_time) summary += ' at <strong>' + preview.reminder_time + '</strong>';
+      var prioLabel = (preview.priority || 'low').charAt(0).toUpperCase() + (preview.priority || 'low').slice(1);
+      if (preview.priority && preview.priority !== 'low') summary += ' <span class="priority-badge p-' + preview.priority + '" style="font-size:10px;">' + prioLabel + '</span>';
+
+      confirmText.innerHTML = '<i class="fas fa-bell" style="color: var(--ig-blue);"></i> ' + summary;
+      confirmArea.style.display = 'block';
+      showVoiceStatus('confirming', '');
+      document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
+
+      aiSpeak(message, function() { startConfirmListening(); });
+    }
+
+    // ===== LISTENING MODES =====
+    function startConfirmListening() {
+      voiceState = 'confirm-listening';
+      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say "yes", "edit", or "no"';
+      startMic();
+    }
+
+    function startNeedsInfoListening() {
+      voiceState = 'needs-info-listening';
+      voiceFullTranscript = '';
+      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Listening for the missing info...';
+      startMic();
+    }
+
+    function startDeleteListening() {
+      voiceState = 'delete-listening';
+      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say the number to delete, or "cancel"';
+      startMic();
+    }
+
+    function startMic() {
+      if (!speechRecognition) speechRecognition = initSpeechRecognition();
+      try { speechRecognition.start(); } catch(e) {
+        try { speechRecognition.stop(); } catch(e2) {}
+        setTimeout(function() { try { speechRecognition.start(); } catch(e3) {} }, 300);
+      }
+    }
+
+    // ===== DELETE SELECTION HANDLER =====
+    function handleDeleteSelection(heard) {
+      if (!pendingDeleteMatches || !pendingDeleteMatches.length) { resetVoiceUI(); return; }
+
+      // Check for cancel
+      var cancelWords = ['cancel', 'stop', 'never mind', 'no', 'none'];
+      if (cancelWords.some(function(w) { return heard.indexOf(w) !== -1; })) {
+        aiSpeak('Okay, nothing deleted.');
+        showVoiceStatus('error', 'Cancelled');
+        setTimeout(function() { resetVoiceUI(); }, 2000);
+        return;
+      }
+
+      // Check for "all"
+      if (heard.indexOf('all') !== -1) {
+        showVoiceStatus('processing', 'Deleting all matches...');
+        var deleteCount = pendingDeleteMatches.length;
+        var deleted = 0;
+        pendingDeleteMatches.forEach(function(m) {
+          InnovateAPI.apiRequest('/reminders/' + m.id, { method: 'DELETE' }).then(function() {
+            deleted++;
+            if (deleted === deleteCount) {
+              aiSpeak('Done! Deleted ' + deleteCount + ' reminders.');
+              showVoiceStatus('success', 'Deleted ' + deleteCount + ' reminders');
+              showToast(deleteCount + ' reminders deleted');
+              loadAllReminders();
+              loadCalendarDots();
+              setTimeout(function() { resetVoiceUI(); }, 3000);
+            }
+          }).catch(function() {});
         });
-      } catch (error) {
+        return;
+      }
+
+      // Try to extract a number
+      var numWords = { one: 1, two: 2, three: 3, four: 4, five: 5, first: 1, second: 2, third: 3 };
+      var num = parseInt(heard);
+      if (isNaN(num)) {
+        Object.keys(numWords).forEach(function(w) { if (heard.indexOf(w) !== -1) num = numWords[w]; });
+      }
+
+      if (!isNaN(num) && num >= 1 && num <= pendingDeleteMatches.length) {
+        var match = pendingDeleteMatches[num - 1];
+        deleteReminderById(match.id, match.title);
+      } else {
+        aiSpeak('I didn\'t catch which one. Say a number from 1 to ' + pendingDeleteMatches.length + ', or say cancel.', function() {
+          startDeleteListening();
+        });
+      }
+    }
+
+    function deleteReminderById(id, title) {
+      showVoiceStatus('processing', 'Deleting...');
+      InnovateAPI.apiRequest('/reminders/' + id, { method: 'DELETE' }).then(function() {
+        aiSpeak('Done! "' + title + '" has been deleted.');
+        showVoiceStatus('success', 'Deleted "' + title + '"');
+        showToast('"' + title + '" deleted');
+        loadAllReminders();
+        loadCalendarDots();
+        if (selectedDate) loadDayDetail(selectedDate);
+        setTimeout(function() { resetVoiceUI(); }, 3000);
+      }).catch(function() {
+        showVoiceStatus('error', 'Failed to delete');
+        aiSpeak('Sorry, I couldn\'t delete that reminder.');
+        hideVoiceStatus(4000);
+        setTimeout(function() { resetVoiceUI(); }, 4000);
+      });
+    }
+
+    // ===== CONFIRMATION ACTIONS =====
+    function voiceConfirmCreate() {
+      if (!pendingPreview) return;
+      stopRecording();
+      if (speechSynth) speechSynth.cancel();
+      autoCreateReminder(pendingPreview, 'Done! Your reminder has been created.');
+    }
+
+    function voiceEditBeforeCreate() {
+      stopRecording();
+      if (speechSynth) speechSynth.cancel();
+      if (!pendingPreview) { resetVoiceUI(); return; }
+      editingReminderId = null;
+      document.getElementById('modalTitle').innerHTML = '<i class="fas fa-bell" style="color: var(--ig-blue);"></i> New Reminder';
+      document.getElementById('modalSubmitBtn').innerHTML = '<i class="fas fa-bell"></i> Create Reminder';
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('rmTitle').value = pendingPreview.title || '';
+      document.getElementById('rmDesc').value = pendingPreview.description || '';
+      document.getElementById('rmDate').value = pendingPreview.reminder_date || new Date().toISOString().split('T')[0];
+      document.getElementById('rmTime').value = pendingPreview.reminder_time || '09:00';
+      document.getElementById('rmRecurrence').value = '';
+      document.getElementById('rmPriority').value = pendingPreview.priority || 'low';
+      selectedColor = pendingPreview.color || '#0095f6';
+      document.querySelectorAll('.color-circle').forEach(function(c) { c.classList.toggle('selected', c.dataset.color === selectedColor); });
+      resetVoiceUI();
+    }
+
+    function voiceCancelCreate() {
+      stopRecording();
+      if (speechSynth) speechSynth.cancel();
+      aiSpeak('Cancelled.');
+      showVoiceStatus('error', 'Cancelled');
+      document.getElementById('aiReminderInput').value = '';
+      pendingPreview = null;
+      pendingDeleteMatches = null;
+      setTimeout(function() { resetVoiceUI(); }, 1500);
+    }
+
+    // ===== VOICE UI HELPERS =====
+    function showVoiceStatus(type, message) {
+      var el = document.getElementById('voiceStatus');
+      var wave = document.getElementById('voiceWave');
+      el.className = 'voice-status active ' + type;
+      if (message) document.getElementById('voiceStatusText').textContent = message;
+      wave.style.display = (type === 'listening' || type === 'confirm-listening') ? 'flex' : 'none';
+    }
+
+    function hideVoiceStatus(delay) {
+      if (delay === 0) {
+        document.getElementById('voiceStatus').className = 'voice-status';
+        document.getElementById('voiceConfirmArea').style.display = 'none';
+        return;
+      }
+      setTimeout(function() {
+        document.getElementById('voiceStatus').className = 'voice-status';
+        document.getElementById('voiceConfirmArea').style.display = 'none';
+      }, delay || 3000);
+    }
+
+    // Pre-load voices
+    if (speechSynth) {
+      cachedVoices = speechSynth.getVoices();
+      if (speechSynth.onvoiceschanged !== undefined) {
+        speechSynth.onvoiceschanged = function() { cachedVoices = speechSynth.getVoices(); };
+      }
+    }
+
+    // ===================== DUE REMINDER POLLING =====================
+    function checkDueReminders() {
+      InnovateAPI.apiRequest('/reminders/due').then(function(data) {
+        if (data.reminders && data.reminders.length > 0) {
+          data.reminders.forEach(function(r) {
+            InnovateAPI.showAlert('\u23F0 ' + r.title, 'info');
+            InnovateAPI.apiRequest('/reminders/' + r.id + '/notified', { method: 'PUT' });
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Innovate Reminder', { body: r.title, icon: '/images/icon-192.png' });
+            }
+          });
+        }
+      }).catch(function() {});
+    }
+    setInterval(checkDueReminders, 60000);
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+
+    // ===================== HELPERS =====================
+    function escapeHtml(text) {
+      if (!text) return '';
+      var d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+    }
+    function getTodayStr() {
+      var t = new Date();
+      return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+    }
+    function isTomorrow(dateStr) {
+      var t = new Date(); t.setDate(t.getDate() + 1);
+      return dateStr === t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+    }
+    function formatDateLabel(dateStr) {
+      return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    // ===================== NOTIFICATIONS CODE =====================
+    function loadUserInfo() {
+      InnovateAPI.apiRequest('/users/' + user.id).then(function(data) {
+        var avatar = InnovateAPI.getUserAvatar(data.user.profile_picture);
+        var pic = document.getElementById('bottomProfilePic');
+        if (pic) pic.src = avatar;
+        var link = document.getElementById('bottomProfileLink');
+        if (link) link.href = '/profile/' + user.id;
+      }).catch(function(error) { console.error('Error loading user info:', error); });
+    }
+
+    function loadNotifications() {
+      InnovateAPI.apiRequest('/notifications').then(function(data) {
+        var list = document.getElementById('notificationsList');
+        list.innerHTML = '';
+        if (data.notifications.length === 0) {
+          list.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);"><div style="font-size: 48px; margin-bottom: 16px;">\uD83D\uDD14</div><div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No Notifications Yet</div><div style="font-size: 14px;">When someone likes or comments on your posts, you\'ll see it here.</div></div>';
+          return;
+        }
+        data.notifications.forEach(function(n) { list.appendChild(createNotificationElement(n)); });
+      }).catch(function(error) {
         console.error('Error loading notifications:', error);
-        document.getElementById('notificationsList').innerHTML = 
-          '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading notifications</div>';
-      }
+        document.getElementById('notificationsList').innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading notifications</div>';
+      });
     }
 
-    // Socket listener for new notifications
-    // Server emits `notification:receive` (and some older routes emit `new_notification`).
     if (notificationsSocket) {
-      notificationsSocket.on('notification:receive', () => loadNotifications());
-      notificationsSocket.on('new_notification', () => loadNotifications());
-      // Backward compat (if any page/server emits plain `notification`)
-      notificationsSocket.on('notification', () => loadNotifications());
+      notificationsSocket.on('notification:receive', function() { loadNotifications(); });
+      notificationsSocket.on('new_notification', function() { loadNotifications(); });
+      notificationsSocket.on('notification', function() { loadNotifications(); });
     }
 
-    // Create notification element
     function createNotificationElement(notification) {
-      const div = document.createElement('div');
-      div.className = `ig-notification-item ${!notification.is_read ? 'unread' : ''}`;
-      
-      const avatar = InnovateAPI.getUserAvatar(notification.profile_picture);
-      const timeAgo = formatTimeAgo(notification.created_at);
-      
-      let actionButton = '';
-      let notificationText = notification.content;
-      
+      var div = document.createElement('div');
+      div.className = 'ig-notification-item ' + (!notification.is_read ? 'unread' : '');
+      var avatar = InnovateAPI.getUserAvatar(notification.profile_picture);
+      var timeAgo = formatTimeAgo(notification.created_at);
+      var actionButton = '';
+      var notificationText = notification.content;
       if (notification.type === 'follow') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> started following you.`;
-        actionButton = `
-          <div class="ig-notification-action">
-            <button class="ig-follow-btn" onclick="followUser(${notification.sender_id}, event)">Follow</button>
-          </div>
-        `;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> started following you.';
+        actionButton = '<div class="ig-notification-action"><button class="ig-follow-btn" onclick="followUser(' + notification.sender_id + ', event)">Follow</button></div>';
       } else if (notification.type === 'message') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> sent you a message.`;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> sent you a message.';
       } else if (notification.type === 'event_invite') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> invited you to an event.`;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> invited you to an event.';
       } else if (notification.type === 'crosspath') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined the same event as you!`;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> joined the same event as you!';
       } else if (notification.type === 'crosspath_match') {
-        // Extract event name from notification content and format with username highlighted
-        const username = notification.username || 'Someone';
-        const contentWithBoldUsername = notification.content.replace(username, `<span class="ig-notification-username">${username}</span>`);
-        notificationText = contentWithBoldUsername;
+        var username = notification.username || 'Someone';
+        notificationText = notification.content.replace(username, '<span class="ig-notification-username">' + username + '</span>');
       } else if (notification.type === 'community_join') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> joined your community.`;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> joined your community.';
       } else if (notification.type === 'join_request') {
-        notificationText = `<span class="ig-notification-username">${notification.username || 'Someone'}</span> requested to join your community.`;
-        actionButton = `
-          <div class="ig-notification-action" style="display: flex; gap: 8px;">
-            <button class="ig-follow-btn" onclick="approveJoinRequest(${notification.related_id}, ${notification.created_by}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px; display: flex; align-items: center; gap: 6px;" title="Accept">
-              <i class="fas fa-check"></i> Accept
-            </button>
-            <button class="ig-following-btn" onclick="declineJoinRequest(${notification.related_id}, ${notification.created_by}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px; display: flex; align-items: center; gap: 6px;" title="Decline">
-              <i class="fas fa-times"></i> Decline
-            </button>
-          </div>
-        `;
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> requested to join your community.';
+        actionButton = '<div class="ig-notification-action" style="display: flex; gap: 8px;"><button class="ig-follow-btn" onclick="approveJoinRequest(' + notification.related_id + ', ' + notification.created_by + ', ' + notification.id + ', event)" style="padding: 7px 14px; font-size: 13px;"><i class="fas fa-check"></i> Accept</button><button class="ig-following-btn" onclick="declineJoinRequest(' + notification.related_id + ', ' + notification.created_by + ', ' + notification.id + ', event)" style="padding: 7px 14px; font-size: 13px;"><i class="fas fa-times"></i> Decline</button></div>';
       } else if (notification.type === 'community_invite') {
-        notificationText = `You've been invited to join <span class="ig-notification-username">${notification.content.replace("You've been invited to join ", "")}</span>`;
-        actionButton = `
-          <div class="ig-notification-action" style="display: flex; gap: 8px;">
-            <button class="ig-follow-btn" onclick="acceptCommunityInvite(${notification.related_id}, ${notification.id}, event)" style="padding: 7px 14px; font-size: 13px;">Accept</button>
-            <button class="ig-following-btn" onclick="rejectCommunityInvite(${notification.id}, event)" style="padding: 7px 14px; font-size: 13px;">Reject</button>
-          </div>
-        `;
+        notificationText = 'You\'ve been invited to join <span class="ig-notification-username">' + notification.content.replace("You've been invited to join ", "") + '</span>';
+        actionButton = '<div class="ig-notification-action" style="display: flex; gap: 8px;"><button class="ig-follow-btn" onclick="acceptCommunityInvite(' + notification.related_id + ', ' + notification.id + ', event)" style="padding: 7px 14px; font-size: 13px;">Accept</button><button class="ig-following-btn" onclick="rejectCommunityInvite(' + notification.id + ', event)" style="padding: 7px 14px; font-size: 13px;">Reject</button></div>';
       }
-      
-      div.innerHTML = `
-        <img src="${avatar}" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href='/profile/${notification.sender_id || user.id}'">
-        <div class="ig-notification-content" onclick="handleNotificationClick(${notification.id}, '${notification.type}', ${notification.related_id || 'null'})">
-          <div class="ig-notification-text">${notificationText}</div>
-          <div class="ig-notification-time">${timeAgo}</div>
-        </div>
-        ${actionButton}
-      `;
-      
+      div.innerHTML = '<img src="' + avatar + '" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href=\'/profile/' + (notification.sender_id || user.id) + '\'">' +
+        '<div class="ig-notification-content" onclick="handleNotificationClick(' + notification.id + ', \'' + notification.type + '\', ' + (notification.related_id || 'null') + ')">' +
+          '<div class="ig-notification-text">' + notificationText + '</div>' +
+          '<div class="ig-notification-time">' + timeAgo + '</div>' +
+        '</div>' + actionButton;
       return div;
     }
 
-    // Format time ago
     function formatTimeAgo(timestamp) {
       if (!timestamp) return 'Unknown';
-      
-      // Handle SQLite datetime format: "2026-02-07 12:00:00"
-      // SQLite stores in UTC, so we need to explicitly handle it
-      let dateStr = timestamp;
-      if (dateStr.includes(' ') && !dateStr.includes('T') && !dateStr.includes('Z')) {
-        dateStr = dateStr.replace(' ', 'T') + 'Z'; // Add 'Z' to indicate UTC
-      }
-      
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diff = now - date;
-      const minutes = Math.floor(diff / 60000);
-      const hours = Math.floor(diff / 3600000);
-      const days = Math.floor(diff / 86400000);
-      const weeks = Math.floor(diff / 604800000);
-      
-      if (minutes < 1) return 'just now';
-      if (minutes < 60) return `${minutes}m`;
-      if (hours < 24) return `${hours}h`;
-      if (days < 7) return `${days}d`;
-      if (weeks < 4) return `${weeks}w`;
+      var dateStr = timestamp;
+      if (dateStr.indexOf(' ') !== -1 && dateStr.indexOf('T') === -1 && dateStr.indexOf('Z') === -1) dateStr = dateStr.replace(' ', 'T') + 'Z';
+      var date = new Date(dateStr);
+      var diff = Date.now() - date;
+      var m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), d = Math.floor(diff / 86400000), w = Math.floor(diff / 604800000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm';
+      if (h < 24) return h + 'h';
+      if (d < 7) return d + 'd';
+      if (w < 4) return w + 'w';
       return date.toLocaleDateString();
     }
 
-    // Handle notification click
-    async function handleNotificationClick(notificationId, type, referenceId) {
-      try {
-        await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
-          method: 'PUT'
-        });
-        
-        if (type === 'message') {
-          window.location.href = '/messages';
-        } else if (type === 'join_request' && referenceId) {
-          window.location.href = `/community/${referenceId}`;
-        } else if (type === 'community_invite' && referenceId) {
-          window.location.href = `/community/${referenceId}`;
-        } else if (type === 'event_invite' && referenceId) {
-          window.location.href = `/events/${referenceId}`;
-        } else if (type === 'crosspath' && referenceId) {
-          window.location.href = `/events/${referenceId}`;
-        } else if (type === 'crosspath_match' && referenceId) {
-          window.location.href = `/events/${referenceId}`;
-        } else if (referenceId) {
-          window.location.href = `/post/${referenceId}`;
-        }
-      } catch (error) {
-        console.error('Error marking notification as read:', error);
-      }
+    function handleNotificationClick(notificationId, type, referenceId) {
+      InnovateAPI.apiRequest('/notifications/' + notificationId + '/read', { method: 'PUT' }).then(function() {
+        if (type === 'message') window.location.href = '/messages';
+        else if ((type === 'join_request' || type === 'community_invite') && referenceId) window.location.href = '/community/' + referenceId;
+        else if ((type === 'event_invite' || type === 'crosspath' || type === 'crosspath_match') && referenceId) window.location.href = '/events/' + referenceId;
+        else if (referenceId) window.location.href = '/post/' + referenceId;
+      }).catch(function(error) { console.error('Error:', error); });
     }
 
-    // Follow user
-    async function followUser(userId, event) {
+    function followUser(userId, event) {
       event.stopPropagation();
-      try {
-        await InnovateAPI.apiRequest(`/users/${userId}/follow`, {
-          method: 'POST'
-        });
-        
-        const btn = event.target;
-        btn.textContent = 'Following';
-        btn.className = 'ig-following-btn';
-        btn.onclick = (e) => unfollowUser(userId, e);
-      } catch (error) {
-        console.error('Error following user:', error);
-      }
+      InnovateAPI.apiRequest('/users/' + userId + '/follow', { method: 'POST' }).then(function() {
+        var btn = event.target; btn.textContent = 'Following'; btn.className = 'ig-following-btn';
+        btn.onclick = function(e) { unfollowUser(userId, e); };
+      }).catch(function(error) { console.error('Error:', error); });
     }
 
-    // Unfollow user
-    async function unfollowUser(userId, event) {
+    function unfollowUser(userId, event) {
       event.stopPropagation();
-      try {
-        await InnovateAPI.apiRequest(`/users/${userId}/unfollow`, {
-          method: 'POST'
-        });
-        
-        const btn = event.target;
-        btn.textContent = 'Follow';
-        btn.className = 'ig-follow-btn';
-        btn.onclick = (e) => followUser(userId, e);
-      } catch (error) {
-        console.error('Error unfollowing user:', error);
-      }
+      InnovateAPI.apiRequest('/users/' + userId + '/unfollow', { method: 'POST' }).then(function() {
+        var btn = event.target; btn.textContent = 'Follow'; btn.className = 'ig-follow-btn';
+        btn.onclick = function(e) { followUser(userId, e); };
+      }).catch(function(error) { console.error('Error:', error); });
     }
 
-    // Mark all as read
-    async function markAllAsRead() {
-      try {
-        await InnovateAPI.apiRequest('/notifications/read/all', {
-          method: 'PUT'
-        });
-        
+    function markAllAsRead() {
+      InnovateAPI.apiRequest('/notifications/read/all', { method: 'PUT' }).then(function() {
         loadNotifications();
         InnovateAPI.showAlert('All notifications marked as read', 'success');
-      } catch (error) {
-        console.error('Error marking all as read:', error);
-      }
+      }).catch(function(error) { console.error('Error:', error); });
     }
 
-    // Clear all notifications
-    async function clearAllNotifications() {
-      if (!confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
-        return;
-      }
-      
-      try {
-        const response = await InnovateAPI.apiRequest('/notifications/clear/all', {
-          method: 'DELETE'
-        });
-        
+    function clearAllNotifications() {
+      if (!confirm('Clear all notifications?')) return;
+      InnovateAPI.apiRequest('/notifications/clear/all', { method: 'DELETE' }).then(function(response) {
         loadNotifications();
-        InnovateAPI.showAlert(`Cleared ${response.deleted || 'all'} notifications`, 'success');
-      } catch (error) {
-        console.error('Error clearing notifications:', error);
-        InnovateAPI.showAlert('Failed to clear notifications', 'error');
-      }
+        InnovateAPI.showAlert('Cleared ' + (response.deleted || 'all') + ' notifications', 'success');
+      }).catch(function() { InnovateAPI.showAlert('Failed to clear notifications', 'error'); });
     }
 
-    // Accept community invitation
-    async function acceptCommunityInvite(communityId, notificationId, event) {
+    function acceptCommunityInvite(communityId, notificationId, event) {
       event.stopPropagation();
-      const actionDiv = event.target.closest('.ig-notification-action');
-      try {
-        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/accept-invite`, {
-          method: 'POST'
-        });
-        
+      var actionDiv = event.target.closest('.ig-notification-action');
+      InnovateAPI.apiRequest('/communities/' + communityId + '/accept-invite', { method: 'POST' }).then(function(response) {
         if (response.success) {
-          // Replace buttons with success message
-          actionDiv.innerHTML = `
-            <div style="color: var(--ig-blue); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-              <i class="fas fa-check-circle"></i>
-              Accepted
-            </div>
-          `;
+          actionDiv.innerHTML = '<div style="color: var(--ig-blue); font-weight: 600; font-size: 13px;"><i class="fas fa-check-circle"></i> Accepted</div>';
           InnovateAPI.showAlert('You joined the community!', 'success');
-          // Mark notification as read
-          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
-            method: 'PUT'
-          });
+          InnovateAPI.apiRequest('/notifications/' + notificationId + '/read', { method: 'PUT' });
         }
-      } catch (error) {
-        console.error('Error accepting invite:', error);
-        InnovateAPI.showAlert(error.message || 'Failed to accept invitation', 'error');
-      }
+      }).catch(function(error) { InnovateAPI.showAlert(error.message || 'Failed', 'error'); });
     }
 
-    // Reject community invitation
-    async function rejectCommunityInvite(notificationId, event) {
+    function rejectCommunityInvite(notificationId, event) {
       event.stopPropagation();
-      const actionDiv = event.target.closest('.ig-notification-action');
-      try {
-        // Replace buttons with declined message
-        actionDiv.innerHTML = `
-          <div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-            <i class="fas fa-times-circle"></i>
-            Declined
-          </div>
-        `;
-        
-        // Just mark the notification as read (delete it) after a short delay
-        setTimeout(async () => {
-          await InnovateAPI.apiRequest(`/notifications/${notificationId}`, {
-            method: 'DELETE'
-          });
-          loadNotifications();
-        }, 1500);
-        
-        InnovateAPI.showAlert('Invitation declined', 'success');
-      } catch (error) {
-        console.error('Error rejecting invite:', error);
-        InnovateAPI.showAlert('Failed to decline invitation', 'error');
-      }
+      var actionDiv = event.target.closest('.ig-notification-action');
+      actionDiv.innerHTML = '<div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;"><i class="fas fa-times-circle"></i> Declined</div>';
+      setTimeout(function() {
+        InnovateAPI.apiRequest('/notifications/' + notificationId, { method: 'DELETE' });
+        loadNotifications();
+      }, 1500);
     }
 
-    // Approve join request
-    async function approveJoinRequest(communityId, userId, notificationId, event) {
+    function approveJoinRequest(communityId, userId, notificationId, event) {
       event.stopPropagation();
-      const actionDiv = event.target.closest('.ig-notification-action');
-      const notifItem = event.target.closest('.ig-notification-item');
-      try {
-        // Disable buttons immediately
-        const buttons = actionDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = true);
-        
-        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/join-requests/${userId}/approve`, {
-          method: 'POST'
-        });
-        
+      var actionDiv = event.target.closest('.ig-notification-action');
+      var notifItem = event.target.closest('.ig-notification-item');
+      actionDiv.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+      InnovateAPI.apiRequest('/communities/' + communityId + '/join-requests/' + userId + '/approve', { method: 'POST' }).then(function(response) {
         if (response.success) {
-          // Replace buttons with success message
-          actionDiv.innerHTML = `
-            <div style="color: #10b981; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-              <i class="fas fa-check-circle"></i>
-              Approved
-            </div>
-          `;
+          actionDiv.innerHTML = '<div style="color: #10b981; font-weight: 600; font-size: 13px;"><i class="fas fa-check-circle"></i> Approved</div>';
           InnovateAPI.showAlert('Join request approved!', 'success');
-          
-          // Mark notification as read and remove the notification item
-          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
-            method: 'PUT'
-          });
-          
-          // Remove the notification from UI after delay
-          setTimeout(() => {
-            notifItem.style.transition = 'opacity 0.3s';
-            notifItem.style.opacity = '0';
-            setTimeout(() => {
-              notifItem.remove();
-            }, 300);
-          }, 1500);
+          InnovateAPI.apiRequest('/notifications/' + notificationId + '/read', { method: 'PUT' });
+          setTimeout(function() { notifItem.style.opacity = '0'; setTimeout(function() { notifItem.remove(); }, 300); }, 1500);
         }
-      } catch (error) {
-        console.error('Error approving request:', error);
-        InnovateAPI.showAlert(error.message || 'Failed to approve request', 'error');
-        // Re-enable buttons on error
-        const buttons = actionDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = false);
-      }
+      }).catch(function(error) {
+        InnovateAPI.showAlert(error.message || 'Failed', 'error');
+        actionDiv.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+      });
     }
 
-    // Decline join request
-    async function declineJoinRequest(communityId, userId, notificationId, event) {
+    function declineJoinRequest(communityId, userId, notificationId, event) {
       event.stopPropagation();
-      const actionDiv = event.target.closest('.ig-notification-action');
-      const notifItem = event.target.closest('.ig-notification-item');
-      try {
-        // Disable buttons immediately
-        const buttons = actionDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = true);
-        
-        const response = await InnovateAPI.apiRequest(`/communities/${communityId}/join-requests/${userId}/decline`, {
-          method: 'POST'
-        });
-        
+      var actionDiv = event.target.closest('.ig-notification-action');
+      var notifItem = event.target.closest('.ig-notification-item');
+      actionDiv.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+      InnovateAPI.apiRequest('/communities/' + communityId + '/join-requests/' + userId + '/decline', { method: 'POST' }).then(function(response) {
         if (response.success) {
-          // Replace buttons with declined message
-          actionDiv.innerHTML = `
-            <div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-              <i class="fas fa-times-circle"></i>
-              Declined
-            </div>
-          `;
+          actionDiv.innerHTML = '<div style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;"><i class="fas fa-times-circle"></i> Declined</div>';
           InnovateAPI.showAlert('Join request declined', 'success');
-          
-          // Mark notification as read and remove the notification item
-          await InnovateAPI.apiRequest(`/notifications/${notificationId}/read`, {
-            method: 'PUT'
-          });
-          
-          // Remove the notification from UI after delay
-          setTimeout(() => {
-            notifItem.style.transition = 'opacity 0.3s';
-            notifItem.style.opacity = '0';
-            setTimeout(() => {
-              notifItem.remove();
-            }, 300);
-          }, 1500);
+          InnovateAPI.apiRequest('/notifications/' + notificationId + '/read', { method: 'PUT' });
+          setTimeout(function() { notifItem.style.opacity = '0'; setTimeout(function() { notifItem.remove(); }, 300); }, 1500);
         }
-      } catch (error) {
-        console.error('Error declining request:', error);
-        InnovateAPI.showAlert(error.message || 'Failed to decline request', 'error');
-        // Re-enable buttons on error
-        const buttons = actionDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = false);
-      }
+      }).catch(function(error) {
+        InnovateAPI.showAlert(error.message || 'Failed', 'error');
+        actionDiv.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+      });
     }
 
-    // Initialize
+    // ===================== HASH NAV =====================
+    function initFromHash() {
+      if (window.location.hash === '#reminders') switchTab('reminders');
+    }
+
+    // ===================== INIT =====================
     loadUserInfo();
     loadNotifications();
+    checkDueReminders();
+    initFromHash();
   </script>
 </body>
 </html>

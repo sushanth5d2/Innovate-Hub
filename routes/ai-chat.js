@@ -330,6 +330,52 @@ async function handleAIChatSend(req, res) {
       );
     });
 
+    // ===== REMINDER CONTEXT: Inject user's reminders when they ask about them =====
+    const msgLower = (message || '').toLowerCase();
+    const reminderKeywords = ['remind', 'reminder', 'calendar', 'birthday', 'schedule', 'upcoming', 'due', 'todo', 'event'];
+    const isReminderQuery = reminderKeywords.some(k => msgLower.includes(k));
+
+    if (isReminderQuery) {
+      try {
+        const reminders = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT title, description, reminder_date, reminder_time, type, color
+             FROM user_reminders WHERE user_id = ? AND is_dismissed = 0
+             ORDER BY reminder_date ASC LIMIT 20`,
+            [userId],
+            (err, rows) => { if (err) reject(err); else resolve(rows || []); }
+          );
+        });
+        const gentleReminders = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT gr.reminder_date, gr.message, p.content as post_content
+             FROM gentle_reminders gr JOIN posts p ON gr.post_id = p.id
+             WHERE gr.user_id = ? ORDER BY gr.reminder_date ASC LIMIT 10`,
+            [userId],
+            (err, rows) => { if (err) reject(err); else resolve(rows || []); }
+          );
+        });
+
+        if (reminders.length > 0 || gentleReminders.length > 0) {
+          const reminderContext = [
+            '--- USER REMINDERS CONTEXT ---',
+            ...reminders.map(r => `- [${r.type}] "${r.title}" on ${r.reminder_date} at ${r.reminder_time || 'all day'}: ${r.description || ''}`),
+            ...gentleReminders.map(r => `- [post_reminder] "${r.message || 'Post reminder'}" on ${r.reminder_date}: ${r.post_content ? r.post_content.substring(0, 80) : ''}`),
+            '--- END REMINDERS ---',
+            'You can help the user manage reminders. To create a new reminder, suggest they use the Reminders tab in Notifications or the AI quick-create bar. Today is ' + new Date().toISOString().split('T')[0] + '.'
+          ].join('\n');
+
+          // Prepend to the last user message
+          const lastUserIdx = history.length - 1;
+          if (lastUserIdx >= 0) {
+            history[lastUserIdx].content = history[lastUserIdx].content + '\n\n' + reminderContext;
+          }
+        }
+      } catch (reminderErr) {
+        console.error('[AI Chat] Error loading reminder context:', reminderErr);
+      }
+    }
+
     // Build enriched history (filter out empty assistant messages to avoid poisoning context)
     const enrichedHistory = history
       .filter(msg => {

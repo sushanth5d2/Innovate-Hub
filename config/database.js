@@ -1181,6 +1181,29 @@ const createTables = () => {
       )
     `);
 
+    // User reminders table (unified reminders system)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS user_reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        reminder_date DATETIME NOT NULL,
+        reminder_time TEXT DEFAULT '09:00',
+        type TEXT DEFAULT 'custom',
+        source_type TEXT,
+        source_id INTEGER,
+        is_recurring BOOLEAN DEFAULT 0,
+        recurrence_pattern TEXT,
+        is_notified BOOLEAN DEFAULT 0,
+        is_dismissed BOOLEAN DEFAULT 0,
+        color TEXT DEFAULT '#0095f6',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('SQLite tables created successfully');
   });
 };
@@ -1675,6 +1698,13 @@ const migrateDatabase = () => {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+
+    // Add priority column to user_reminders
+    db.run(`ALTER TABLE user_reminders ADD COLUMN priority TEXT DEFAULT 'low'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: priority column migration - ', err ? err.message : 'ok');
+      }
+    });
   });
 };
 

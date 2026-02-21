@@ -109,6 +109,7 @@ app.use('/api/search', require('./routes/search'));
 app.use('/api/ml', require('./routes/ml'));
 app.use('/api/social-service', require('./routes/social-service'));
 app.use('/api/todos', require('./routes/todos'));
+app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/ai-chat', require('./routes/ai-chat'));
 app.use('/api/portfolio', require('./routes/portfolio'));

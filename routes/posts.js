@@ -1089,6 +1089,16 @@ router.post('/:postId/reminder', authMiddleware, (req, res) => {
         }
       );
 
+      // Also create a unified reminder entry
+      db.run(
+        `INSERT INTO user_reminders (user_id, title, description, reminder_date, type, source_type, source_id, color)
+         VALUES (?, ?, ?, ?, 'post_reminder', 'post', ?, '#ff6b6b')`,
+        [userId, message || 'Post Reminder', 'Gentle reminder from post', reminder_date, postId],
+        (err) => {
+          if (err) console.error('Error creating unified reminder:', err);
+        }
+      );
+
       res.json({ success: true, reminderId: this.lastID });
     }
   );
