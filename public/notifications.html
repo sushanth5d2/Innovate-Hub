@@ -324,9 +324,12 @@
         </div>
         <div id="voiceConfirmArea" style="display:none; width:100%;">
           <div class="voice-confirm-text" id="voiceConfirmText"></div>
-          <div class="voice-confirm-actions">
+          <div class="voice-confirm-actions" id="voiceConfirmActions">
             <button class="voice-confirm-btn confirm-yes" onclick="voiceConfirmCreate()">
-              <i class="fas fa-check"></i> Yes, create
+              <i class="fas fa-check"></i> Create
+            </button>
+            <button class="voice-confirm-btn confirm-edit" onclick="startConflictDeleteFlow()" id="btnDeleteOld" style="display:none; background:linear-gradient(135deg,#f44336,#e91e63);">
+              <i class="fas fa-trash"></i> Delete old
             </button>
             <button class="voice-confirm-btn confirm-edit" onclick="voiceEditBeforeCreate()">
               <i class="fas fa-pen"></i> Edit
@@ -959,23 +962,62 @@
       if (!prompt) return;
       input.disabled = true;
       btn.classList.add('loading');
-      var original = input.value;
       input.value = 'Creating your reminder...';
-      InnovateAPI.apiRequest('/reminders/ai-create', {
+
+      // Use smart ai-preview first for conflict detection
+      InnovateAPI.apiRequest('/reminders/ai-preview', {
         method: 'POST',
         body: JSON.stringify({ prompt: prompt })
       }).then(function(data) {
-        input.value = '';
-        showToast('"' + data.reminder.title + '" created!');
-        loadAllReminders();
-        loadCalendarDots();
-      }).catch(function() {
-        InnovateAPI.showAlert('Could not create reminder. Try the + button instead.', 'error');
-        input.value = original;
-      }).finally(function() {
         input.disabled = false;
         btn.classList.remove('loading');
-        input.focus();
+
+        if (!data.success) {
+          InnovateAPI.showAlert('Could not understand. Try rephrasing.', 'error');
+          input.value = prompt;
+          return;
+        }
+
+        if (data.action === 'create_ready') {
+          // Auto-create
+          pendingPreview = data.preview;
+          if (data.conflicts && data.conflicts.length > 0) {
+            // Has conflicts — use voice flow to handle
+            pendingConflicts = data.conflicts;
+            input.value = '';
+            var conflictMsg = 'You already have ';
+            if (data.conflicts.length === 1) conflictMsg += '"' + data.conflicts[0].title + '" around that time.';
+            else conflictMsg += data.conflicts.length + ' reminders around that time.';
+            conflictMsg += ' Delete old and create new, or keep both?';
+            showConflictConfirmation(conflictMsg, data.preview, data.conflicts);
+          } else {
+            input.value = '';
+            autoCreateReminder(data.preview, data.spoken_message || 'Reminder created.');
+          }
+        } else if (data.action === 'needs_info') {
+          input.value = '';
+          InnovateAPI.showAlert(data.spoken_message || 'Please include date and time.', 'info');
+          input.placeholder = data.spoken_message || 'Add date/time info...';
+          setTimeout(function() { input.placeholder = 'Try: "Call mom tomorrow at 5pm" or tap \uD83C\uDFA4'; }, 5000);
+        } else if (data.action === 'delete' && data.matches) {
+          input.value = '';
+          if (data.matches.length === 1) {
+            deleteReminderById(data.matches[0].id, data.matches[0].title);
+          } else {
+            InnovateAPI.showAlert('Found ' + data.matches.length + ' matches. Use voice to pick which to delete.', 'info');
+          }
+        } else if (data.action === 'delete_not_found') {
+          input.value = '';
+          InnovateAPI.showAlert(data.spoken_message || 'No matching reminder found to delete.', 'error');
+        } else {
+          input.value = prompt;
+          InnovateAPI.showAlert('Could not process. Try the + button.', 'error');
+        }
+      }).catch(function() {
+        InnovateAPI.showAlert('Could not create reminder. Try the + button instead.', 'error');
+        input.value = prompt;
+        input.disabled = false;
+        btn.classList.remove('loading');
       });
     }
 
@@ -987,6 +1029,7 @@
     var voiceFullTranscript = '';
     var pendingPreview = null;
     var pendingDeleteMatches = null; // stores delete matches for voice selection
+    var pendingConflicts = null; // stores conflict reminders during create flow
     var conversationContext = ''; // accumulates partial info across turns
     var SILENCE_TIMEOUT = 4000;
     var speechSynth = window.speechSynthesis || null;
@@ -1122,23 +1165,52 @@
           else interim += transcript;
         }
 
-        // ---- CONFIRMATION LISTENING (for conflicts) ----
+        // ---- CONFIRMATION LISTENING (for conflicts + normal confirm) ----
         if (voiceState === 'confirm-listening') {
           var heard = (finalParts + interim).toLowerCase().trim();
           if (heard && finalParts) {
-            var yesWords = ['yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay', 'confirm', 'create', 'go ahead', 'do it', 'keep'];
-            var noWords = ['no', 'nope', 'cancel', 'stop', 'don\'t', 'never mind', 'discard', 'remove'];
+            stopRecording();
+
+            var noWords = ['no', 'nope', 'cancel', 'stop', 'don\'t', 'never mind', 'discard'];
             var editWords = ['edit', 'change', 'modify', 'update', 'fix', 'different'];
-            var isYes = yesWords.some(function(w) { return heard.indexOf(w) !== -1; });
+            var justCreateWords = ['just create', 'create it', 'alongside', 'keep both', 'both', 'yes', 'yeah', 'yep', 'yup', 'sure', 'ok', 'okay', 'go ahead', 'do it', 'create'];
+            var deleteWords = ['delete', 'remove', 'replace', 'get rid'];
+            var isDelete = deleteWords.some(function(w) { return heard.indexOf(w) !== -1; });
             var isNo = noWords.some(function(w) { return heard.indexOf(w) !== -1; });
             var isEdit = editWords.some(function(w) { return heard.indexOf(w) !== -1; });
-            stopRecording();
-            if (isYes) voiceConfirmCreate();
-            else if (isEdit) voiceEditBeforeCreate();
-            else if (isNo) voiceCancelCreate();
-            else {
-              aiSpeak('Say yes to keep it, edit to change, or no to cancel.', function() { startConfirmListening(); });
+            var isJustCreate = justCreateWords.some(function(w) { return heard.indexOf(w) !== -1; });
+
+            // If user says "delete <name>" directly, find & delete that conflict immediately
+            if (isDelete && pendingConflicts && pendingConflicts.length > 0) {
+              var nameAfterDelete = heard.replace(/\b(delete|remove|replace|get rid of|the|my|old|reminder|for|about|and|create|new|one)\b/g, '').trim();
+              if (nameAfterDelete && nameAfterDelete.length > 1) {
+                var nameMatch = findConflictByName(nameAfterDelete);
+                if (nameMatch) {
+                  deleteReminderThenCreate(nameMatch.id, nameMatch.title);
+                  return;
+                }
+              }
+              // User said "delete" but no specific name or no match — start delete flow
+              startConflictDeleteFlow();
+            } else if (isNo) {
+              voiceCancelCreate();
+            } else if (isEdit) {
+              voiceEditBeforeCreate();
+            } else if (isJustCreate) {
+              voiceConfirmCreate();
+            } else {
+              aiSpeak('Say create, delete, edit, or cancel.', function() { startConfirmListening(); });
             }
+          }
+          return;
+        }
+
+        // ---- CONFLICT DELETE LISTENING (pick which conflict to delete) ----
+        if (voiceState === 'conflict-delete-listening') {
+          var cdheard = (finalParts + interim).toLowerCase().trim();
+          if (cdheard && finalParts) {
+            stopRecording();
+            handleConflictDeleteSelection(cdheard);
           }
           return;
         }
@@ -1263,6 +1335,7 @@
       voiceState = 'idle';
       pendingPreview = null;
       pendingDeleteMatches = null;
+      pendingConflicts = null;
       conversationContext = '';
       document.getElementById('aiReminderInput').value = '';
       document.getElementById('voiceConfirmArea').style.display = 'none';
@@ -1292,10 +1365,14 @@
       voiceFullTranscript = '';
       pendingPreview = null;
       pendingDeleteMatches = null;
+      pendingConflicts = null;
       conversationContext = '';
+      document.getElementById('aiReminderInput').value = '';
       document.getElementById('aiReminderInput').placeholder = 'Try: "Call mom tomorrow at 5pm" or tap \uD83C\uDFA4';
       document.getElementById('aiReminderInput').style.fontStyle = 'normal';
       document.getElementById('voiceConfirmArea').style.display = 'none';
+      var delBtn = document.getElementById('btnDeleteOld');
+      if (delBtn) delBtn.style.display = 'none';
       hideVoiceStatus(0);
     }
 
@@ -1327,14 +1404,10 @@
 
           // Check for conflicts
           if (data.conflicts && data.conflicts.length > 0) {
-            // There are conflicts — warn the user and ask
-            var conflictMsg = spoken + ' But heads up, you already have ';
-            if (data.conflicts.length === 1) {
-              conflictMsg += '"' + data.conflicts[0].title + '" at ' + (data.conflicts[0].reminder_time || 'the same time') + ' on that day.';
-            } else {
-              conflictMsg += data.conflicts.length + ' other reminders around that time.';
-            }
-            conflictMsg += ' Should I still create it?';
+            pendingConflicts = data.conflicts;
+            // Short, fast conflict message
+            var names = data.conflicts.map(function(c) { return c.title; }).join(', ');
+            var conflictMsg = 'You already have ' + names + ' around that time. Delete old or keep both?';
 
             showConflictConfirmation(conflictMsg, data.preview, data.conflicts);
           } else {
@@ -1410,6 +1483,10 @@
     function autoCreateReminder(preview, spokenMsg) {
       showVoiceStatus('processing', 'Creating...');
       document.getElementById('voiceConfirmArea').style.display = 'none';
+      document.getElementById('aiReminderInput').value = '';
+      // Hide delete-old button
+      var delBtn = document.getElementById('btnDeleteOld');
+      if (delBtn) delBtn.style.display = 'none';
 
       InnovateAPI.apiRequest('/reminders', {
         method: 'POST',
@@ -1422,19 +1499,19 @@
           priority: preview.priority || 'low'
         })
       }).then(function() {
-        var confirmSpoken = spokenMsg || 'Done! Reminder created.';
+        var confirmSpoken = spokenMsg || 'Done!';
         aiSpeak(confirmSpoken);
-        showVoiceStatus('success', 'Reminder created!');
+        showVoiceStatus('success', '"' + preview.title + '" created!');
         showToast('"' + preview.title + '" created!');
         loadAllReminders();
         loadCalendarDots();
         if (selectedDate) loadDayDetail(selectedDate);
-        setTimeout(function() { resetVoiceUI(); }, 3000);
+        setTimeout(function() { resetVoiceUI(); }, 2500);
       }).catch(function() {
-        showVoiceStatus('error', 'Failed to create. Try again.');
-        aiSpeak('Sorry, I couldn\'t create the reminder. Please try again.');
-        hideVoiceStatus(4000);
-        setTimeout(function() { resetVoiceUI(); }, 4000);
+        showVoiceStatus('error', 'Failed to create.');
+        aiSpeak('Failed to create. Try again.');
+        hideVoiceStatus(3000);
+        setTimeout(function() { resetVoiceUI(); }, 3000);
       });
     }
 
@@ -1448,7 +1525,7 @@
       summary += '<strong>"' + escapeHtml(preview.title) + '"</strong>';
       if (preview.reminder_date) summary += ' on <strong>' + formatDateLabel(preview.reminder_date) + '</strong>';
       if (preview.reminder_time) summary += ' at <strong>' + preview.reminder_time + '</strong>';
-      summary += '<br><span style="color: #f59e0b; font-size: 12px;"><i class="fas fa-clock"></i> Conflicts with: ';
+      summary += '<br><span style="color: #f59e0b; font-size: 12px;"><i class="fas fa-clock"></i> Conflicts: ';
       conflicts.forEach(function(c, idx) {
         if (idx > 0) summary += ', ';
         summary += '"' + escapeHtml(c.title) + '"';
@@ -1457,10 +1534,125 @@
 
       confirmText.innerHTML = summary;
       confirmArea.style.display = 'block';
+      // Show the "Delete old" button
+      var delBtn = document.getElementById('btnDeleteOld');
+      if (delBtn) delBtn.style.display = 'inline-flex';
+
       showVoiceStatus('confirming', '');
       document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
+      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say "create", "delete <name>", "edit", or "cancel"';
 
       aiSpeak(message, function() { startConfirmListening(); });
+    }
+
+    // ===== FIND CONFLICT BY NAME =====
+    function findConflictByName(name) {
+      if (!pendingConflicts) return null;
+      var lower = name.toLowerCase();
+      // Exact match first
+      var exact = pendingConflicts.find(function(c) { return c.title.toLowerCase() === lower; });
+      if (exact) return exact;
+      // Partial match
+      var partial = pendingConflicts.find(function(c) { return c.title.toLowerCase().indexOf(lower) !== -1 || lower.indexOf(c.title.toLowerCase()) !== -1; });
+      return partial || null;
+    }
+
+    // ===== CONFLICT DELETE FLOW =====
+    function startConflictDeleteFlow() {
+      if (!pendingConflicts || pendingConflicts.length === 0) {
+        voiceConfirmCreate();
+        return;
+      }
+
+      if (pendingConflicts.length === 1) {
+        // Only one conflict — delete it immediately then create
+        deleteReminderThenCreate(pendingConflicts[0].id, pendingConflicts[0].title);
+      } else {
+        // Multiple — short message, list names, start listening
+        var names = pendingConflicts.map(function(c, idx) { return (idx + 1) + ', ' + c.title; }).join('. ');
+        var listMsg = 'Which one? ' + names + '. Say the name, number, or all.';
+
+        showVoiceStatus('confirming', '');
+        document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> Which one to delete? ' + pendingConflicts.map(function(c) { return '"' + escapeHtml(c.title) + '"'; }).join(', ');
+        document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say name, number, "all", or "skip"';
+
+        aiSpeak(listMsg, function() {
+          voiceState = 'conflict-delete-listening';
+          startMic();
+        });
+      }
+    }
+
+    function handleConflictDeleteSelection(heard) {
+      if (!pendingConflicts || !pendingConflicts.length) { voiceConfirmCreate(); return; }
+
+      // Skip / cancel — just create without deleting
+      var skipWords = ['skip', 'none', 'never mind', 'cancel', 'no'];
+      if (skipWords.some(function(w) { return heard.indexOf(w) !== -1; })) {
+        voiceConfirmCreate();
+        return;
+      }
+
+      // "All" — delete everything then create
+      if (heard.indexOf('all') !== -1) {
+        showVoiceStatus('processing', 'Deleting all...');
+        var total = pendingConflicts.length;
+        var done = 0;
+        pendingConflicts.forEach(function(c) {
+          InnovateAPI.apiRequest('/reminders/' + c.id, { method: 'DELETE' }).then(function() {
+            done++;
+            if (done === total) {
+              showToast(total + ' reminders deleted');
+              loadAllReminders();
+              loadCalendarDots();
+              autoCreateReminder(pendingPreview, 'Deleted all and created your new reminder.');
+            }
+          }).catch(function() {
+            done++;
+            if (done === total) autoCreateReminder(pendingPreview, 'Created your new reminder.');
+          });
+        });
+        return;
+      }
+
+      // Try match by NAME first (most natural: "delete lunch")
+      var cleanHeard = heard.replace(/\b(delete|remove|the|my|old|number|reminder)\b/g, '').trim();
+      if (cleanHeard.length > 1) {
+        var nameMatch = findConflictByName(cleanHeard);
+        if (nameMatch) {
+          deleteReminderThenCreate(nameMatch.id, nameMatch.title);
+          return;
+        }
+      }
+
+      // Try number
+      var numWords = { one: 1, two: 2, three: 3, four: 4, five: 5, first: 1, second: 2, third: 3 };
+      var num = parseInt(heard);
+      if (isNaN(num)) {
+        Object.keys(numWords).forEach(function(w) { if (heard.indexOf(w) !== -1) num = numWords[w]; });
+      }
+
+      if (!isNaN(num) && num >= 1 && num <= pendingConflicts.length) {
+        deleteReminderThenCreate(pendingConflicts[num - 1].id, pendingConflicts[num - 1].title);
+      } else {
+        aiSpeak('Which one? Say the name or number.', function() {
+          voiceState = 'conflict-delete-listening';
+          startMic();
+        });
+      }
+    }
+
+    function deleteReminderThenCreate(conflictId, conflictTitle) {
+      showVoiceStatus('processing', 'Deleting "' + conflictTitle + '"...');
+      document.getElementById('voiceConfirmArea').style.display = 'none';
+      InnovateAPI.apiRequest('/reminders/' + conflictId, { method: 'DELETE' }).then(function() {
+        showToast('"' + conflictTitle + '" deleted');
+        loadAllReminders();
+        loadCalendarDots();
+        autoCreateReminder(pendingPreview, 'Deleted "' + conflictTitle + '", created your new reminder.');
+      }).catch(function() {
+        autoCreateReminder(pendingPreview, 'Created your new reminder.');
+      });
     }
 
     // ===== SHOW NON-CONFLICT CONFIRMATION (for needs-info resolved) =====
@@ -1610,12 +1802,14 @@
     function voiceCancelCreate() {
       stopRecording();
       if (speechSynth) speechSynth.cancel();
-      aiSpeak('Cancelled.');
       showVoiceStatus('error', 'Cancelled');
       document.getElementById('aiReminderInput').value = '';
       pendingPreview = null;
       pendingDeleteMatches = null;
-      setTimeout(function() { resetVoiceUI(); }, 1500);
+      pendingConflicts = null;
+      var delBtn = document.getElementById('btnDeleteOld');
+      if (delBtn) delBtn.style.display = 'none';
+      setTimeout(function() { resetVoiceUI(); }, 1000);
     }
 
     // ===== VOICE UI HELPERS =====
