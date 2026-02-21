@@ -1105,12 +1105,14 @@
     }
 
     // ===== AI SPEAK (Human-like TTS) =====
+    var aiSpeaking = false;
     function aiSpeak(text, onDone) {
       if (!speechSynth) { if (onDone) onDone(); return; }
       speechSynth.cancel();
+      aiSpeaking = true;
 
       var utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95; // slightly slower = more natural
+      utterance.rate = 1.05; // slightly faster for quick response
       utterance.pitch = voiceGender === 'female' ? 1.05 : 0.9;
       utterance.volume = 1.0;
       utterance.lang = 'en-US';
@@ -1118,9 +1120,14 @@
       var preferred = getPreferredVoice();
       if (preferred) utterance.voice = preferred;
 
-      utterance.onend = function() { if (onDone) onDone(); };
-      utterance.onerror = function() { if (onDone) onDone(); };
+      utterance.onend = function() { aiSpeaking = false; if (onDone) onDone(); };
+      utterance.onerror = function() { aiSpeaking = false; if (onDone) onDone(); };
       speechSynth.speak(utterance);
+    }
+
+    function stopAiSpeech() {
+      if (speechSynth) speechSynth.cancel();
+      aiSpeaking = false;
     }
 
     function initSpeechRecognition() {
@@ -1169,6 +1176,8 @@
         if (voiceState === 'confirm-listening') {
           var heard = (finalParts + interim).toLowerCase().trim();
           if (heard && finalParts) {
+            // User spoke — immediately cancel AI speech if still talking
+            stopAiSpeech();
             stopRecording();
 
             var noWords = ['no', 'nope', 'cancel', 'stop', 'don\'t', 'never mind', 'discard'];
@@ -1209,6 +1218,7 @@
         if (voiceState === 'conflict-delete-listening') {
           var cdheard = (finalParts + interim).toLowerCase().trim();
           if (cdheard && finalParts) {
+            stopAiSpeech();
             stopRecording();
             handleConflictDeleteSelection(cdheard);
           }
@@ -1219,6 +1229,7 @@
         if (voiceState === 'delete-listening') {
           var dheard = (finalParts + interim).toLowerCase().trim();
           if (dheard && finalParts) {
+            stopAiSpeech();
             stopRecording();
             handleDeleteSelection(dheard);
           }
@@ -1227,6 +1238,7 @@
 
         // ---- NEEDS-INFO LISTENING ----
         if (voiceState === 'needs-info-listening') {
+          if (aiSpeaking) stopAiSpeech();
           if (finalParts) voiceFullTranscript += (voiceFullTranscript ? ' ' : '') + finalParts;
           var input = document.getElementById('aiReminderInput');
           input.value = voiceFullTranscript + (interim ? ' ' + interim : '');
@@ -1425,9 +1437,8 @@
           showVoiceStatus('confirming', '');
           document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(question);
 
-          aiSpeak(question, function() {
-            startNeedsInfoListening();
-          });
+          aiSpeak(question);
+          startNeedsInfoListening();
         }
 
         // ---- DELETE: Found matches to delete ----
@@ -1450,9 +1461,8 @@
             showVoiceStatus('confirming', '');
             document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(listMsg);
 
-            aiSpeak(listMsg, function() {
-              startDeleteListening();
-            });
+            startDeleteListening();
+            aiSpeak(listMsg);
           }
         }
 
@@ -1542,7 +1552,9 @@
       document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
       document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say "create", "delete <name>", "edit", or "cancel"';
 
-      aiSpeak(message, function() { startConfirmListening(); });
+      // Start listening IMMEDIATELY while AI speaks (interruptible)
+      startConfirmListening();
+      aiSpeak(message);
     }
 
     // ===== FIND CONFLICT BY NAME =====
@@ -1672,7 +1684,9 @@
       showVoiceStatus('confirming', '');
       document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
 
-      aiSpeak(message, function() { startConfirmListening(); });
+      // Start listening IMMEDIATELY while AI speaks (interruptible)
+      startConfirmListening();
+      aiSpeak(message);
     }
 
     // ===== LISTENING MODES =====
@@ -1776,13 +1790,13 @@
     function voiceConfirmCreate() {
       if (!pendingPreview) return;
       stopRecording();
-      if (speechSynth) speechSynth.cancel();
-      autoCreateReminder(pendingPreview, 'Done! Your reminder has been created.');
+      stopAiSpeech();
+      autoCreateReminder(pendingPreview, 'Done!');
     }
 
     function voiceEditBeforeCreate() {
       stopRecording();
-      if (speechSynth) speechSynth.cancel();
+      stopAiSpeech();
       if (!pendingPreview) { resetVoiceUI(); return; }
       editingReminderId = null;
       document.getElementById('modalTitle').innerHTML = '<i class="fas fa-bell" style="color: var(--ig-blue);"></i> New Reminder';
@@ -1801,7 +1815,7 @@
 
     function voiceCancelCreate() {
       stopRecording();
-      if (speechSynth) speechSynth.cancel();
+      stopAiSpeech();
       showVoiceStatus('error', 'Cancelled');
       document.getElementById('aiReminderInput').value = '';
       pendingPreview = null;
