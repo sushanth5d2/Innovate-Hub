@@ -1204,6 +1204,63 @@ const createTables = () => {
       )
     `);
 
+    // ==================== Shared Tasks (unified for user + group contexts) ====================
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shared_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        context_type TEXT NOT NULL DEFAULT 'user',
+        context_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        priority TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'todo',
+        due_date DATETIME,
+        assignees TEXT,
+        progress INTEGER DEFAULT 0,
+        subtasks TEXT,
+        tags TEXT,
+        source_type TEXT,
+        source_ref TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // ==================== Shared Notes (unified for user + group contexts) ====================
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shared_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        context_type TEXT NOT NULL DEFAULT 'user',
+        context_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content_md TEXT,
+        is_pinned BOOLEAN DEFAULT 0,
+        is_locked BOOLEAN DEFAULT 0,
+        is_archived BOOLEAN DEFAULT 0,
+        color TEXT DEFAULT '#ffffff',
+        created_by INTEGER NOT NULL,
+        updated_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS shared_note_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER NOT NULL,
+        content_md TEXT,
+        created_by INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (note_id) REFERENCES shared_notes(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('SQLite tables created successfully');
   });
 };

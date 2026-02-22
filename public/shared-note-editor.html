@@ -1,0 +1,3507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note Editor</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <!-- Quill Rich Text Editor -->
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <style>
+    /* ===== UI Theme Variables ===== */
+    :root {
+      --note-bg: #0a0a0a;
+      --note-surface: #141414;
+      --note-surface-2: #1c1c1e;
+      --note-border: rgba(255,255,255,0.08);
+      --note-text: #f5f5f7;
+      --note-text-secondary: #86868b;
+      --note-accent: #6c5ce7;
+      --note-accent-soft: rgba(108,92,231,0.12);
+      --note-accent-glow: rgba(108,92,231,0.25);
+      --note-success: #00b894;
+      --note-danger: #ff3b30;
+      --note-warning: #fdcb6e;
+      --note-radius: 14px;
+      --note-header-h: 56px;
+    }
+    
+    /* Old UI theme (classic) */
+    body.ui-classic {
+      --note-bg: var(--ig-primary-background);
+      --note-surface: var(--ig-secondary-background);
+      --note-surface-2: var(--ig-secondary-background);
+      --note-border: var(--ig-border);
+      --note-text: var(--ig-primary-text);
+      --note-text-secondary: var(--ig-secondary-text);
+      --note-accent: var(--ig-blue);
+      --note-accent-soft: rgba(0,149,246,0.1);
+      --note-accent-glow: rgba(0,149,246,0.2);
+      --note-radius: 8px;
+    }
+    body.ui-classic .editor-header { background: var(--ig-primary-background); border-bottom: 1px solid var(--ig-border); }
+    body.ui-classic .editor-header::before { display: none; }
+    body.ui-classic .header-left { gap: 8px; }
+    body.ui-classic .header-brand { font-size: 16px; background: none; -webkit-text-fill-color: var(--ig-primary-text); }
+    body.ui-classic .header-actions .action-btn { border-radius: 8px; backdrop-filter: none; background: var(--ig-secondary-background); }
+    body.ui-classic .editor-container { padding: 20px; }
+    body.ui-classic .note-title-input { font-size: 28px; }
+    body.ui-classic .status-bar { border-radius: 8px; }
+
+    body { 
+      padding: 0; margin: 0;
+      background: var(--note-bg);
+      color: var(--note-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* ===== Header ===== */
+    .editor-header {
+      position: sticky;
+      top: 0;
+      height: var(--note-header-h);
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(20px) saturate(1.8);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      border-bottom: 1px solid var(--note-border);
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+    .editor-header::before {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--note-accent), transparent);
+      opacity: 0.3;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-brand {
+      font-size: 17px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .action-btn {
+      padding: 7px 14px;
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      background: var(--note-surface);
+      color: var(--note-text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      backdrop-filter: blur(10px);
+    }
+    .action-btn:hover { background: var(--note-surface-2); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
+    .action-btn:active { transform: scale(0.97); }
+    .action-btn.primary {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      border: none;
+      color: white;
+      font-weight: 600;
+    }
+    .action-btn.primary:hover { box-shadow: 0 4px 15px var(--note-accent-glow); }
+    .action-btn.save-btn {
+      background: linear-gradient(135deg, #00b894, #55efc4);
+      border: none;
+      color: #000;
+      font-weight: 700;
+    }
+    .action-btn.save-btn:hover { box-shadow: 0 4px 15px rgba(0,184,148,0.3); }
+    .action-btn.voice-btn.recording {
+      background: #ff3b30;
+      color: white;
+      border-color: #ff3b30;
+      animation: pulse-rec 1.5s infinite;
+    }
+    @keyframes pulse-rec {
+      0%,100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.3); }
+      50% { box-shadow: 0 0 0 6px rgba(255,59,48,0); }
+    }
+    
+    /* UI Toggle */
+    .ui-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 4px;
+    }
+    .ui-toggle-label {
+      font-size: 10px;
+      color: var(--note-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .ui-toggle-switch {
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: var(--note-surface-2);
+      border: 1px solid var(--note-border);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .ui-toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--note-text-secondary);
+      transition: all 0.3s;
+    }
+    .ui-toggle-switch.active {
+      background: var(--note-accent);
+      border-color: var(--note-accent);
+    }
+    .ui-toggle-switch.active::after {
+      left: 18px;
+      background: white;
+    }
+
+    /* ===== Editor Container ===== */
+    .editor-container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 24px 28px 80px;
+      min-height: calc(100vh - var(--note-header-h) - 60px);
+    }
+    
+    .note-title-input {
+      width: 100%;
+      border: none;
+      outline: none;
+      font-size: 36px;
+      font-weight: 800;
+      padding: 20px 0 8px;
+      background: transparent;
+      color: var(--note-text);
+      font-family: inherit;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+    .note-title-input::placeholder { color: var(--note-text-secondary); opacity: 0.5; }
+    
+    .editor-wrapper {
+      background: transparent;
+      min-height: 400px;
+    }
+    
+    /* ===== Quill Theme Override ===== */
+    .ql-toolbar.ql-snow {
+      border: none;
+      border-bottom: 1px solid var(--note-border);
+      padding: 10px 0;
+      background: transparent;
+      position: sticky;
+      top: var(--note-header-h);
+      z-index: 50;
+      backdrop-filter: blur(12px);
+    }
+    .ql-container.ql-snow {
+      border: none;
+      font-size: 16px;
+      line-height: 1.75;
+    }
+    .ql-editor {
+      min-height: 350px;
+      padding: 20px 0;
+      color: var(--note-text);
+    }
+    .ql-editor.ql-blank::before {
+      color: var(--note-text-secondary);
+      font-style: normal;
+      opacity: 0.4;
+    }
+    .ql-snow .ql-stroke { stroke: var(--note-text-secondary); }
+    .ql-snow .ql-fill { fill: var(--note-text-secondary); }
+    .ql-snow .ql-picker-label { color: var(--note-text-secondary); }
+    .ql-snow .ql-picker-options { background: var(--note-surface); border-color: var(--note-border); }
+    .ql-snow .ql-picker-item { color: var(--note-text); }
+    .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-label { border-color: var(--note-border); color: var(--note-text); }
+    
+    /* ===== Status Bar ===== */
+    .status-bar {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      z-index: 90;
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--note-border);
+      transition: all 0.3s ease;
+      max-width: 90vw;
+    }
+    .status-bar.success {
+      background: rgba(0,184,148,0.15);
+      color: var(--note-success);
+      border-color: rgba(0,184,148,0.2);
+    }
+    .status-bar.error {
+      background: rgba(255,59,48,0.15);
+      color: var(--note-danger);
+      border-color: rgba(255,59,48,0.2);
+    }
+    .status-bar.info {
+      background: var(--note-surface);
+      color: var(--note-text-secondary);
+    }
+    
+    /* Legacy btn classes */
+    .btn { padding: 7px 14px; border: 1px solid var(--note-border); border-radius: 10px; background: var(--note-surface); color: var(--note-text); cursor: pointer; font-weight: 500; font-size: 13px; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border: none; }
+    .btn-primary:hover { box-shadow: 0 4px 15px var(--note-accent-glow); }
+    .btn-secondary { background: var(--note-surface); color: var(--note-text); border: 1px solid var(--note-border); }
+    .btn-secondary:hover { background: var(--note-surface-2); }
+
+    .status { margin-top: 12px; padding: 12px; border-radius: var(--note-radius); font-size: 14px; text-align: center; }
+    .status.success { background: rgba(0,184,148,0.1); color: var(--note-success); }
+    .status.error { background: rgba(255,59,48,0.1); color: var(--note-danger); }
+    .status.info { background: var(--note-accent-soft); color: var(--note-accent); }
+
+    /* ===== AI Panel Styles ===== */
+    .ai-btn {
+      background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ai-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px var(--note-accent-glow); }
+    .ai-btn:active { transform: scale(0.97); }
+
+    .voice-btn {
+      background: var(--note-surface);
+      color: var(--note-text);
+      border: 1px solid var(--note-border);
+      padding: 7px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .voice-btn:hover { background: var(--note-surface-2); border-color: rgba(255,255,255,0.15); }
+    .voice-btn.recording {
+      background: var(--note-danger);
+      color: white;
+      border-color: var(--note-danger);
+      animation: pulse-rec 1.5s infinite;
+    }
+
+    .ai-panel-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 9998;
+      display: none;
+    }
+    .ai-panel-overlay.show { display: block; }
+
+    .ai-panel {
+      position: fixed;
+      right: -420px;
+      top: 0;
+      bottom: 0;
+      width: 400px;
+      max-width: 90vw;
+      background: var(--note-bg);
+      border-left: 1px solid var(--note-border);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: -8px 0 40px rgba(0,0,0,0.3);
+    }
+    .ai-panel.open { right: 0; }
+
+    .ai-panel-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--note-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(20,20,20,0.6);
+      backdrop-filter: blur(12px);
+    }
+    .ai-panel-header h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .ai-panel-close {
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--note-text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .ai-panel-close:hover { background: var(--note-surface-2); color: var(--note-text); }
+
+    .ai-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .ai-panel-body::-webkit-scrollbar { width: 4px; }
+    .ai-panel-body::-webkit-scrollbar-track { background: transparent; }
+    .ai-panel-body::-webkit-scrollbar-thumb { background: var(--note-border); border-radius: 4px; }
+
+    .ai-section { margin-bottom: 24px; }
+    .ai-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--note-text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .ai-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .ai-action-btn {
+      padding: 10px 12px;
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      background: var(--note-surface);
+      color: var(--note-text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .ai-action-btn:hover {
+      border-color: var(--note-accent);
+      background: var(--note-accent-soft);
+      transform: translateY(-1px);
+    }
+    .ai-action-btn:active { transform: scale(0.97); }
+    .ai-action-btn .ai-icon { font-size: 16px; flex-shrink: 0; }
+    .ai-action-btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    .ai-custom-prompt { margin-top: 12px; }
+    .ai-custom-prompt textarea {
+      width: 100%;
+      min-height: 70px;
+      padding: 12px;
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      background: var(--note-surface);
+      color: var(--note-text);
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+    .ai-custom-prompt textarea:focus { border-color: var(--note-accent); box-shadow: 0 0 0 3px var(--note-accent-soft); }
+    .ai-custom-prompt .send-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .ai-custom-prompt .send-btn:hover { box-shadow: 0 4px 15px var(--note-accent-glow); }
+
+    .ai-translate-row { display: flex; gap: 8px; margin-top: 8px; }
+    .ai-translate-row select {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      background: var(--note-surface);
+      color: var(--note-text);
+      font-size: 13px;
+    }
+    .ai-translate-row button {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .ai-result-area {
+      display: none;
+      margin-top: 16px;
+      border: 1px solid var(--note-border);
+      border-radius: var(--note-radius);
+      overflow: hidden;
+      background: var(--note-surface);
+    }
+    .ai-result-area.show { display: block; }
+    .ai-result-header {
+      padding: 10px 14px;
+      background: var(--note-accent-soft);
+      border-bottom: 1px solid var(--note-border);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--note-text);
+    }
+    .ai-result-content {
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.7;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: var(--note-text);
+    }
+    .ai-result-actions {
+      padding: 10px 14px;
+      border-top: 1px solid var(--note-border);
+      display: flex;
+      gap: 8px;
+    }
+    .ai-result-actions button {
+      flex: 1;
+      padding: 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--note-border);
+      background: var(--note-surface-2);
+      color: var(--note-text);
+      transition: all 0.2s;
+    }
+    .ai-result-actions button:hover { background: var(--note-surface); }
+    .ai-result-actions .insert-btn {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      border: none;
+    }
+
+    .ai-loading { display: none; padding: 20px; text-align: center; }
+    .ai-loading.show { display: block; }
+    .ai-loading .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--note-border);
+      border-top-color: var(--note-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-loading-text { font-size: 13px; color: var(--note-text-secondary); }
+
+    /* ===== Voice Indicator ===== */
+    .voice-indicator {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: 20px;
+      padding: 18px 28px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+      z-index: 9999;
+      text-align: center;
+      min-width: 280px;
+      backdrop-filter: blur(20px);
+    }
+    .voice-indicator.show { display: block; }
+    .voice-indicator .voice-waves {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .voice-indicator .wave-bar {
+      width: 4px;
+      height: 20px;
+      background: var(--note-danger);
+      border-radius: 2px;
+      animation: wave 0.8s ease-in-out infinite;
+    }
+    .voice-indicator .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+    .voice-indicator .wave-bar:nth-child(3) { animation-delay: 0.2s; height: 28px; }
+    .voice-indicator .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+    .voice-indicator .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1.2); } }
+    .voice-text-preview {
+      font-size: 14px;
+      color: var(--note-text);
+      max-height: 60px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+    .voice-controls { display: flex; gap: 8px; justify-content: center; }
+    .voice-controls button {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+    }
+    .voice-stop-btn { background: var(--note-danger); color: white; }
+    .voice-lang-select {
+      padding: 6px 10px;
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      background: var(--note-surface);
+      color: var(--note-text);
+      font-size: 12px;
+    }
+
+    .selection-hint {
+      font-size: 11px;
+      color: var(--note-text-secondary);
+      padding: 8px 0 4px;
+      font-style: italic;
+    }
+
+    /* ===== Mobile Responsive ===== */
+    @media (max-width: 600px) {
+      .ai-panel { width: 100%; right: -100%; }
+      .editor-header { padding: 0 10px; height: 48px; }
+      .header-actions { gap: 4px; }
+      .action-btn { padding: 5px 8px; font-size: 11px; border-radius: 8px; }
+      .editor-container { padding: 12px 14px 80px; }
+      .note-title-input { font-size: 24px; padding: 12px 0 4px; }
+      .ql-container.ql-snow { font-size: 15px; }
+      .ql-editor { min-height: 250px; padding: 12px 0; }
+      .ql-toolbar.ql-snow { padding: 6px 0; overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; }
+      .inline-ai-toolbar { max-width: 95vw; overflow-x: auto; padding: 4px 2px; }
+      .inline-ai-toolbar button { padding: 5px 7px; font-size: 11px; }
+      .voice-indicator { min-width: 90vw; bottom: 60px; }
+      .ghost-hint { bottom: 40px; right: 10px; font-size: 10px; }
+      .selection-ai-toolbar { max-width: 95vw; }
+      .selection-ai-toolbar button { padding: 5px 8px; font-size: 11px; }
+      .ai-inline-suggestion { max-height: 200px; padding: 8px 10px; }
+      .suggestion-controls { flex-wrap: wrap; }
+      .voice-recordings-section { padding: 0 4px; }
+      .voice-recording-card { padding: 10px 12px; }
+      .ui-toggle-label { display: none; }
+      .header-brand { font-size: 14px; }
+    }
+
+    /* ===== Selection AI Toolbar ===== */
+    .selection-ai-toolbar {
+      position: fixed;
+      display: none;
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: 12px;
+      padding: 4px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      z-index: 250;
+      white-space: nowrap;
+      animation: fadeInUp 0.15s ease;
+      backdrop-filter: blur(12px);
+    }
+    .selection-ai-toolbar.show { display: flex; align-items: center; gap: 2px; }
+    .selection-ai-toolbar button {
+      background: none;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--note-text);
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .selection-ai-toolbar button:hover {
+      background: var(--note-accent-soft);
+      color: var(--note-accent);
+    }
+
+    /* ===== Voice Recording Cards ===== */
+    .voice-recordings-section {
+      margin-top: 20px;
+      padding: 0;
+    }
+    .voice-recordings-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--note-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .voice-recording-card {
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: var(--note-radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+    .voice-recording-card:hover { border-color: var(--note-accent); box-shadow: 0 2px 12px var(--note-accent-soft); }
+    .recording-top-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .recording-play-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .recording-play-btn:hover { transform: scale(1.08); box-shadow: 0 4px 12px var(--note-accent-glow); }
+    .recording-play-btn.playing { background: var(--note-danger); }
+    .recording-info { flex: 1; min-width: 0; }
+    .recording-name { font-size: 14px; font-weight: 600; color: var(--note-text); }
+    .recording-meta { font-size: 11px; color: var(--note-text-secondary); display: flex; gap: 8px; }
+    .recording-waveform {
+      height: 36px;
+      background: var(--note-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .recording-waveform-bars {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      gap: 1px;
+      padding: 4px 2px;
+    }
+    .recording-waveform-bars .bar {
+      flex: 1;
+      background: rgba(255,255,255,0.12);
+      border-radius: 2px;
+      min-width: 2px;
+      transition: background 0.1s;
+    }
+    .recording-waveform-bars .bar.active { background: var(--note-accent); }
+    .recording-waveform-progress {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      background: var(--note-accent-soft);
+      transition: width 0.1s linear;
+    }
+    .recording-transcript { margin-top: 6px; }
+    .transcript-toggle {
+      background: none;
+      border: none;
+      color: var(--note-accent);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .transcript-toggle:hover { text-decoration: underline; }
+    .transcript-content {
+      display: none;
+      margin-top: 6px;
+      padding: 10px 12px;
+      background: var(--note-bg);
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--note-text);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .transcript-content.show { display: block; }
+    .transcript-word {
+      transition: background 0.15s, color 0.15s;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+    .transcript-word.highlight {
+      background: var(--note-accent-soft);
+      color: var(--note-accent);
+      font-weight: 600;
+    }
+    .recording-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .recording-actions button {
+      flex: 1;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--note-border);
+      background: var(--note-surface-2);
+      color: var(--note-text);
+      transition: all 0.15s;
+    }
+    .recording-actions button:hover { background: var(--note-surface); }
+    .recording-actions .ai-analyze-btn {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      border: none;
+    }
+
+    /* ===== Inline AI Toolbar ===== */
+    .inline-ai-toolbar {
+      position: absolute;
+      display: none;
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: 12px;
+      padding: 4px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      z-index: 200;
+      white-space: nowrap;
+      animation: fadeInUp 0.15s ease;
+      backdrop-filter: blur(12px);
+    }
+    .inline-ai-toolbar.show { display: flex; align-items: center; gap: 2px; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .inline-ai-toolbar button {
+      background: none;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--note-text);
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .inline-ai-toolbar button:hover {
+      background: var(--note-accent-soft);
+      color: var(--note-accent);
+    }
+    .inline-ai-toolbar .divider {
+      width: 1px;
+      height: 20px;
+      background: var(--note-border);
+      margin: 0 2px;
+    }
+
+    /* ===== Ghost Text ===== */
+    .ghost-text-overlay {
+      position: absolute;
+      pointer-events: none;
+      color: var(--note-text-secondary);
+      opacity: 0.35;
+      font-style: italic;
+      font-size: 16px;
+      line-height: 1.75;
+      z-index: 50;
+      white-space: pre-wrap;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .ghost-hint {
+      position: fixed;
+      bottom: 60px;
+      right: 20px;
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--note-text-secondary);
+      display: none;
+      z-index: 100;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      backdrop-filter: blur(10px);
+    }
+    .ghost-hint.show { display: block; }
+    .ghost-hint kbd {
+      background: var(--note-surface-2);
+      border: 1px solid var(--note-border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+    }
+
+    /* ===== Math Result ===== */
+    .math-result-badge {
+      display: inline-block;
+      background: rgba(0,184,148,0.15);
+      color: var(--note-success);
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 8px;
+      font-size: inherit;
+      animation: fadeInUp 0.2s ease;
+      cursor: pointer;
+      position: absolute;
+      z-index: 60;
+      white-space: nowrap;
+      pointer-events: auto;
+      box-shadow: 0 2px 8px rgba(0,184,148,0.15);
+    }
+    .math-result-badge:hover { background: rgba(0,184,148,0.25); transform: scale(1.05); }
+
+    /* ===== Link Preview ===== */
+    .link-preview-card {
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: var(--note-radius);
+      padding: 12px 14px;
+      margin: 6px 0;
+      font-size: 13px;
+      animation: slideInSuggestion 0.2s ease;
+    }
+    .link-preview-card .link-url {
+      color: var(--note-accent);
+      font-size: 11px;
+      word-break: break-all;
+      margin-bottom: 4px;
+    }
+    .link-preview-card .link-summary { color: var(--note-text); line-height: 1.6; }
+    .link-preview-card .link-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .link-preview-card .link-actions button {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--note-border);
+      background: var(--note-surface-2);
+      color: var(--note-text);
+      transition: all 0.15s;
+    }
+    .link-preview-card .link-actions button:hover { background: var(--note-accent-soft); }
+
+    /* ===== Slash Menu ===== */
+    .slash-menu {
+      position: absolute;
+      display: none;
+      background: var(--note-surface);
+      border: 1px solid var(--note-border);
+      border-radius: var(--note-radius);
+      padding: 6px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+      z-index: 300;
+      width: 280px;
+      max-height: 340px;
+      overflow-y: auto;
+      animation: fadeInUp 0.15s ease;
+      backdrop-filter: blur(20px);
+    }
+    .slash-menu.show { display: block; }
+    .slash-menu-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.1s;
+    }
+    .slash-menu-item:hover, .slash-menu-item.active {
+      background: var(--note-accent-soft);
+    }
+    .slash-menu-item .slash-icon { font-size: 18px; flex-shrink: 0; }
+    .slash-menu-item .slash-label { font-size: 13px; font-weight: 600; color: var(--note-text); }
+    .slash-menu-item .slash-desc { font-size: 11px; color: var(--note-text-secondary); }
+
+    /* ===== Inline Suggestion ===== */
+    #suggestion-container { position: relative; z-index: 150; }
+    .ai-inline-suggestion {
+      position: relative;
+      background: var(--note-accent-soft);
+      border-left: 3px solid var(--note-accent);
+      padding: 12px 14px;
+      margin: 6px 0;
+      border-radius: 0 var(--note-radius) var(--note-radius) 0;
+      animation: slideInSuggestion 0.25s ease;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    @keyframes slideInSuggestion { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    .ai-inline-suggestion .suggestion-text {
+      font-size: 14px;
+      color: var(--note-accent);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+    .ai-inline-suggestion .suggestion-controls { display: flex; gap: 6px; align-items: center; }
+    .ai-inline-suggestion .suggestion-controls button {
+      padding: 5px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .suggestion-accept { background: var(--note-success); color: white; }
+    .suggestion-accept:hover { filter: brightness(1.1); }
+    .suggestion-reject {
+      background: var(--note-surface);
+      color: var(--note-text);
+      border: 1px solid var(--note-border) !important;
+    }
+    .suggestion-reject:hover { background: var(--note-surface-2); }
+    .suggestion-modify { background: none; color: var(--note-accent); text-decoration: underline; }
+    .suggestion-label { font-size: 11px; color: var(--note-text-secondary); font-style: italic; }
+
+    /* ===== Custom Scrollbars ===== */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+  </style>
+</head>
+<body>
+  <div class="editor-header">
+    <div class="header-left">
+      <div class="header-brand">✦ Notes</div>
+    </div>
+    <div class="header-actions">
+      <div class="ui-toggle" id="ui-toggle">
+        <span class="ui-toggle-label">Modern</span>
+        <div class="ui-toggle-switch active" id="ui-toggle-switch" title="Switch between Modern and Classic UI"></div>
+      </div>
+      <button class="action-btn" id="templates-btn" title="Choose template">📄 Template</button>
+      <button class="action-btn" id="upload-image-btn" title="Upload image">🖼️</button>
+      <button class="action-btn" id="upload-file-btn" title="Upload file">📎</button>
+      <button class="action-btn voice-btn" id="voice-btn" title="Voice dictation">🎤 Voice</button>
+      <button class="action-btn primary" id="ai-btn" title="AI Writing Assistant">✨ AI</button>
+      <button class="action-btn" id="back-btn">✕</button>
+      <button class="action-btn save-btn" id="save-btn">💾 Save</button>
+    </div>
+  </div>
+
+  <div class="editor-container">
+    <input id="note-title" class="note-title-input" type="text" placeholder="Note Title">
+    
+    <div class="editor-wrapper">
+      <div id="editor"></div>
+    </div>
+    
+    <div class="status-bar info" id="status">Loading note...</div>
+    
+    <!-- AI Inline Suggestion (outside Quill to avoid DOM stripping) -->
+    <div id="suggestion-container" style="display:none;"></div>
+    
+    <!-- Link Preview Area -->
+    <div id="link-preview-container" style="display:none;"></div>
+
+    <!-- Voice Recordings Section -->
+    <div class="voice-recordings-section" id="voice-recordings-section" style="display:none;">
+      <div class="voice-recordings-header">🎙️ Voice Recordings</div>
+      <div id="voice-recordings-list"></div>
+    </div>
+  </div>
+
+  <!-- AI Panel Overlay -->
+  <div class="ai-panel-overlay" id="ai-overlay"></div>
+
+  <!-- AI Side Panel -->
+  <div class="ai-panel" id="ai-panel">
+    <div class="ai-panel-header">
+      <h3>✨ AI Writing Assistant</h3>
+      <button class="ai-panel-close" id="ai-panel-close">✕</button>
+    </div>
+    <div class="ai-panel-body">
+      <div class="selection-hint" id="ai-selection-hint">💡 Select text in editor first, or AI will use the full note.</div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">✍️ Writing</div>
+        <div class="ai-actions-grid">
+          <button class="ai-action-btn" onclick="runAI('continue')"><span class="ai-icon">➡️</span> Continue Writing</button>
+          <button class="ai-action-btn" onclick="runAI('expand')"><span class="ai-icon">📝</span> Expand</button>
+          <button class="ai-action-btn" onclick="runAI('rewrite')"><span class="ai-icon">✍️</span> Rewrite</button>
+          <button class="ai-action-btn" onclick="runAI('brainstorm')"><span class="ai-icon">💡</span> Brainstorm</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">🔧 Editing</div>
+        <div class="ai-actions-grid">
+          <button class="ai-action-btn" onclick="runAI('grammar')"><span class="ai-icon">🔤</span> Fix Grammar</button>
+          <button class="ai-action-btn" onclick="runAI('summarize')"><span class="ai-icon">📋</span> Summarize</button>
+          <button class="ai-action-btn" onclick="runAI('bullet_points')"><span class="ai-icon">📌</span> Bullet Points</button>
+          <button class="ai-action-btn" onclick="runAI('outline')"><span class="ai-icon">🗂️</span> Make Outline</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">🎭 Tone & Style</div>
+        <div class="ai-actions-grid">
+          <button class="ai-action-btn" onclick="runAI('formal')"><span class="ai-icon">👔</span> Formal</button>
+          <button class="ai-action-btn" onclick="runAI('casual')"><span class="ai-icon">😊</span> Casual</button>
+          <button class="ai-action-btn" onclick="runAI('explain')"><span class="ai-icon">📖</span> Simplify</button>
+          <button class="ai-action-btn" onclick="runAI('eli5')"><span class="ai-icon">👶</span> ELI5</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">📊 Extract & Format</div>
+        <div class="ai-actions-grid">
+          <button class="ai-action-btn" onclick="runAI('key_takeaways')"><span class="ai-icon">🔑</span> Key Takeaways</button>
+          <button class="ai-action-btn" onclick="runAI('action_items')"><span class="ai-icon">✅</span> Action Items</button>
+          <button class="ai-action-btn" onclick="runAI('title_suggest')"><span class="ai-icon">🏷️</span> Suggest Titles</button>
+          <button class="ai-action-btn" onclick="runAI('meeting_notes')"><span class="ai-icon">📋</span> Meeting Format</button>
+          <button class="ai-action-btn" onclick="runAI('study_notes')"><span class="ai-icon">📚</span> Study Notes</button>
+          <button class="ai-action-btn" onclick="runAI('email_draft')"><span class="ai-icon">✉️</span> Email Draft</button>
+          <button class="ai-action-btn" onclick="runAI('pros_cons')"><span class="ai-icon">⚖️</span> Pros & Cons</button>
+          <button class="ai-action-btn" onclick="runAI('poem')"><span class="ai-icon">🎨</span> Make it a Poem</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">🌐 Translate</div>
+        <div class="ai-translate-row">
+          <select id="ai-translate-lang">
+            <option value="English">English</option>
+            <option value="Spanish">Spanish</option>
+            <option value="French">French</option>
+            <option value="German">German</option>
+            <option value="Portuguese">Portuguese</option>
+            <option value="Italian">Italian</option>
+            <option value="Chinese">Chinese</option>
+            <option value="Japanese">Japanese</option>
+            <option value="Korean">Korean</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Arabic">Arabic</option>
+            <option value="Russian">Russian</option>
+          </select>
+          <button onclick="runAI('translate')">Translate</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-title">💬 Custom Prompt</div>
+        <div class="ai-custom-prompt">
+          <textarea id="ai-custom-prompt" placeholder="Ask AI anything about your note... e.g., 'Make this more persuasive' or 'Add statistics to support these claims'"></textarea>
+          <button class="send-btn" onclick="runAI('custom')">🚀 Send to AI</button>
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div class="ai-loading" id="ai-loading">
+        <div class="spinner"></div>
+        <div class="ai-loading-text" id="ai-loading-text">AI is thinking...</div>
+      </div>
+
+      <!-- Result Area -->
+      <div class="ai-result-area" id="ai-result-area">
+        <div class="ai-result-header">
+          <span id="ai-result-label">AI Result</span>
+          <button onclick="copyAIResult()" style="background:none;border:none;cursor:pointer;font-size:14px;" title="Copy">📋</button>
+        </div>
+        <div class="ai-result-content" id="ai-result-content"></div>
+        <div class="ai-result-actions">
+          <button onclick="insertAIResult('replace')" class="insert-btn">Replace Selected</button>
+          <button onclick="insertAIResult('append')">Insert Below</button>
+          <button onclick="insertAIResult('cursor')">Insert at Cursor</button>
+          <button onclick="dismissAIResult()">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice Indicator -->
+  <div class="voice-indicator" id="voice-indicator">
+    <div style="font-size:12px;font-weight:700;color:var(--ig-secondary-text);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;" id="voice-mode-label">🗣️ Dictation</div>
+    <div class="voice-waves">
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+    </div>
+    <div class="voice-text-preview" id="voice-preview">Listening...</div>
+    <div id="voice-silence-status" style="display:none;font-size:12px;color:var(--ig-secondary-text);margin-bottom:6px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span id="voice-word-count" style="font-size:11px;color:var(--ig-secondary-text);">0 words</span>
+      <span id="voice-confidence" style="font-size:11px;"></span>
+    </div>
+    <div class="voice-controls">
+      <select class="voice-lang-select" id="voice-lang" onchange="updateVoiceLang()">
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="es-ES">Spanish</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="pt-BR">Portuguese</option>
+        <option value="it-IT">Italian</option>
+        <option value="ja-JP">Japanese</option>
+        <option value="ko-KR">Korean</option>
+        <option value="zh-CN">Chinese</option>
+        <option value="hi-IN">Hindi</option>
+        <option value="ar-SA">Arabic</option>
+      </select>
+      <button class="voice-stop-btn" onclick="stopVoice()">⏹ Stop</button>
+    </div>
+  </div>
+
+  <!-- Inline AI Toolbar (floats near cursor line) -->
+  <div class="inline-ai-toolbar" id="inline-ai-toolbar">
+    <button onclick="inlineAI('continue')" title="Continue writing">✨ Continue</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('improve')" title="Improve this line">🔧 Improve</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('expand')" title="Expand this line">📝 Expand</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('grammar')" title="Fix grammar">🔤 Grammar</button>
+    <div class="divider"></div>
+    <button onclick="openAIPanel()" title="More AI options">⚡ More</button>
+  </div>
+
+  <!-- Slash Command Menu -->
+  <div class="slash-menu" id="slash-menu"></div>
+
+  <!-- Ghost text hint -->
+  <div class="ghost-hint" id="ghost-hint">Press <kbd>Tab</kbd> to accept suggestion &middot; <kbd>Esc</kbd> to dismiss</div>
+
+  <!-- Selection AI Toolbar (appears when text is selected) -->
+  <div class="selection-ai-toolbar" id="selection-ai-toolbar">
+    <button onclick="inlineAI('improve')" title="Improve selected text">🔧 Improve</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('expand')" title="Expand on selection">📝 Expand</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('grammar')" title="Fix grammar">🔤 Grammar</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('summarize')" title="Summarize">📋 Summarize</button>
+    <div class="divider"></div>
+    <button onclick="inlineAI('explain')" title="Explain simply">💡 Explain</button>
+    <div class="divider"></div>
+    <button onclick="openAIPanel()" title="More AI options">⚡ More</button>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // ===== UI Theme Toggle =====
+    (function() {
+      const savedUI = localStorage.getItem('note-editor-ui') || 'modern';
+      const toggleSwitch = document.getElementById('ui-toggle-switch');
+      
+      function applyUI(mode) {
+        if (mode === 'classic') {
+          document.body.classList.add('ui-classic');
+          toggleSwitch.classList.remove('active');
+        } else {
+          document.body.classList.remove('ui-classic');
+          toggleSwitch.classList.add('active');
+        }
+        localStorage.setItem('note-editor-ui', mode);
+      }
+      
+      applyUI(savedUI);
+      
+      toggleSwitch.addEventListener('click', function() {
+        const isModern = this.classList.contains('active');
+        applyUI(isModern ? 'classic' : 'modern');
+      });
+    })();
+
+    const params = new URLSearchParams(window.location.search);
+    const noteId = params.get('id');
+    const titleEl = document.getElementById('note-title');
+    const statusEl = document.getElementById('status');
+    
+    let quill;
+    let autoSaveTimer;
+
+    // Initialize Quill editor
+    quill = new Quill('#editor', {
+      theme: 'snow',
+      placeholder: 'Start writing your note...',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'indent': '-1'}, { 'indent': '+1' }],
+          [{ 'color': [] }, { 'background': [] }],
+          ['blockquote', 'code-block'],
+          ['link'],
+          ['clean']
+        ]
+      }
+    });
+
+    if (!noteId) {
+      statusEl.textContent = 'Missing note ID';
+      statusEl.className = 'status-bar error';
+    } else {
+      loadNote();
+    }
+
+    async function loadNote() {
+      try {
+        // Use shared API endpoint
+        const { note } = await InnovateAPI.apiRequest(`/shared/notes/${noteId}`);
+        titleEl.value = note.title || '';
+        
+        // Check if note is locked
+        if (note.is_locked) {
+          quill.disable();
+          titleEl.disabled = true;
+          document.getElementById('save-btn').disabled = true;
+          document.getElementById('templates-btn').disabled = true;
+          document.getElementById('upload-image-btn').disabled = true;
+          document.getElementById('upload-file-btn').disabled = true;
+          statusEl.textContent = '🔒 This note is locked (read-only)';
+          statusEl.className = 'status-bar error';
+          statusEl.style.display = 'block';
+        }
+        
+        // Set content
+        if (note.content_md) {
+          try {
+            const delta = JSON.parse(note.content_md);
+            quill.setContents(delta);
+          } catch {
+            quill.setText(note.content_md);
+          }
+        }
+        
+        statusEl.textContent = `Last updated ${new Date(note.updated_at).toLocaleString()}`;
+        statusEl.className = 'status-bar info';
+        
+        // Auto-save on changes
+        quill.on('text-change', scheduleAutoSave);
+        titleEl.addEventListener('input', scheduleAutoSave);
+      } catch (err) {
+        statusEl.textContent = err.message || 'Failed to load note';
+        statusEl.className = 'status-bar error';
+      }
+    }
+
+    function scheduleAutoSave() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      
+      statusEl.textContent = 'Unsaved changes...';
+      statusEl.className = 'status-bar info';
+      
+      autoSaveTimer = setTimeout(async () => {
+        await saveNote(true);
+      }, 2000);
+    }
+
+    async function saveNote(silent = false) {
+      const title = titleEl.value.trim();
+      const content_md = JSON.stringify(quill.getContents());
+      
+      if (!title) {
+        if (!silent) {
+          statusEl.textContent = 'Title is required';
+          statusEl.className = 'status-bar error';
+        }
+        return;
+      }
+
+      try {
+        // Use shared API endpoint
+        await InnovateAPI.apiRequest(`/shared/notes/${noteId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title, content_md })
+        });
+        
+        statusEl.textContent = silent ? '✓ Saved' : '✓ Saved successfully';
+        statusEl.className = 'status-bar success';
+        
+        // Notify parent window to refresh notes list
+        if (window.opener && !window.opener.closed) {
+          try {
+            window.opener.postMessage({ type: 'note-updated', noteId }, '*');
+          } catch (e) {
+            console.log('Could not notify parent window');
+          }
+        }
+        
+        if (!silent) {
+          setTimeout(() => {
+            statusEl.textContent = `Last updated ${new Date().toLocaleString()}`;
+            statusEl.className = 'status-bar info';
+          }, 2000);
+        }
+      } catch (err) {
+        statusEl.textContent = err.message || 'Failed to save note';
+        statusEl.className = 'status-bar error';
+      }
+    }
+
+    document.getElementById('save-btn').addEventListener('click', () => saveNote(false));
+    
+    document.getElementById('back-btn').addEventListener('click', () => {
+      if (confirm('Close note? Any unsaved changes will be lost.')) {
+        window.close();
+      }
+    });
+
+    // Template button handler
+    document.getElementById('templates-btn').addEventListener('click', () => {
+      showTemplateModal();
+    });
+
+    // Image upload handler
+    document.getElementById('upload-image-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) await uploadImage(file);
+      };
+      input.click();
+    });
+
+    // File upload handler
+    document.getElementById('upload-file-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,.doc,.docx,.txt,.xlsx,.xls';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) await uploadFile(file);
+      };
+      input.click();
+    });
+
+    async function uploadImage(file) {
+      const formData = new FormData();
+      formData.append('images', file);
+      
+      try {
+        statusEl.textContent = 'Uploading image...';
+        statusEl.className = 'status-bar info';
+        
+        const res = await fetch('/api/shared/notes/upload-image', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error('Upload failed');
+        
+        const data = await res.json();
+        const imageUrl = data.url || data.imageUrl;
+        
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', imageUrl);
+        quill.setSelection(range.index + 1);
+        
+        statusEl.textContent = '✓ Image uploaded';
+        statusEl.className = 'status-bar success';
+        setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Failed to upload image';
+        statusEl.className = 'status-bar error';
+      }
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('files', file);
+      
+      try {
+        statusEl.textContent = 'Uploading file...';
+        statusEl.className = 'status-bar info';
+        
+        const res = await fetch('/api/shared/notes/upload-file', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${InnovateAPI.getToken()}` },
+          body: formData
+        });
+        
+        if (!res.ok) throw new Error('Upload failed');
+        
+        const data = await res.json();
+        const fileUrl = data.url || data.fileUrl;
+        const fileName = file.name;
+        
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, `📎 ${fileName}`, 'link', fileUrl);
+        quill.setSelection(range.index + fileName.length + 3);
+        
+        statusEl.textContent = '✓ File uploaded';
+        statusEl.className = 'status-bar success';
+        setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 2000);
+      } catch (err) {
+        statusEl.textContent = 'Failed to upload file';
+        statusEl.className = 'status-bar error';
+      }
+    }
+
+    function showTemplateModal() {
+      const templates = [
+        { id: 'meeting', name: '📋 Meeting Notes', icon: '📋' },
+        { id: 'todo', name: '✅ To-Do List', icon: '✅' },
+        { id: 'brainstorm', name: '💡 Brainstorm', icon: '💡' },
+        { id: 'project', name: '🚀 Project Plan', icon: '🚀' },
+        { id: 'research', name: '📚 Research Notes', icon: '📚' },
+        { id: 'blank', name: '📄 Blank Page', icon: '📄' }
+      ];
+      
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center;';
+      modal.className = 'template-modal';
+      
+      modal.innerHTML = `
+        <div style="background: var(--ig-primary-background); border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+          <h2 style="margin: 0 0 20px 0; font-size: 20px; color: var(--ig-primary-text);">Choose Template</h2>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+            ${templates.map(t => `
+              <button onclick="applyTemplate('${t.id}')" style="padding: 20px; border: 2px solid var(--ig-border); border-radius: 12px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; transition: all 0.2s;">
+                <span style="font-size: 32px;">${t.icon}</span>
+                ${t.name}
+              </button>
+            `).join('')}
+          </div>
+          <button onclick="this.closest('.template-modal').remove()" style="margin-top: 20px; width: 100%; padding: 12px; border: none; border-radius: 8px; background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">Cancel</button>
+        </div>
+      `;
+      
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.body.appendChild(modal);
+    }
+
+    window.applyTemplate = function(templateId) {
+      const templates = {
+        meeting: { ops: [{ insert: '📋 Meeting Notes\n', attributes: { header: 1 } }, { insert: '\nDate: ' + new Date().toLocaleDateString() + '\n' }, { insert: 'Attendees:\n', attributes: { bold: true } }, { insert: '• \n• \n\n' }, { insert: 'Agenda:\n', attributes: { bold: true } }, { insert: '1. \n2. \n3. \n\n' }, { insert: 'Action Items:\n', attributes: { bold: true } }, { insert: '• \n• \n\n' }, { insert: 'Next Steps:\n', attributes: { bold: true } }, { insert: '• \n' }] },
+        todo: { ops: [{ insert: '✅ To-Do List\n', attributes: { header: 1 } }, { insert: '\n' }, { insert: 'High Priority\n', attributes: { header: 2 } }, { insert: '☐ \n☐ \n\n' }, { insert: 'Medium Priority\n', attributes: { header: 2 } }, { insert: '☐ \n☐ \n\n' }, { insert: 'Low Priority\n', attributes: { header: 2 } }, { insert: '☐ \n' }] },
+        brainstorm: { ops: [{ insert: '💡 Brainstorm Session\n', attributes: { header: 1 } }, { insert: '\nTopic: \n\n' }, { insert: 'Ideas:\n', attributes: { bold: true } }, { insert: '• \n• \n• \n\n' }, { insert: 'Top Picks:\n', attributes: { bold: true } }, { insert: '1. \n2. \n3. \n' }] },
+        project: { ops: [{ insert: '🚀 Project Plan\n', attributes: { header: 1 } }, { insert: '\nProject Name: \n\n' }, { insert: 'Objective:\n', attributes: { bold: true } }, { insert: '\n\n' }, { insert: 'Timeline:\n', attributes: { bold: true } }, { insert: '• Start: \n• End: \n\n' }, { insert: 'Milestones:\n', attributes: { bold: true } }, { insert: '1. \n2. \n3. \n\n' }, { insert: 'Resources:\n', attributes: { bold: true } }, { insert: '• \n' }] },
+        research: { ops: [{ insert: '📚 Research Notes\n', attributes: { header: 1 } }, { insert: '\nTopic: \n\n' }, { insert: 'Key Points:\n', attributes: { bold: true } }, { insert: '• \n• \n• \n\n' }, { insert: 'Sources:\n', attributes: { bold: true } }, { insert: '1. \n2. \n\n' }, { insert: 'Conclusions:\n', attributes: { bold: true } }, { insert: '\n' }] },
+        blank: { ops: [{ insert: '\n' }] }
+      };
+      
+      const template = templates[templateId];
+      if (template) {
+        quill.setContents(template);
+        quill.setSelection(0, 0);
+      }
+      document.querySelector('.template-modal')?.remove();
+    };
+    
+    // Keyboard shortcut: Cmd+S / Ctrl+S to save
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        saveNote(false);
+      }
+    });
+
+    // =====================================================
+    // AI WRITING ASSISTANT
+    // =====================================================
+    
+    let aiLastResult = '';
+    let aiSelectionRange = null;
+
+    // Open/close AI panel
+    document.getElementById('ai-btn').addEventListener('click', () => {
+      openAIPanel();
+    });
+    document.getElementById('ai-panel-close').addEventListener('click', closeAIPanel);
+    document.getElementById('ai-overlay').addEventListener('click', closeAIPanel);
+
+    function openAIPanel() {
+      document.getElementById('ai-overlay').classList.add('show');
+      document.getElementById('ai-panel').classList.add('open');
+      // Capture current selection
+      const sel = quill.getSelection();
+      if (sel && sel.length > 0) {
+        aiSelectionRange = sel;
+        document.getElementById('ai-selection-hint').textContent = `📝 Using selected text (${sel.length} chars)`;
+      } else {
+        aiSelectionRange = null;
+        document.getElementById('ai-selection-hint').textContent = '💡 Select text in editor first, or AI will use the full note.';
+      }
+    }
+
+    function closeAIPanel() {
+      document.getElementById('ai-overlay').classList.remove('show');
+      document.getElementById('ai-panel').classList.remove('open');
+    }
+
+    function getAIInputText() {
+      if (aiSelectionRange && aiSelectionRange.length > 0) {
+        return quill.getText(aiSelectionRange.index, aiSelectionRange.length);
+      }
+      return quill.getText().trim();
+    }
+
+    async function runAI(action) {
+      const text = getAIInputText();
+      
+      if (!text && action !== 'custom') {
+        alert('Please write some text in the note first, or select text to use with AI.');
+        return;
+      }
+
+      const loadingEl = document.getElementById('ai-loading');
+      const loadingTextEl = document.getElementById('ai-loading-text');
+      const resultArea = document.getElementById('ai-result-area');
+      
+      // Show loading
+      resultArea.classList.remove('show');
+      loadingEl.classList.add('show');
+
+      const loadingMessages = {
+        summarize: 'Summarizing your text...',
+        expand: 'Expanding your content...',
+        rewrite: 'Rewriting for clarity...',
+        grammar: 'Fixing grammar and spelling...',
+        formal: 'Making it more formal...',
+        casual: 'Making it more casual...',
+        translate: 'Translating...',
+        outline: 'Creating an outline...',
+        continue: 'Continuing your writing...',
+        explain: 'Simplifying the text...',
+        bullet_points: 'Converting to bullet points...',
+        key_takeaways: 'Extracting key takeaways...',
+        title_suggest: 'Suggesting titles...',
+        action_items: 'Extracting action items...',
+        brainstorm: 'Brainstorming ideas...',
+        pros_cons: 'Creating pros & cons list...',
+        eli5: 'Making it super simple...',
+        poem: 'Getting creative... 🎨',
+        email_draft: 'Drafting email...',
+        meeting_notes: 'Formatting meeting notes...',
+        study_notes: 'Creating study notes...',
+        custom: 'Processing your request...'
+      };
+      loadingTextEl.textContent = loadingMessages[action] || 'AI is thinking...';
+
+      // Disable all action buttons
+      document.querySelectorAll('.ai-action-btn, .ai-custom-prompt .send-btn, .ai-translate-row button').forEach(b => b.disabled = true);
+
+      try {
+        const body = { action, text };
+        
+        if (action === 'translate') {
+          body.language = document.getElementById('ai-translate-lang').value;
+        }
+        if (action === 'custom') {
+          body.customPrompt = document.getElementById('ai-custom-prompt').value.trim();
+          if (!body.customPrompt) {
+            loadingEl.classList.remove('show');
+            document.querySelectorAll('.ai-action-btn, .ai-custom-prompt .send-btn, .ai-translate-row button').forEach(b => b.disabled = false);
+            alert('Please enter a custom prompt.');
+            return;
+          }
+          body.text = text || '';
+        }
+
+        console.log('[AI Panel] Sending request:', action, 'text length:', text.length);
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        console.log('[AI Panel] Response received:', response);
+        loadingEl.classList.remove('show');
+
+        if (response.success && response.result) {
+          aiLastResult = response.result;
+          console.log('[AI Panel] Result length:', response.result.length);
+          
+          const actionLabels = {
+            summarize: '📋 Summary', expand: '📝 Expanded', rewrite: '✍️ Rewritten',
+            grammar: '🔤 Grammar Fixed', formal: '👔 Formal Tone', casual: '😊 Casual Tone',
+            translate: '🌐 Translation', outline: '🗂️ Outline', continue: '➡️ Continuation',
+            explain: '📖 Simplified', bullet_points: '📌 Bullet Points', key_takeaways: '🔑 Key Takeaways',
+            title_suggest: '🏷️ Title Suggestions', action_items: '✅ Action Items',
+            brainstorm: '💡 Brainstorm', pros_cons: '⚖️ Pros & Cons', eli5: '👶 ELI5',
+            poem: '🎨 Poem', email_draft: '✉️ Email Draft', meeting_notes: '📋 Meeting Notes',
+            study_notes: '📚 Study Notes', custom: '💬 AI Response'
+          };
+
+          document.getElementById('ai-result-label').textContent = actionLabels[action] || 'AI Result';
+          document.getElementById('ai-result-content').textContent = response.result;
+          resultArea.classList.add('show');
+          
+          // Scroll result into view
+          resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          alert(response.error || 'AI did not return a result. Please try again.');
+        }
+      } catch (err) {
+        loadingEl.classList.remove('show');
+        console.error('AI error:', err);
+        alert('AI request failed: ' + (err.message || 'Unknown error'));
+      } finally {
+        document.querySelectorAll('.ai-action-btn, .ai-custom-prompt .send-btn, .ai-translate-row button').forEach(b => b.disabled = false);
+      }
+    }
+
+    function insertAIResult(mode) {
+      if (!aiLastResult) return;
+
+      if (mode === 'replace') {
+        if (aiSelectionRange && aiSelectionRange.length > 0) {
+          quill.deleteText(aiSelectionRange.index, aiSelectionRange.length);
+          quill.insertText(aiSelectionRange.index, aiLastResult);
+          quill.setSelection(aiSelectionRange.index + aiLastResult.length);
+        } else {
+          // Replace all content
+          quill.setText(aiLastResult);
+        }
+      } else if (mode === 'append') {
+        const length = quill.getLength();
+        quill.insertText(length - 1, '\n\n' + aiLastResult);
+        quill.setSelection(length + aiLastResult.length + 1);
+      } else if (mode === 'cursor') {
+        const sel = quill.getSelection(true);
+        quill.insertText(sel.index, aiLastResult);
+        quill.setSelection(sel.index + aiLastResult.length);
+      }
+
+      dismissAIResult();
+      scheduleAutoSave();
+    }
+
+    function dismissAIResult() {
+      document.getElementById('ai-result-area').classList.remove('show');
+      aiLastResult = '';
+    }
+
+    function copyAIResult() {
+      if (!aiLastResult) return;
+      navigator.clipboard.writeText(aiLastResult).then(() => {
+        const btn = document.querySelector('#ai-result-area .ai-result-header button');
+        const orig = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => btn.textContent = orig, 1500);
+      });
+    }
+
+    // Keyboard shortcut: Cmd+Shift+A / Ctrl+Shift+A to open AI panel
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'a') {
+        e.preventDefault();
+        openAIPanel();
+      }
+    });
+
+    // =====================================================
+    // VOICE-TO-TEXT (Web Speech API)
+    // Enhanced for ambient/external audio capture (YouTube, lectures, etc.)
+    // =====================================================
+
+    let recognition = null;
+    let isRecording = false;
+    let voiceTranscript = '';
+    let voiceMode = 'dictation'; // 'dictation' or 'transcribe'
+    let restartAttempts = 0;
+    const MAX_RESTART_ATTEMPTS = 100; // keep going for a long time
+    let lastResultTime = 0;
+    let silenceTimer = null;
+    let totalTranscribed = 0;
+
+    const voiceBtn = document.getElementById('voice-btn');
+    const voiceIndicator = document.getElementById('voice-indicator');
+    const voicePreview = document.getElementById('voice-preview');
+
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      voiceBtn.title = 'Voice not supported in this browser';
+      voiceBtn.style.opacity = '0.5';
+      voiceBtn.style.cursor = 'not-allowed';
+    }
+
+    voiceBtn.addEventListener('click', () => {
+      if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+        return;
+      }
+      if (isRecording) {
+        stopVoice();
+      } else {
+        // Use window-level version which includes Record option
+        (window.showVoiceModeSelector || showVoiceModeSelector)();
+      }
+    });
+
+    function showVoiceModeSelector() {
+      const modal = document.createElement('div');
+      modal.className = 'template-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = `
+        <div style="background:var(--ig-primary-background);border-radius:16px;padding:24px;max-width:420px;width:90%;">
+          <h3 style="margin:0 0 6px;font-size:18px;color:var(--ig-primary-text);">🎤 Voice Input Mode</h3>
+          <p style="margin:0 0 16px;font-size:13px;color:var(--ig-secondary-text);">Choose how you want to capture voice</p>
+          
+          <button onclick="startVoiceWithMode('dictation');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid var(--ig-border);border-radius:12px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🗣️ Dictation Mode</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Speak directly into your microphone to type</div>
+          </button>
+          
+          <button onclick="startVoiceWithMode('transcribe');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid #667eea;border-radius:12px;background:rgba(102,126,234,0.08);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🎧 Transcribe External Audio</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Capture audio from YouTube, lectures, another device playing nearby. Keeps listening through silences & pauses.</div>
+          </button>
+
+          <button onclick="startVoiceWithMode('lecture');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid var(--ig-border);border-radius:12px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🎓 Lecture / Meeting Mode</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Long-running transcription with timestamps. Great for classes & meetings.</div>
+          </button>
+          
+          <button onclick="this.closest('.template-modal').remove()" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;font-weight:600;margin-top:4px;">Cancel</button>
+        </div>
+      `;
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.body.appendChild(modal);
+    }
+
+    window.startVoiceWithMode = function(mode) {
+      voiceMode = mode;
+      startVoice();
+    };
+
+    function startVoice() {
+      if (isRecording) return;
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 3;
+      recognition.lang = document.getElementById('voice-lang').value;
+
+      restartAttempts = 0;
+      totalTranscribed = 0;
+      lastResultTime = Date.now();
+      let finalTranscript = '';
+
+      const modeLabels = { dictation: '🗣️ Dictation', transcribe: '🎧 Transcribing External Audio', lecture: '🎓 Lecture Transcription' };
+      document.getElementById('voice-mode-label').textContent = modeLabels[voiceMode] || 'Listening';
+      document.getElementById('voice-word-count').textContent = '0 words';
+
+      recognition.onstart = () => {
+        isRecording = true;
+        restartAttempts = 0;
+        voiceBtn.classList.add('recording');
+        voiceBtn.innerHTML = '<span style="font-size: 16px;">⏹</span> Stop';
+        voiceIndicator.classList.add('show');
+        voicePreview.textContent = voiceMode === 'transcribe'
+          ? 'Listening for external audio... Play your video/audio now'
+          : voiceMode === 'dictation'
+          ? 'Listening... Try "add in [section]: [text]" for smart placement'
+          : 'Listening...';
+        lastResultTime = Date.now();
+        console.log('[Voice] Started in mode:', voiceMode);
+
+        if (voiceMode === 'transcribe' || voiceMode === 'lecture') {
+          clearInterval(silenceTimer);
+          silenceTimer = setInterval(() => {
+            const silenceSec = Math.floor((Date.now() - lastResultTime) / 1000);
+            if (silenceSec > 3 && isRecording) {
+              const dots = '.'.repeat((silenceSec % 3) + 1);
+              document.getElementById('voice-silence-status').textContent = `Waiting for audio${dots} (${silenceSec}s silence)`;
+              document.getElementById('voice-silence-status').style.display = 'block';
+            } else {
+              document.getElementById('voice-silence-status').style.display = 'none';
+            }
+          }, 1000);
+        }
+      };
+
+      recognition.onresult = (event) => {
+        lastResultTime = Date.now();
+        document.getElementById('voice-silence-status').style.display = 'none';
+
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          let bestTranscript = event.results[i][0].transcript;
+          let bestConfidence = event.results[i][0].confidence;
+          for (let alt = 1; alt < event.results[i].length; alt++) {
+            if (event.results[i][alt].confidence > bestConfidence) {
+              bestTranscript = event.results[i][alt].transcript;
+              bestConfidence = event.results[i][alt].confidence;
+            }
+          }
+
+          if (event.results[i].isFinal) {
+            finalTranscript += bestTranscript + ' ';
+            console.log('[Voice] Final result:', bestTranscript, 'confidence:', bestConfidence);
+
+            // === SMART COMMAND DETECTION (dictation mode) ===
+            if (voiceMode === 'dictation') {
+              const voiceCmd = parseVoiceCommand(bestTranscript);
+              if (voiceCmd) {
+                console.log('[Voice] Command detected:', voiceCmd);
+                const handled = handleVoiceCommand(voiceCmd, bestTranscript);
+                if (handled) {
+                  totalTranscribed += bestTranscript.split(/\s+/).filter(w => w).length;
+                  document.getElementById('voice-word-count').textContent = `${totalTranscribed} words`;
+                  continue; // Skip normal insertion
+                }
+              }
+            }
+
+            // Normal insertion
+            let insertText = bestTranscript;
+            if (voiceMode === 'lecture') {
+              const now = new Date();
+              const timestamp = `[${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}] `;
+              if (totalTranscribed === 0) insertText = '\n' + timestamp + bestTranscript;
+            }
+
+            const range = quill.getSelection(true);
+            quill.insertText(range.index, insertText + ' ');
+            quill.setSelection(range.index + insertText.length + 1);
+            scheduleAutoSave();
+
+            totalTranscribed += bestTranscript.split(/\s+/).filter(w => w).length;
+            document.getElementById('voice-word-count').textContent = `${totalTranscribed} words`;
+
+            if (voiceMode === 'transcribe' || voiceMode === 'lecture') {
+              const confPct = Math.round((bestConfidence || 0) * 100);
+              document.getElementById('voice-confidence').textContent = confPct > 0 ? `${confPct}% confidence` : '';
+              document.getElementById('voice-confidence').style.color = confPct > 80 ? '#34c759' : confPct > 50 ? '#ff9800' : '#ff3b30';
+            }
+          } else {
+            interim = bestTranscript;
+          }
+        }
+        voicePreview.textContent = interim || finalTranscript.slice(-100) || 'Listening...';
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('[Voice] Error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('Microphone access denied. Please allow microphone access in your browser settings.');
+          stopVoice();
+          return;
+        }
+        if (event.error === 'aborted') return;
+        
+        if (voiceMode === 'transcribe' || voiceMode === 'lecture') {
+          if (event.error === 'no-speech') { voicePreview.textContent = 'No speech heard yet... Keep audio playing'; return; }
+          if (event.error === 'audio-capture') { voicePreview.textContent = 'Audio capture issue - retrying...'; return; }
+          if (event.error === 'network') { voicePreview.textContent = 'Network issue - retrying...'; return; }
+          return;
+        }
+        
+        if (event.error === 'no-speech') { voicePreview.textContent = 'No speech detected. Try speaking closer to the mic...'; return; }
+        if (event.error === 'audio-capture') { alert('Could not capture audio.'); stopVoice(); }
+      };
+
+      recognition.onend = () => {
+        console.log('[Voice] onend - isRecording:', isRecording, 'attempts:', restartAttempts);
+        if (isRecording && restartAttempts < MAX_RESTART_ATTEMPTS) {
+          restartAttempts++;
+          const delay = voiceMode === 'transcribe' || voiceMode === 'lecture' ? 100 : 200;
+          setTimeout(() => {
+            if (isRecording) {
+              try {
+                recognition.start();
+                console.log('[Voice] Restarted successfully');
+              } catch (e) {
+                console.warn('[Voice] Restart failed:', e.message);
+                // Create fresh instance and retry
+                setTimeout(() => {
+                  if (isRecording) {
+                    try {
+                      recognition = new SpeechRecognition();
+                      recognition.continuous = true;
+                      recognition.interimResults = true;
+                      recognition.maxAlternatives = 3;
+                      recognition.lang = document.getElementById('voice-lang').value;
+                      startVoice(); // Full restart with new instance
+                    } catch (e2) {
+                      console.error('[Voice] Could not restart:', e2);
+                      stopVoice();
+                    }
+                  }
+                }, 500);
+              }
+            }
+          }, delay);
+        } else if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
+          voicePreview.textContent = 'Session ended (max duration). Click Voice to start again.';
+          stopVoice();
+        }
+      };
+
+      try {
+        recognition.start();
+        console.log('[Voice] Starting in mode:', voiceMode);
+      } catch (e) {
+        console.error('[Voice] Failed to start:', e);
+        alert('Failed to start voice recognition. Please try again.');
+      }
+    }
+
+    window.stopVoice = function() {
+      isRecording = false;
+      clearInterval(silenceTimer);
+      silenceTimer = null;
+      if (recognition) {
+        try { recognition.abort(); } catch (e) {}
+        recognition = null;
+      }
+      voiceBtn.classList.remove('recording');
+      voiceBtn.innerHTML = '<span style="font-size: 16px;">🎤</span> Voice';
+      voiceIndicator.classList.remove('show');
+      
+      if (totalTranscribed > 0) {
+        statusEl.textContent = `✓ Voice: ${totalTranscribed} words transcribed`;
+        statusEl.className = 'status-bar success';
+        setTimeout(() => {
+          statusEl.textContent = 'Ready';
+          statusEl.className = 'status-bar info';
+        }, 3000);
+      }
+    };
+
+    window.updateVoiceLang = function() {
+      if (isRecording && recognition) {
+        const newLang = document.getElementById('voice-lang').value;
+        recognition.lang = newLang;
+        // Restart with new language
+        try { recognition.abort(); } catch (e) {}
+        setTimeout(() => {
+          if (isRecording) {
+            try { recognition.start(); } catch (e) {}
+          }
+        }, 300);
+      }
+    };
+
+    // Keyboard shortcut: Cmd+Shift+V / Ctrl+Shift+V for voice
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'v') {
+        // Don't override paste
+        if (e.shiftKey && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          if (isRecording) stopVoice();
+          else startVoice();
+        }
+      }
+    });
+
+    // Make runAI globally accessible for inline onclick handlers
+    window.runAI = runAI;
+    window.insertAIResult = insertAIResult;
+    window.dismissAIResult = dismissAIResult;
+    window.copyAIResult = copyAIResult;
+
+    // =====================================================
+    // INLINE AI TOOLBAR (appears after pausing on a line)
+    // =====================================================
+
+    const inlineToolbar = document.getElementById('inline-ai-toolbar');
+    let inlineToolbarTimer = null;
+    let lastCursorLine = -1;
+    let inlineToolbarVisible = false;
+
+    // Track cursor position changes and typing pauses
+    quill.on('selection-change', (range) => {
+      if (!range) { hideInlineToolbar(); if (typeof hideSelectionToolbar === 'function') try { hideSelectionToolbar(); } catch(e){}; return; }
+      clearTimeout(inlineToolbarTimer);
+      hideInlineToolbar();
+      hideSlashMenu();
+      clearMathResult();
+
+      // If text is selected, the selectionChangeForToolbar handler shows the selection toolbar
+      // If no selection, show inline toolbar after pause
+      if (range.length > 0) return; // Let the selection handler deal with it
+
+      // Hide selection toolbar if open
+      try { hideSelectionToolbar(); } catch(e) {}
+
+      const [line] = quill.getLine(range.index);
+      if (!line) return;
+
+      const lineText = line.domNode?.textContent || '';
+      const currentLine = quill.getIndex(line);
+
+      // If user has typed something on this line, show toolbar after pause
+      if (lineText.trim().length > 5 && range.length === 0) {
+        inlineToolbarTimer = setTimeout(() => {
+          showInlineToolbar(range.index, line);
+        }, 800); // 0.8s pause — show quickly
+      }
+    });
+
+    quill.on('text-change', (delta, oldDelta, source) => {
+      if (source !== 'user') return;
+      clearTimeout(inlineToolbarTimer);
+      hideInlineToolbar();
+      clearGhostText();
+      clearMathResult();
+
+      const range = quill.getSelection();
+      if (!range) return;
+
+      const [line] = quill.getLine(range.index);
+      if (!line) return;
+      const lineText = line.domNode?.textContent || '';
+      const lineIndex = quill.getIndex(line);
+
+      // Detect slash command trigger
+      if (lineText.startsWith('/')) {
+        showSlashMenu(range.index, line, lineText);
+        return;
+      }
+      hideSlashMenu();
+
+      // Math evaluation (instant)
+      const mathResult = tryEvalMath(lineText);
+      if (mathResult) {
+        showMathResult(lineIndex + line.length() - 1, mathResult);
+      }
+
+      // Link detection (with debounce)
+      if (/https?:\/\//.test(lineText)) {
+        clearTimeout(linkDetectTimer);
+        linkDetectTimer = setTimeout(() => {
+          detectAndProcessLinks(lineText, lineIndex + line.length());
+        }, 1500);
+      }
+
+      // After typing, set timer for inline toolbar
+      if (lineText.trim().length > 5) {
+        inlineToolbarTimer = setTimeout(() => {
+          showInlineToolbar(range.index, line);
+        }, 1200); // 1.2s after last keystroke — fast
+      }
+
+      // Also trigger ghost text (autocomplete) after longer pause
+      if (lineText.trim().length > 10) {
+        clearTimeout(ghostTextTimer);
+        ghostTextTimer = setTimeout(() => {
+          generateGhostText(range.index);
+        }, 2500); // 2.5s for ghost text
+      }
+    });
+
+    function showInlineToolbar(index, line) {
+      if (!line || !line.domNode) return;
+      if (aiIsWorking) return; // Don't show while AI is working
+      const range = quill.getSelection();
+      if (!range) return;
+      
+      // Use cursor/selection end position for toolbar placement
+      const bounds = quill.getBounds(range.index + (range.length || 0));
+      const containerRect = quill.container.getBoundingClientRect();
+
+      // Position toolbar below the current line, aligned at cursor
+      let left = containerRect.left + bounds.left;
+      let top = containerRect.top + bounds.top + bounds.height + 6;
+      
+      // Ensure toolbar doesn't overflow right edge
+      const toolbarWidth = 420; // approximate
+      if (left + toolbarWidth > window.innerWidth) {
+        left = window.innerWidth - toolbarWidth - 10;
+      }
+      if (left < 10) left = 10;
+      
+      inlineToolbar.style.left = `${left}px`;
+      inlineToolbar.style.top = `${top}px`;
+      inlineToolbar.classList.add('show');
+      inlineToolbarVisible = true;
+    }
+
+    function hideInlineToolbar() {
+      inlineToolbar.classList.remove('show');
+      inlineToolbarVisible = false;
+    }
+
+    window.inlineAI = async function(action) {
+      hideInlineToolbar();
+      try { hideSelectionToolbar(); } catch(e) {}
+      clearGhostText();
+      aiIsWorking = true;
+      const range = quill.getSelection();
+      if (!range) { aiIsWorking = false; return; }
+
+      const [line] = quill.getLine(range.index);
+      if (!line) { aiIsWorking = false; return; }
+      const lineIndex = quill.getIndex(line);
+      const lineLength = line.length();
+      const lineText = quill.getText(lineIndex, lineLength).trim();
+
+      // If user has selected text, use that instead of the whole line
+      const selectedText = range.length > 0 ? quill.getText(range.index, range.length).trim() : '';
+
+      // Get surrounding context (full document for better AI understanding)
+      const allText = quill.getText();
+      const textBefore = allText.substring(0, lineIndex + lineLength);
+
+      statusEl.textContent = '✨ AI is thinking...';
+      statusEl.className = 'status-bar info';
+
+      try {
+        let aiAction = action;
+        let text = selectedText || lineText;
+
+        if (action === 'improve') {
+          aiAction = 'rewrite';
+        } else if (action === 'continue') {
+          text = textBefore;
+        }
+
+        console.log('[Inline AI] Sending:', aiAction, 'text length:', text.length);
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify({ action: aiAction, text })
+        });
+
+        console.log('[Inline AI] Response:', response);
+        if (response.success && response.result) {
+          console.log('[Inline AI] Showing suggestion, result length:', response.result.length);
+          if (action === 'continue') {
+            showInlineSuggestion(lineIndex + lineLength, response.result, 'continue');
+          } else if (selectedText && range.length > 0) {
+            // Replace the selected text specifically
+            showInlineSuggestion(range.index, response.result, 'replace', range.length);
+          } else {
+            showInlineSuggestion(lineIndex, response.result, 'replace', lineLength);
+          }
+          statusEl.textContent = '✨ AI suggestion ready — accept or reject below';
+          statusEl.className = 'status-bar success';
+        }
+      } catch (err) {
+        statusEl.textContent = 'AI request failed: ' + (err.message || 'Unknown error');
+        statusEl.className = 'status-bar error';
+      } finally {
+        aiIsWorking = false;
+      }
+    };
+
+    // =====================================================
+    // INLINE ACCEPT/REJECT SUGGESTIONS
+    // =====================================================
+
+    let activeSuggestion = null;
+
+    function showInlineSuggestion(index, text, mode, replaceLength) {
+      // Remove any existing suggestion
+      clearInlineSuggestion();
+
+      // Place suggestion OUTSIDE Quill (inside #suggestion-container) 
+      // to prevent Quill's MutationObserver from stripping it
+      const container = document.getElementById('suggestion-container');
+
+      const suggEl = document.createElement('div');
+      suggEl.className = 'ai-inline-suggestion';
+      suggEl.id = 'active-suggestion';
+      
+      const modeLabel = mode === 'replace' ? '🔄 Replace Suggestion' : '➡️ Continue Suggestion';
+      const previewText = text.length > 500 ? text.substring(0, 500) + '...' : text;
+      
+      suggEl.innerHTML = `
+        <div class="suggestion-label">${modeLabel}</div>
+        <div class="suggestion-text">${escapeHTML(previewText)}</div>
+        <div class="suggestion-controls">
+          <button class="suggestion-accept" onclick="acceptSuggestion()">✓ Accept</button>
+          <button class="suggestion-reject" onclick="rejectSuggestion()">✗ Reject</button>
+          <button class="suggestion-modify" onclick="modifySuggestion()">✏️ Edit</button>
+        </div>
+      `;
+
+      container.innerHTML = '';
+      container.appendChild(suggEl);
+      container.style.display = 'block';
+
+      activeSuggestion = { index, text, mode, replaceLength: replaceLength || 0, element: suggEl };
+
+      // Scroll suggestion into view
+      container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      console.log('[AI Suggestion] Shown:', mode, 'at index', index, 'text length:', text.length);
+    }
+
+    function getLineElementAtIndex(index) {
+      const [line] = quill.getLine(index);
+      return line ? line.domNode : null;
+    }
+
+    window.acceptSuggestion = function() {
+      if (!activeSuggestion) return;
+      const { index, text, mode, replaceLength } = activeSuggestion;
+
+      if (mode === 'replace' && replaceLength > 0) {
+        quill.deleteText(index, replaceLength);
+        quill.insertText(index, text);
+      } else if (mode === 'continue') {
+        quill.insertText(index, '\n' + text);
+      } else {
+        const range = quill.getSelection(true);
+        quill.insertText(range.index, text);
+      }
+
+      clearInlineSuggestion();
+      scheduleAutoSave();
+      statusEl.textContent = '✓ Suggestion accepted';
+      statusEl.className = 'status-bar success';
+      setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 2000);
+    };
+
+    window.rejectSuggestion = function() {
+      clearInlineSuggestion();
+      statusEl.textContent = 'Suggestion dismissed';
+      statusEl.className = 'status-bar info';
+      setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 1500);
+    };
+
+    window.modifySuggestion = function() {
+      if (!activeSuggestion) return;
+      const text = activeSuggestion.text;
+      clearInlineSuggestion();
+      // Open AI panel with the text pre-filled for custom editing
+      document.getElementById('ai-custom-prompt').value = 'Modify this: ' + text.substring(0, 200);
+      openAIPanel();
+    };
+
+    function clearInlineSuggestion() {
+      const el = document.getElementById('active-suggestion');
+      if (el) el.remove();
+      const container = document.getElementById('suggestion-container');
+      if (container) { container.innerHTML = ''; container.style.display = 'none'; }
+      activeSuggestion = null;
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // =====================================================
+    // GHOST TEXT (AI autocomplete - DOM overlay, not Quill)
+    // =====================================================
+
+    let ghostTextTimer = null;
+    let currentGhostText = '';
+    let ghostTextIndex = -1;
+    let ghostOverlayEl = null;
+    let isGhostActive = false;
+    let aiIsWorking = false; // Flag to prevent ghost text while AI is active
+
+    async function generateGhostText(cursorIndex) {
+      // Don't generate ghost text while AI is already working
+      if (aiIsWorking) return;
+      const allText = quill.getText();
+      const textBefore = allText.substring(Math.max(0, cursorIndex - 400), cursorIndex);
+
+      if (textBefore.trim().length < 10) return;
+
+      try {
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'continue',
+            text: textBefore
+          })
+        });
+
+        if (response.success && response.result) {
+          // Only show first sentence as ghost
+          let ghostContent = response.result.trim();
+          const sentenceEnd = ghostContent.search(/[.!?]\s/);
+          if (sentenceEnd > 10) {
+            ghostContent = ghostContent.substring(0, sentenceEnd + 1);
+          } else if (ghostContent.length > 80) {
+            ghostContent = ghostContent.substring(0, 80) + '...';
+          }
+
+          // Check cursor hasn't moved
+          const currentRange = quill.getSelection();
+          if (!currentRange || Math.abs(currentRange.index - cursorIndex) > 5) return;
+
+          showGhostText(cursorIndex, ghostContent);
+        }
+      } catch (e) {
+        console.debug('Ghost text generation failed:', e.message);
+      }
+    }
+
+    function showGhostText(index, text) {
+      clearGhostText();
+      currentGhostText = text;
+      ghostTextIndex = index;
+      isGhostActive = true;
+
+      // Create DOM overlay positioned at cursor using Quill bounds
+      const bounds = quill.getBounds(index);
+
+      // Append to quill.container (.ql-container) — getBounds coords are relative to this
+      const containerEl = quill.container;
+      containerEl.style.position = 'relative';
+
+      ghostOverlayEl = document.createElement('span');
+      ghostOverlayEl.className = 'ghost-text-overlay';
+      ghostOverlayEl.textContent = text;
+      ghostOverlayEl.style.left = `${bounds.left}px`;
+      ghostOverlayEl.style.top = `${bounds.top}px`;
+      ghostOverlayEl.style.lineHeight = `${bounds.height}px`;
+
+      containerEl.appendChild(ghostOverlayEl);
+
+      document.getElementById('ghost-hint').classList.add('show');
+      console.log('[Ghost] Shown at index', index, 'text:', text.substring(0, 40));
+    }
+
+    function clearGhostText() {
+      if (ghostOverlayEl) {
+        ghostOverlayEl.remove();
+        ghostOverlayEl = null;
+      }
+      currentGhostText = '';
+      ghostTextIndex = -1;
+      isGhostActive = false;
+      document.getElementById('ghost-hint').classList.remove('show');
+    }
+
+    function acceptGhostText() {
+      if (!isGhostActive || !currentGhostText) return;
+      const text = currentGhostText;
+      const index = ghostTextIndex;
+      
+      // Clear overlay first  
+      clearGhostText();
+      
+      // Now insert the text into Quill for real
+      quill.insertText(index, text);
+      quill.setSelection(index + text.length);
+      scheduleAutoSave();
+      
+      statusEl.textContent = '✓ Ghost text accepted';
+      statusEl.className = 'status-bar success';
+      setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 1500);
+      console.log('[Ghost] Accepted:', text.substring(0, 40));
+    }
+
+    // Use capture-phase DOM listener for Tab — fires BEFORE Quill's keyboard module
+    // quill.keyboard.addBinding appends to END of binding list, so Quill's built-in
+    // Tab (indent) handler runs first and steals the event. Capture phase solves this.
+    quill.root.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab' && isGhostActive) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        acceptGhostText();
+        console.log('[Ghost] Tab accepted ghost text via capture listener');
+      }
+    }, true); // <-- capture phase = fires before Quill
+
+    // Escape to dismiss ghost text or suggestion
+    document.addEventListener('keydown', (e) => {
+      if (isGhostActive && e.key === 'Escape') {
+        e.preventDefault();
+        clearGhostText();
+        return;
+      }
+      if (activeSuggestion && e.key === 'Escape') {
+        rejectSuggestion();
+      }
+    });
+
+    // =====================================================
+    // MATH EVALUATION (detect 2+2, sqrt(16), etc.)
+    // =====================================================
+
+    const mathPatterns = [
+      // Basic arithmetic: 2+2, 100/5, 3*4, 10-3
+      /^[\s]*(\d[\d\s+\-*/().^%]+\d)\s*=?\s*$/,
+      // Functions: sqrt(16), pow(2,3), abs(-5)
+      /^[\s]*((?:sqrt|pow|abs|ceil|floor|round|log|sin|cos|tan|max|min)\s*\([\d\s,+\-*/().]+\))\s*=?\s*$/i,
+      // Percentage: 20% of 150, 15% off 200
+      /^[\s]*(\d+(?:\.\d+)?)\s*%\s*(?:of|from)\s*(\d+(?:\.\d+)?)\s*$/i,
+      // Percentage off: 15% off 200
+      /^[\s]*(\d+(?:\.\d+)?)\s*%\s*off\s*(\d+(?:\.\d+)?)\s*$/i,
+    ];
+
+    function tryEvalMath(lineText) {
+      const trimmed = lineText.trim();
+      if (!trimmed || trimmed.length < 2) return null;
+
+      // Percentage of
+      const pctOfMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/i);
+      if (pctOfMatch) {
+        const result = (parseFloat(pctOfMatch[1]) / 100) * parseFloat(pctOfMatch[2]);
+        return { expr: trimmed, result: Math.round(result * 1000) / 1000 };
+      }
+
+      // Percentage off
+      const pctOffMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*%\s*off\s*(\d+(?:\.\d+)?)/i);
+      if (pctOffMatch) {
+        const result = parseFloat(pctOffMatch[2]) * (1 - parseFloat(pctOffMatch[1]) / 100);
+        return { expr: trimmed, result: Math.round(result * 1000) / 1000 };
+      }
+
+      // General math: only if it looks like a math expression
+      if (/^\d[\d\s+\-*/().^%]*\d$/.test(trimmed.replace(/=\s*$/, '').trim()) ||
+          /^(?:sqrt|pow|abs|ceil|floor|round|log|sin|cos|tan|max|min)\s*\(/i.test(trimmed)) {
+        try {
+          // Safe eval: replace ^ with **, support math functions
+          let expr = trimmed.replace(/=\s*$/, '').trim();
+          expr = expr.replace(/\^/g, '**');
+          expr = expr.replace(/sqrt/gi, 'Math.sqrt');
+          expr = expr.replace(/pow/gi, 'Math.pow');
+          expr = expr.replace(/abs/gi, 'Math.abs');
+          expr = expr.replace(/ceil/gi, 'Math.ceil');
+          expr = expr.replace(/floor/gi, 'Math.floor');
+          expr = expr.replace(/round/gi, 'Math.round');
+          expr = expr.replace(/log/gi, 'Math.log');
+          expr = expr.replace(/sin/gi, 'Math.sin');
+          expr = expr.replace(/cos/gi, 'Math.cos');
+          expr = expr.replace(/tan/gi, 'Math.tan');
+          expr = expr.replace(/max/gi, 'Math.max');
+          expr = expr.replace(/min/gi, 'Math.min');
+          expr = expr.replace(/pi/gi, 'Math.PI');
+          expr = expr.replace(/e(?![a-zA-Z])/gi, 'Math.E');
+          
+          // Security: only allow digits, operators, Math.*, parens, commas, spaces
+          if (!/^[\d\s+\-*/().,%]*(?:Math\.\w+[\d\s+\-*/().,%]*)*$/.test(expr)) return null;
+          
+          const result = Function('"use strict"; return (' + expr + ')')();
+          if (typeof result === 'number' && isFinite(result)) {
+            return { expr: trimmed, result: Math.round(result * 10000) / 10000 };
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    let mathResultEl = null;
+
+    function showMathResult(index, result) {
+      clearMathResult();
+      
+      // Get bounds of end-of-line character to position badge right after text
+      const bounds = quill.getBounds(index);
+      
+      // Append to quill.container (.ql-container) since getBounds is relative to it
+      const containerEl = quill.container;
+      containerEl.style.position = 'relative';
+
+      mathResultEl = document.createElement('span');
+      mathResultEl.className = 'math-result-badge';
+      mathResultEl.textContent = ` = ${result.result}`;
+      mathResultEl.title = `Click to insert "= ${result.result}" into your note`;
+      mathResultEl.style.left = `${bounds.left + 4}px`;
+      mathResultEl.style.top = `${bounds.top}px`;
+      mathResultEl.style.lineHeight = `${bounds.height}px`;
+      
+      mathResultEl.onclick = () => {
+        // Insert the result right after the expression on the same line
+        const range = quill.getSelection(true);
+        const insertPos = range ? range.index : index;
+        quill.insertText(insertPos, ` = ${result.result}`);
+        quill.setSelection(insertPos + ` = ${result.result}`.length);
+        scheduleAutoSave();
+        clearMathResult();
+        statusEl.textContent = `✓ Inserted: ${result.expr} = ${result.result}`;
+        statusEl.className = 'status-bar success';
+        setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 2000);
+      };
+
+      containerEl.appendChild(mathResultEl);
+      console.log('[Math] Showing result badge at', bounds.left, bounds.top, ':', result.expr, '=', result.result);
+    }
+
+    function clearMathResult() {
+      if (mathResultEl) { mathResultEl.remove(); mathResultEl = null; }
+    }
+
+    // =====================================================
+    // LINK INTELLIGENCE (detect URLs, fetch & summarize)
+    // =====================================================
+
+    let linkDetectTimer = null;
+    const processedLinks = new Set();
+
+    function detectAndProcessLinks(lineText, lineIndex) {
+      const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+      const matches = lineText.match(urlPattern);
+      if (!matches) return;
+
+      for (const url of matches) {
+        if (processedLinks.has(url)) continue;
+        processedLinks.add(url);
+        fetchAndSummarizeLink(url, lineIndex);
+      }
+    }
+
+    async function fetchAndSummarizeLink(url, insertIndex) {
+      const container = document.getElementById('link-preview-container');
+      
+      // Show loading card
+      const cardId = 'link-' + Date.now();
+      const card = document.createElement('div');
+      card.className = 'link-preview-card';
+      card.id = cardId;
+      card.innerHTML = `
+        <div class="link-url">🔗 ${escapeHTML(url)}</div>
+        <div class="link-summary" style="color:var(--ig-secondary-text);">⏳ Fetching and analyzing link...</div>
+      `;
+      container.innerHTML = '';
+      container.appendChild(card);
+      container.style.display = 'block';
+
+      try {
+        // Use AI to analyze the URL topic (since we can't fetch external URLs from browser)
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'custom',
+            customPrompt: `The user pasted this URL in their notes: ${url}\n\nBased on the URL structure and domain, provide:\n1. What this link is likely about (topic/subject)\n2. A brief summary of what content you'd expect to find there\n3. 3-5 key talking points or facts about the topic that would be useful for their notes\n\nFormat your response as:\nTopic: [topic]\nSummary: [1-2 sentences]\nKey Points:\n- [point 1]\n- [point 2]\n- [point 3]`,
+            text: url
+          })
+        });
+
+        if (response.success && response.result) {
+          const formattedResult = escapeHTML(response.result)
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+          card.innerHTML = `
+            <div class="link-url">🔗 ${escapeHTML(url)}</div>
+            <div class="link-summary">${formattedResult}</div>
+            <div class="link-actions">
+              <button onclick="insertLinkSummary('${cardId}', ${insertIndex})">📝 Insert Summary</button>
+              <button onclick="dismissLinkCard(this)">✕ Dismiss</button>
+            </div>
+          `;
+        } else {
+          card.querySelector('.link-summary').textContent = 'Could not analyze this link.';
+        }
+      } catch (err) {
+        card.querySelector('.link-summary').textContent = 'Link analysis failed: ' + (err.message || 'Error');
+      }
+    }
+
+    window.dismissLinkCard = function(btn) {
+      const card = btn.closest('.link-preview-card');
+      if (card) card.remove();
+      if (!document.querySelector('.link-preview-card')) {
+        document.getElementById('link-preview-container').style.display = 'none';
+      }
+    };
+
+    window.insertLinkSummary = function(cardId, insertIndex) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+      const summary = card.querySelector('.link-summary')?.textContent || '';
+      if (summary) {
+        const range = quill.getSelection(true);
+        const pos = range ? range.index : quill.getLength() - 1;
+        quill.insertText(pos, '\n' + summary + '\n');
+        quill.setSelection(pos + summary.length + 2);
+        scheduleAutoSave();
+      }
+      card.remove();
+      if (!document.querySelector('.link-preview-card')) {
+        document.getElementById('link-preview-container').style.display = 'none';
+      }
+    };
+
+    // =====================================================
+    // SLASH COMMANDS (type / to open command menu)
+    // =====================================================
+
+    const slashMenu = document.getElementById('slash-menu');
+    let slashMenuVisible = false;
+    let slashMenuIndex = -1;
+    let slashActiveItem = 0;
+    let slashQuery = '';
+
+    const slashCommands = [
+      { cmd: 'continue', icon: '➡️', label: 'Continue Writing', desc: 'AI continues your text' },
+      { cmd: 'summarize', icon: '📋', label: 'Summarize', desc: 'Summarize the note' },
+      { cmd: 'expand', icon: '📝', label: 'Expand', desc: 'Expand current paragraph' },
+      { cmd: 'rewrite', icon: '✍️', label: 'Rewrite', desc: 'Rewrite for clarity' },
+      { cmd: 'grammar', icon: '🔤', label: 'Fix Grammar', desc: 'Correct grammar & spelling' },
+      { cmd: 'formal', icon: '👔', label: 'Make Formal', desc: 'Professional tone' },
+      { cmd: 'casual', icon: '😊', label: 'Make Casual', desc: 'Friendly tone' },
+      { cmd: 'bullet_points', icon: '📌', label: 'Bullet Points', desc: 'Convert to bullet list' },
+      { cmd: 'outline', icon: '🗂️', label: 'Make Outline', desc: 'Create structured outline' },
+      { cmd: 'action_items', icon: '✅', label: 'Extract Actions', desc: 'Pull out action items' },
+      { cmd: 'key_takeaways', icon: '🔑', label: 'Key Takeaways', desc: 'Extract main points' },
+      { cmd: 'translate', icon: '🌐', label: 'Translate', desc: 'Translate to another language' },
+      { cmd: 'brainstorm', icon: '💡', label: 'Brainstorm', desc: 'Generate related ideas' },
+      { cmd: 'eli5', icon: '👶', label: 'Explain Simply', desc: 'Explain like I\'m 5' },
+      { cmd: 'study_notes', icon: '📚', label: 'Study Notes', desc: 'Format as study notes' },
+      { cmd: 'meeting_notes', icon: '📋', label: 'Meeting Notes', desc: 'Format as meeting notes' },
+      { cmd: 'email_draft', icon: '✉️', label: 'Email Draft', desc: 'Draft an email from notes' },
+      { cmd: 'title_suggest', icon: '🏷️', label: 'Suggest Title', desc: 'Suggest note titles' },
+    ];
+
+    function showSlashMenu(cursorIndex, line, lineText) {
+      slashQuery = lineText.substring(1).toLowerCase(); // strip the /
+      slashMenuIndex = cursorIndex;
+
+      const filtered = slashQuery
+        ? slashCommands.filter(c => c.label.toLowerCase().includes(slashQuery) || c.cmd.includes(slashQuery))
+        : slashCommands;
+
+      if (filtered.length === 0) { hideSlashMenu(); return; }
+
+      slashActiveItem = 0;
+      slashMenu.innerHTML = filtered.map((c, i) => `
+        <div class="slash-menu-item ${i === 0 ? 'active' : ''}" data-cmd="${c.cmd}" onclick="executeSlashCommand('${c.cmd}')">
+          <span class="slash-icon">${c.icon}</span>
+          <div>
+            <div class="slash-label">${c.label}</div>
+            <div class="slash-desc">${c.desc}</div>
+          </div>
+        </div>
+      `).join('');
+
+      const bounds = quill.getBounds(cursorIndex);
+      const editorRect = document.querySelector('.ql-editor').getBoundingClientRect();
+      slashMenu.style.left = `${editorRect.left + bounds.left}px`;
+      slashMenu.style.top = `${editorRect.top + bounds.top + bounds.height + 4}px`;
+      slashMenu.classList.add('show');
+      slashMenuVisible = true;
+    }
+
+    function hideSlashMenu() {
+      slashMenu.classList.remove('show');
+      slashMenuVisible = false;
+    }
+
+    window.executeSlashCommand = async function(cmd) {
+      hideSlashMenu();
+
+      // Delete the slash command text from the editor
+      const range = quill.getSelection();
+      if (range) {
+        const [line] = quill.getLine(range.index);
+        if (line) {
+          const lineIndex = quill.getIndex(line);
+          const lineLength = line.length();
+          const lineText = quill.getText(lineIndex, lineLength);
+          if (lineText.startsWith('/')) {
+            quill.deleteText(lineIndex, lineLength);
+          }
+        }
+      }
+
+      // Get the note content for context
+      const allText = quill.getText().trim();
+      const cursorPos = range ? range.index : quill.getLength();
+      const textBefore = allText.substring(0, Math.min(cursorPos, allText.length));
+
+      statusEl.textContent = '✨ Running /' + cmd + '...';
+      statusEl.className = 'status-bar info';
+
+      try {
+        const body = { action: cmd, text: allText };
+        if (cmd === 'continue') body.text = textBefore;
+        if (cmd === 'translate') body.language = 'English';
+
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (response.success && response.result) {
+          const insertAt = range ? range.index : quill.getLength() - 1;
+          showInlineSuggestion(insertAt, response.result, cmd === 'rewrite' ? 'replace' : 'continue');
+          statusEl.textContent = '✨ Ready — accept or reject the suggestion';
+          statusEl.className = 'status-bar success';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Slash command failed: ' + (err.message || 'Error');
+        statusEl.className = 'status-bar error';
+      }
+    };
+
+    // Keyboard navigation for slash menu
+    quill.root.addEventListener('keydown', (e) => {
+      if (slashMenuVisible) {
+        const items = slashMenu.querySelectorAll('.slash-menu-item');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          slashActiveItem = Math.min(slashActiveItem + 1, items.length - 1);
+          items.forEach((el, i) => el.classList.toggle('active', i === slashActiveItem));
+          items[slashActiveItem]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          slashActiveItem = Math.max(slashActiveItem - 1, 0);
+          items.forEach((el, i) => el.classList.toggle('active', i === slashActiveItem));
+          items[slashActiveItem]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const activeEl = items[slashActiveItem];
+          if (activeEl) executeSlashCommand(activeEl.dataset.cmd);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          hideSlashMenu();
+        }
+      }
+    });
+
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.inline-ai-toolbar') && !e.target.closest('.ql-editor')) {
+        hideInlineToolbar();
+      }
+      if (!e.target.closest('.slash-menu') && !e.target.closest('.ql-editor')) {
+        hideSlashMenu();
+      }
+    });
+
+    // =====================================================
+    // VOICE POSITIONAL COMMANDS (Smart voice commands)
+    // "add in features section: battery is 5000mAh"
+    // =====================================================
+
+    // Intercept voice results in transcribe/dictation mode to detect commands
+    const originalOnResult = (recognition && recognition.onresult) ? recognition.onresult : null;
+
+    function parseVoiceCommand(transcript) {
+      const lower = transcript.toLowerCase().trim();
+      console.log('[Voice Command] Checking transcript:', lower);
+
+      // Pattern: "add in/under/at/to <section> [section] [: or separator] <content>"
+      // Very lenient — speech doesn't produce colons, so we split on common separators
+      const addPatterns = [
+        // "add in features section battery is 5000mah" → section=features, content=battery is 5000mah
+        /^(?:add|insert|put|write|type)\s+(?:in|under|at|to|into)\s+(?:the\s+)?(.+?)\s+(?:section|heading|part|area)[\s:.,]*(.+)$/i,
+        // "add in features: battery is 5000mah" (with colon)
+        /^(?:add|insert|put|write|type)\s+(?:in|under|at|to|into)\s+(?:the\s+)?(.+?)[\s]*[:.]\s*(.+)$/i,
+        // "add in features that battery is 5000mah"
+        /^(?:add|insert|put|write|type)\s+(?:in|under|at|to|into)\s+(?:the\s+)?(.+?)\s+(?:that|the\s+following|this|saying)\s+(.+)$/i,
+        // "in features section add battery is 5000mah"
+        /^(?:in|under|at)\s+(?:the\s+)?(.+?)\s*(?:section|heading|part|area)?\s*(?:add|insert|put|write|type)\s+(.+)$/i,
+        // Simplest: "add to features battery is 5000" — section is just 1 word, rest is content
+        /^(?:add|insert|put|write|type)\s+(?:in|under|at|to|into)\s+(?:the\s+)?(\S+)\s+(.{5,})$/i,
+      ];
+
+      // Pattern: "go to <section>"
+      const goToPatterns = [
+        /^(?:go\s+to|navigate\s+to|jump\s+to|move\s+to|scroll\s+to)\s+(?:the\s+)?(.+?)(?:\s+section|\s+heading|\s+part)?$/i,
+        /^(?:go|jump|move|scroll)\s+(?:the\s+)?(.+?)(?:\s+section|\s+heading|\s+part)$/i,
+      ];
+
+      // Pattern: "replace <old> with <new>"
+      const replacePatterns = [
+        /^(?:replace|change|swap)\s+(.+?)\s+(?:with|to|by)\s+(.+)$/i,
+        /^(?:change|update)\s+(.+?)\s+(?:to|into)\s+(.+)$/i,
+      ];
+
+      // Pattern: "delete/remove <text>" — require at least 3 chars target
+      const deletePatterns = [
+        /^(?:delete|remove|erase|clear)\s+(?:the\s+)?(?:text\s+)?["']?(.{3,})["']?$/i,
+      ];
+
+      // Check add patterns first (most common voice command)
+      for (const pattern of addPatterns) {
+        const match = lower.match(pattern);
+        if (match && match[1] && match[2] && match[2].trim().length >= 3) {
+          const section = match[1].trim().replace(/\s+section$|\s+heading$|\s+part$/i, '');
+          // Get original case content from transcript
+          const contentLower = match[2].trim();
+          const contentStart = transcript.toLowerCase().indexOf(contentLower);
+          const content = contentStart >= 0 ? transcript.substring(contentStart).trim() : contentLower;
+          console.log('[Voice Command] ADD detected → section:', section, 'content:', content);
+          return { type: 'add', section, content };
+        }
+      }
+
+      // Check go-to patterns
+      for (const pattern of goToPatterns) {
+        const match = lower.match(pattern);
+        if (match && match[1] && match[1].trim().length >= 2) {
+          console.log('[Voice Command] GOTO detected → section:', match[1].trim());
+          return { type: 'goto', section: match[1].trim() };
+        }
+      }
+
+      // Check replace patterns
+      for (const pattern of replacePatterns) {
+        const match = lower.match(pattern);
+        if (match && match[1] && match[2]) {
+          console.log('[Voice Command] REPLACE detected →', match[1].trim(), '→', match[2].trim());
+          return { type: 'replace', old: match[1].trim(), new: match[2].trim() };
+        }
+      }
+
+      // Check delete patterns
+      for (const pattern of deletePatterns) {
+        const match = lower.match(pattern);
+        if (match && match[1] && match[1].trim().length >= 3) {
+          console.log('[Voice Command] DELETE detected → target:', match[1].trim());
+          return { type: 'delete', target: match[1].trim() };
+        }
+      }
+
+      console.log('[Voice Command] No command detected, treating as dictation');
+      return null; // Not a command, treat as regular dictation
+    }
+
+    function findSectionInEditor(sectionName) {
+      const text = quill.getText();
+      const lines = text.split('\n');
+      let charCount = 0;
+      const sectionLower = sectionName.toLowerCase().trim();
+      
+      console.log('[Voice Section] Looking for section:', sectionLower);
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase().trim();
+        
+        // Skip empty lines
+        if (!lineLower) {
+          charCount += lines[i].length + 1;
+          continue;
+        }
+
+        // Check multiple matching strategies
+        const isMatch = 
+          lineLower.includes(sectionLower) ||                    // "features" found in "Key Features"
+          sectionLower.includes(lineLower.replace(/^[#\s*\-]+/, '').trim()) ||  // heading matches
+          levenshteinSimilar(lineLower, sectionLower);           // fuzzy word overlap
+        
+        if (isMatch) {
+          console.log('[Voice Section] Found match at line', i, ':', lines[i]);
+          
+          // Find the end of content under this section (insert at end of section)
+          let insertIndex = charCount + lines[i].length + 1; // after heading + newline
+          
+          for (let j = i + 1; j < lines.length; j++) {
+            const nextLine = lines[j].trim();
+            
+            // If we hit another heading (Quill format check), stop
+            try {
+              const nextCharIdx = charCount;
+              for (let k = i; k < j; k++) nextCharIdx; // just count
+              const charPos = lines.slice(0, j).join('\n').length + j;
+              const [nextLineBlot] = quill.getLine(charPos);
+              if (nextLineBlot) {
+                const format = quill.getFormat(quill.getIndex(nextLineBlot));
+                if (format.header && nextLine.length > 0) break;
+              }
+            } catch (e) {}
+            
+            insertIndex = lines.slice(0, j + 1).join('\n').length;
+            
+            // If we hit a blank line after some content, that's the section boundary
+            if (nextLine === '' && j > i + 1) break;
+          }
+          
+          return { found: true, index: Math.min(insertIndex, text.length), heading: lines[i].trim() };
+        }
+        charCount += lines[i].length + 1; // +1 for \n
+      }
+      
+      console.log('[Voice Section] Section not found:', sectionLower);
+      return { found: false };
+    }
+
+    function levenshteinSimilar(a, b) {
+      if (a.length < 3 || b.length < 3) return false;
+      // Simple word overlap check
+      const wordsA = a.split(/\s+/).filter(w => w.length > 2);
+      const wordsB = b.split(/\s+/).filter(w => w.length > 2);
+      const overlap = wordsA.filter(w => wordsB.some(wb => wb.includes(w) || w.includes(wb)));
+      return overlap.length > 0 && overlap.length >= Math.min(wordsA.length, wordsB.length) * 0.5;
+    }
+
+    function handleVoiceCommand(command, originalTranscript) {
+      if (command.type === 'add') {
+        const section = findSectionInEditor(command.section);
+        if (section.found) {
+          // Show inline suggestion at that position with accept/reject
+          showInlineSuggestion(section.index, '\n• ' + command.content, 'continue');
+          voicePreview.textContent = `Found "${section.heading}" — suggestion added. Accept or reject it.`;
+          statusEl.textContent = `✨ Voice: Added suggestion under "${command.section}"`;
+          statusEl.className = 'status-bar success';
+        } else {
+          voicePreview.textContent = `Could not find section "${command.section}". Adding at cursor instead.`;
+          const range = quill.getSelection(true);
+          showInlineSuggestion(range.index, '\n• ' + command.content, 'continue');
+        }
+        return true;
+      }
+
+      if (command.type === 'goto') {
+        const section = findSectionInEditor(command.section);
+        if (section.found) {
+          quill.setSelection(section.index);
+          quill.scrollIntoView();
+          voicePreview.textContent = `Jumped to "${section.heading}"`;
+          statusEl.textContent = `📍 Moved to "${command.section}"`;
+          statusEl.className = 'status-bar info';
+        } else {
+          voicePreview.textContent = `Could not find section "${command.section}"`;
+        }
+        return true;
+      }
+
+      if (command.type === 'replace') {
+        const fullText = quill.getText();
+        const idx = fullText.toLowerCase().indexOf(command.old.toLowerCase());
+        if (idx !== -1) {
+          const origText = fullText.substring(idx, idx + command.old.length);
+          showInlineSuggestion(idx, command.new, 'replace', origText.length);
+          voicePreview.textContent = `Replace "${command.old}" → "${command.new}" — Accept or reject`;
+        } else {
+          voicePreview.textContent = `Could not find "${command.old}" in the note`;
+        }
+        return true;
+      }
+
+      if (command.type === 'delete') {
+        const fullText = quill.getText();
+        const idx = fullText.toLowerCase().indexOf(command.target.toLowerCase());
+        if (idx !== -1) {
+          // Highlight and ask confirmation
+          quill.setSelection(idx, command.target.length);
+          if (confirm(`Delete "${command.target}"?`)) {
+            quill.deleteText(idx, command.target.length);
+            scheduleAutoSave();
+          }
+          voicePreview.textContent = `Deleted "${command.target}"`;
+        }
+        return true;
+      }
+
+      return false; // Not handled
+    }
+
+    // =====================================================
+    // SELECTION AI TOOLBAR (appears when text is selected)
+    // =====================================================
+
+    const selectionToolbar = document.getElementById('selection-ai-toolbar');
+    let selectionToolbarVisible = false;
+
+    function showSelectionToolbar(range) {
+      if (!range || range.length === 0) { hideSelectionToolbar(); return; }
+      if (aiIsWorking) return;
+      const toolbar = document.getElementById('selection-ai-toolbar');
+      if (!toolbar) return;
+
+      const bounds = quill.getBounds(range.index, range.length);
+      const containerRect = quill.container.getBoundingClientRect();
+
+      // Position above the selection
+      let left = containerRect.left + bounds.left + (bounds.width / 2) - 180;
+      let top = containerRect.top + bounds.top - 44;
+
+      // If too high, show below
+      if (top < 60) {
+        top = containerRect.top + bounds.top + bounds.height + 6;
+      }
+
+      // Clamp to viewport
+      if (left < 10) left = 10;
+      if (left + 380 > window.innerWidth) left = window.innerWidth - 390;
+
+      toolbar.style.left = `${left}px`;
+      toolbar.style.top = `${top}px`;
+      toolbar.classList.add('show');
+      selectionToolbarVisible = true;
+    }
+
+    function hideSelectionToolbar() {
+      const el = document.getElementById('selection-ai-toolbar');
+      if (el) el.classList.remove('show');
+      selectionToolbarVisible = false;
+    }
+
+    // Update selection-change handler to show selection toolbar
+    quill.on('selection-change', function selectionChangeForToolbar(range) {
+      if (!range) { hideSelectionToolbar(); return; }
+
+      if (range.length > 0) {
+        // Text is selected — show selection toolbar, hide inline toolbar
+        hideInlineToolbar();
+        clearTimeout(inlineToolbarTimer);
+        setTimeout(() => showSelectionToolbar(range), 150);
+      } else {
+        hideSelectionToolbar();
+      }
+    });
+
+    // Close selection toolbar on click outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.selection-ai-toolbar') && !e.target.closest('.ql-editor')) {
+        hideSelectionToolbar();
+      }
+    });
+
+    // =====================================================
+    // VOICE RECORDING (record audio + transcription)
+    // =====================================================
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let voiceRecordings = []; // {id, blob, url, duration, transcript, timestamps, date}
+    let recordingStartTime = 0;
+    let recordingTranscriptParts = []; // {text, startTime, endTime}
+
+    // Add "Record" option to voice mode selector — replace original function body
+    // (Original showVoiceModeSelector at line ~1699 is overridden by this window-level function)
+    window.showVoiceModeSelector = function() {
+      const modal = document.createElement('div');
+      modal.className = 'template-modal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = `
+        <div style="background:var(--ig-primary-background);border-radius:16px;padding:24px;max-width:420px;width:90%;">
+          <h3 style="margin:0 0 6px;font-size:18px;color:var(--ig-primary-text);">🎤 Voice Input Mode</h3>
+          <p style="margin:0 0 16px;font-size:13px;color:var(--ig-secondary-text);">Choose how you want to capture voice</p>
+          
+          <button onclick="startVoiceWithMode('dictation');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid var(--ig-border);border-radius:12px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🗣️ Dictation Mode</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Speak directly into your microphone to type</div>
+          </button>
+          
+          <button onclick="startVoiceWithMode('transcribe');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid #667eea;border-radius:12px;background:rgba(102,126,234,0.08);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🎧 Transcribe External Audio</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Capture audio from YouTube, lectures, another device playing nearby.</div>
+          </button>
+
+          <button onclick="startVoiceWithMode('lecture');this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid var(--ig-border);border-radius:12px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🎓 Lecture / Meeting Mode</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Long-running transcription with timestamps.</div>
+          </button>
+
+          <button onclick="startVoiceRecording();this.closest('.template-modal').remove()" style="width:100%;padding:16px;margin-bottom:10px;border:2px solid #ff3b30;border-radius:12px;background:rgba(255,59,48,0.08);color:var(--ig-primary-text);cursor:pointer;text-align:left;">
+            <div style="font-size:20px;margin-bottom:4px;">🔴 Record Voice Note</div>
+            <div style="font-size:13px;color:var(--ig-secondary-text);">Record audio with live transcription. Playback syncs with transcript highlighting.</div>
+          </button>
+          
+          <button onclick="this.closest('.template-modal').remove()" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--ig-secondary-background);color:var(--ig-primary-text);cursor:pointer;font-weight:600;margin-top:4px;">Cancel</button>
+        </div>
+      `;
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.body.appendChild(modal);
+    };
+
+    window.startVoiceRecording = async function() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        recordingTranscriptParts = [];
+        recordingStartTime = Date.now();
+
+        // Start MediaRecorder for audio capture
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          const url = URL.createObjectURL(blob);
+          const duration = (Date.now() - recordingStartTime) / 1000;
+          const fullTranscript = recordingTranscriptParts.map(p => p.text).join(' ');
+
+          const recording = {
+            id: Date.now(),
+            blob, url, duration,
+            transcript: fullTranscript,
+            parts: [...recordingTranscriptParts],
+            date: new Date().toLocaleString()
+          };
+          voiceRecordings.push(recording);
+          renderVoiceRecordings();
+
+          statusEl.textContent = `✓ Voice note saved (${Math.round(duration)}s)`;
+          statusEl.className = 'status-bar success';
+          setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 3000);
+        };
+        mediaRecorder.start(100); // collect data every 100ms
+
+        // Also start speech recognition concurrently for live transcription
+        if (SpeechRecognition) {
+          const recogRec = new SpeechRecognition();
+          recogRec.continuous = true;
+          recogRec.interimResults = true;
+          recogRec.lang = document.getElementById('voice-lang').value || 'en-US';
+
+          recogRec.onresult = (event) => {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                const text = event.results[i][0].transcript.trim();
+                if (text) {
+                  const elapsed = (Date.now() - recordingStartTime) / 1000;
+                  recordingTranscriptParts.push({
+                    text,
+                    startTime: Math.max(0, elapsed - (text.split(/\s+/).length * 0.3)),
+                    endTime: elapsed
+                  });
+                  voicePreview.textContent = text;
+                }
+              } else {
+                voicePreview.textContent = event.results[i][0].transcript;
+              }
+            }
+          };
+          recogRec.onend = () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+              try { recogRec.start(); } catch(e) {}
+            }
+          };
+          recogRec.onerror = (e) => {
+            if (e.error !== 'aborted' && mediaRecorder && mediaRecorder.state === 'recording') {
+              try { recogRec.start(); } catch(e2) {}
+            }
+          };
+          recogRec.start();
+          window._recogRec = recogRec; // store reference to stop later
+        }
+
+        // Update UI
+        isRecording = true;
+        voiceBtn.classList.add('recording');
+        voiceBtn.innerHTML = '<span style="font-size:16px;">⏹</span> Stop';
+        voiceIndicator.classList.add('show');
+        document.getElementById('voice-mode-label').textContent = '🔴 Recording Voice Note';
+        voicePreview.textContent = 'Recording... speak now';
+
+        statusEl.textContent = '🔴 Recording voice note...';
+        statusEl.className = 'status-bar error';
+      } catch (err) {
+        alert('Microphone access denied. Please allow microphone access in your browser settings.');
+        console.error('Mic error:', err);
+      }
+    };
+
+    // Override stopVoice to also handle recording mode
+    const origStopVoice = window.stopVoice;
+    window.stopVoice = function() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        mediaRecorder = null;
+        if (window._recogRec) {
+          try { window._recogRec.abort(); } catch(e) {}
+          window._recogRec = null;
+        }
+        isRecording = false;
+        voiceBtn.classList.remove('recording');
+        voiceBtn.innerHTML = '<span style="font-size:16px;">🎤</span> Voice';
+        voiceIndicator.classList.remove('show');
+        return;
+      }
+      // Original stop for dictation/transcribe modes
+      if (typeof origStopVoice === 'function') origStopVoice();
+    };
+
+    function renderVoiceRecordings() {
+      const section = document.getElementById('voice-recordings-section');
+      const list = document.getElementById('voice-recordings-list');
+      if (!voiceRecordings.length) { section.style.display = 'none'; return; }
+
+      section.style.display = 'block';
+      list.innerHTML = voiceRecordings.map((rec, idx) => {
+        const mins = Math.floor(rec.duration / 60);
+        const secs = Math.round(rec.duration % 60);
+        const durationStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        const bars = generateWaveformBars(40);
+        const transcriptPreview = rec.transcript
+          ? rec.transcript.substring(0, 80) + (rec.transcript.length > 80 ? '...' : '')
+          : 'No transcription available';
+
+        return `
+          <div class="voice-recording-card" data-rec-id="${rec.id}">
+            <div class="recording-top-row">
+              <button class="recording-play-btn" onclick="togglePlayRecording(${rec.id})" id="play-btn-${rec.id}" title="Play">▶</button>
+              <div class="recording-info">
+                <div class="recording-name">🎙️ Voice Note ${idx + 1}</div>
+                <div class="recording-meta">
+                  <span>⏱ ${durationStr}</span>
+                  <span>📅 ${rec.date}</span>
+                </div>
+              </div>
+            </div>
+            <div class="recording-waveform" id="waveform-${rec.id}" onclick="seekRecording(event, ${rec.id})">
+              <div class="recording-waveform-progress" id="progress-${rec.id}"></div>
+              <div class="recording-waveform-bars" id="bars-${rec.id}">${bars}</div>
+            </div>
+            ${rec.transcript ? `
+              <div class="recording-transcript">
+                <button class="transcript-toggle" onclick="toggleTranscript(${rec.id})">
+                  📝 <span id="toggle-text-${rec.id}">Show Transcript</span> ▸
+                </button>
+                <div class="transcript-content" id="transcript-${rec.id}">
+                  ${buildTranscriptHTML(rec)}
+                </div>
+              </div>
+            ` : ''}
+            <div class="recording-actions">
+              <button onclick="insertRecordingTranscript(${rec.id})">📋 Insert Transcript</button>
+              <button class="ai-analyze-btn" onclick="analyzeRecording(${rec.id})">✨ AI Analyze</button>
+              <button onclick="deleteRecording(${rec.id})">🗑 Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function generateWaveformBars(count) {
+      let html = '';
+      for (let i = 0; i < count; i++) {
+        const h = 4 + Math.random() * 24;
+        html += `<div class="bar" style="height:${h}px"></div>`;
+      }
+      return html;
+    }
+
+    function buildTranscriptHTML(rec) {
+      if (!rec.parts || rec.parts.length === 0) return escapeHTML(rec.transcript);
+      return rec.parts.map((part, i) => {
+        const words = part.text.split(/\s+/);
+        const wordDuration = (part.endTime - part.startTime) / Math.max(words.length, 1);
+        return words.map((word, j) => {
+          const t = part.startTime + j * wordDuration;
+          return `<span class="transcript-word" data-time="${t.toFixed(2)}">${escapeHTML(word)}</span>`;
+        }).join(' ');
+      }).join(' ');
+    }
+
+    // Audio playback
+    let currentAudio = null;
+    let currentPlayingId = null;
+    let playbackAnimFrame = null;
+
+    window.togglePlayRecording = function(recId) {
+      const rec = voiceRecordings.find(r => r.id === recId);
+      if (!rec) return;
+
+      if (currentPlayingId === recId && currentAudio && !currentAudio.paused) {
+        // Pause
+        currentAudio.pause();
+        document.getElementById(`play-btn-${recId}`).textContent = '▶';
+        document.getElementById(`play-btn-${recId}`).classList.remove('playing');
+        cancelAnimationFrame(playbackAnimFrame);
+        return;
+      }
+
+      // Stop any other playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        if (currentPlayingId) {
+          const oldBtn = document.getElementById(`play-btn-${currentPlayingId}`);
+          if (oldBtn) { oldBtn.textContent = '▶'; oldBtn.classList.remove('playing'); }
+        }
+        cancelAnimationFrame(playbackAnimFrame);
+      }
+
+      currentAudio = new Audio(rec.url);
+      currentPlayingId = recId;
+
+      const btn = document.getElementById(`play-btn-${recId}`);
+      btn.textContent = '⏸';
+      btn.classList.add('playing');
+
+      currentAudio.play();
+
+      // Animate progress + transcript highlighting
+      function updatePlayback() {
+        if (!currentAudio || currentAudio.paused || currentAudio.ended) {
+          if (currentAudio && currentAudio.ended) {
+            btn.textContent = '▶';
+            btn.classList.remove('playing');
+            clearTranscriptHighlights(recId);
+            const prog = document.getElementById(`progress-${recId}`);
+            if (prog) prog.style.width = '0%';
+          }
+          return;
+        }
+
+        const pct = (currentAudio.currentTime / currentAudio.duration) * 100;
+        const prog = document.getElementById(`progress-${recId}`);
+        if (prog) prog.style.width = `${pct}%`;
+
+        // Highlight active waveform bars
+        const bars = document.querySelectorAll(`#bars-${recId} .bar`);
+        const activeIdx = Math.floor((pct / 100) * bars.length);
+        bars.forEach((b, i) => b.classList.toggle('active', i <= activeIdx));
+
+        // Highlight transcript words
+        highlightTranscriptWord(recId, currentAudio.currentTime);
+
+        playbackAnimFrame = requestAnimationFrame(updatePlayback);
+      }
+      playbackAnimFrame = requestAnimationFrame(updatePlayback);
+
+      currentAudio.onended = () => {
+        btn.textContent = '▶';
+        btn.classList.remove('playing');
+        clearTranscriptHighlights(recId);
+        const prog = document.getElementById(`progress-${recId}`);
+        if (prog) prog.style.width = '0%';
+        const bars = document.querySelectorAll(`#bars-${recId} .bar`);
+        bars.forEach(b => b.classList.remove('active'));
+      };
+    };
+
+    function highlightTranscriptWord(recId, currentTime) {
+      const container = document.getElementById(`transcript-${recId}`);
+      if (!container) return;
+      const words = container.querySelectorAll('.transcript-word');
+      words.forEach(w => {
+        const t = parseFloat(w.dataset.time);
+        // Highlight words within a 0.5s window around current time
+        const isActive = Math.abs(currentTime - t) < 0.5;
+        w.classList.toggle('highlight', isActive);
+        if (isActive) {
+          w.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
+    }
+
+    function clearTranscriptHighlights(recId) {
+      const container = document.getElementById(`transcript-${recId}`);
+      if (!container) return;
+      container.querySelectorAll('.transcript-word.highlight').forEach(w => w.classList.remove('highlight'));
+    }
+
+    window.seekRecording = function(event, recId) {
+      if (!currentAudio || currentPlayingId !== recId) return;
+      const waveform = document.getElementById(`waveform-${recId}`);
+      const rect = waveform.getBoundingClientRect();
+      const pct = (event.clientX - rect.left) / rect.width;
+      currentAudio.currentTime = pct * currentAudio.duration;
+    };
+
+    window.toggleTranscript = function(recId) {
+      const content = document.getElementById(`transcript-${recId}`);
+      const toggleText = document.getElementById(`toggle-text-${recId}`);
+      if (!content) return;
+      const isShowing = content.classList.toggle('show');
+      if (toggleText) toggleText.textContent = isShowing ? 'Hide Transcript' : 'Show Transcript';
+    };
+
+    window.insertRecordingTranscript = function(recId) {
+      const rec = voiceRecordings.find(r => r.id === recId);
+      if (!rec || !rec.transcript) return;
+      const range = quill.getSelection(true);
+      quill.insertText(range.index, '\n📝 Voice Note Transcript:\n' + rec.transcript + '\n');
+      quill.setSelection(range.index + rec.transcript.length + 25);
+      scheduleAutoSave();
+      statusEl.textContent = '✓ Transcript inserted into note';
+      statusEl.className = 'status-bar success';
+      setTimeout(() => { statusEl.textContent = 'Ready'; statusEl.className = 'status-bar info'; }, 2000);
+    };
+
+    window.analyzeRecording = async function(recId) {
+      const rec = voiceRecordings.find(r => r.id === recId);
+      if (!rec || !rec.transcript) return;
+
+      statusEl.textContent = '✨ AI analyzing voice note...';
+      statusEl.className = 'status-bar info';
+
+      try {
+        const response = await InnovateAPI.apiRequest('/shared/notes/ai', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'custom',
+            text: rec.transcript,
+            customPrompt: 'Analyze this voice recording transcript. Provide: 1) A brief summary, 2) Key points mentioned, 3) Any action items or important details. Format it nicely with headings.'
+          })
+        });
+
+        if (response.success && response.result) {
+          const range = quill.getSelection(true);
+          showInlineSuggestion(range.index, '\n\n' + response.result, 'continue');
+          statusEl.textContent = '✨ AI analysis ready — accept or reject';
+          statusEl.className = 'status-bar success';
+        }
+      } catch (err) {
+        statusEl.textContent = 'AI analysis failed: ' + (err.message || 'Error');
+        statusEl.className = 'status-bar error';
+      }
+    };
+
+    window.deleteRecording = function(recId) {
+      if (!confirm('Delete this voice recording?')) return;
+      // Stop if playing
+      if (currentPlayingId === recId && currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        currentPlayingId = null;
+        cancelAnimationFrame(playbackAnimFrame);
+      }
+      const rec = voiceRecordings.find(r => r.id === recId);
+      if (rec && rec.url) URL.revokeObjectURL(rec.url);
+      voiceRecordings = voiceRecordings.filter(r => r.id !== recId);
+      renderVoiceRecordings();
+    };
+
+  </script>
+</body>
+</html>

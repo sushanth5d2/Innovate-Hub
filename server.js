@@ -113,6 +113,7 @@ app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/ai-chat', require('./routes/ai-chat'));
 app.use('/api/portfolio', require('./routes/portfolio'));
+app.use('/api/shared', require('./routes/shared-tasks-notes'));
 app.use('/api', require('./routes/community-groups'));
 
 // Link preview endpoint

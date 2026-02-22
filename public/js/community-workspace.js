@@ -1094,7 +1094,7 @@
       renderTasks();
       return;
     }
-    const data = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/tasks`);
+    const data = await InnovateAPI.apiRequest(`/shared/tasks?context_type=group&context_id=${state.currentGroup.id}`);
     state.tasks = data.tasks || [];
     renderTasks();
   }
@@ -1104,9 +1104,9 @@
     const text = (el.todoText.value || '').trim();
     if (!text) return;
 
-    await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/tasks/from-text`, {
+    await InnovateAPI.apiRequest(`/shared/tasks/from-text`, {
       method: 'POST',
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, context_type: 'group', context_id: state.currentGroup.id })
     });
 
     el.todoText.value = '';
@@ -1121,8 +1121,10 @@
 
     const form = new FormData();
     form.append('image', file);
+    form.append('context_type', 'group');
+    form.append('context_id', state.currentGroup.id);
 
-    await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/tasks/from-image`, {
+    await InnovateAPI.apiRequest(`/shared/tasks/from-image`, {
       method: 'POST',
       body: form
     });
@@ -1138,9 +1140,9 @@
     const nextProgress = prompt('Progress (0-100)', String(task.progress ?? 0));
     const progressNum = Math.max(0, Math.min(100, parseInt(nextProgress || '0', 10)));
 
-    await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/tasks/${task.id}`, {
+    await InnovateAPI.apiRequest(`/shared/tasks/${task.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: nextStatus, progress: progressNum })
+      body: JSON.stringify({ status: nextStatus, progress: progressNum, context_type: 'group', context_id: state.currentGroup.id })
     });
 
     await loadGroupTasks();
@@ -1152,7 +1154,7 @@
       renderNotesList();
       return;
     }
-    const data = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/notes`);
+    const data = await InnovateAPI.apiRequest(`/shared/notes?context_type=group&context_id=${state.currentGroup.id}`);
     state.notes = data.notes || [];
     renderNotesList();
   }
@@ -1186,7 +1188,7 @@
   }
 
   async function openNote(noteId) {
-    const data = await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}`);
+    const data = await InnovateAPI.apiRequest(`/shared/notes/${noteId}`);
     state.currentNote = data.note;
     el.noteTitle.value = state.currentNote.title || '';
     el.noteContent.value = state.currentNote.content_md || '';
@@ -1198,9 +1200,9 @@
     ensureGroupSelected();
     const title = prompt('Note title');
     if (!title) return;
-    const data = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroup.id}/notes`, {
+    const data = await InnovateAPI.apiRequest(`/shared/notes`, {
       method: 'POST',
-      body: JSON.stringify({ title, content_md: '' })
+      body: JSON.stringify({ title, content_md: '', context_type: 'group', context_id: state.currentGroup.id })
     });
     await loadNotes();
     await openNote(data.note.id);
@@ -1211,7 +1213,7 @@
       InnovateAPI.showAlert('Open a note first', 'error');
       return;
     }
-    await InnovateAPI.apiRequest(`/community-groups/notes/${state.currentNote.id}`, {
+    await InnovateAPI.apiRequest(`/shared/notes/${state.currentNote.id}`, {
       method: 'PUT',
       body: JSON.stringify({ title: el.noteTitle.value, content_md: el.noteContent.value })
     });
@@ -1222,7 +1224,7 @@
 
   async function showVersions() {
     if (!state.currentNote) return;
-    const data = await InnovateAPI.apiRequest(`/community-groups/notes/${state.currentNote.id}/versions`);
+    const data = await InnovateAPI.apiRequest(`/shared/notes/${state.currentNote.id}/versions`);
     const versions = data.versions || [];
     if (!versions.length) {
       InnovateAPI.showAlert('No versions yet', 'success');
@@ -1233,7 +1235,7 @@
       versions.slice(0, 10).map(v => `${v.id}: ${v.created_by_username} @ ${new Date(v.created_at).toLocaleString()}`).join('\n')
     );
     if (!choice) return;
-    await InnovateAPI.apiRequest(`/community-groups/notes/${state.currentNote.id}/restore/${choice}`, { method: 'POST' });
+    await InnovateAPI.apiRequest(`/shared/notes/${state.currentNote.id}/restore/${choice}`, { method: 'POST' });
     await openNote(state.currentNote.id);
     InnovateAPI.showAlert('Restored', 'success');
   }

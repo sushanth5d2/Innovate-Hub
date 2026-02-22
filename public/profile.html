@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="/css/shared-tasks-notes.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Macondo&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
@@ -2159,9 +2160,19 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           Tagged
         </button>
+        <button class="pf-ig-tab" id="pf-ig-tab-tasks" onclick="switchIgTab('tasks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Tasks
+        </button>
+        <button class="pf-ig-tab" id="pf-ig-tab-notes" onclick="switchIgTab('notes')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Notes
+        </button>
       </div>
       <!-- Posts Grid -->
       <div class="pf-ig-grid" id="pf-ig-grid"></div>
+      <!-- Shared Tasks/Notes Container (shown when tasks or notes tab is active) -->
+      <div id="pf-shared-tasks-notes" style="display: none; padding: 16px 0;"></div>
     </section>
 
     <!-- Footer -->
@@ -3593,7 +3604,31 @@
       currentIgTab = tab;
       document.querySelectorAll('.pf-ig-tab').forEach(t => t.classList.remove('active'));
       document.getElementById('pf-ig-tab-' + tab).classList.add('active');
-      renderIgGrid(tab);
+
+      const grid = document.getElementById('pf-ig-grid');
+      const stnContainer = document.getElementById('pf-shared-tasks-notes');
+
+      if (tab === 'tasks' || tab === 'notes') {
+        // Show shared tasks/notes component, hide posts grid
+        if (grid) grid.style.display = 'none';
+        if (stnContainer) stnContainer.style.display = 'block';
+        // Only show tasks/notes for own profile
+        if (isOwnPortfolio && portfolioUserId) {
+          SharedTasksNotes.init({
+            contextType: 'user',
+            contextId: portfolioUserId,
+            container: '#pf-shared-tasks-notes',
+            activeTab: tab
+          });
+        } else {
+          stnContainer.innerHTML = '<div style="text-align:center;padding:40px;color:var(--pf-text2);"><i class="fas fa-lock" style="font-size:32px;margin-bottom:12px;display:block;"></i>Tasks and notes are private</div>';
+        }
+      } else {
+        // Show posts grid, hide shared tasks/notes
+        if (grid) grid.style.display = '';
+        if (stnContainer) stnContainer.style.display = 'none';
+        renderIgGrid(tab);
+      }
     }
 
     function renderIgGrid(tab) {
@@ -3960,5 +3995,6 @@
     // Init
     initPortfolio();
   </script>
+  <script src="/js/shared-tasks-notes.js"></script>
 </body>
 </html>

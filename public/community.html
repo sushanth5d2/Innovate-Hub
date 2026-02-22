@@ -6548,7 +6548,7 @@
       footer.style.display = 'none';
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/tasks`);
+        const res = await InnovateAPI.apiRequest(`/shared/tasks?context_type=group&context_id=${groupId}`);
         const tasks = res.tasks || [];
         
         // Group tasks by status
@@ -6569,7 +6569,7 @@
             <button class="btn btn-secondary" onclick="createTaskFromVoice()">
               <i class="fas fa-microphone"></i> From Voice
             </button>
-            <button class="btn btn-secondary" onclick="showTaskCalendar(${groupId})">
+            <button class="btn btn-secondary" onclick="showTaskCalendar(${groupId}, 'grid')">
               <i class="fas fa-calendar"></i> Calendar View
             </button>
             <button class="btn btn-secondary" onclick="loadTasksView(${groupId})">
@@ -6641,11 +6641,15 @@
       
       return tasks.map(task => {
         let subtasks = [];
+        let taskAssignees = [];
         try {
           subtasks = task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [];
         } catch (e) {
           console.error('Error parsing subtasks:', e);
         }
+        try {
+          taskAssignees = task.assignees ? (typeof task.assignees === 'string' ? JSON.parse(task.assignees) : task.assignees) : [];
+        } catch (e) { taskAssignees = []; }
         
         const totalSubtasks = subtasks.length;
         const completedSubtasks = subtasks.filter(st => st.completed).length;
@@ -6698,6 +6702,7 @@
           <div class="kanban-task-title">${task.title}</div>
           ${task.description ? `<div class="kanban-task-desc">${task.description.substring(0, 80)}${task.description.length > 80 ? '...' : ''}</div>` : ''}
           ${totalSubtasks > 0 ? `<div class="kanban-task-subtasks"><i class="fas fa-check-circle"></i> ${completedSubtasks}/${totalSubtasks} steps</div>` : ''}
+          ${taskAssignees.length > 0 ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${taskAssignees.map(a => `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;background:rgba(0,149,246,0.15);color:var(--ig-blue);font-size:11px;font-weight:600;">@${a.username}</span>`).join('')}</div>` : ''}
           <div class="kanban-task-footer">
             ${task.due_date ? `<span class="task-due ${dueDateClass}"><i class="fas fa-calendar"></i> ${dueDateText}</span>` : ''}
             ${task.progress !== null && task.progress !== undefined ? `<span class="task-progress-chip">${task.progress}%</span>` : ''}
@@ -6725,9 +6730,9 @@
       if (!draggedTaskId) return;
       
       try {
-        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${draggedTaskId}`, {
+        await InnovateAPI.apiRequest(`/shared/tasks/${draggedTaskId}`, {
           method: 'PATCH',
-          body: JSON.stringify({ status: newStatus })
+          body: JSON.stringify({ status: newStatus, context_type: 'group', context_id: state.currentGroupId })
         });
         
         loadTasksView(state.currentGroupId);
@@ -6747,6 +6752,7 @@
     window.openTaskModal = function(task = null) {
       const isEdit = !!task;
       let subtasks = [];
+      let assignees = [];
       
       if (task?.subtasks) {
         try {
@@ -6755,6 +6761,11 @@
           console.error('Error parsing subtasks:', e);
           subtasks = [];
         }
+      }
+      if (task?.assignees) {
+        try {
+          assignees = typeof task.assignees === 'string' ? JSON.parse(task.assignees) : task.assignees;
+        } catch (e) { assignees = []; }
       }
       
       const modalHTML = `
@@ -6788,6 +6799,23 @@
                     <option value="medium" ${task?.priority === 'medium' || !task ? 'selected' : ''}>Medium</option>
                     <option value="high" ${task?.priority === 'high' ? 'selected' : ''}>High</option>
                   </select>
+                </div>
+
+                <div class="task-form-group">
+                  <label>Assign To <span style="font-size:12px;color:var(--ig-secondary-text);">(type @ to mention)</span></label>
+                  <div id="taskAssigneeTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                    ${assignees.map(a => `
+                      <span class="task-mention-tag" data-user-id="${a.id}" data-username="${a.username}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;background:var(--ig-blue);color:#fff;font-size:13px;font-weight:600;">
+                        @${a.username}
+                        <button type="button" onclick="removeTaskAssignee(this)" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;padding:0 2px;">×</button>
+                      </span>
+                    `).join('')}
+                  </div>
+                  <div style="position:relative;">
+                    <input type="text" id="taskMentionInput" placeholder="@username to assign..." autocomplete="off"
+                      oninput="handleTaskMentionInput(this)" onkeydown="handleTaskMentionKeydown(event)">
+                    <div id="taskMentionDropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;max-height:180px;overflow-y:auto;background:var(--ig-primary-background);border:1px solid var(--ig-border);border-radius:12px;margin-bottom:4px;box-shadow:0 -4px 20px rgba(0,0,0,0.3);z-index:1000;"></div>
+                  </div>
                 </div>
                 
                 <div class="task-form-group">
@@ -6849,6 +6877,122 @@
       updateTaskProgress();
     };
 
+    // ===== Task @Mention / Assignee functions =====
+    let taskMentionDebounce = null;
+
+    window.handleTaskMentionInput = function(input) {
+      const val = input.value;
+      const dropdown = document.getElementById('taskMentionDropdown');
+      if (!val || val.length < 1) {
+        dropdown.style.display = 'none';
+        return;
+      }
+      // Search for users (strip leading @)
+      const query = val.startsWith('@') ? val.slice(1) : val;
+      if (!query) { dropdown.style.display = 'none'; return; }
+
+      clearTimeout(taskMentionDebounce);
+      taskMentionDebounce = setTimeout(async () => {
+        try {
+          let users = [];
+          // If in a group context, search group members first
+          if (state.currentGroupId) {
+            const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/members`);
+            const members = res.members || res || [];
+            users = members.filter(m =>
+              m.username && m.username.toLowerCase().includes(query.toLowerCase())
+            ).slice(0, 10);
+          }
+          // Fallback: search all users
+          if (users.length === 0) {
+            const res = await InnovateAPI.apiRequest(`/search/users?q=${encodeURIComponent(query)}&limit=10`);
+            users = res.users || res || [];
+          }
+          // Filter out already assigned
+          const existingIds = Array.from(document.querySelectorAll('#taskAssigneeTags .task-mention-tag'))
+            .map(t => t.dataset.userId);
+          users = users.filter(u => !existingIds.includes(String(u.id || u.user_id)));
+
+          if (users.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+          }
+          dropdown.innerHTML = users.map(u => `
+            <div class="task-mention-item" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;"
+                 onmouseenter="this.style.background='var(--ig-secondary-background)'"
+                 onmouseleave="this.style.background='none'"
+                 onclick="selectTaskAssignee(${u.id || u.user_id}, '${(u.username || '').replace(/'/g, "\\'")}', '${(u.profile_picture || '/images/default-avatar.svg').replace(/'/g, "\\'")}')">
+              <img src="${u.profile_picture || '/images/default-avatar.svg'}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'">
+              <div>
+                <div style="font-weight:600;font-size:14px;color:var(--ig-primary-text);">${u.username}</div>
+                ${u.display_name ? `<div style="font-size:12px;color:var(--ig-secondary-text);">${u.display_name}</div>` : ''}
+              </div>
+            </div>
+          `).join('');
+          dropdown.style.display = 'block';
+        } catch (e) {
+          console.error('Mention search error:', e);
+          dropdown.style.display = 'none';
+        }
+      }, 250);
+    };
+
+    window.handleTaskMentionKeydown = function(event) {
+      const dropdown = document.getElementById('taskMentionDropdown');
+      if (!dropdown || dropdown.style.display === 'none') return;
+      const items = dropdown.querySelectorAll('.task-mention-item');
+      const active = dropdown.querySelector('.task-mention-item[data-active="true"]');
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (!active && items.length) { items[0].dataset.active = 'true'; items[0].style.background = 'var(--ig-secondary-background)'; }
+        else if (active) {
+          const idx = Array.from(items).indexOf(active);
+          active.dataset.active = ''; active.style.background = 'none';
+          const next = items[(idx + 1) % items.length]; next.dataset.active = 'true'; next.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (active) {
+          const idx = Array.from(items).indexOf(active);
+          active.dataset.active = ''; active.style.background = 'none';
+          const prev = items[(idx - 1 + items.length) % items.length]; prev.dataset.active = 'true'; prev.style.background = 'var(--ig-secondary-background)';
+        }
+      } else if (event.key === 'Enter' && (active || items.length)) {
+        event.preventDefault();
+        (active || items[0]).click();
+      } else if (event.key === 'Escape') {
+        dropdown.style.display = 'none';
+      }
+    };
+
+    window.selectTaskAssignee = function(userId, username, avatar) {
+      const tagsEl = document.getElementById('taskAssigneeTags');
+      const input = document.getElementById('taskMentionInput');
+      const dropdown = document.getElementById('taskMentionDropdown');
+      // Add tag
+      const tag = document.createElement('span');
+      tag.className = 'task-mention-tag';
+      tag.dataset.userId = userId;
+      tag.dataset.username = username;
+      tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;background:var(--ig-blue);color:#fff;font-size:13px;font-weight:600;';
+      tag.innerHTML = `@${username}<button type="button" onclick="removeTaskAssignee(this)" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;padding:0 2px;">×</button>`;
+      tagsEl.appendChild(tag);
+      input.value = '';
+      dropdown.style.display = 'none';
+      input.focus();
+    };
+
+    window.removeTaskAssignee = function(btn) {
+      btn.closest('.task-mention-tag').remove();
+    };
+
+    window.getTaskAssignees = function() {
+      return Array.from(document.querySelectorAll('#taskAssigneeTags .task-mention-tag')).map(t => ({
+        id: parseInt(t.dataset.userId),
+        username: t.dataset.username
+      }));
+    };
+
     window.updateTaskProgress = function() {
       const subtaskItems = document.querySelectorAll('.subtask-item');
       const total = subtaskItems.length;
@@ -6872,6 +7016,7 @@
       const description = document.getElementById('taskDescription').value.trim();
       const dueDate = document.getElementById('taskDueDate').value;
       const priority = document.getElementById('taskPriority').value;
+      const assignees = getTaskAssignees();
       
       // Collect subtasks
       const subtaskItems = document.querySelectorAll('.subtask-item');
@@ -6888,7 +7033,7 @@
       try {
         if (taskId) {
           // Update existing task
-          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${taskId}`, {
+          await InnovateAPI.apiRequest(`/shared/tasks/${taskId}`, {
             method: 'PATCH',
             body: JSON.stringify({
               title,
@@ -6896,13 +7041,16 @@
               due_date: dueDate || null,
               priority,
               subtasks: JSON.stringify(subtasks),
-              progress
+              progress,
+              assignees: JSON.stringify(assignees),
+              context_type: 'group',
+              context_id: state.currentGroupId
             })
           });
           InnovateAPI.showAlert('Task updated!', 'success');
         } else {
           // Create new task
-          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-text`, {
+          await InnovateAPI.apiRequest(`/shared/tasks/from-text`, {
             method: 'POST',
             body: JSON.stringify({
               text: title,
@@ -6910,7 +7058,10 @@
               due_date: dueDate || null,
               priority,
               subtasks: JSON.stringify(subtasks),
-              progress
+              progress,
+              assignees: JSON.stringify(assignees),
+              context_type: 'group',
+              context_id: state.currentGroupId
             })
           });
           InnovateAPI.showAlert('Task created!', 'success');
@@ -6927,7 +7078,7 @@
     window.editTask = async function(taskId) {
       try {
         // Fetch the task details
-        const tasks = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks`);
+        const tasks = await InnovateAPI.apiRequest(`/shared/tasks?context_type=group&context_id=${state.currentGroupId}`);
         const task = tasks.tasks.find(t => t.id === taskId);
         if (!task) {
           InnovateAPI.showAlert('Task not found', 'error');
@@ -6944,7 +7095,7 @@
       if (!confirm('Delete this task? This cannot be undone.')) return;
       
       try {
-        await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/${taskId}`, {
+        await InnovateAPI.apiRequest(`/shared/tasks/${taskId}?context_type=group&context_id=${state.currentGroupId}`, {
           method: 'DELETE'
         });
         loadTasksView(state.currentGroupId);
@@ -6965,9 +7116,11 @@
 
         const formData = new FormData();
         formData.append('image', file);
+        formData.append('context_type', 'group');
+        formData.append('context_id', state.currentGroupId);
 
         try {
-          await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/tasks/from-image`, {
+          await InnovateAPI.apiRequest(`/shared/tasks/from-image`, {
             method: 'POST',
             body: formData
           });
@@ -6992,7 +7145,7 @@
       const content = document.getElementById('centerContent');
       
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/tasks`);
+        const res = await InnovateAPI.apiRequest(`/shared/tasks?context_type=group&context_id=${groupId}`);
         const tasks = res.tasks || [];
         
         // Persist calendar state per group so month navigation works
@@ -7360,7 +7513,7 @@
         console.log('Loading notes for group:', groupId);
         // Add timestamp to prevent caching
         const timestamp = new Date().getTime();
-        const res = await InnovateAPI.apiRequest(`/community-groups/${groupId}/notes?_t=${timestamp}`);
+        const res = await InnovateAPI.apiRequest(`/shared/notes?context_type=group&context_id=${groupId}&_t=${timestamp}`);
         let notes = res.notes || [];
         console.log('Loaded notes:', notes.length);
         
@@ -7473,7 +7626,7 @@
 
     async function togglePinNote(noteId, isPinned) {
       try {
-        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/pin`, {
+        await InnovateAPI.apiRequest(`/shared/notes/${noteId}/pin`, {
           method: 'PUT',
           body: JSON.stringify({ is_pinned: isPinned })
         });
@@ -7486,7 +7639,7 @@
 
     async function toggleLockNote(noteId, isLocked) {
       try {
-        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/lock`, {
+        await InnovateAPI.apiRequest(`/shared/notes/${noteId}/lock`, {
           method: 'PUT',
           body: JSON.stringify({ is_locked: isLocked })
         });
@@ -7499,7 +7652,7 @@
 
     async function toggleArchiveNote(noteId, isArchived) {
       try {
-        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/archive`, {
+        await InnovateAPI.apiRequest(`/shared/notes/${noteId}/archive`, {
           method: 'PUT',
           body: JSON.stringify({ is_archived: isArchived })
         });
@@ -7512,7 +7665,7 @@
 
     async function duplicateNote(noteId) {
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}/duplicate`, {
+        const res = await InnovateAPI.apiRequest(`/shared/notes/${noteId}/duplicate`, {
           method: 'POST'
         });
         InnovateAPI.showAlert('Note duplicated!', 'success');
@@ -7523,7 +7676,7 @@
     }
 
     async function shareNote(noteId) {
-      const noteUrl = `${window.location.origin}/note-editor.html?id=${noteId}`;
+      const noteUrl = `${window.location.origin}/shared-note-editor.html?id=${noteId}`;
       try {
         await navigator.clipboard.writeText(noteUrl);
         InnovateAPI.showAlert('Note link copied to clipboard!', 'success');
@@ -7536,7 +7689,7 @@
       if (!confirm('Are you sure you want to delete this note? This cannot be undone.')) return;
       
       try {
-        await InnovateAPI.apiRequest(`/community-groups/notes/${noteId}`, {
+        await InnovateAPI.apiRequest(`/shared/notes/${noteId}`, {
           method: 'DELETE'
         });
         InnovateAPI.showAlert('Note deleted!', 'success');
@@ -7596,9 +7749,9 @@
       if (!title) return;
 
       try {
-        const res = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/notes`, {
+        const res = await InnovateAPI.apiRequest(`/shared/notes`, {
           method: 'POST',
-          body: JSON.stringify({ title, content_md: '' })
+          body: JSON.stringify({ title, content_md: '', context_type: 'group', context_id: state.currentGroupId })
         });
         console.log('Note created successfully');
         closeModal();
@@ -7610,7 +7763,7 @@
     }
 
     function openNote(noteId) {
-      window.open(`/note-editor.html?id=${noteId}`, '_blank');
+      window.open(`/shared-note-editor.html?id=${noteId}`, '_blank');
     }
 
     // ==================== MODALS ====================

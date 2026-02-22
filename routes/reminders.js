@@ -179,23 +179,78 @@ router.get('/', authMiddleware, (req, res) => {
     }
   );
 
-  // 5. Community group todos with due dates
+  // 5. Shared tasks with due dates (personal + group)
+  const totalQueries5 = 2;
+  let completed5 = 0;
+  const finish5 = () => {
+    completed5++;
+    if (completed5 === totalQueries5) finish();
+  };
+
+  // 5a. Personal shared tasks (with AND without due dates)
   db.all(
-    `SELECT t.id, t.title, t.description, t.due_date, t.priority, t.status,
-            cg.name as group_name, cg.id as group_id
-     FROM community_group_tasks t
-     JOIN community_groups cg ON t.group_id = cg.id
-     JOIN community_group_members m ON cg.id = m.group_id AND m.user_id = ?
-     WHERE t.due_date IS NOT NULL AND t.status != 'done'
-     ORDER BY t.due_date ASC`,
+    `SELECT t.id, t.title, t.description, t.due_date, t.priority, t.status, t.assignees,
+            t.context_type, t.context_id
+     FROM shared_tasks t
+     WHERE t.context_type = 'user' AND t.context_id = ? AND t.status != 'done'
+     ORDER BY CASE WHEN t.due_date IS NOT NULL THEN 0 ELSE 1 END, t.due_date ASC`,
     [userId],
     (err, rows) => {
       if (!err && rows) {
         rows.forEach(r => {
           allReminders.push({
-            id: `todo-${r.id}`,
+            id: `todo-user-${r.id}`,
             title: `📋 ${r.title}`,
-            description: r.description || `From group: ${r.group_name}`,
+            description: r.description || 'Personal task',
+            reminder_date: r.due_date || null,
+            reminder_time: null,
+            type: 'todo',
+            source: 'personal_todo',
+            source_type: 'user_task',
+            source_id: r.id,
+            group_name: null,
+            group_id: null,
+            priority: r.priority,
+            task_status: r.status,
+            assignees: r.assignees,
+            has_due_date: !!r.due_date,
+            is_notified: false,
+            color: r.priority === 'high' ? '#f44336' : r.priority === 'medium' ? '#ff9800' : '#2196f3',
+            created_at: null
+          });
+        });
+      }
+      finish5();
+    }
+  );
+
+  // 5b. Group shared tasks with due dates + legacy community_group_tasks
+  db.all(
+    `SELECT t.id, t.title, t.description, t.due_date, t.priority, t.status, t.assignees,
+            t.context_type, t.context_id,
+            cg.name as group_name
+     FROM shared_tasks t
+     LEFT JOIN community_groups cg ON t.context_type = 'group' AND t.context_id = cg.id
+     WHERE t.context_type = 'group' AND t.due_date IS NOT NULL AND t.status != 'done'
+       AND t.context_id IN (SELECT group_id FROM community_group_members WHERE user_id = ?)
+     UNION ALL
+     SELECT t.id, t.title, t.description, t.due_date, t.priority, t.status, NULL as assignees,
+            'group' as context_type, t.group_id as context_id,
+            cg.name as group_name
+     FROM community_group_tasks t
+     JOIN community_groups cg ON t.group_id = cg.id
+     JOIN community_group_members m ON cg.id = m.group_id AND m.user_id = ?
+     WHERE t.due_date IS NOT NULL AND t.status != 'done'
+       AND t.id NOT IN (SELECT id FROM shared_tasks WHERE context_type = 'group')
+     ORDER BY due_date ASC`,
+    [userId, userId],
+    (err, rows) => {
+      if (!err && rows) {
+        rows.forEach(r => {
+          allReminders.push({
+            id: `todo-grp-${r.id}`,
+            title: `📋 ${r.title}`,
+            description: r.description || `From group: ${r.group_name || 'Unknown'}`,
             reminder_date: r.due_date,
             reminder_time: null,
             type: 'todo',
@@ -203,16 +258,17 @@ router.get('/', authMiddleware, (req, res) => {
             source_type: 'group_task',
             source_id: r.id,
             group_name: r.group_name,
-            group_id: r.group_id,
+            group_id: r.context_id,
             priority: r.priority,
             task_status: r.status,
+            assignees: r.assignees,
             is_notified: false,
             color: r.priority === 'high' ? '#f44336' : r.priority === 'medium' ? '#ff9800' : '#2196f3',
             created_at: null
           });
         });
       }
-      finish();
+      finish5();
     }
   );
 });
@@ -289,15 +345,35 @@ router.get('/calendar', authMiddleware, (req, res) => {
     }
   );
 
-  // Community todos
+  // Shared tasks (personal + group) with due dates
+  const totalCal5 = 2;
+  let completedCal5 = 0;
+  const finishCal5 = () => { completedCal5++; if (completedCal5 === totalCal5) finish(); };
+
   db.all(
-    `SELECT t.due_date FROM community_group_tasks t
-     JOIN community_group_members m ON t.group_id = m.group_id AND m.user_id = ?
-     WHERE t.due_date IS NOT NULL AND t.status != 'done' AND t.due_date >= ? AND t.due_date < ?`,
+    `SELECT due_date FROM shared_tasks
+     WHERE context_type = 'user' AND context_id = ? AND due_date IS NOT NULL AND status != 'done'
+       AND due_date >= ? AND due_date < ?`,
     [userId, startDate, endDate],
     (err, rows) => {
       if (!err && rows) rows.forEach(r => addDate(r.due_date, 'todo', '#ff9800'));
-      finish();
+      finishCal5();
+    }
+  );
+  db.all(
+    `SELECT t.due_date FROM shared_tasks t
+     WHERE t.context_type = 'group' AND t.due_date IS NOT NULL AND t.status != 'done'
+       AND t.due_date >= ? AND t.due_date < ?
+       AND t.context_id IN (SELECT group_id FROM community_group_members WHERE user_id = ?)
+     UNION ALL
+     SELECT t.due_date FROM community_group_tasks t
+     JOIN community_group_members m ON t.group_id = m.group_id AND m.user_id = ?
+     WHERE t.due_date IS NOT NULL AND t.status != 'done' AND t.due_date >= ? AND t.due_date < ?
+       AND t.id NOT IN (SELECT id FROM shared_tasks WHERE context_type = 'group')`,
+    [startDate, endDate, userId, userId, startDate, endDate],
+    (err, rows) => {
+      if (!err && rows) rows.forEach(r => addDate(r.due_date, 'todo', '#ff9800'));
+      finishCal5();
     }
   );
 });
