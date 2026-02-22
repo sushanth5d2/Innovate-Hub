@@ -516,7 +516,8 @@ router.post('/ai-preview', authMiddleware, async (req, res) => {
 IMPORTANT RULES:
 1. If the user clearly states WHAT + WHEN (date/time), it's COMPLETE. Set "complete": true
 2. If missing date OR title, set "complete": false and "missing_fields": ["date"] or ["title"] etc.
-3. If user says "delete", "remove", "cancel" a reminder, set "intent": "delete" with "search_query" of what to delete
+3. If user says "delete", "remove", "cancel" a reminder, set "intent": "delete" with "search_query" being the EXACT item names the user mentioned (keep "and" between multiple items, e.g. "outing and meeting with friends")
+4. If the user says to delete AND create in one sentence (e.g. "delete outing and create lunch"), split them: set "intent": "delete" with search_query for the delete part
 4. If user mentions priority (high/medium/low/urgent/important), extract it. Default: "low"
 5. Generate a natural, friendly spoken_message (as if a human assistant is talking)
 
@@ -572,8 +573,8 @@ spoken_message for DELETE:
     if (!parsed) {
       const lower = prompt.toLowerCase();
       // Detect delete intent
-      if (/\b(delete|remove|cancel|get rid of)\b/.test(lower)) {
-        const searchQuery = lower.replace(/\b(delete|remove|cancel|get rid of|the|my|reminder|for|about)\b/g, '').trim();
+      if (/\b(delete|remove|cancel|get rid of|erase|clear|trash)\b/.test(lower)) {
+        const searchQuery = lower.replace(/\b(delete|remove|cancel|get rid of|erase|clear|trash|the|my|reminder|reminders|for|about|please|all|every|everything)\b/g, '').trim();
         return res.json({
           success: true,
           action: 'delete',
@@ -629,33 +630,170 @@ spoken_message for DELETE:
     // Handle delete intent
     if (parsed.intent === 'delete') {
       const searchQuery = parsed.search_query || parsed.title || '';
-      // Find matching reminders
+      const lower = (prompt || '').toLowerCase();
+
+      // Check if user wants to delete ALL reminders (e.g., "delete all reminders", "remove everything")
+      const isDeleteAll = /\b(delete all|remove all|clear all|delete every|remove every|delete all reminders|remove all reminders|delete everything|remove everything|clear everything)\b/i.test(lower);
+
+      // SMART: Parse multi-item references from ORIGINAL user prompt (not just AI's search_query)
+      // This catches "delete outing and a meeting with friends" correctly
+      const cleanedPrompt = lower
+        .replace(/\b(please|can you|could you|i want to|i'd like to|i want you to|go ahead and)\b/gi, '')
+        .replace(/\b(delete|remove|erase|clear|trash|get rid of|cancel)\b/gi, '')
+        .replace(/\b(the|my|a|an|those|these|that|this|some|old|new)\b/gi, '')
+        .replace(/\b(reminder|reminders|one|ones|item|items|thing|things)\b/gi, '')
+        .replace(/\b(for me|for|about|named|called)\b/gi, '')
+        .trim();
+      const promptParts = cleanedPrompt.split(/\s*(?:,|\band\b|&|\+)\s*/).map(s => s.trim()).filter(s => s.length > 0);
+      // Also keep AI's search_query split
+      const aiParts = searchQuery.split(/\s*(?:,|\band\b|&|\+)\s*/).map(s => s.trim()).filter(s => s.length > 0);
+      // Use whichever has more items (better split)
+      const multiItems = promptParts.length >= aiParts.length ? promptParts : aiParts;
+
       return new Promise((resolve) => {
-        db.all(
-          `SELECT id, title, reminder_date, reminder_time FROM user_reminders
-           WHERE user_id = ? AND is_dismissed = 0 AND LOWER(title) LIKE ?
-           ORDER BY reminder_date DESC LIMIT 5`,
-          [userId, `%${searchQuery.toLowerCase()}%`],
-          (err, rows) => {
-            if (!err && rows && rows.length > 0) {
-              res.json({
-                success: true,
-                action: 'delete',
-                matches: rows,
-                spoken_message: rows.length === 1
-                  ? `I found "${rows[0].title}". Should I delete it?`
-                  : `I found ${rows.length} matching reminders. Which one should I delete?`
-              });
-            } else {
-              res.json({
-                success: true,
-                action: 'delete_not_found',
-                spoken_message: "I couldn't find a matching reminder. Could you be more specific?"
-              });
+        if (isDeleteAll) {
+          // Delete ALL: return all undismissed reminders
+          db.all(
+            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+             WHERE user_id = ? AND is_dismissed = 0
+             ORDER BY reminder_date DESC LIMIT 50`,
+            [userId],
+            (err, rows) => {
+              if (!err && rows && rows.length > 0) {
+                res.json({
+                  success: true,
+                  action: 'delete',
+                  matches: rows,
+                  spoken_message: `I found ${rows.length} reminders. Deleting all of them now.`
+                });
+              } else {
+                res.json({
+                  success: true,
+                  action: 'delete_not_found',
+                  spoken_message: "You don't have any reminders to delete."
+                });
+              }
+              resolve();
             }
-            resolve();
-          }
-        );
+          );
+        } else if (multiItems.length > 1) {
+          // Multiple search terms — find matches for each
+          db.all(
+            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+             WHERE user_id = ? AND is_dismissed = 0
+             ORDER BY reminder_date DESC`,
+            [userId],
+            (err, rows) => {
+              if (!err && rows && rows.length > 0) {
+                const allMatches = [];
+                const matchedIds = new Set();
+
+                // Helper: try to match a term against all rows
+                const tryMatchTerm = (term) => {
+                  const termLower = term.toLowerCase();
+                  let found = false;
+                  rows.forEach(r => {
+                    if (!matchedIds.has(r.id) && r.title.toLowerCase().includes(termLower)) {
+                      allMatches.push(r);
+                      matchedIds.add(r.id);
+                      found = true;
+                    }
+                  });
+                  return found;
+                };
+
+                multiItems.forEach(term => {
+                  // Try full term first (e.g. "team meeting")
+                  if (tryMatchTerm(term)) return;
+                  // If multi-word term didn't match, split by spaces and try each word
+                  // e.g. "outing meeting" -> try "outing" then "meeting" separately
+                  const subTerms = term.split(/\s+/).filter(s => s.length > 0);
+                  if (subTerms.length > 1) {
+                    subTerms.forEach(sub => tryMatchTerm(sub));
+                  }
+                });
+                if (allMatches.length > 0) {
+                  res.json({
+                    success: true,
+                    action: 'delete',
+                    matches: allMatches,
+                    spoken_message: allMatches.length === 1
+                      ? `I found "${allMatches[0].title}". Deleting it now.`
+                      : `I found ${allMatches.length} matching reminders. Deleting them now.`
+                  });
+                } else {
+                  // Fallback: try as single search
+                  const fallback = rows.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase()));
+                  if (fallback.length > 0) {
+                    res.json({ success: true, action: 'delete', matches: fallback,
+                      spoken_message: fallback.length === 1 ? `I found "${fallback[0].title}".` : `I found ${fallback.length} matching reminders.` });
+                  } else {
+                    res.json({ success: true, action: 'delete_not_found', spoken_message: "I couldn't find matching reminders. Could you be more specific?" });
+                  }
+                }
+              } else {
+                res.json({ success: true, action: 'delete_not_found', spoken_message: "I couldn't find a matching reminder. Could you be more specific?" });
+              }
+              resolve();
+            }
+          );
+        } else {
+          // Single search term — try exact match first, then split by spaces
+          db.all(
+            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+             WHERE user_id = ? AND is_dismissed = 0
+             ORDER BY reminder_date DESC`,
+            [userId],
+            (err, rows) => {
+              if (!err && rows && rows.length > 0) {
+                // Try full-phrase LIKE match first
+                const sqLower = searchQuery.toLowerCase();
+                let matches = rows.filter(r => r.title.toLowerCase().includes(sqLower));
+
+                // If no full-phrase match and query has multiple words, try each word
+                if (matches.length === 0 && searchQuery.includes(' ')) {
+                  const words = searchQuery.split(/\s+/).filter(w => w.length > 1);
+                  const matchedIds = new Set();
+                  words.forEach(word => {
+                    const wLower = word.toLowerCase();
+                    rows.forEach(r => {
+                      if (!matchedIds.has(r.id) && r.title.toLowerCase().includes(wLower)) {
+                        matches.push(r);
+                        matchedIds.add(r.id);
+                      }
+                    });
+                  });
+                }
+
+                if (matches.length > 0) {
+                  // Limit to 10
+                  matches = matches.slice(0, 10);
+                  res.json({
+                    success: true,
+                    action: 'delete',
+                    matches: matches,
+                    spoken_message: matches.length === 1
+                      ? `Deleting "${matches[0].title}" now.`
+                      : `Found ${matches.length} matching reminders.`
+                  });
+                } else {
+                  res.json({
+                    success: true,
+                    action: 'delete_not_found',
+                    spoken_message: "I couldn't find a matching reminder. Could you be more specific?"
+                  });
+                }
+              } else {
+                res.json({
+                  success: true,
+                  action: 'delete_not_found',
+                  spoken_message: "I couldn't find a matching reminder. Could you be more specific?"
+                });
+              }
+              resolve();
+            }
+          );
+        }
       });
     }
 

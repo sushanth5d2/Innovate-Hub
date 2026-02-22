@@ -8,6 +8,18 @@
 
 const axios = require('axios');
 
+// ===================== Google GenAI SDK (Official) =====================
+let _geminiClient = null;
+function getGeminiClient() {
+  if (!_geminiClient) {
+    const { GoogleGenAI } = require('@google/genai');
+    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY || '';
+    if (!apiKey) throw new Error('GOOGLE_AI_API_KEY not set');
+    _geminiClient = new GoogleGenAI({ apiKey });
+  }
+  return _geminiClient;
+}
+
 // ===================== Local AI Auto-Detection =====================
 // Automatically detect local AI services — no env config needed
 
@@ -533,8 +545,23 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
   { provider: 'gpt4all', modelId: 'gpt4all/default', envKey: '_AUTO_DETECT_' },
   { provider: 'jan', modelId: 'jan/default', envKey: '_AUTO_DETECT_' },
   { provider: 'koboldcpp', modelId: 'koboldcpp/default', envKey: '_AUTO_DETECT_' },
+  // Gemini 3.x (newest)
+  { provider: 'google', modelId: 'gemini-3.1-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-3-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-3-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemini 2.5
+  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-pro', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemini 2.0
   { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-1.5-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.0-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
+  // Latest aliases
+  { provider: 'google', modelId: 'gemini-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-pro-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemma open models
+  { provider: 'google', modelId: 'gemma-3-27b-it', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'groq', modelId: 'qwen/qwen3-32b', envKey: 'GROQ_API_KEY' },
   { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
   { provider: 'cohere', modelId: 'command-r-plus', envKey: 'COHERE_API_KEY' },
@@ -799,19 +826,171 @@ const AI_MODELS = {
     envKey: 'OPENAI_API_KEY'
   },
 
-  // Google Gemini Models (generous free tier)
+  // ===== Google Gemini Models (ALL 43 models from Google AI API) =====
+
+  // --- Gemini 3.x Series (Latest & Most Powerful) ---
+  'gemini-3.1-pro-preview': {
+    provider: 'google',
+    name: 'Gemini 3.1 Pro Preview',
+    description: 'FREE - Newest Gemini 3.1 Pro, 1M context, 65K output',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-3.1-pro-preview-customtools': {
+    provider: 'google',
+    name: 'Gemini 3.1 Pro Custom Tools',
+    description: 'FREE - Gemini 3.1 Pro optimized for custom tool usage',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-3-pro-preview': {
+    provider: 'google',
+    name: 'Gemini 3 Pro Preview',
+    description: 'FREE - Gemini 3 Pro, 1M context, 65K output',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-3-flash-preview': {
+    provider: 'google',
+    name: 'Gemini 3 Flash Preview',
+    description: 'FREE - Gemini 3 Flash, fast & powerful, 1M context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-3-pro-image-preview': {
+    provider: 'google',
+    name: 'Gemini 3 Pro Image',
+    description: 'FREE - Gemini 3 Pro with image generation, 128K context',
+    maxTokens: 32768,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- Gemini 2.5 Series ---
+  'gemini-2.5-flash': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash',
+    description: 'FREE - Stable 2.5 Flash with thinking, 1M context, 65K output',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-pro': {
+    provider: 'google',
+    name: 'Gemini 2.5 Pro',
+    description: 'FREE - Stable 2.5 Pro, thinking, 1M context, 65K output',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-flash-lite': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash-Lite',
+    description: 'FREE - Lightweight 2.5, 1M context, 65K output',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-flash-preview': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash Preview',
+    description: 'FREE - Preview of Gemini 2.5 Flash',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-flash-image': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash Image',
+    description: 'FREE - 2.5 Flash with image generation, 32K context',
+    maxTokens: 32768,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-flash-lite-preview-09-2025': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash-Lite Preview Sep 2025',
+    description: 'FREE - Preview of 2.5 Flash-Lite, 1M context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- Gemini 2.0 Series ---
   'gemini-2.0-flash': {
     provider: 'google',
     name: 'Gemini 2.0 Flash',
-    description: 'FREE tier available - Latest fast model',
+    description: 'FREE - Fast and versatile multimodal model, 1M context',
     maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.0-flash-001': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash 001',
+    description: 'FREE - Stable version of 2.0 Flash',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.0-flash-lite': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash-Lite',
+    description: 'FREE - Lightweight, fastest Gemini 2.0 model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.0-flash-lite-001': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash-Lite 001',
+    description: 'FREE - Stable version of 2.0 Flash-Lite',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.0-flash-exp-image-generation': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash Image Gen',
+    description: 'FREE - Experimental image generation model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- Gemini Latest Aliases ---
+  'gemini-flash-latest': {
+    provider: 'google',
+    name: 'Gemini Flash Latest',
+    description: 'FREE - Always points to latest Flash release, 1M context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-flash-lite-latest': {
+    provider: 'google',
+    name: 'Gemini Flash-Lite Latest',
+    description: 'FREE - Always points to latest Flash-Lite, 1M context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-pro-latest': {
+    provider: 'google',
+    name: 'Gemini Pro Latest',
+    description: 'FREE - Always points to latest Pro release, 1M context',
+    maxTokens: 65536,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
   'gemini-1.5-pro-latest': {
     provider: 'google',
     name: 'Gemini 1.5 Pro',
-    description: 'FREE tier - 1M context window',
+    description: 'FREE - 1M context window',
     maxTokens: 8192,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
@@ -819,8 +998,186 @@ const AI_MODELS = {
   'gemini-1.5-flash-latest': {
     provider: 'google',
     name: 'Gemini 1.5 Flash',
-    description: 'FREE tier - Fast and versatile',
+    description: 'FREE - Fast and versatile',
     maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- Special Purpose Gemini Models ---
+  'gemini-2.5-computer-use-preview-10-2025': {
+    provider: 'google',
+    name: 'Gemini 2.5 Computer Use',
+    description: 'FREE - Computer Use preview model, 128K context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'deep-research-pro-preview-12-2025': {
+    provider: 'google',
+    name: 'Deep Research Pro',
+    description: 'FREE - Deep Research model for complex queries, 128K context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-robotics-er-1.5-preview': {
+    provider: 'google',
+    name: 'Gemini Robotics ER 1.5',
+    description: 'FREE - Robotics embodied reasoning model, 1M context',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- TTS & Audio Models ---
+  'gemini-2.5-flash-preview-tts': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash TTS',
+    description: 'FREE - Text-to-speech preview, 8K input',
+    maxTokens: 16384,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-pro-preview-tts': {
+    provider: 'google',
+    name: 'Gemini 2.5 Pro TTS',
+    description: 'FREE - Pro text-to-speech preview',
+    maxTokens: 16384,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemini-2.5-flash-native-audio-latest': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash Native Audio',
+    description: 'FREE - Native audio processing, 128K context',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+
+  // --- Imagen (Image Generation) ---
+  'imagen-4.0-generate-001': {
+    provider: 'google',
+    name: 'Imagen 4',
+    description: 'Image generation model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'imagen-4.0-ultra-generate-001': {
+    provider: 'google',
+    name: 'Imagen 4 Ultra',
+    description: 'Premium image generation',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'imagen-4.0-fast-generate-001': {
+    provider: 'google',
+    name: 'Imagen 4 Fast',
+    description: 'Fast image generation',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+
+  // --- Veo (Video Generation) ---
+  'veo-3.1-generate-preview': {
+    provider: 'google',
+    name: 'Veo 3.1',
+    description: 'Latest video generation model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'veo-3.1-fast-generate-preview': {
+    provider: 'google',
+    name: 'Veo 3.1 Fast',
+    description: 'Fast video generation',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'veo-3.0-generate-001': {
+    provider: 'google',
+    name: 'Veo 3',
+    description: 'Video generation model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'veo-3.0-fast-generate-001': {
+    provider: 'google',
+    name: 'Veo 3 Fast',
+    description: 'Fast video generation',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'veo-2.0-generate-001': {
+    provider: 'google',
+    name: 'Veo 2',
+    description: 'Video generation model',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+
+  // --- Embedding & QA Models ---
+  'gemini-embedding-001': {
+    provider: 'google',
+    name: 'Gemini Embedding',
+    description: 'Text embedding model',
+    maxTokens: 1,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+  'aqa': {
+    provider: 'google',
+    name: 'Attributed QA',
+    description: 'Grounded question answering model',
+    maxTokens: 1024,
+    envKey: 'GOOGLE_AI_API_KEY'
+  },
+
+  // --- Google Gemma Open Models (FREE via Gemini API) ---
+  'gemma-3-27b-it': {
+    provider: 'google',
+    name: 'Gemma 3 27B',
+    description: 'FREE - Open model, 128K context',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemma-3-12b-it': {
+    provider: 'google',
+    name: 'Gemma 3 12B',
+    description: 'FREE - Open model, 32K context',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemma-3-4b-it': {
+    provider: 'google',
+    name: 'Gemma 3 4B',
+    description: 'FREE - Small open model, 32K context',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemma-3-1b-it': {
+    provider: 'google',
+    name: 'Gemma 3 1B',
+    description: 'FREE - Tiny open model, 32K context',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemma-3n-e4b-it': {
+    provider: 'google',
+    name: 'Gemma 3n E4B',
+    description: 'FREE - Efficient edge model',
+    maxTokens: 2048,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: true
+  },
+  'gemma-3n-e2b-it': {
+    provider: 'google',
+    name: 'Gemma 3n E2B',
+    description: 'FREE - Smallest edge model',
+    maxTokens: 2048,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
@@ -982,6 +1339,16 @@ const PROVIDER_CONFIGS = {
 
 // Vision-capable model priority (for image analysis)
 const INNOVATE_AI_VISION_PRIORITY = [
+  // Gemini 3.x (newest, most capable)
+  { provider: 'google', modelId: 'gemini-3.1-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-3-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-3-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemini 2.5
+  { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-pro', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-2.5-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemini 2.0
   { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-1.5-pro-latest', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-1.5-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
@@ -1757,26 +2124,38 @@ async function callHuggingFaceWithPrompt(modelId, apiKey, messages, temperature,
 }
 
 async function callGeminiWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
-  const url = `${PROVIDER_CONFIGS.google.baseUrl(modelId)}?key=${apiKey}`;
-  const contents = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }));
-  const payload = {
-    contents,
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { temperature, maxOutputTokens: maxTokens, topP: 0.95 }
-  };
-  const response = await axios.post(url, payload, {
-    headers: PROVIDER_CONFIGS.google.headers(), timeout: 15000
-  });
-  const candidate = response.data.candidates?.[0];
-  if (!candidate || !candidate.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
-  return {
-    content: candidate.content.parts[0].text,
-    model: modelId,
-    tokens: { prompt: response.data.usageMetadata?.promptTokenCount, completion: response.data.usageMetadata?.candidatesTokenCount, total: response.data.usageMetadata?.totalTokenCount }
-  };
+  try {
+    const client = getGeminiClient();
+    // Build contents from messages
+    const contents = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    const response = await client.models.generateContent({
+      model: modelId,
+      contents: contents,
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: temperature,
+        maxOutputTokens: maxTokens,
+        topP: 0.95
+      }
+    });
+    const text = response.text;
+    if (!text) throw new Error('No response from Gemini');
+    return {
+      content: text,
+      model: modelId,
+      tokens: {
+        prompt: response.usageMetadata?.promptTokenCount,
+        completion: response.usageMetadata?.candidatesTokenCount,
+        total: response.usageMetadata?.totalTokenCount
+      }
+    };
+  } catch (err) {
+    console.error('[Gemini SDK] callGeminiWithPrompt error:', err.message);
+    throw err;
+  }
 }
 
 async function callAnthropicWithPrompt(modelId, apiKey, messages, temperature, maxTokens, systemPrompt) {
@@ -1945,45 +2324,38 @@ async function callOpenAI(modelId, apiKey, messages, temperature, maxTokens) {
 }
 
 async function callGemini(modelId, apiKey, messages, temperature, maxTokens) {
-  const url = `${PROVIDER_CONFIGS.google.baseUrl(modelId)}?key=${apiKey}`;
-  
-  // Convert OpenAI-style messages to Gemini format
-  const contents = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }));
-
-  const payload = {
-    contents,
-    systemInstruction: {
-      parts: [{ text: SYSTEM_PROMPT }]
-    },
-    generationConfig: {
-      temperature,
-      maxOutputTokens: maxTokens,
-      topP: 0.95
-    }
-  };
-
-  const response = await axios.post(url, payload, {
-    headers: PROVIDER_CONFIGS.google.headers(),
-    timeout: 15000
-  });
-
-  const candidate = response.data.candidates?.[0];
-  if (!candidate || !candidate.content?.parts?.[0]?.text) {
-    throw new Error('No response generated by Gemini');
+  try {
+    const client = getGeminiClient();
+    // Convert OpenAI-style messages to Gemini format
+    const contents = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    const response = await client.models.generateContent({
+      model: modelId,
+      contents: contents,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: temperature,
+        maxOutputTokens: maxTokens,
+        topP: 0.95
+      }
+    });
+    const text = response.text;
+    if (!text) throw new Error('No response generated by Gemini');
+    return {
+      content: text,
+      model: modelId,
+      tokens: {
+        prompt: response.usageMetadata?.promptTokenCount,
+        completion: response.usageMetadata?.candidatesTokenCount,
+        total: response.usageMetadata?.totalTokenCount
+      }
+    };
+  } catch (err) {
+    console.error('[Gemini SDK] callGemini error:', err.message);
+    throw err;
   }
-
-  return {
-    content: candidate.content.parts[0].text,
-    model: modelId,
-    tokens: {
-      prompt: response.data.usageMetadata?.promptTokenCount,
-      completion: response.data.usageMetadata?.candidatesTokenCount,
-      total: response.data.usageMetadata?.totalTokenCount
-    }
-  };
 }
 
 async function callXAI(modelId, apiKey, messages, temperature, maxTokens) {
@@ -2364,66 +2736,58 @@ async function chatWithVision(modelId, messages, imageData, options = {}) {
  * Google Gemini Vision - Send image for analysis
  */
 async function callGeminiVision(modelId, apiKey, messages, imageData, temperature, maxTokens, systemPrompt) {
-  const url = `${PROVIDER_CONFIGS.google.baseUrl(modelId)}?key=${apiKey}`;
-  
-  // Build Gemini multimodal content
-  const contents = [];
-  
-  // Add conversation history (text only) 
-  for (const msg of messages.slice(0, -1)) {
-    contents.push({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
+  try {
+    const client = getGeminiClient();
+    // Build multimodal contents
+    const contents = [];
+    // Add conversation history (text only)
+    for (const msg of messages.slice(0, -1)) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      });
+    }
+    // Last message includes the image
+    const lastMsg = messages[messages.length - 1];
+    const lastParts = [];
+    // Add image data
+    lastParts.push({
+      inlineData: {
+        mimeType: imageData.mimeType,
+        data: imageData.base64
+      }
     });
-  }
-  
-  // Last message includes the image
-  const lastMsg = messages[messages.length - 1];
-  const lastParts = [];
-  
-  // Add image data
-  lastParts.push({
-    inline_data: {
-      mime_type: imageData.mimeType,
-      data: imageData.base64
+    // Add text prompt
+    if (lastMsg?.content) {
+      lastParts.push({ text: lastMsg.content });
     }
-  });
-  
-  // Add text prompt
-  if (lastMsg?.content) {
-    lastParts.push({ text: lastMsg.content });
+    contents.push({ role: 'user', parts: lastParts });
+
+    const response = await client.models.generateContent({
+      model: modelId,
+      contents: contents,
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: temperature,
+        maxOutputTokens: maxTokens,
+        topP: 0.95
+      }
+    });
+    const text = response.text;
+    if (!text) throw new Error('No response from Gemini Vision');
+    return {
+      content: text,
+      model: modelId,
+      tokens: {
+        prompt: response.usageMetadata?.promptTokenCount,
+        completion: response.usageMetadata?.candidatesTokenCount,
+        total: response.usageMetadata?.totalTokenCount
+      }
+    };
+  } catch (err) {
+    console.error('[Gemini SDK] callGeminiVision error:', err.message);
+    throw err;
   }
-  
-  contents.push({
-    role: 'user',
-    parts: lastParts
-  });
-
-  const payload = {
-    contents,
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { temperature, maxOutputTokens: maxTokens, topP: 0.95 }
-  };
-
-  const response = await axios.post(url, payload, {
-    headers: PROVIDER_CONFIGS.google.headers(),
-    timeout: 15000
-  });
-
-  const candidate = response.data.candidates?.[0];
-  if (!candidate || !candidate.content?.parts?.[0]?.text) {
-    throw new Error('No response from Gemini Vision');
-  }
-
-  return {
-    content: candidate.content.parts[0].text,
-    model: modelId,
-    tokens: {
-      prompt: response.data.usageMetadata?.promptTokenCount,
-      completion: response.data.usageMetadata?.candidatesTokenCount,
-      total: response.data.usageMetadata?.totalTokenCount
-    }
-  };
 }
 
 /**
