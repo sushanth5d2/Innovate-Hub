@@ -521,7 +521,7 @@ router.post('/ai-preview', authMiddleware, async (req, res) => {
 IMPORTANT RULES:
 1. If the user clearly states WHAT + WHEN (date/time), it's COMPLETE. Set "complete": true
 2. If missing date OR title, set "complete": false and "missing_fields": ["date"] or ["title"] etc.
-3. If user says "delete", "remove", "cancel" a reminder, set "intent": "delete" with "search_query" being the EXACT item names the user mentioned (keep "and" between multiple items, e.g. "outing and meeting with friends")
+3. If user says "delete", "remove", "cancel" a reminder, set "intent": "delete" with "search_query" being the EXACT item names the user mentioned (keep "and" between multiple items, e.g. "outing and meeting with friends"). If user mentions priority for deletion (e.g. "delete any low priority meeting"), include "priority_filter": "low" (or "medium"/"high")
 4. If the user says to delete AND create in one sentence (e.g. "delete outing and create lunch"), split them: set "intent": "delete" with search_query for the delete part
 4. If user mentions priority (high/medium/low/urgent/important), extract it. Default: "low"
 5. Generate a natural, friendly spoken_message (as if a human assistant is talking)
@@ -538,7 +538,8 @@ Return JSON format:
   "color": "#hex",
   "missing_fields": [],
   "spoken_message": "natural human-like response",
-  "search_query": "for delete intent only"
+  "search_query": "for delete intent only",
+  "priority_filter": "low/medium/high or empty — only for delete when user specifies priority"
 }
 
 Today is ${now.toISOString().split('T')[0]} (${now.toLocaleDateString('en-US',{weekday:'long'})}).
@@ -648,6 +649,8 @@ spoken_message for DELETE:
         .replace(/\b(the|my|a|an|those|these|that|this|some|old|new)\b/gi, '')
         .replace(/\b(reminder|reminders|one|ones|item|items|thing|things)\b/gi, '')
         .replace(/\b(for me|for|about|named|called)\b/gi, '')
+        .replace(/\b(low|medium|high|urgent)\s*priority\b/gi, '')
+        .replace(/\b(any|every|first|last|random)\b/gi, '')
         .trim();
       const promptParts = cleanedPrompt.split(/\s*(?:,|\band\b|&|\+)\s*/).map(s => s.trim()).filter(s => s.length > 0);
       // Also keep AI's search_query split
@@ -655,11 +658,26 @@ spoken_message for DELETE:
       // Use whichever has more items (better split)
       const multiItems = promptParts.length >= aiParts.length ? promptParts : aiParts;
 
+      // Priority filter: if user said "delete low priority meeting", filter results by priority
+      let priorityFilter = (parsed.priority_filter || '').toLowerCase().trim();
+      // Also detect priority from the original prompt if AI didn't extract it
+      if (!priorityFilter) {
+        const prioMatch = lower.match(/\b(low|medium|high)\s*priority\b/i);
+        if (prioMatch) priorityFilter = prioMatch[1].toLowerCase();
+      }
+
+      // Helper: apply priority filter to matches array
+      const applyPriorityFilter = (matches) => {
+        if (!priorityFilter || !matches || matches.length === 0) return matches;
+        const filtered = matches.filter(m => (m.priority || 'low').toLowerCase() === priorityFilter);
+        return filtered.length > 0 ? filtered : matches; // fallback to all if no priority match
+      };
+
       return new Promise((resolve) => {
         if (isDeleteAll) {
           // Delete ALL: return all undismissed reminders
           db.all(
-            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+            `SELECT id, title, reminder_date, reminder_time, priority FROM user_reminders
              WHERE user_id = ? AND is_dismissed = 0
              ORDER BY reminder_date DESC LIMIT 50`,
             [userId],
@@ -684,7 +702,7 @@ spoken_message for DELETE:
         } else if (multiItems.length > 1) {
           // Multiple search terms — find matches for each
           db.all(
-            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+            `SELECT id, title, reminder_date, reminder_time, priority FROM user_reminders
              WHERE user_id = ? AND is_dismissed = 0
              ORDER BY reminder_date DESC`,
             [userId],
@@ -718,13 +736,15 @@ spoken_message for DELETE:
                   }
                 });
                 if (allMatches.length > 0) {
+                  const filtered = applyPriorityFilter(allMatches);
                   res.json({
                     success: true,
                     action: 'delete',
-                    matches: allMatches,
-                    spoken_message: allMatches.length === 1
-                      ? `I found "${allMatches[0].title}". Deleting it now.`
-                      : `I found ${allMatches.length} matching reminders. Deleting them now.`
+                    matches: filtered,
+                    priority_filter: priorityFilter || undefined,
+                    spoken_message: filtered.length === 1
+                      ? `I found "${filtered[0].title}"${priorityFilter ? ' (' + priorityFilter + ' priority)' : ''}. Deleting it now.`
+                      : `I found ${filtered.length} matching reminders${priorityFilter ? ' with ' + priorityFilter + ' priority' : ''}. Deleting them now.`
                   });
                 } else {
                   // Fallback: try as single search
@@ -745,7 +765,7 @@ spoken_message for DELETE:
         } else {
           // Single search term — try exact match first, then split by spaces
           db.all(
-            `SELECT id, title, reminder_date, reminder_time FROM user_reminders
+            `SELECT id, title, reminder_date, reminder_time, priority FROM user_reminders
              WHERE user_id = ? AND is_dismissed = 0
              ORDER BY reminder_date DESC`,
             [userId],
@@ -771,15 +791,17 @@ spoken_message for DELETE:
                 }
 
                 if (matches.length > 0) {
-                  // Limit to 10
+                  // Limit to 10, then apply priority filter
                   matches = matches.slice(0, 10);
+                  matches = applyPriorityFilter(matches);
                   res.json({
                     success: true,
                     action: 'delete',
                     matches: matches,
+                    priority_filter: priorityFilter || undefined,
                     spoken_message: matches.length === 1
-                      ? `Deleting "${matches[0].title}" now.`
-                      : `Found ${matches.length} matching reminders.`
+                      ? `Deleting "${matches[0].title}"${priorityFilter ? ' (' + priorityFilter + ' priority)' : ''} now.`
+                      : `Found ${matches.length} matching reminders${priorityFilter ? ' with ' + priorityFilter + ' priority' : ''}.`
                   });
                 } else {
                   res.json({
