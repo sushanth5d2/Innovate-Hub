@@ -962,7 +962,7 @@
       if (!prompt) return;
       input.disabled = true;
       btn.classList.add('loading');
-      input.value = 'Creating your reminder...';
+      input.value = 'Understanding your request...';
 
       // Use smart ai-preview first for conflict detection
       InnovateAPI.apiRequest('/reminders/ai-preview', {
@@ -1001,10 +1001,34 @@
           setTimeout(function() { input.placeholder = 'Try: "Call mom tomorrow at 5pm" or tap \uD83C\uDFA4'; }, 5000);
         } else if (data.action === 'delete' && data.matches) {
           input.value = '';
-          if (data.matches.length === 1) {
-            deleteReminderById(data.matches[0].id, data.matches[0].title);
+          var matches = data.matches;
+          if (matches.length === 1) {
+            deleteReminderById(matches[0].id, matches[0].title);
           } else {
-            InnovateAPI.showAlert('Found ' + data.matches.length + ' matches. Use voice to pick which to delete.', 'info');
+            // Check for count-based delete: "delete 2 any", "delete one of them", "delete 3"
+            var lowerPrompt = prompt.toLowerCase();
+            var tCountNumWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+            var tCountMatch = lowerPrompt.match(/\b(?:delete|remove)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:any|of them|of those|random|reminders?|items?|$)/i);
+            var tCountN = tCountMatch ? (parseInt(tCountMatch[1]) || tCountNumWords[(tCountMatch[1] || '').toLowerCase()] || 0) : 0;
+            var wantsAll = /\b(delete all|remove all|all of them|delete every|remove every)\b/i.test(lowerPrompt);
+
+            if (wantsAll) {
+              // Delete all matches
+              pendingDeleteMatches = matches;
+              deleteMultipleRemindersById(matches.slice());
+            } else if (tCountN > 0 && tCountN < matches.length) {
+              // Delete exactly N items
+              pendingDeleteMatches = matches;
+              if (tCountN === 1) {
+                deleteReminderById(matches[0].id, matches[0].title);
+              } else {
+                deleteMultipleRemindersById(matches.slice(0, tCountN));
+              }
+            } else {
+              // Show inline picker for user to choose
+              pendingDeleteMatches = matches;
+              showDeletePicker(matches);
+            }
           }
         } else if (data.action === 'delete_not_found') {
           input.value = '';
@@ -1206,19 +1230,31 @@
             else if (quickEditWords.some(function(w) { return heard.indexOf(w) !== -1; })) quickAction = 'edit';
             else if (quickCreateWords.some(function(w) { return heard.indexOf(w) !== -1; })) quickAction = 'create';
 
-            // Act immediately on recognized action (don't wait for final transcript)
+            // For "delete" — WAIT for final transcript so we capture the full command
+            // (user might say "delete outing and meeting" but interim only gives "delete")
+            // For simple yes/no/create/cancel — react immediately on interim
+            if (quickAction === 'delete' && !finalParts) {
+              // Don't act yet — wait for final transcript to get full delete command
+              // But DO interrupt AI speech so user knows we heard them
+              interruptAiIfSpeaking();
+              return;
+            }
+
+            // Act immediately on recognized action
             if (quickAction && (finalParts || heard.length > 2)) {
               stopAiSpeech();
               stopRecording();
 
               if (quickAction === 'delete' && pendingConflicts && pendingConflicts.length > 0) {
+                // Use the FINAL heard text for parsing delete targets
+                var deleteHeard = finalParts ? (finalParts + ' ' + interim).trim().toLowerCase() : heard;
                 var allWords = ['all', 'every', 'everything', 'all of them', 'all reminders', 'all four', 'all 4', 'all three', 'all 3', 'all two', 'all 2', 'delete all', 'remove all'];
-                var isAll = allWords.some(function(w) { return heard.indexOf(w) !== -1; });
+                var isAll = allWords.some(function(w) { return deleteHeard.indexOf(w) !== -1; });
                 if (isAll) {
                   deleteMultipleConflictsThenCreate(pendingConflicts.slice());
                   return;
                 }
-                var multiResult = parseMultiDeleteFromHeard(heard, pendingConflicts);
+                var multiResult = parseMultiDeleteFromHeard(deleteHeard, pendingConflicts);
                 if (multiResult && multiResult.length > 1) {
                   deleteMultipleConflictsThenCreate(multiResult);
                   return;
@@ -1227,14 +1263,27 @@
                   deleteReminderThenCreate(multiResult[0].id, multiResult[0].title);
                   return;
                 }
-                var nameAfterDelete = heard.replace(/\b(delete|remove|replace|get rid of|erase|clear|trash|the|my|old|reminder|reminders|for|about|and|create|new|one|it|them|those)\b/g, '').trim();
+                // Extract name(s) after delete words — keep "and" between items for name matching
+                var nameAfterDelete = deleteHeard.replace(/\b(delete|remove|replace|get rid of|erase|clear|trash|the|my|old|reminder|reminders|for|about|create|new|one|it|them|those)\b/g, '').trim();
                 if (nameAfterDelete && nameAfterDelete.length > 1) {
+                  // Try splitting by "and" for multiple names
+                  var nameParts = nameAfterDelete.split(/\s*\band\b\s*/).filter(function(p) { return p.trim().length > 1; });
+                  if (nameParts.length > 1) {
+                    var nameMatches = [];
+                    nameParts.forEach(function(part) {
+                      var m = findConflictByName(part.trim());
+                      if (m && !nameMatches.some(function(nm) { return nm.id === m.id; })) nameMatches.push(m);
+                    });
+                    if (nameMatches.length > 1) { deleteMultipleConflictsThenCreate(nameMatches); return; }
+                    if (nameMatches.length === 1) { deleteReminderThenCreate(nameMatches[0].id, nameMatches[0].title); return; }
+                  }
                   var nameMatch = findConflictByName(nameAfterDelete);
                   if (nameMatch) {
                     deleteReminderThenCreate(nameMatch.id, nameMatch.title);
                     return;
                   }
                 }
+                // No specific target identified — ask which one to delete
                 startConflictDeleteFlow();
               } else if (quickAction === 'cancel') {
                 voiceCancelCreate();
@@ -1256,9 +1305,9 @@
           if (cdheard && (interim || finalParts) && aiSpeaking) {
             interruptAiIfSpeaking();
           }
-          // React on interim for quick words like "all", "cancel", "skip", numbers
+          // React on interim for quick words like "all", "cancel", "skip", "keep both", numbers
           if (cdheard && (finalParts || cdheard.length > 2)) {
-            var cdQuickWords = ['all', 'every', 'skip', 'cancel', 'none', 'never mind'];
+            var cdQuickWords = ['all', 'every', 'skip', 'cancel', 'none', 'never mind', 'keep both', 'just create', 'create it'];
             var cdHasQuick = cdQuickWords.some(function(w) { return cdheard.indexOf(w) !== -1; });
             var cdHasNumber = /\b[0-9]\b/.test(cdheard) || /\b(one|two|three|four|five|first|second|third)\b/.test(cdheard);
             if ((cdHasQuick || cdHasNumber) && (finalParts || cdheard.length > 1)) {
@@ -1268,6 +1317,7 @@
               return;
             }
           }
+          // Wait for final transcript for name-based matches (user might say multi-word name)
           if (cdheard && finalParts) {
             stopAiSpeech();
             stopRecording();
@@ -1285,7 +1335,7 @@
           }
           // React on interim for quick words like "all", "cancel", numbers
           if (dheard && (finalParts || dheard.length > 2)) {
-            var dQuickWords = ['all', 'every', 'cancel', 'none', 'never mind'];
+            var dQuickWords = ['all', 'every', 'cancel', 'none', 'never mind', 'stop'];
             var dHasQuick = dQuickWords.some(function(w) { return dheard.indexOf(w) !== -1; });
             var dHasNumber = /\b[0-9]\b/.test(dheard) || /\b(one|two|three|four|five|first|second|third)\b/.test(dheard);
             if ((dHasQuick || dHasNumber) && (finalParts || dheard.length > 1)) {
@@ -1295,6 +1345,7 @@
               return;
             }
           }
+          // Wait for final transcript for name-based matches
           if (dheard && finalParts) {
             stopAiSpeech();
             stopRecording();
@@ -1341,6 +1392,17 @@
 
       recognition.onerror = function(event) {
         clearTimeout(voiceSilenceTimer);
+
+        // For confirmation/listening states, no-speech just means user hasn't spoken yet — restart mic
+        var keepListeningStates = ['confirm-listening', 'conflict-delete-listening', 'delete-listening'];
+        if (event.error === 'no-speech' && keepListeningStates.indexOf(voiceState) !== -1) {
+          console.log('[Voice] No speech in', voiceState, '— restarting mic');
+          setTimeout(function() {
+            if (keepListeningStates.indexOf(voiceState) !== -1) startMic();
+          }, 200);
+          return;
+        }
+
         if (event.error === 'no-speech' && voiceFullTranscript.trim() && (voiceState === 'listening' || voiceState === 'needs-info-listening')) {
           stopRecording();
           var combined = voiceState === 'needs-info-listening' ? conversationContext + '. ' + voiceFullTranscript.trim() : voiceFullTranscript.trim();
@@ -1348,7 +1410,18 @@
           processVoiceInput(combined);
           return;
         }
-        if (event.error === 'aborted') { resetVoiceUI(); return; }
+        if (event.error === 'aborted') {
+          // Only reset if we're not in a confirmation state
+          if (keepListeningStates.indexOf(voiceState) === -1) resetVoiceUI();
+          return;
+        }
+        if (keepListeningStates.indexOf(voiceState) !== -1) {
+          // Don't reset for other errors in confirmation states — just restart
+          setTimeout(function() {
+            if (keepListeningStates.indexOf(voiceState) !== -1) startMic();
+          }, 300);
+          return;
+        }
         resetVoiceUI();
         var errorMsg = 'Voice error';
         if (event.error === 'no-speech') errorMsg = 'No speech detected. Tap the mic and try again!';
@@ -1365,11 +1438,37 @@
         btn.classList.remove('recording');
         document.getElementById('micIcon').className = 'fas fa-microphone';
         document.getElementById('aiReminderInput').style.fontStyle = 'normal';
-        if ((voiceState === 'listening' || voiceState === 'needs-info-listening') && voiceFullTranscript.trim()) {
+
+        // needs-info-listening: if user spoke, process it; otherwise restart mic
+        if (voiceState === 'needs-info-listening') {
+          if (voiceFullTranscript.trim()) {
+            clearTimeout(voiceSilenceTimer);
+            var combined = conversationContext + '. ' + voiceFullTranscript.trim();
+            voiceFullTranscript = '';
+            processVoiceInput(combined);
+          } else {
+            console.log('[Voice] Auto-restarting mic for needs-info-listening');
+            setTimeout(function() {
+              if (voiceState === 'needs-info-listening') startMic();
+            }, 200);
+          }
+          return;
+        }
+
+        // Auto-restart mic for states that need continuous listening
+        var keepListeningStates = ['confirm-listening', 'conflict-delete-listening', 'delete-listening'];
+        if (keepListeningStates.indexOf(voiceState) !== -1) {
+          console.log('[Voice] Auto-restarting mic for state:', voiceState);
+          setTimeout(function() {
+            if (keepListeningStates.indexOf(voiceState) !== -1) startMic();
+          }, 200);
+          return;
+        }
+
+        if ((voiceState === 'listening') && voiceFullTranscript.trim()) {
           clearTimeout(voiceSilenceTimer);
-          var combined = voiceState === 'needs-info-listening' ? conversationContext + '. ' + voiceFullTranscript.trim() : voiceFullTranscript.trim();
+          processVoiceInput(voiceFullTranscript.trim());
           voiceFullTranscript = '';
-          processVoiceInput(combined);
         } else if (voiceState === 'listening') {
           resetVoiceUI();
         }
@@ -1447,6 +1546,7 @@
       pendingDeleteMatches = null;
       pendingConflicts = null;
       conversationContext = '';
+      closeDeletePicker();
       document.getElementById('aiReminderInput').value = '';
       document.getElementById('aiReminderInput').placeholder = 'Try: "Call mom tomorrow at 5pm" or tap \uD83C\uDFA4';
       document.getElementById('aiReminderInput').style.fontStyle = 'normal';
@@ -1477,18 +1577,19 @@
 
         var action = data.action;
 
-        // ---- CREATE_READY: Complete sentence, auto-create ----
+        // ---- CREATE_READY: Complete sentence ----
         if (action === 'create_ready') {
           pendingPreview = data.preview;
           var spoken = data.spoken_message || 'Creating your reminder.';
 
-          // Check for conflicts — but ALWAYS auto-create first, just mention conflicts as FYI
           if (data.conflicts && data.conflicts.length > 0) {
-            // User said to CREATE — just create it immediately
-            // Mention conflicts as a quick FYI in the speech, not a blocking question
-            var names = data.conflicts.map(function(c) { return c.title; }).join(', ');
-            var fyi = spoken + ' Note: you also have ' + names + ' around the same time.';
-            autoCreateReminder(data.preview, fyi);
+            // Has conflicts — ask user BEFORE creating, keep voice listening
+            pendingConflicts = data.conflicts;
+            var conflictMsg = 'You already have ';
+            if (data.conflicts.length === 1) conflictMsg += '"' + data.conflicts[0].title + '" around that time.';
+            else conflictMsg += data.conflicts.length + ' reminders around that time.';
+            conflictMsg += ' Should I still create it, or delete the old one first?';
+            showConflictConfirmation(conflictMsg, data.preview, data.conflicts);
           } else {
             // No conflicts — just create immediately
             autoCreateReminder(data.preview, spoken);
@@ -1536,19 +1637,34 @@
                 deleteMultipleRemindersById(userNamedItems);
               }
             } else {
-              // Ambiguous — ask which one
-              pendingDeleteMatches = matches;
-              var listMsg = 'I found ' + matches.length + ' reminders. ';
-              matches.forEach(function(m, idx) {
-                listMsg += 'Number ' + (idx + 1) + ': "' + m.title + '". ';
-              });
-              listMsg += 'Say the number, name, all, or cancel.';
+              // Check for "delete N" / "delete N any" / "delete one of them" / "delete 2" — count-based
+              var vCountNumWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+              var vCountMatch = transcript.match(/\b(?:delete|remove)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:any|of them|of those|random|reminders?|items?|$)/i);
+              var vCountN = vCountMatch ? (parseInt(vCountMatch[1]) || vCountNumWords[(vCountMatch[1] || '').toLowerCase()] || 0) : 0;
+              if (vCountN > 0 && vCountN < matches.length) {
+                pendingDeleteMatches = matches;
+                if (vCountN === 1) {
+                  aiSpeak('Deleting one "' + matches[0].title + '".');
+                  deleteReminderById(matches[0].id, matches[0].title);
+                } else {
+                  aiSpeak('Deleting ' + vCountN + ' reminders.');
+                  deleteMultipleRemindersById(matches.slice(0, vCountN));
+                }
+              } else {
+                // Ambiguous — ask which one
+                pendingDeleteMatches = matches;
+                var listMsg = 'I found ' + matches.length + ' reminders. ';
+                matches.forEach(function(m, idx) {
+                  listMsg += 'Number ' + (idx + 1) + ': "' + m.title + '". ';
+                });
+                listMsg += 'Say the number, name, all, or cancel.';
 
-              showVoiceStatus('confirming', '');
-              document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(listMsg);
+                showVoiceStatus('confirming', '');
+                document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(listMsg);
 
-              startDeleteListening();
-              aiSpeak(listMsg);
+                startDeleteListening();
+                aiSpeak(listMsg);
+              }
             }
           }
         }
@@ -1578,6 +1694,8 @@
 
     // ===== AUTO-CREATE (no confirmation needed for complete sentences) =====
     function autoCreateReminder(preview, spokenMsg) {
+      voiceState = 'processing';
+      stopRecording();
       showVoiceStatus('processing', 'Creating...');
       document.getElementById('voiceConfirmArea').style.display = 'none';
       document.getElementById('aiReminderInput').value = '';
@@ -1637,7 +1755,7 @@
 
       showVoiceStatus('confirming', '');
       document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(message);
-      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say "create", "delete <name>", "edit", or "cancel"';
+      document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say "yes" / "create", "delete", "no" / "cancel"';
 
       // Start listening IMMEDIATELY while AI speaks (interruptible)
       startConfirmListening();
@@ -1686,7 +1804,7 @@
       if (!pendingConflicts || !pendingConflicts.length) { voiceConfirmCreate(); return; }
 
       // Skip / cancel — just create without deleting
-      var skipWords = ['skip', 'none', 'never mind', 'cancel', 'no'];
+      var skipWords = ['skip', 'none', 'never mind', 'cancel', 'no', 'keep', 'keep both', 'just create', 'create it'];
       if (skipWords.some(function(w) { return heard.indexOf(w) !== -1; })) {
         voiceConfirmCreate();
         return;
@@ -1697,6 +1815,21 @@
       if (allWords.some(function(w) { return heard.indexOf(w) !== -1; })) {
         deleteMultipleConflictsThenCreate(pendingConflicts.slice());
         return;
+      }
+
+      // Check for "delete N any" / "delete N of them" — means delete N items by count
+      var cCountNumWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+      var cCountPattern = heard.match(/\b(?:delete|remove)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:any|of them|of those|random|whatever|doesn't matter|don't care|reminders?|items?)\b/i);
+      if (cCountPattern) {
+        var cCountN = parseInt(cCountPattern[1]) || cCountNumWords[cCountPattern[1].toLowerCase()] || 0;
+        if (cCountN > 0 && cCountN <= pendingConflicts.length) {
+          if (cCountN === 1) {
+            deleteReminderThenCreate(pendingConflicts[0].id, pendingConflicts[0].title);
+          } else {
+            deleteMultipleConflictsThenCreate(pendingConflicts.slice(0, cCountN));
+          }
+          return;
+        }
       }
 
       // Try to parse multiple items: "1 and 3", "meeting and lunch", "first and second", "delete 1, 2, 3"
@@ -1710,9 +1843,21 @@
         return;
       }
 
-      // Try single name match
+      // Try name match with "and" splitting for multi-name input
       var cleanHeard = heard.replace(/\b(delete|remove|the|my|old|number|reminder|reminders)\b/g, '').trim();
       if (cleanHeard.length > 1) {
+        // Try splitting by "and" first for multi-name
+        var andParts = cleanHeard.split(/\s*\band\b\s*/).filter(function(p) { return p.trim().length > 1; });
+        if (andParts.length > 1) {
+          var andMatches = [];
+          andParts.forEach(function(part) {
+            var m = findConflictByName(part.trim());
+            if (m && !andMatches.some(function(nm) { return nm.id === m.id; })) andMatches.push(m);
+          });
+          if (andMatches.length > 1) { deleteMultipleConflictsThenCreate(andMatches); return; }
+          if (andMatches.length === 1) { deleteReminderThenCreate(andMatches[0].id, andMatches[0].title); return; }
+        }
+        // Single name match
         var nameMatch = findConflictByName(cleanHeard);
         if (nameMatch) {
           deleteReminderThenCreate(nameMatch.id, nameMatch.title);
@@ -1730,14 +1875,22 @@
       if (!isNaN(num) && num >= 1 && num <= pendingConflicts.length) {
         deleteReminderThenCreate(pendingConflicts[num - 1].id, pendingConflicts[num - 1].title);
       } else {
+        // Re-list the conflicts so user knows what to say
+        var names = pendingConflicts.map(function(c, idx) { return (idx + 1) + ', ' + c.title; }).join('. ');
+        var retryMsg = 'I didn\'t catch which one. Your options are: ' + names + '. Say the name, number, all, or skip.';
+        document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> Which one to delete? ' + pendingConflicts.map(function(c) { return '"' + escapeHtml(c.title) + '"'; }).join(', ');
+        document.getElementById('voiceHint').innerHTML = '<i class="fas fa-microphone" style="color:#ed4956;"></i> Say name, number, "all", or "skip"';
         // Start listening immediately while AI speaks (interruptible)
         voiceState = 'conflict-delete-listening';
         startMic();
-        aiSpeak('Which one? Say the name, number, or all.');
+        aiSpeak(retryMsg);
       }
     }
 
     function deleteReminderThenCreate(conflictId, conflictTitle) {
+      voiceState = 'processing';
+      stopRecording();
+      stopAiSpeech();
       showVoiceStatus('processing', 'Deleting "' + conflictTitle + '"...');
       document.getElementById('voiceConfirmArea').style.display = 'none';
       InnovateAPI.apiRequest('/reminders/' + conflictId, { method: 'DELETE' }).then(function() {
@@ -1753,6 +1906,9 @@
     // ===== DELETE MULTIPLE CONFLICTS THEN CREATE =====
     function deleteMultipleConflictsThenCreate(conflictsToDelete) {
       if (!conflictsToDelete || !conflictsToDelete.length) { voiceConfirmCreate(); return; }
+      voiceState = 'processing';
+      stopRecording();
+      stopAiSpeech();
       showVoiceStatus('processing', 'Deleting ' + conflictsToDelete.length + ' reminders...');
       document.getElementById('voiceConfirmArea').style.display = 'none';
       var total = conflictsToDelete.length;
@@ -1972,6 +2128,8 @@
 
     function startMic() {
       if (!speechRecognition) speechRecognition = initSpeechRecognition();
+      // If already recording, don't restart — just keep going
+      if (isRecording) return;
       try { speechRecognition.start(); } catch(e) {
         try { speechRecognition.stop(); } catch(e2) {}
         setTimeout(function() { try { speechRecognition.start(); } catch(e3) {} }, 300);
@@ -1998,6 +2156,21 @@
         return;
       }
 
+      // Check for "delete N" / "delete N any" / "delete N of them" — means delete N items (count, not position)
+      var countNumWords = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+      var countPattern = heard.match(/\b(?:delete|remove)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:any|of them|of those|random|whatever|doesn't matter|don't care|reminders?|items?)\b/i);
+      if (countPattern) {
+        var countN = parseInt(countPattern[1]) || countNumWords[countPattern[1].toLowerCase()] || 0;
+        if (countN > 0 && countN <= pendingDeleteMatches.length) {
+          if (countN === 1) {
+            deleteReminderById(pendingDeleteMatches[0].id, pendingDeleteMatches[0].title);
+          } else {
+            deleteMultipleRemindersById(pendingDeleteMatches.slice(0, countN));
+          }
+          return;
+        }
+      }
+
       // Try to parse multiple items: "1 and 3", "delete meeting and lunch", "first and second"
       var multiResult = parseMultiDeleteFromHeard(heard, pendingDeleteMatches);
       if (multiResult && multiResult.length > 1) {
@@ -2009,9 +2182,27 @@
         return;
       }
 
-      // Try single name match
+      // Try name match with "and" splitting
       var cleanHeard = heard.replace(/\b(delete|remove|the|my|old|number|reminder|reminders)\b/g, '').trim();
       if (cleanHeard.length > 1) {
+        // Try "and" split for multi-name
+        var andParts = cleanHeard.split(/\s*\band\b\s*/).filter(function(p) { return p.trim().length > 1; });
+        if (andParts.length > 1) {
+          var andMatches = [];
+          andParts.forEach(function(part) {
+            var partLower = part.trim().toLowerCase();
+            pendingDeleteMatches.forEach(function(m) {
+              if (!andMatches.some(function(am) { return am.id === m.id; }) &&
+                  (m.title.toLowerCase().indexOf(partLower) !== -1 || partLower.indexOf(m.title.toLowerCase()) !== -1)) {
+                andMatches.push(m);
+              }
+            });
+          });
+          if (andMatches.length > 1) { deleteMultipleRemindersById(andMatches); return; }
+          if (andMatches.length === 1) { deleteReminderById(andMatches[0].id, andMatches[0].title); return; }
+        }
+
+        // Single name match
         var nameMatch = null;
         pendingDeleteMatches.forEach(function(m) {
           if (!nameMatch && (m.title.toLowerCase().indexOf(cleanHeard) !== -1 || cleanHeard.indexOf(m.title.toLowerCase()) !== -1)) {
@@ -2035,15 +2226,25 @@
         var match = pendingDeleteMatches[num - 1];
         deleteReminderById(match.id, match.title);
       } else {
+        // Re-list the options so user knows what to say
+        var listMsg = 'I didn\'t catch which one. Your options are: ';
+        pendingDeleteMatches.forEach(function(m, idx) {
+          listMsg += 'Number ' + (idx + 1) + ': "' + m.title + '". ';
+        });
+        listMsg += 'Say the name, number, all, or cancel.';
+        document.getElementById('voiceStatusText').innerHTML = '<span class="ai-speaker-icon"><i class="fas fa-volume-up"></i> AI</span> ' + escapeHtml(listMsg);
         // Listen again immediately while AI speaks (interruptible)
         startDeleteListening();
-        aiSpeak('I didn\'t catch which one. Say a number from 1 to ' + pendingDeleteMatches.length + ', name, all, or cancel.');
+        aiSpeak(listMsg);
       }
     }
 
     // ===== DELETE MULTIPLE REMINDERS BY ID (non-conflict flow) =====
     function deleteMultipleRemindersById(remindersToDelete) {
       if (!remindersToDelete || !remindersToDelete.length) { resetVoiceUI(); return; }
+      voiceState = 'processing';
+      stopRecording();
+      stopAiSpeech();
       showVoiceStatus('processing', 'Deleting ' + remindersToDelete.length + ' reminders...');
       var total = remindersToDelete.length;
       var deleted = 0;
@@ -2072,6 +2273,9 @@
     }
 
     function deleteReminderById(id, title) {
+      voiceState = 'processing';
+      stopRecording();
+      stopAiSpeech();
       showVoiceStatus('processing', 'Deleting...');
       InnovateAPI.apiRequest('/reminders/' + id, { method: 'DELETE' }).then(function() {
         aiSpeak('Done! "' + title + '" has been deleted.');
@@ -2080,24 +2284,90 @@
         loadAllReminders();
         loadCalendarDots();
         if (selectedDate) loadDayDetail(selectedDate);
-        setTimeout(function() { resetVoiceUI(); }, 3000);
+        setTimeout(function() { resetVoiceUI(); closeDeletePicker(); }, 3000);
       }).catch(function() {
         showVoiceStatus('error', 'Failed to delete');
         aiSpeak('Sorry, I couldn\'t delete that reminder.');
         hideVoiceStatus(4000);
-        setTimeout(function() { resetVoiceUI(); }, 4000);
+        setTimeout(function() { resetVoiceUI(); closeDeletePicker(); }, 4000);
       });
+    }
+
+    // ===== DELETE PICKER UI (for typed input with multiple matches) =====
+    function showDeletePicker(matches) {
+      // Remove existing picker if any
+      closeDeletePicker();
+
+      var picker = document.createElement('div');
+      picker.id = 'deletePickerOverlay';
+      picker.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);z-index:10000;display:flex;align-items:center;justify-content:center;';
+      picker.onclick = function(e) { if (e.target === picker) closeDeletePicker(); };
+
+      var card = document.createElement('div');
+      card.style.cssText = 'background:var(--ig-card, #262626);border-radius:16px;padding:20px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
+
+      var header = '<div style="text-align:center;margin-bottom:16px;">'
+        + '<i class="fas fa-trash-alt" style="color:#ed4956;font-size:24px;margin-bottom:8px;display:block;"></i>'
+        + '<h3 style="color:var(--ig-text,#fff);margin:0;font-size:16px;">Which reminder to delete?</h3>'
+        + '<p style="color:var(--ig-secondary,#a8a8a8);font-size:13px;margin:6px 0 0;">Found ' + matches.length + ' matching reminders</p>'
+        + '</div>';
+
+      var items = '';
+      matches.forEach(function(m, idx) {
+        var dateLabel = m.reminder_date ? formatDateLabel(m.reminder_date) : '';
+        var timeLabel = m.reminder_time || '';
+        items += '<div class="delete-picker-item" onclick="pickerDeleteItem(' + m.id + ', \'' + escapeHtml(m.title).replace(/'/g, "\\'") + '\')" '
+          + 'style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:var(--ig-bg-secondary,#1a1a1a);border-radius:10px;cursor:pointer;transition:background 0.2s;" '
+          + 'onmouseover="this.style.background=\'rgba(237,73,86,0.15)\'" onmouseout="this.style.background=\'var(--ig-bg-secondary,#1a1a1a)\'">'
+          + '<span style="color:#ed4956;font-weight:700;font-size:16px;min-width:24px;text-align:center;">' + (idx + 1) + '</span>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="color:var(--ig-text,#fff);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(m.title) + '</div>'
+          + '<div style="color:var(--ig-secondary,#a8a8a8);font-size:12px;">' + dateLabel + (timeLabel ? ' at ' + timeLabel : '') + '</div>'
+          + '</div>'
+          + '<i class="fas fa-times-circle" style="color:#ed4956;font-size:18px;opacity:0.7;"></i>'
+          + '</div>';
+      });
+
+      // Action buttons
+      var actions = '<div style="display:flex;gap:8px;margin-top:12px;">'
+        + '<button onclick="pickerDeleteAll()" style="flex:1;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#f44336,#e91e63);color:#fff;font-weight:600;font-size:13px;cursor:pointer;">'
+        + '<i class="fas fa-trash"></i> Delete All (' + matches.length + ')</button>'
+        + '<button onclick="closeDeletePicker()" style="flex:1;padding:10px;border:none;border-radius:8px;background:var(--ig-bg-secondary,#1a1a1a);color:var(--ig-text,#fff);font-weight:600;font-size:13px;cursor:pointer;border:1px solid var(--ig-border,#363636);">'
+        + '<i class="fas fa-times"></i> Cancel</button>'
+        + '</div>';
+
+      card.innerHTML = header + items + actions;
+      picker.appendChild(card);
+      document.body.appendChild(picker);
+    }
+
+    function closeDeletePicker() {
+      var picker = document.getElementById('deletePickerOverlay');
+      if (picker) picker.remove();
+    }
+
+    function pickerDeleteItem(id, title) {
+      closeDeletePicker();
+      deleteReminderById(id, title);
+    }
+
+    function pickerDeleteAll() {
+      if (!pendingDeleteMatches || !pendingDeleteMatches.length) return;
+      closeDeletePicker();
+      deleteMultipleRemindersById(pendingDeleteMatches.slice());
     }
 
     // ===== CONFIRMATION ACTIONS =====
     function voiceConfirmCreate() {
       if (!pendingPreview) return;
+      voiceState = 'processing';
       stopRecording();
       stopAiSpeech();
       autoCreateReminder(pendingPreview, 'Done!');
     }
 
     function voiceEditBeforeCreate() {
+      voiceState = 'processing';
       stopRecording();
       stopAiSpeech();
       if (!pendingPreview) { resetVoiceUI(); return; }
@@ -2117,6 +2387,7 @@
     }
 
     function voiceCancelCreate() {
+      voiceState = 'processing';
       stopRecording();
       stopAiSpeech();
       showVoiceStatus('error', 'Cancelled');

@@ -371,7 +371,7 @@ router.put('/:id', authMiddleware, (req, res) => {
          priority = COALESCE(?, priority),
          updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND user_id = ?`,
-    [title, description, reminder_date, reminder_time, color, is_recurring ? 1 : 0, recurrence_pattern, priority, id, userId],
+    [title, description, reminder_date, reminder_time, color, is_recurring === undefined ? null : (is_recurring ? 1 : 0), recurrence_pattern, priority || null, id, userId],
     function(err) {
       if (err) {
         return res.status(500).json({ error: 'Error updating reminder' });
@@ -505,8 +505,13 @@ router.post('/ai-preview', authMiddleware, async (req, res) => {
         let modelId = 'innovate-ai';
         try {
           const models = aiProvider.getAllModels();
-          const available = models.find(m => m.available !== false);
-          if (available) modelId = available.id;
+          // Prefer free flash models first (pro models have 0 free tier quota)
+          const freeFlash = models.find(m => m.available && m.free && /flash/i.test(m.id));
+          const anyFree = models.find(m => m.available && m.free);
+          const anyAvailable = models.find(m => m.available);
+          if (freeFlash) modelId = freeFlash.id;
+          else if (anyFree) modelId = anyFree.id;
+          else if (anyAvailable) modelId = anyAvailable.id;
         } catch (e) {}
 
         const systemMsg = {
@@ -893,7 +898,7 @@ router.post('/ai-create', authMiddleware, async (req, res) => {
       // AI not available, do basic parsing
     }
 
-    let title, description, reminderDate, reminderTime, color;
+    let title, description, reminderDate, reminderTime, color, priority;
     const now = new Date();
 
     if (aiProvider) {
@@ -902,16 +907,21 @@ router.post('/ai-create', authMiddleware, async (req, res) => {
         let modelId = 'innovate-ai';
         try {
           const models = aiProvider.getAllModels();
-          const available = models.find(m => m.available !== false);
-          if (available) modelId = available.id;
+          const freeFlash = models.find(m => m.available && m.free && /flash/i.test(m.id));
+          const anyFree = models.find(m => m.available && m.free);
+          const anyAvailable = models.find(m => m.available);
+          if (freeFlash) modelId = freeFlash.id;
+          else if (anyFree) modelId = anyFree.id;
+          else if (anyAvailable) modelId = anyAvailable.id;
         } catch (e) { /* use default */ }
 
         const systemMsg = {
           role: 'system',
           content: `You are a reminder parser. Extract reminder info from user text. Return ONLY valid JSON:
-{"title":"short title","description":"details","date":"YYYY-MM-DD","time":"HH:MM","color":"#hex"}
+{"title":"short title","description":"details","date":"YYYY-MM-DD","time":"HH:MM","color":"#hex","priority":"low or medium or high"}
 Today is ${now.toISOString().split('T')[0]}. Day of week: ${now.toLocaleDateString('en-US',{weekday:'long'})}. If user says "tomorrow", calculate the date. "next week" = +7 days. "after X" means X hours from now. Default time: 09:00. Default color: #0095f6.
-For birthdays use color #e91e63, for work #ff9800, for personal #2196f3, for events #4caf50.`
+For birthdays use color #e91e63, for work #ff9800, for personal #2196f3, for events #4caf50.
+For priority: "urgent"/"important"/"critical" = high, "kind of"/"maybe" = medium, default = low.`
         };
 
         const response = await aiProvider.chat(modelId, [
@@ -927,6 +937,7 @@ For birthdays use color #e91e63, for work #ff9800, for personal #2196f3, for eve
           reminderDate = parsed.date;
           reminderTime = parsed.time || '09:00';
           color = parsed.color || '#0095f6';
+          priority = parsed.priority || 'low';
         }
       } catch (aiErr) {
         console.error('AI parse/chat error, falling back to basic parsing:', aiErr.message);
@@ -987,9 +998,9 @@ For birthdays use color #e91e63, for work #ff9800, for personal #2196f3, for eve
 
     // Create the reminder
     db.run(
-      `INSERT INTO user_reminders (user_id, title, description, reminder_date, reminder_time, type, color)
-       VALUES (?, ?, ?, ?, ?, 'custom', ?)`,
-      [userId, title, description || '', reminderDate, reminderTime, color],
+      `INSERT INTO user_reminders (user_id, title, description, reminder_date, reminder_time, type, color, priority)
+       VALUES (?, ?, ?, ?, ?, 'custom', ?, ?)`,
+      [userId, title, description || '', reminderDate, reminderTime, color, priority || 'low'],
       function(err) {
         if (err) {
           console.error('Error creating AI reminder:', err);

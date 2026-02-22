@@ -545,22 +545,13 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
   { provider: 'gpt4all', modelId: 'gpt4all/default', envKey: '_AUTO_DETECT_' },
   { provider: 'jan', modelId: 'jan/default', envKey: '_AUTO_DETECT_' },
   { provider: 'koboldcpp', modelId: 'koboldcpp/default', envKey: '_AUTO_DETECT_' },
-  // Gemini 3.x (newest)
-  { provider: 'google', modelId: 'gemini-3.1-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-3-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // Google Gemini — ONLY verified FREE models (tested 2026-02-22)
   { provider: 'google', modelId: 'gemini-3-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  // Gemini 2.5
   { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.5-pro', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-2.5-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.5-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  // Gemini 2.0
-  { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.0-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
-  // Latest aliases
   { provider: 'google', modelId: 'gemini-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-pro-latest', envKey: 'GOOGLE_AI_API_KEY' },
-  // Gemma open models
+  { provider: 'google', modelId: 'gemini-flash-lite-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  // Gemma open models (free)
   { provider: 'google', modelId: 'gemma-3-27b-it', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'groq', modelId: 'qwen/qwen3-32b', envKey: 'GROQ_API_KEY' },
   { provider: 'mistral', modelId: 'mistral-small-latest', envKey: 'MISTRAL_API_KEY' },
@@ -579,6 +570,8 @@ const INNOVATE_AI_PROVIDER_PRIORITY = [
 ];
 
 const INNOVATE_AI_SYSTEM_PROMPT = `You are Innovate AI, the custom built-in AI assistant of the Innovate Hub social platform. 
+
+Current date/time: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.
 
 Your personality:
 - Friendly, approachable, and slightly witty
@@ -826,63 +819,26 @@ const AI_MODELS = {
     envKey: 'OPENAI_API_KEY'
   },
 
-  // ===== Google Gemini Models (ALL 43 models from Google AI API) =====
+  // ===== Google Gemini Models (VERIFIED working with generateContent API) =====
+  // Tested 2026-02-22: Only models that actually respond to generateContent are included.
+  // Models removed: imagen-*, veo-*, gemini-embedding-001, aqa (use different API methods),
+  //   gemini-2.5-flash-preview (404), gemini-1.5-* (not in API list),
+  //   TTS/audio models (require special config, not standard generateContent)
 
-  // --- Gemini 3.x Series (Latest & Most Powerful) ---
-  'gemini-3.1-pro-preview': {
-    provider: 'google',
-    name: 'Gemini 3.1 Pro Preview',
-    description: 'FREE - Newest Gemini 3.1 Pro, 1M context, 65K output',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-3.1-pro-preview-customtools': {
-    provider: 'google',
-    name: 'Gemini 3.1 Pro Custom Tools',
-    description: 'FREE - Gemini 3.1 Pro optimized for custom tool usage',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-3-pro-preview': {
-    provider: 'google',
-    name: 'Gemini 3 Pro Preview',
-    description: 'FREE - Gemini 3 Pro, 1M context, 65K output',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
+  // --- FREE TIER: Verified working (200 OK) ---
+
   'gemini-3-flash-preview': {
     provider: 'google',
     name: 'Gemini 3 Flash Preview',
-    description: 'FREE - Gemini 3 Flash, fast & powerful, 1M context',
+    description: 'FREE - Latest Gemini 3 Flash, fast & powerful, 1M context',
     maxTokens: 65536,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-  'gemini-3-pro-image-preview': {
-    provider: 'google',
-    name: 'Gemini 3 Pro Image',
-    description: 'FREE - Gemini 3 Pro with image generation, 128K context',
-    maxTokens: 32768,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-
-  // --- Gemini 2.5 Series ---
   'gemini-2.5-flash': {
     provider: 'google',
     name: 'Gemini 2.5 Flash',
     description: 'FREE - Stable 2.5 Flash with thinking, 1M context, 65K output',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.5-pro': {
-    provider: 'google',
-    name: 'Gemini 2.5 Pro',
-    description: 'FREE - Stable 2.5 Pro, thinking, 1M context, 65K output',
     maxTokens: 65536,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
@@ -895,74 +851,14 @@ const AI_MODELS = {
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-  'gemini-2.5-flash-preview': {
-    provider: 'google',
-    name: 'Gemini 2.5 Flash Preview',
-    description: 'FREE - Preview of Gemini 2.5 Flash',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.5-flash-image': {
-    provider: 'google',
-    name: 'Gemini 2.5 Flash Image',
-    description: 'FREE - 2.5 Flash with image generation, 32K context',
-    maxTokens: 32768,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
   'gemini-2.5-flash-lite-preview-09-2025': {
     provider: 'google',
-    name: 'Gemini 2.5 Flash-Lite Preview Sep 2025',
+    name: 'Gemini 2.5 Flash-Lite Preview',
     description: 'FREE - Preview of 2.5 Flash-Lite, 1M context',
     maxTokens: 65536,
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-
-  // --- Gemini 2.0 Series ---
-  'gemini-2.0-flash': {
-    provider: 'google',
-    name: 'Gemini 2.0 Flash',
-    description: 'FREE - Fast and versatile multimodal model, 1M context',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.0-flash-001': {
-    provider: 'google',
-    name: 'Gemini 2.0 Flash 001',
-    description: 'FREE - Stable version of 2.0 Flash',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.0-flash-lite': {
-    provider: 'google',
-    name: 'Gemini 2.0 Flash-Lite',
-    description: 'FREE - Lightweight, fastest Gemini 2.0 model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.0-flash-lite-001': {
-    provider: 'google',
-    name: 'Gemini 2.0 Flash-Lite 001',
-    description: 'FREE - Stable version of 2.0 Flash-Lite',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-2.0-flash-exp-image-generation': {
-    provider: 'google',
-    name: 'Gemini 2.0 Flash Image Gen',
-    description: 'FREE - Experimental image generation model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-
-  // --- Gemini Latest Aliases ---
   'gemini-flash-latest': {
     provider: 'google',
     name: 'Gemini Flash Latest',
@@ -979,48 +875,6 @@ const AI_MODELS = {
     envKey: 'GOOGLE_AI_API_KEY',
     free: true
   },
-  'gemini-pro-latest': {
-    provider: 'google',
-    name: 'Gemini Pro Latest',
-    description: 'FREE - Always points to latest Pro release, 1M context',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-1.5-pro-latest': {
-    provider: 'google',
-    name: 'Gemini 1.5 Pro',
-    description: 'FREE - 1M context window',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'gemini-1.5-flash-latest': {
-    provider: 'google',
-    name: 'Gemini 1.5 Flash',
-    description: 'FREE - Fast and versatile',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-
-  // --- Special Purpose Gemini Models ---
-  'gemini-2.5-computer-use-preview-10-2025': {
-    provider: 'google',
-    name: 'Gemini 2.5 Computer Use',
-    description: 'FREE - Computer Use preview model, 128K context',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
-  'deep-research-pro-preview-12-2025': {
-    provider: 'google',
-    name: 'Deep Research Pro',
-    description: 'FREE - Deep Research model for complex queries, 128K context',
-    maxTokens: 65536,
-    envKey: 'GOOGLE_AI_API_KEY',
-    free: true
-  },
   'gemini-robotics-er-1.5-preview': {
     provider: 'google',
     name: 'Gemini Robotics ER 1.5',
@@ -1030,106 +884,135 @@ const AI_MODELS = {
     free: true
   },
 
-  // --- TTS & Audio Models ---
-  'gemini-2.5-flash-preview-tts': {
+  // --- PAID TIER: Verified 429 quota exceeded on free key ---
+
+  'gemini-3.1-pro-preview': {
     provider: 'google',
-    name: 'Gemini 2.5 Flash TTS',
-    description: 'FREE - Text-to-speech preview, 8K input',
-    maxTokens: 16384,
+    name: 'Gemini 3.1 Pro Preview',
+    description: 'PAID - Gemini 3.1 Pro, 1M context, 65K output (requires billing)',
+    maxTokens: 65536,
     envKey: 'GOOGLE_AI_API_KEY',
-    free: true
+    free: false
+  },
+  'gemini-3.1-pro-preview-customtools': {
+    provider: 'google',
+    name: 'Gemini 3.1 Pro Custom Tools',
+    description: 'PAID - Gemini 3.1 Pro for tool use (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-3-pro-preview': {
+    provider: 'google',
+    name: 'Gemini 3 Pro Preview',
+    description: 'PAID - Gemini 3 Pro, 1M context (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-3-pro-image-preview': {
+    provider: 'google',
+    name: 'Gemini 3 Pro Image',
+    description: 'PAID - Gemini 3 Pro with image generation (requires billing)',
+    maxTokens: 32768,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.5-pro': {
+    provider: 'google',
+    name: 'Gemini 2.5 Pro',
+    description: 'PAID - Gemini 2.5 Pro, thinking, 1M context (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.5-flash-image': {
+    provider: 'google',
+    name: 'Gemini 2.5 Flash Image',
+    description: 'PAID - 2.5 Flash with image generation (requires billing)',
+    maxTokens: 32768,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-pro-latest': {
+    provider: 'google',
+    name: 'Gemini Pro Latest',
+    description: 'PAID - Always points to latest Pro release (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.0-flash': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash',
+    description: 'PAID - Multimodal model, 1M context (requires billing)',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.0-flash-001': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash 001',
+    description: 'PAID - Stable version of 2.0 Flash (requires billing)',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.0-flash-lite': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash-Lite',
+    description: 'PAID - Lightweight 2.0 (requires billing)',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.0-flash-lite-001': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash-Lite 001',
+    description: 'PAID - Stable 2.0 Flash-Lite (requires billing)',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
+  },
+  'gemini-2.0-flash-exp-image-generation': {
+    provider: 'google',
+    name: 'Gemini 2.0 Flash Image Gen',
+    description: 'PAID - Image generation model (requires billing)',
+    maxTokens: 8192,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
   },
   'gemini-2.5-pro-preview-tts': {
     provider: 'google',
     name: 'Gemini 2.5 Pro TTS',
-    description: 'FREE - Pro text-to-speech preview',
+    description: 'PAID - Pro text-to-speech (requires billing)',
     maxTokens: 16384,
     envKey: 'GOOGLE_AI_API_KEY',
-    free: true
+    free: false
   },
-  'gemini-2.5-flash-native-audio-latest': {
+  'nano-banana-pro-preview': {
     provider: 'google',
-    name: 'Gemini 2.5 Flash Native Audio',
-    description: 'FREE - Native audio processing, 128K context',
+    name: 'Nano Banana Pro',
+    description: 'PAID - Nano model preview (requires billing)',
     maxTokens: 8192,
     envKey: 'GOOGLE_AI_API_KEY',
-    free: true
+    free: false
   },
-
-  // --- Imagen (Image Generation) ---
-  'imagen-4.0-generate-001': {
+  'gemini-2.5-computer-use-preview-10-2025': {
     provider: 'google',
-    name: 'Imagen 4',
-    description: 'Image generation model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
+    name: 'Gemini 2.5 Computer Use',
+    description: 'PAID - Computer Use preview (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
   },
-  'imagen-4.0-ultra-generate-001': {
+  'deep-research-pro-preview-12-2025': {
     provider: 'google',
-    name: 'Imagen 4 Ultra',
-    description: 'Premium image generation',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'imagen-4.0-fast-generate-001': {
-    provider: 'google',
-    name: 'Imagen 4 Fast',
-    description: 'Fast image generation',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-
-  // --- Veo (Video Generation) ---
-  'veo-3.1-generate-preview': {
-    provider: 'google',
-    name: 'Veo 3.1',
-    description: 'Latest video generation model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'veo-3.1-fast-generate-preview': {
-    provider: 'google',
-    name: 'Veo 3.1 Fast',
-    description: 'Fast video generation',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'veo-3.0-generate-001': {
-    provider: 'google',
-    name: 'Veo 3',
-    description: 'Video generation model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'veo-3.0-fast-generate-001': {
-    provider: 'google',
-    name: 'Veo 3 Fast',
-    description: 'Fast video generation',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'veo-2.0-generate-001': {
-    provider: 'google',
-    name: 'Veo 2',
-    description: 'Video generation model',
-    maxTokens: 8192,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-
-  // --- Embedding & QA Models ---
-  'gemini-embedding-001': {
-    provider: 'google',
-    name: 'Gemini Embedding',
-    description: 'Text embedding model',
-    maxTokens: 1,
-    envKey: 'GOOGLE_AI_API_KEY'
-  },
-  'aqa': {
-    provider: 'google',
-    name: 'Attributed QA',
-    description: 'Grounded question answering model',
-    maxTokens: 1024,
-    envKey: 'GOOGLE_AI_API_KEY'
+    name: 'Deep Research Pro',
+    description: 'PAID - Deep Research model (requires billing)',
+    maxTokens: 65536,
+    envKey: 'GOOGLE_AI_API_KEY',
+    free: false
   },
 
   // --- Google Gemma Open Models (FREE via Gemini API) ---
@@ -1339,19 +1222,11 @@ const PROVIDER_CONFIGS = {
 
 // Vision-capable model priority (for image analysis)
 const INNOVATE_AI_VISION_PRIORITY = [
-  // Gemini 3.x (newest, most capable)
-  { provider: 'google', modelId: 'gemini-3.1-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-3-pro-preview', envKey: 'GOOGLE_AI_API_KEY' },
+  // ONLY verified FREE models (tested 2026-02-22)
   { provider: 'google', modelId: 'gemini-3-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  // Gemini 2.5
   { provider: 'google', modelId: 'gemini-2.5-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.5-pro', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'google', modelId: 'gemini-2.5-flash-lite', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-2.5-flash-preview', envKey: 'GOOGLE_AI_API_KEY' },
-  // Gemini 2.0
-  { provider: 'google', modelId: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-1.5-pro-latest', envKey: 'GOOGLE_AI_API_KEY' },
-  { provider: 'google', modelId: 'gemini-1.5-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
+  { provider: 'google', modelId: 'gemini-flash-latest', envKey: 'GOOGLE_AI_API_KEY' },
   { provider: 'groq', modelId: 'meta-llama/llama-4-scout-17b-16e-instruct', envKey: 'GROQ_API_KEY' },
   { provider: 'groq', modelId: 'meta-llama/llama-4-maverick-17b-128e-instruct', envKey: 'GROQ_API_KEY' },
   { provider: 'openai', modelId: 'gpt-4o', envKey: 'OPENAI_API_KEY' },
