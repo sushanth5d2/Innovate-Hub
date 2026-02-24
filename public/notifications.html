@@ -9,35 +9,65 @@
   <style>
     /* ===== NOTIFICATION ITEMS ===== */
     .ig-notification-item {
-      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-      border-bottom: 1px solid var(--ig-border); cursor: pointer; transition: background-color 0.2s;
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      cursor: pointer; transition: background-color 0.2s;
     }
     .ig-notification-item:hover { background-color: var(--ig-hover); }
-    .ig-notification-item.unread { background-color: rgba(0, 149, 246, 0.05); }
+    .ig-notification-item.unread { background-color: rgba(0, 149, 246, 0.06); }
     .ig-notification-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
     .ig-notification-content { flex: 1; min-width: 0; }
-    .ig-notification-text { font-size: 14px; color: var(--ig-primary-text); line-height: 1.4; }
-    .ig-notification-username { font-weight: 600; }
-    .ig-notification-time { font-size: 12px; color: var(--ig-secondary-text); margin-top: 2px; }
+    .ig-notification-text { font-size: 13px; color: var(--ig-primary-text); line-height: 1.4; }
+    .ig-notification-text .ig-notification-username { font-weight: 600; }
+    .ig-notification-time { font-size: 12px; color: var(--ig-secondary-text); margin-top: 1px; }
     .ig-notification-action { flex-shrink: 0; }
-    .ig-follow-btn { background-color: var(--ig-blue); color: white; border: none; border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .ig-follow-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .ig-following-btn { background-color: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .ig-following-btn:hover { background-color: var(--ig-hover); transform: translateY(-1px); }
+    .ig-follow-btn { background-color: var(--ig-blue); color: white; border: none; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .ig-follow-btn:hover { opacity: 0.9; }
+    .ig-following-btn { background-color: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .ig-following-btn:hover { background-color: var(--ig-hover); }
+
+    /* Time group headers (Instagram style) */
+    .notif-time-group { padding: 14px 16px 6px; font-size: 14px; font-weight: 700; color: var(--ig-primary-text); }
 
     /* ===== TABS ===== */
-    .notif-tabs { display: flex; border-bottom: 1px solid var(--ig-border); position: sticky; top: 60px; z-index: 10; background: var(--ig-background); }
+    .notif-tabs { display: flex; border-bottom: 1px solid var(--ig-border); position: sticky; top: 60px; z-index: 10; background: var(--ig-background); max-width: 600px; margin: 0 auto; }
     .notif-tab-btn { flex: 1; padding: 14px 0; text-align: center; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .notif-tab-btn.active { color: var(--ig-primary-text); border-bottom-color: var(--ig-primary-text); }
     .notif-tab-btn:hover { color: var(--ig-primary-text); }
     .notif-tab-panel { display: none; }
     .notif-tab-panel.active { display: block; }
 
+    /* Empty state */
+    .notif-empty-state { text-align: center; padding: 60px 32px; }
+    .notif-empty-state .notif-empty-icon { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--ig-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    .notif-empty-state h3 { font-size: 18px; font-weight: 700; margin: 0 0 8px; }
+    .notif-empty-state p { font-size: 14px; color: var(--ig-secondary-text); margin: 0; }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 480px) {
+      .ig-notification-item { padding: 10px 14px; gap: 10px; }
+      .ig-notification-avatar { width: 40px; height: 40px; }
+      .ig-notification-text { font-size: 13px; }
+      .ig-follow-btn, .ig-following-btn { padding: 6px 12px; font-size: 12px; }
+      .fr-btn-confirm, .fr-btn-delete { padding: 6px 12px; font-size: 13px; }
+      .fr-avatar { width: 40px; height: 40px; }
+      .notif-tabs { top: 44px; }
+      .notif-tab-btn { padding: 12px 0; font-size: 13px; }
+      .reminder-header { padding: 12px 14px 6px; }
+      .reminder-header h2 { font-size: 16px; }
+      .ai-create-bar { margin: 10px 14px; }
+      .reminder-filters { padding: 4px 14px 10px; }
+      .reminder-section { padding: 0 14px; }
+      .g-card-title { font-size: 13px; }
+      .g-card-desc { font-size: 11px; }
+      .reminder-fab { bottom: 70px; right: 14px; }
+      .fab-main { width: 50px; height: 50px; border-radius: 14px; font-size: 20px; }
+    }
+
     /* ===== GOOGLE REMINDERS STYLE ===== */
-    .reminder-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px; }
+    .reminder-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; }
     .reminder-header h2 { font-size: 20px; font-weight: 700; margin: 0; }
     .view-pills { display: flex; background: var(--ig-secondary-background); border-radius: 24px; padding: 3px; border: 1px solid var(--ig-border); }
-    .view-pill { padding: 6px 16px; border-radius: 20px; border: none; background: transparent; color: var(--ig-secondary-text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+    .view-pill { padding: 6px 14px; border-radius: 20px; border: none; background: transparent; color: var(--ig-secondary-text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .view-pill.active { background: var(--ig-blue); color: white; box-shadow: 0 2px 6px rgba(0,149,246,0.3); }
 
     /* ===== AI INPUT BAR ===== */
@@ -185,10 +215,10 @@
 
     /* ===== FAB ===== */
     .reminder-fab { position: fixed; bottom: 80px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
-    .fab-main { width: 56px; height: 56px; border-radius: 16px; border: none; background: var(--ig-blue); color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,149,246,0.4); display: flex; align-items: center; justify-content: center; transition: all 0.25s; }
+    .fab-main { width: 52px; height: 52px; border-radius: 16px; border: none; background: var(--ig-blue); color: white; font-size: 22px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,149,246,0.4); display: flex; align-items: center; justify-content: center; transition: all 0.25s; }
     .fab-main:hover { transform: scale(1.05); box-shadow: 0 6px 24px rgba(0,149,246,0.5); }
     .fab-main:active { transform: scale(0.95); }
-    .fab-label { position: absolute; right: 66px; top: 50%; transform: translateY(-50%); background: var(--ig-primary-text); color: var(--ig-background); padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .fab-label { position: absolute; right: 62px; top: 50%; transform: translateY(-50%); background: var(--ig-primary-text); color: var(--ig-background); padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
     .fab-main:hover .fab-label { opacity: 1; }
 
     /* ===== CREATE MODAL ===== */
@@ -250,8 +280,9 @@
     .light-theme .modal-field select option { background: #fff; color: #222; }
 
     /* ===== EMPTY STATE ===== */
-    .reminder-empty { text-align: center; padding: 60px 24px; }
-    .reminder-empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.3; }
+    .reminder-empty { text-align: center; padding: 48px 24px; }
+    .reminder-empty-icon { width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--ig-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+    .reminder-empty-icon i { font-size: 28px; color: var(--ig-secondary-text); }
     .reminder-empty h3 { font-size: 18px; font-weight: 700; margin: 0 0 8px; color: var(--ig-primary-text); }
     .reminder-empty p { font-size: 14px; color: var(--ig-secondary-text); margin: 0; line-height: 1.5; }
 
@@ -274,7 +305,7 @@
 <body>
   <!-- Top Navigation -->
   <nav class="ig-top-nav">
-    <div class="ig-nav-container">
+    <div class="ig-nav-container" style="max-width: 600px;">
       <a href="/home" class="ig-logo">Innovate</a>
       <div></div>
       <div class="ig-nav-icons">
@@ -297,7 +328,7 @@
     </button>
   </div>
 
-  <main class="ig-main" style="padding-top: 4px; padding-bottom: 70px;">
+  <main class="ig-main" style="padding-top: 4px; padding-bottom: 70px; max-width: 600px; margin: 0 auto;">
 
     <!-- NOTIFICATIONS TAB -->
     <div class="notif-tab-panel active" id="panelNotifications">
@@ -310,22 +341,22 @@
         <div class="fr-list" id="followRequestsList"></div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 8px;">
-        <h2 style="font-size: 20px; font-weight: 600; margin: 0;">Notifications</h2>
-        <div style="display: flex; gap: 8px;">
-          <button class="ig-following-btn" onclick="markAllAsRead()" style="padding: 5px 12px; font-size: 12px;">Mark all read</button>
-          <button class="ig-following-btn" onclick="clearAllNotifications()" style="color: var(--ig-error, #ed4956); padding: 5px 12px; font-size: 12px;">Clear</button>
+      <!-- Notification Actions -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 6px;">
+        <h2 style="font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">Notifications</h2>
+        <div style="display: flex; gap: 6px;">
+          <button onclick="markAllAsRead()" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); cursor: pointer; transition: all 0.2s;">Mark all read</button>
+          <button onclick="clearAllNotifications()" style="padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid rgba(237,73,86,0.3); background: transparent; color: #ed4956; cursor: pointer; transition: all 0.2s;">Clear</button>
         </div>
       </div>
-      <div class="ig-settings-section">
-        <div id="notificationsList"><div class="ig-spinner"></div></div>
-      </div>
+      
+      <div id="notificationsList" style="padding: 0;"><div class="ig-spinner"></div></div>
     </div>
 
     <!-- REMINDERS TAB -->
     <div class="notif-tab-panel" id="panelReminders">
       <div class="reminder-header">
-        <h2>My Reminders</h2>
+        <h2 style="font-size: 18px; letter-spacing: -0.3px;">My Reminders</h2>
         <div class="view-pills">
           <button class="view-pill active" onclick="switchReminderView('cards')" id="viewBtnCards">
             <i class="fas fa-list-ul"></i> List
@@ -2637,7 +2668,6 @@
       // Load the current user's following list first, then render notifications
       var currentUser = InnovateAPI.getCurrentUser ? InnovateAPI.getCurrentUser() : null;
       var followingPromise = currentUser ? InnovateAPI.apiRequest('/users/' + currentUser.id).then(function(data) {
-        // Build a quick lookup of who we follow by checking each notification's related_id
         return data;
       }).catch(function() { return null; }) : Promise.resolve(null);
 
@@ -2649,7 +2679,7 @@
         var list = document.getElementById('notificationsList');
         list.innerHTML = '';
         if (data.notifications.length === 0) {
-          list.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);"><div style="font-size: 48px; margin-bottom: 16px;">\uD83D\uDD14</div><div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No Notifications Yet</div><div style="font-size: 14px;">When someone likes or comments on your posts, you\'ll see it here.</div></div>';
+          list.innerHTML = '<div class="notif-empty-state"><div class="notif-empty-icon"><svg fill="none" height="36" viewBox="0 0 24 24" width="36" stroke="var(--ig-secondary-text)" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round"></path><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><h3>Activity On Your Posts</h3><p>When someone likes or comments on one of your posts, you\'ll see it here.</p></div>';
           return;
         }
         // For follow-type notifications, check follow state per user
@@ -2666,7 +2696,42 @@
           }).catch(function() {});
         });
         Promise.all(checkPromises).then(function() {
-          data.notifications.forEach(function(n) { list.appendChild(createNotificationElement(n)); });
+          // Group notifications by time: Today, This Week, Earlier (Instagram style)
+          var now = new Date();
+          var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          var weekStart = todayStart - 6 * 86400000;
+          
+          var groups = { today: [], thisWeek: [], earlier: [] };
+          data.notifications.forEach(function(n) {
+            var dateStr = n.created_at || '';
+            if (dateStr.indexOf(' ') !== -1 && dateStr.indexOf('T') === -1) dateStr = dateStr.replace(' ', 'T') + 'Z';
+            var ts = new Date(dateStr).getTime();
+            if (ts >= todayStart) groups.today.push(n);
+            else if (ts >= weekStart) groups.thisWeek.push(n);
+            else groups.earlier.push(n);
+          });
+          
+          if (groups.today.length > 0) {
+            var h = document.createElement('div');
+            h.className = 'notif-time-group';
+            h.textContent = 'Today';
+            list.appendChild(h);
+            groups.today.forEach(function(n) { list.appendChild(createNotificationElement(n)); });
+          }
+          if (groups.thisWeek.length > 0) {
+            var h = document.createElement('div');
+            h.className = 'notif-time-group';
+            h.textContent = 'This Week';
+            list.appendChild(h);
+            groups.thisWeek.forEach(function(n) { list.appendChild(createNotificationElement(n)); });
+          }
+          if (groups.earlier.length > 0) {
+            var h = document.createElement('div');
+            h.className = 'notif-time-group';
+            h.textContent = 'Earlier';
+            list.appendChild(h);
+            groups.earlier.forEach(function(n) { list.appendChild(createNotificationElement(n)); });
+          }
         });
       }).catch(function(error) {
         console.error('Error loading notifications:', error);
@@ -2722,8 +2787,7 @@
       }
       div.innerHTML = '<img src="' + avatar + '" alt="Avatar" class="ig-notification-avatar" onclick="window.location.href=\'/profile/' + (senderUserId || '') + '\'">' +
         '<div class="ig-notification-content" onclick="handleNotificationClick(' + notification.id + ', \'' + notification.type + '\', ' + (notification.related_id || 'null') + ')">' +
-          '<div class="ig-notification-text">' + notificationText + '</div>' +
-          '<div class="ig-notification-time">' + timeAgo + '</div>' +
+          '<div class="ig-notification-text">' + notificationText + ' <span style="color: var(--ig-secondary-text); font-weight: 400;">' + timeAgo + '</span></div>' +
         '</div>' + actionButton;
       return div;
     }

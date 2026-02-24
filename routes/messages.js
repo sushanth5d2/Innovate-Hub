@@ -88,7 +88,10 @@ router.get('/:contactId', authMiddleware, (req, res) => {
       attachments: msg.attachments ? JSON.parse(msg.attachments) : []
     }));
 
-    res.json({ success: true, messages });
+    // Check if this is a message request conversation (any pending message request from this contact)
+    const hasMessageRequest = messages.some(m => m.is_message_request === 1 && m.message_request_status === 'pending' && m.sender_id == contactId);
+
+    res.json({ success: true, messages, is_message_request: hasMessageRequest });
   });
 });
 

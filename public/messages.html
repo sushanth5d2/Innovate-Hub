@@ -287,7 +287,24 @@
       <!-- Reply/Edit Preview Container -->
       <div id="messagePreviewContainer" style="padding: 0 16px;"></div>
       
-      <div class="ig-chat-input-container">
+      <!-- Message Request Action Bar (shown instead of input for message requests) -->
+      <div id="messageRequestBar" style="display: none; padding: 16px; border-top: 1px solid var(--ig-border); background: var(--ig-background);">
+        <div style="text-align: center; margin-bottom: 14px;">
+          <div style="font-size: 14px; color: var(--ig-secondary-text); line-height: 1.5;">
+            <span id="msgReqUsername" style="font-weight: 600; color: var(--ig-primary-text);"></span> wants to send you a message.
+          </div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text); margin-top: 4px;">
+            Do you want to let them send you messages from now on? They won't know you've seen their request.
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="handleMsgRequestAction('delete')" style="flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Delete</button>
+          <button onclick="handleMsgRequestAction('accept')" style="flex: 1; padding: 12px; border-radius: 10px; border: none; background: var(--ig-blue); color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Accept</button>
+        </div>
+        <button onclick="handleMsgRequestAction('report')" style="display: block; width: 100%; margin-top: 8px; padding: 10px; border: none; background: transparent; color: #ed4956; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;">Report</button>
+      </div>
+      
+      <div class="ig-chat-input-container" id="chatInputContainer">
         <button class="ig-input-action-btn ig-camera-circle" onclick="openCamera()" title="Camera">
           <svg fill="none" height="24" viewBox="0 0 24 24" width="24" stroke="currentColor" stroke-width="2">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -1453,6 +1470,9 @@
         document.querySelector('.ig-bottom-nav')?.style.setProperty('display', 'none');
       }
       
+      // Store username for request bar
+      window._currentChatUsername = username;
+      
       // Load messages
       await loadMessages(contactId);
     }
@@ -1463,6 +1483,18 @@
         const data = await InnovateAPI.apiRequest(`/messages/${contactId}`);
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.innerHTML = '';
+
+        // Toggle message request bar vs normal input
+        const msgReqBar = document.getElementById('messageRequestBar');
+        const chatInput = document.getElementById('chatInputContainer');
+        if (data.is_message_request) {
+          msgReqBar.style.display = 'block';
+          chatInput.style.display = 'none';
+          document.getElementById('msgReqUsername').textContent = window._currentChatUsername || 'This user';
+        } else {
+          msgReqBar.style.display = 'none';
+          chatInput.style.display = '';
+        }
 
         if (data.messages.length === 0) {
           messagesContainer.innerHTML = `
@@ -3390,7 +3422,9 @@
       
       // Always reload conversations to update last message preview
       setTimeout(() => {
-        loadConversations();
+        if (currentMessagesTab === 'messages') {
+          loadConversations();
+        }
       }, 300);
     });
     
@@ -4636,8 +4670,12 @@
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('user');
     
+    // Track current messages tab
+    let currentMessagesTab = 'messages';
+
     // Switch Messages/Requests tab
     function switchMessagesTab(tab) {
+      currentMessagesTab = tab;
       document.getElementById('messagesTab').classList.toggle('active', tab === 'messages');
       document.getElementById('requestsTab').classList.toggle('active', tab === 'requests');
       
@@ -4733,6 +4771,51 @@
         buttonsDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-size: 12px;">Deleted</span>';
       } catch (error) {
         InnovateAPI.showAlert('Failed to delete request', 'error');
+      }
+    }
+
+    // Handle message request action from chat view bar (Accept/Delete/Report)
+    async function handleMsgRequestAction(action) {
+      if (!currentContactId) return;
+      
+      if (action === 'accept') {
+        try {
+          await InnovateAPI.apiRequest(`/messages/requests/${currentContactId}/accept`, { method: 'POST' });
+          InnovateAPI.showAlert('Message request accepted', 'success');
+          // Show normal input, hide request bar
+          document.getElementById('messageRequestBar').style.display = 'none';
+          document.getElementById('chatInputContainer').style.display = '';
+          loadMessageRequestCount();
+          if (currentMessagesTab === 'requests') loadMessageRequests();
+        } catch (error) {
+          InnovateAPI.showAlert('Failed to accept request', 'error');
+        }
+      } else if (action === 'delete') {
+        try {
+          await InnovateAPI.apiRequest(`/messages/requests/${currentContactId}`, { method: 'DELETE' });
+          InnovateAPI.showAlert('Message request deleted', 'success');
+          loadMessageRequestCount();
+          // Go back to conversation list
+          closeChat();
+          if (currentMessagesTab === 'requests') loadMessageRequests();
+          else loadConversations();
+        } catch (error) {
+          InnovateAPI.showAlert('Failed to delete request', 'error');
+        }
+      } else if (action === 'report') {
+        // Show report confirmation
+        if (confirm('Are you sure you want to report this user?')) {
+          try {
+            await InnovateAPI.apiRequest(`/messages/requests/${currentContactId}`, { method: 'DELETE' });
+            InnovateAPI.showAlert('User reported and message request deleted', 'success');
+            loadMessageRequestCount();
+            closeChat();
+            if (currentMessagesTab === 'requests') loadMessageRequests();
+            else loadConversations();
+          } catch (error) {
+            InnovateAPI.showAlert('Failed to report', 'error');
+          }
+        }
       }
     }
 
@@ -4906,9 +4989,11 @@
       // Setup socket event listeners
       setupSocketListeners();
       
-      // Poll conversation list every 10 seconds for updates
+      // Poll conversation list every 10 seconds for updates (only if on Messages tab)
       setInterval(() => {
-        loadConversations();
+        if (currentMessagesTab === 'messages') {
+          loadConversations();
+        }
       }, 10000);
       
       // Load user info and conversations
