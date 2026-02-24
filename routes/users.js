@@ -524,6 +524,12 @@ router.post('/follow-requests/:requestId/accept', authMiddleware, (req, res) => 
 
       db.run('UPDATE follow_requests SET status = ? WHERE id = ?', ['accepted', requestId]);
 
+      // Clean up the follow_request notification (no longer needed)
+      db.run(
+        'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+        [userId, 'follow_request', request.requester_id]
+      );
+
       // Notify the requester that their request was accepted
       db.run(
         'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
@@ -550,11 +556,23 @@ router.post('/follow-requests/:requestId/decline', authMiddleware, (req, res) =>
   const userId = req.user.userId;
   const requestId = parseInt(req.params.requestId);
 
-  db.run('UPDATE follow_requests SET status = ? WHERE id = ? AND target_id = ?', ['declined', requestId, userId], function(err) {
-    if (err) {
-      return res.status(500).json({ error: 'Error declining follow request' });
+  // Get the request first so we know the requester_id for notification cleanup
+  db.get('SELECT requester_id FROM follow_requests WHERE id = ? AND target_id = ?', [requestId, userId], (err, request) => {
+    if (err || !request) {
+      return res.status(404).json({ error: 'Follow request not found' });
     }
-    res.json({ success: true });
+
+    db.run('UPDATE follow_requests SET status = ? WHERE id = ? AND target_id = ?', ['declined', requestId, userId], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error declining follow request' });
+      }
+      // Clean up the follow_request notification
+      db.run(
+        'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+        [userId, 'follow_request', request.requester_id]
+      );
+      res.json({ success: true });
+    });
   });
 });
 
