@@ -123,6 +123,7 @@ router.get('/', authMiddleware, (req, res) => {
   const userId = req.user.userId;
 
   // Get posts excluding stories that have expired
+  // For private accounts: only show posts from users the current user follows, or is_public_post = 1
   const query = `
     SELECT p.*, u.username, u.profile_picture,
            (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
@@ -138,6 +139,12 @@ router.get('/', authMiddleware, (req, res) => {
       AND (p.scheduled_at IS NULL OR p.scheduled_at <= CURRENT_TIMESTAMP)
       AND b1.id IS NULL
       AND b2.id IS NULL
+      AND (
+        p.user_id = ?
+        OR u.is_private = 0
+        OR p.is_public_post = 1
+        OR EXISTS (SELECT 1 FROM followers WHERE follower_id = ? AND following_id = p.user_id)
+      )
     ORDER BY (
       (ABS(RANDOM()) % 1000) / 1000.0
       + CASE WHEN p.created_at >= datetime('now', '-1 day') THEN 0.3
@@ -149,7 +156,7 @@ router.get('/', authMiddleware, (req, res) => {
     LIMIT 50
   `;
 
-  db.all(query, [userId, userId, userId, userId], (err, posts) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId], (err, posts) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Error fetching posts' });
@@ -361,7 +368,8 @@ router.post('/', authMiddleware, (req, res, next) => {
     custom_button,
     comment_to_dm,
     existing_images,
-    existing_video
+    existing_video,
+    is_public_post
   } = req.body;
 
   let images = [];
@@ -413,8 +421,8 @@ router.post('/', authMiddleware, (req, res, next) => {
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_creator_series, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_creator_series, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm, is_public_post)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -433,7 +441,8 @@ router.post('/', authMiddleware, (req, res, next) => {
       enable_contact === '1' || enable_contact === true ? 1 : 0,
       enable_interested === '1' || enable_interested === true ? 1 : 0,
       custom_button || null,
-      comment_to_dm || null
+      comment_to_dm || null,
+      is_public_post === '1' || is_public_post === true ? 1 : 0
     ],
     function(err) {
       if (err) {
@@ -1160,7 +1169,7 @@ router.put('/:postId', authMiddleware, upload.fields([
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button } = req.body;
+  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button, is_public_post } = req.body;
 
   db.get('SELECT * FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, post) => {
     if (err || !post) {
@@ -1229,6 +1238,12 @@ router.put('/:postId', authMiddleware, upload.fields([
     if (custom_button !== undefined) {
       updateFields.push('custom_button = ?');
       updateValues.push(custom_button || null);
+    }
+
+    // Post Public toggle for private accounts
+    if (is_public_post !== undefined) {
+      updateFields.push('is_public_post = ?');
+      updateValues.push(is_public_post === '1' || is_public_post === true ? 1 : 0);
     }
     
     updateValues.push(postId);

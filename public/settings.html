@@ -60,6 +60,26 @@
     <div class="ig-settings-section">
       <div class="ig-settings-item">
         <div>
+          <div style="font-weight: 600;">Private Account</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text);">When your account is private, only people you approve can see your posts, followers list, and following list</div>
+        </div>
+        <div class="ig-toggle-switch" id="privateAccountToggle" onclick="togglePrivateAccount()">
+          <div class="ig-toggle-slider"></div>
+        </div>
+      </div>
+
+      <div class="ig-settings-item" id="followRequestsItem" style="display: none;" onclick="window.location.href='/notifications'">
+        <div>
+          <div style="font-weight: 600;">Follow Requests</div>
+          <div style="font-size: 12px; color: var(--ig-secondary-text);">
+            <span id="followRequestCount">0</span> pending requests
+          </div>
+        </div>
+        <div>›</div>
+      </div>
+
+      <div class="ig-settings-item">
+        <div>
           <div style="font-weight: 600;">Crosspath</div>
           <div style="font-size: 12px; color: var(--ig-secondary-text);">Allow others to find you nearby</div>
         </div>
@@ -242,31 +262,68 @@
         themeToggle.classList.add('active');
       }
 
+      // Private Account
+      try {
+        const userData = await InnovateAPI.apiRequest(`/users/${user.id}`);
+        if (userData.user.is_private) {
+          document.getElementById('privateAccountToggle').classList.add('active');
+          document.getElementById('followRequestsItem').style.display = '';
+          loadFollowRequestCount();
+        }
+        if (userData.user.is_online) {
+          document.getElementById('onlineStatusToggle').classList.add('active');
+        }
+      } catch (error) {
+        console.error('Error loading user settings:', error);
+      }
+
       // Crosspath
       const crosspath = localStorage.getItem('crosspath_enabled') === 'true';
       if (crosspath) {
         document.getElementById('crosspathToggle').classList.add('active');
       }
 
-      // Online status - fetch from server
-      try {
-        const userData = await InnovateAPI.apiRequest(`/users/${user.id}`);
-        if (userData.user.is_online) {
-          document.getElementById('onlineStatusToggle').classList.add('active');
-        }
-      } catch (error) {
-        console.error('Error loading online status:', error);
-        // Fallback to localStorage
-        const onlineStatus = localStorage.getItem('show_online_status') !== 'false';
-        if (onlineStatus) {
-          document.getElementById('onlineStatusToggle').classList.add('active');
-        }
-      }
-
       // Notifications
       const notifications = localStorage.getItem('notifications_enabled') !== 'false';
       if (notifications) {
         document.getElementById('notificationsToggle').classList.add('active');
+      }
+    }
+
+    // Load follow request count
+    async function loadFollowRequestCount() {
+      try {
+        const data = await InnovateAPI.apiRequest('/users/follow-requests/count');
+        document.getElementById('followRequestCount').textContent = data.count || 0;
+      } catch (error) {
+        console.error('Error loading follow request count:', error);
+      }
+    }
+
+    // Toggle private account
+    async function togglePrivateAccount() {
+      const toggle = document.getElementById('privateAccountToggle');
+      const isEnabled = toggle.classList.contains('active');
+
+      try {
+        await InnovateAPI.apiRequest('/users/privacy', {
+          method: 'PUT',
+          body: JSON.stringify({
+            is_private: !isEnabled
+          })
+        });
+
+        toggle.classList.toggle('active');
+        const followRequestsItem = document.getElementById('followRequestsItem');
+        if (!isEnabled) {
+          followRequestsItem.style.display = '';
+          loadFollowRequestCount();
+        } else {
+          followRequestsItem.style.display = 'none';
+        }
+        InnovateAPI.showAlert(`Account is now ${!isEnabled ? 'private' : 'public'}`, 'success');
+      } catch (error) {
+        InnovateAPI.showAlert(error.message || 'Failed to update privacy setting', 'error');
       }
     }
 

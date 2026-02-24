@@ -9,7 +9,7 @@ router.get('/conversations', authMiddleware, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
-  // First, get all unique contacts and their last message ID
+  // First, get all unique contacts and their last message ID (exclude message requests)
   const query = `
     WITH contact_messages AS (
       SELECT 
@@ -22,6 +22,7 @@ router.get('/conversations', authMiddleware, (req, res) => {
       WHERE (sender_id = ? OR receiver_id = ?)
         AND (is_deleted_by_sender = 0 OR sender_id != ?)
         AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
+        AND (is_message_request = 0 OR message_request_status = 'accepted')
       GROUP BY contact_id
     )
     SELECT 
@@ -143,12 +144,18 @@ router.post('/send', authMiddleware, (req, res, next) => {
       expiresAt = now.toISOString();
     }
 
-    const query = `
-      INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `;
+    // Check if receiver has a private account and sender is not a follower
+    // If so, mark the message as a message request
+    let isMessageRequest = 0;
+    let messageRequestStatus = null;
 
-    db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename], function(err) {
+    const checkAndSend = () => {
+      const query = `
+        INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, is_message_request, message_request_status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `;
+
+      db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename, isMessageRequest, messageRequestStatus], function(err) {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Error sending message' });
@@ -199,6 +206,130 @@ router.post('/send', authMiddleware, (req, res, next) => {
       }
     );
   });
+    }; // end of checkAndSend
+
+    // Check receiver's privacy setting
+    db.get('SELECT is_private FROM users WHERE id = ?', [receiver_id], (err, receiverUser) => {
+      if (err || !receiverUser) {
+        return checkAndSend(); // proceed anyway if user lookup fails
+      }
+
+      if (receiverUser.is_private) {
+        // Check if sender follows the receiver (i.e., receiver accepted them)
+        db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [senderId, receiver_id], (err, follow) => {
+          if (!follow) {
+            // Check if there were any previous accepted messages between them
+            db.get(`SELECT id FROM messages WHERE 
+              ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+              AND is_message_request = 0
+              LIMIT 1`, [senderId, receiver_id, receiver_id, senderId], (err, existingConvo) => {
+              if (!existingConvo) {
+                // No existing conversation and not a follower — it's a message request
+                isMessageRequest = 1;
+                messageRequestStatus = 'pending';
+              }
+              checkAndSend();
+            });
+          } else {
+            checkAndSend();
+          }
+        });
+      } else {
+        checkAndSend();
+      }
+    });
+
+  });
+});
+
+// ===== MESSAGE REQUESTS =====
+
+// Get message requests (messages from non-followers to private accounts)
+router.get('/requests/list', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  // Get unique senders who have sent message requests to this user
+  const query = `
+    WITH request_senders AS (
+      SELECT 
+        sender_id,
+        MAX(id) as last_message_id,
+        COUNT(*) as message_count
+      FROM messages
+      WHERE receiver_id = ? AND is_message_request = 1 AND message_request_status = 'pending'
+      GROUP BY sender_id
+    )
+    SELECT 
+      rs.sender_id as contact_id,
+      u.username,
+      u.profile_picture,
+      m.content as last_message,
+      m.type as last_message_type,
+      m.created_at as last_message_time,
+      rs.message_count
+    FROM request_senders rs
+    JOIN users u ON u.id = rs.sender_id
+    LEFT JOIN messages m ON m.id = rs.last_message_id
+    ORDER BY m.created_at DESC
+  `;
+
+  db.all(query, [userId], (err, requests) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching message requests' });
+    }
+    res.json({ success: true, requests: requests || [] });
+  });
+});
+
+// Get message requests count
+router.get('/requests/count', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.get(`
+    SELECT COUNT(DISTINCT sender_id) as count 
+    FROM messages 
+    WHERE receiver_id = ? AND is_message_request = 1 AND message_request_status = 'pending'
+  `, [userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching count' });
+    }
+    res.json({ success: true, count: result ? result.count : 0 });
+  });
+});
+
+// Accept message request (move to regular inbox)
+router.post('/requests/:senderId/accept', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const senderId = parseInt(req.params.senderId);
+
+  db.run(`
+    UPDATE messages SET is_message_request = 0, message_request_status = 'accepted'
+    WHERE sender_id = ? AND receiver_id = ? AND is_message_request = 1
+  `, [senderId, userId], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Error accepting message request' });
+    }
+    res.json({ success: true });
+  });
+});
+
+// Delete message request
+router.delete('/requests/:senderId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const senderId = parseInt(req.params.senderId);
+
+  db.run(`
+    UPDATE messages SET message_request_status = 'declined'
+    WHERE sender_id = ? AND receiver_id = ? AND is_message_request = 1
+  `, [senderId, userId], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Error deleting message request' });
+    }
+    res.json({ success: true });
   });
 });
 

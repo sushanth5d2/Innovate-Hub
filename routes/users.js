@@ -13,17 +13,18 @@ router.get('/:userId', authMiddleware, (req, res) => {
   const query = `
     SELECT 
       u.id, u.username, u.email, u.bio, u.skills, u.interests, u.fullname,
-      u.favorite_teams, u.profile_picture, u.created_at,
+      u.favorite_teams, u.profile_picture, u.created_at, u.is_private,
       (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_archived = 0) as post_count,
       (SELECT COUNT(*) FROM followers WHERE following_id = u.id) as followers_count,
       (SELECT COUNT(*) FROM followers WHERE follower_id = u.id) as following_count,
       (SELECT COUNT(*) FROM followers WHERE follower_id = ? AND following_id = u.id) as is_following,
-      (SELECT COUNT(*) FROM blocked_users WHERE blocker_id = ? AND blocked_id = u.id) as is_blocked
+      (SELECT COUNT(*) FROM blocked_users WHERE blocker_id = ? AND blocked_id = u.id) as is_blocked,
+      (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ? AND target_id = u.id AND status = 'pending') as has_requested_follow
     FROM users u
     WHERE u.id = ?
   `;
 
-  db.get(query, [currentUserId, currentUserId, userId], (err, user) => {
+  db.get(query, [currentUserId, currentUserId, currentUserId, userId], (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -48,7 +49,36 @@ router.get('/:userId/posts', authMiddleware, (req, res) => {
   const { userId } = req.params;
   const currentUserId = req.user.userId;
 
-  const query = `
+  // Check if user is private and current user is not a follower
+  if (parseInt(userId) !== currentUserId) {
+    db.get('SELECT is_private FROM users WHERE id = ?', [userId], (err, targetUser) => {
+      if (err || !targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (targetUser.is_private) {
+        // Check if current user follows the private user
+        db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [currentUserId, userId], (err, follow) => {
+          if (!follow) {
+            // Not a follower — only return public posts (is_public_post = 1)
+            return fetchUserPosts(db, userId, currentUserId, res, true);
+          }
+          // Is a follower — return all posts
+          return fetchUserPosts(db, userId, currentUserId, res, false);
+        });
+        return;
+      }
+      // Public account — return all posts
+      return fetchUserPosts(db, userId, currentUserId, res, false);
+    });
+  } else {
+    // Own profile — return all posts
+    return fetchUserPosts(db, userId, currentUserId, res, false);
+  }
+});
+
+function fetchUserPosts(db, userId, currentUserId, res, onlyPublicPosts) {
+  let query = `
     SELECT p.*, u.username, u.profile_picture,
            (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
            (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
@@ -58,9 +88,13 @@ router.get('/:userId/posts', authMiddleware, (req, res) => {
     FROM posts p
     JOIN users u ON p.user_id = u.id
     WHERE p.user_id = ? AND p.is_archived = 0 AND p.is_story = 0
-    ORDER BY p.created_at DESC
-    LIMIT 50
   `;
+
+  if (onlyPublicPosts) {
+    query += ` AND p.is_public_post = 1`;
+  }
+
+  query += ` ORDER BY p.created_at DESC LIMIT 50`;
 
   db.all(query, [currentUserId, currentUserId, userId], (err, posts) => {
     if (err) {
@@ -123,7 +157,7 @@ router.get('/:userId/posts', authMiddleware, (req, res) => {
       });
     });
   });
-});
+}
 
 // Get user's saved posts
 router.get('/:userId/saved', authMiddleware, (req, res) => {
@@ -316,7 +350,7 @@ router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => 
   });
 });
 
-// Follow user
+// Follow user (with private account support)
 router.post('/:userId/follow', authMiddleware, (req, res) => {
   const db = getDb();
   const followerId = req.user.userId;
@@ -326,31 +360,71 @@ router.post('/:userId/follow', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'Cannot follow yourself' });
   }
 
-  db.run(
-    'INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)',
-    [followerId, followingId],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: 'Error following user' });
-      }
-
-      // Create notification
-      db.run(
-        'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-        [followingId, 'follow', 'started following you', followerId]
-      );
-
-      res.json({ success: true });
+  // Check if target user is private
+  db.get('SELECT is_private FROM users WHERE id = ?', [followingId], (err, targetUser) => {
+    if (err || !targetUser) {
+      return res.status(404).json({ error: 'User not found' });
     }
-  );
+
+    if (targetUser.is_private) {
+      // Private account: create a follow request instead of instant follow
+      db.run(
+        'INSERT OR IGNORE INTO follow_requests (requester_id, target_id, status) VALUES (?, ?, ?)',
+        [followerId, followingId, 'pending'],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error sending follow request' });
+          }
+
+          // Create follow request notification
+          db.run(
+            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+            [followingId, 'follow_request', 'requested to follow you', followerId]
+          );
+
+          // Emit real-time notification
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`user-${followingId}`).emit('notification:received', {
+              type: 'follow_request',
+              content: 'requested to follow you',
+              related_id: followerId
+            });
+          }
+
+          res.json({ success: true, status: 'requested' });
+        }
+      );
+    } else {
+      // Public account: instant follow
+      db.run(
+        'INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)',
+        [followerId, followingId],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ error: 'Error following user' });
+          }
+
+          // Create notification
+          db.run(
+            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+            [followingId, 'follow', 'started following you', followerId]
+          );
+
+          res.json({ success: true, status: 'following' });
+        }
+      );
+    }
+  });
 });
 
-// Unfollow user
+// Unfollow user (also cancels pending follow requests)
 router.delete('/:userId/follow', authMiddleware, (req, res) => {
   const db = getDb();
   const followerId = req.user.userId;
   const followingId = parseInt(req.params.userId);
 
+  // Delete from followers
   db.run(
     'DELETE FROM followers WHERE follower_id = ? AND following_id = ?',
     [followerId, followingId],
@@ -358,9 +432,104 @@ router.delete('/:userId/follow', authMiddleware, (req, res) => {
       if (err) {
         return res.status(500).json({ error: 'Error unfollowing user' });
       }
+
+      // Also delete any pending follow request
+      db.run(
+        'DELETE FROM follow_requests WHERE requester_id = ? AND target_id = ?',
+        [followerId, followingId]
+      );
+
       res.json({ success: true });
     }
   );
+});
+
+// ===== FOLLOW REQUEST ENDPOINTS =====
+
+// Get pending follow requests (for current user)
+router.get('/follow-requests/pending', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.all(`
+    SELECT fr.id, fr.requester_id, fr.created_at, 
+           u.username, u.profile_picture, u.bio
+    FROM follow_requests fr
+    JOIN users u ON fr.requester_id = u.id
+    WHERE fr.target_id = ? AND fr.status = 'pending'
+    ORDER BY fr.created_at DESC
+  `, [userId], (err, requests) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching follow requests' });
+    }
+    res.json({ success: true, requests: requests || [] });
+  });
+});
+
+// Accept follow request
+router.post('/follow-requests/:requestId/accept', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const requestId = parseInt(req.params.requestId);
+
+  db.get('SELECT * FROM follow_requests WHERE id = ? AND target_id = ? AND status = ?', [requestId, userId, 'pending'], (err, request) => {
+    if (err || !request) {
+      return res.status(404).json({ error: 'Follow request not found' });
+    }
+
+    // Accept: add to followers and update request status
+    db.run('INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)', [request.requester_id, request.target_id], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error accepting follow request' });
+      }
+
+      db.run('UPDATE follow_requests SET status = ? WHERE id = ?', ['accepted', requestId]);
+
+      // Notify the requester that their request was accepted
+      db.run(
+        'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+        [request.requester_id, 'follow_accepted', 'accepted your follow request', userId]
+      );
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user-${request.requester_id}`).emit('notification:received', {
+          type: 'follow_accepted',
+          content: 'accepted your follow request',
+          related_id: userId
+        });
+      }
+
+      res.json({ success: true });
+    });
+  });
+});
+
+// Decline follow request
+router.post('/follow-requests/:requestId/decline', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const requestId = parseInt(req.params.requestId);
+
+  db.run('UPDATE follow_requests SET status = ? WHERE id = ? AND target_id = ?', ['declined', requestId, userId], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Error declining follow request' });
+    }
+    res.json({ success: true });
+  });
+});
+
+// Get follow request count
+router.get('/follow-requests/count', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.get('SELECT COUNT(*) as count FROM follow_requests WHERE target_id = ? AND status = ?', [userId, 'pending'], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching count' });
+    }
+    res.json({ success: true, count: result ? result.count : 0 });
+  });
 });
 
 // Block user
@@ -427,6 +596,37 @@ router.get('/blocked/list', authMiddleware, (req, res) => {
     }
     res.json({ success: true, blocked });
   });
+});
+
+// Toggle private account
+router.put('/privacy', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { is_private } = req.body;
+
+  db.run(
+    'UPDATE users SET is_private = ? WHERE id = ?',
+    [is_private ? 1 : 0, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error updating privacy setting' });
+      }
+
+      // If switching from private to public, auto-accept all pending follow requests
+      if (!is_private) {
+        db.all('SELECT requester_id FROM follow_requests WHERE target_id = ? AND status = ?', [userId, 'pending'], (err, requests) => {
+          if (requests && requests.length > 0) {
+            requests.forEach(req => {
+              db.run('INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)', [req.requester_id, userId]);
+            });
+            db.run('UPDATE follow_requests SET status = ? WHERE target_id = ? AND status = ?', ['accepted', userId, 'pending']);
+          }
+        });
+      }
+
+      res.json({ success: true, is_private: is_private ? 1 : 0 });
+    }
+  );
 });
 
 // Toggle online status

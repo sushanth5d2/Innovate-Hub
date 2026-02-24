@@ -4632,14 +4632,115 @@
       document.getElementById('requestsTab').classList.toggle('active', tab === 'requests');
       
       if (tab === 'requests') {
-        document.getElementById('conversationsList').innerHTML = `
-          <div style=\"text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);\">
-            <div style=\"font-size: 48px; margin-bottom: 16px;\">📬</div>
-            <div style=\"font-size: 16px;\">No message requests</div>
-          </div>
-        `;
+        loadMessageRequests();
       } else {
         loadConversations();
+      }
+    }
+
+    // Load message requests
+    async function loadMessageRequests() {
+      const list = document.getElementById('conversationsList');
+      list.innerHTML = '<div class="ig-spinner"></div>';
+      
+      try {
+        const data = await InnovateAPI.apiRequest('/messages/requests/list');
+        const requests = data.requests || [];
+
+        if (requests.length === 0) {
+          list.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: var(--ig-secondary-text);">
+              <div style="font-size: 48px; margin-bottom: 16px;">📬</div>
+              <div style="font-size: 16px; font-weight: 600;">No Message Requests</div>
+              <div style="font-size: 13px; margin-top: 8px;">Messages from people you don't follow will appear here.</div>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = `
+          <div style="padding: 12px 16px; font-size: 13px; color: var(--ig-secondary-text); border-bottom: 1px solid var(--ig-border);">
+            These messages are from people you don't follow. They won't know you've seen their request until you accept it.
+          </div>
+        `;
+
+        requests.forEach(req => {
+          const convEl = document.createElement('div');
+          convEl.className = 'ig-conversation';
+          convEl.style.position = 'relative';
+          
+          const preview = req.last_message ? (req.last_message.length > 35 ? req.last_message.substring(0, 35) + '...' : req.last_message) : 'Message request';
+          
+          convEl.innerHTML = `
+            <div>
+              <img src="${InnovateAPI.getUserAvatar(req.profile_picture)}" alt="${req.username}" class="ig-conversation-avatar" onerror="this.src='/images/default-avatar.svg'">
+            </div>
+            <div class="ig-conversation-info">
+              <div class="ig-conversation-name">${req.username}</div>
+              <div class="ig-conversation-message" style="color: var(--ig-secondary-text);">${preview}</div>
+            </div>
+            <div style="display: flex; gap: 6px; flex-shrink: 0;">
+              <button onclick="event.stopPropagation(); acceptMessageRequest(${req.contact_id}, this)" style="background: var(--ig-blue, #0095f6); color: white; border: none; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer;">Accept</button>
+              <button onclick="event.stopPropagation(); deleteMessageRequest(${req.contact_id}, this)" style="background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer;">Delete</button>
+            </div>
+          `;
+          
+          convEl.onclick = () => {
+            openChat(req.contact_id, req.username, req.profile_picture);
+          };
+          
+          list.appendChild(convEl);
+        });
+      } catch (error) {
+        console.error('Error loading message requests:', error);
+        list.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: var(--ig-secondary-text);">Error loading requests</div>
+        `;
+      }
+    }
+
+    // Accept message request
+    async function acceptMessageRequest(senderId, btn) {
+      try {
+        await InnovateAPI.apiRequest(`/messages/requests/${senderId}/accept`, { method: 'POST' });
+        const parentEl = btn.closest('.ig-conversation');
+        const buttonsDiv = btn.parentElement;
+        buttonsDiv.innerHTML = '<span style="color: #4caf50; font-size: 12px; font-weight: 600;">Accepted</span>';
+        InnovateAPI.showAlert('Message request accepted', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to accept request', 'error');
+      }
+    }
+
+    // Delete message request
+    async function deleteMessageRequest(senderId, btn) {
+      try {
+        await InnovateAPI.apiRequest(`/messages/requests/${senderId}`, { method: 'DELETE' });
+        const parentEl = btn.closest('.ig-conversation');
+        parentEl.style.opacity = '0.5';
+        parentEl.style.pointerEvents = 'none';
+        const buttonsDiv = btn.parentElement;
+        buttonsDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-size: 12px;">Deleted</span>';
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to delete request', 'error');
+      }
+    }
+
+    // Load message request count badge
+    async function loadMessageRequestCount() {
+      try {
+        const data = await InnovateAPI.apiRequest('/messages/requests/count');
+        const count = data.count || 0;
+        const tab = document.getElementById('requestsTab');
+        if (tab) {
+          if (count > 0) {
+            tab.innerHTML = `Requests <span style="background: #ef4444; color: white; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; font-weight: 700;">${count}</span>`;
+          } else {
+            tab.textContent = 'Requests';
+          }
+        }
+      } catch (error) {
+        console.error('Error loading message request count:', error);
       }
     }
     
@@ -4804,6 +4905,7 @@
       loadUserInfo()
         .then(() => {
           console.log('User info loaded');
+          loadMessageRequestCount(); // Load message request count badge
           return loadConversations();
         })
         .then(async () => {

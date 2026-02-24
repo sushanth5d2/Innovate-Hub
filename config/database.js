@@ -1762,6 +1762,51 @@ const migrateDatabase = () => {
         console.log('Note: priority column migration - ', err ? err.message : 'ok');
       }
     });
+
+    // ===== PRIVATE ACCOUNT FEATURE =====
+
+    // Add is_private column to users
+    db.run(`ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: is_private column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Add is_public_post column to posts (allows private account users to make specific posts public)
+    db.run(`ALTER TABLE posts ADD COLUMN is_public_post BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: is_public_post column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Create follow_requests table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS follow_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        requester_id INTEGER NOT NULL,
+        target_id INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(requester_id, target_id),
+        FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Add is_message_request column to messages for message request functionality
+    db.run(`ALTER TABLE messages ADD COLUMN is_message_request BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: is_message_request column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Add message_request_status column: 'pending', 'accepted', 'declined'
+    db.run(`ALTER TABLE messages ADD COLUMN message_request_status TEXT DEFAULT NULL`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Note: message_request_status column migration - ', err ? err.message : 'ok');
+      }
+    });
+
   });
 };
 

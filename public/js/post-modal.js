@@ -341,6 +341,19 @@ const PostModal = (function () {
                 '<button type="button" class="cp-add-option-btn" onclick="PostModal.addCDMItem()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> + Add another custom button</button>' +
               '</div>' +
             '</div>' +
+
+            '<!-- Post Public Toggle (for private accounts) -->' +
+            '<div class="cb-builder" id="' + p + 'pmPostPublicSection" style="margin-top:12px;display:none;">' +
+              '<label class="cp-toggle-row" style="padding:0;margin-bottom:4px;">' +
+                '<div class="cp-toggle-info">' +
+                  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>' +
+                  '<span style="font-weight:600;font-size:14px;">Post Public</span>' +
+                '</div>' +
+                '<div class="cp-switch"><input type="checkbox" id="' + p + 'pmPublicPost"><span class="cp-switch-slider"></span></div>' +
+              '</label>' +
+              '<p class="cb-hint" style="margin-top:0;">Even though your account is private, this specific post will be visible to everyone. You can change this later by editing the post.</p>' +
+            '</div>' +
+
           '</div>' +
 
         '</div>' + // cp-body
@@ -396,6 +409,7 @@ const PostModal = (function () {
     setUserInfo();
     switchTab('post');
     loadTrendingHashtags();
+    checkPrivateAccountForPostPublic();
 
     el('postModalOverlay').style.display = 'flex';
     setTimeout(function () { var t = el('pmCaption'); if (t) t.focus(); }, 300);
@@ -495,6 +509,11 @@ const PostModal = (function () {
       prefillCustomButton(post.custom_button);
       // Pre-fill comment-to-DM
       prefillCommentDM(post.comment_to_dm);
+
+      // Pre-fill Post Public toggle (for private accounts)
+      var publicPostCheckbox = el('pmPublicPost');
+      if (publicPostCheckbox) publicPostCheckbox.checked = !!post.is_public_post;
+      checkPrivateAccountForPostPublic();
 
       // Load trending hashtags
       loadTrendingHashtags();
@@ -1007,6 +1026,28 @@ const PostModal = (function () {
     if (chev) chev.style.transform = visible ? '' : 'rotate(180deg)';
   }
 
+  // ========== POST PUBLIC (Private Account) ==========
+  function checkPrivateAccountForPostPublic() {
+    var section = el('pmPostPublicSection');
+    if (!section) return;
+    
+    // Check if current user has a private account
+    var user = _getUser ? _getUser() : null;
+    if (user && user.id) {
+      InnovateAPI.apiRequest('/users/' + user.id).then(function(data) {
+        if (data && data.user && data.user.is_private) {
+          section.style.display = '';
+        } else {
+          section.style.display = 'none';
+        }
+      }).catch(function() {
+        section.style.display = 'none';
+      });
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
   // ========== CUSTOM BUTTON / CDM HELPERS ==========
   function toggleCBSection(fieldId) {
     var fields = document.getElementById(fieldId);
@@ -1436,6 +1477,12 @@ const PostModal = (function () {
     var commentDMData = collectCommentDMData();
     if (commentDMData) formData.append('comment_to_dm', JSON.stringify(commentDMData));
 
+    // Post Public toggle for private accounts
+    var publicPostToggle = el('pmPublicPost');
+    if (publicPostToggle && publicPostToggle.checked) {
+      formData.append('is_public_post', '1');
+    }
+
     try {
       await InnovateAPI.apiRequest('/posts', { method: 'POST', body: formData, headers: {} });
       InnovateAPI.showAlert(scheduleTime ? 'Post scheduled successfully!' : 'Post shared!', 'success');
@@ -1534,6 +1581,10 @@ const PostModal = (function () {
       if (customButtonData) formData.append('custom_button', JSON.stringify(customButtonData));
       var commentDMData = collectCommentDMData();
       if (commentDMData) formData.append('comment_to_dm', JSON.stringify(commentDMData));
+
+      // Post Public toggle for private accounts
+      var publicPostCheck = el('pmPublicPost');
+      if (publicPostCheck) formData.append('is_public_post', publicPostCheck.checked ? '1' : '0');
 
       await InnovateAPI.apiRequest('/posts', { method: 'POST', body: formData, headers: {} });
       InnovateAPI.showAlert(scheduleTime ? 'Creator Series scheduled!' : 'Creator Series shared!', 'success');
@@ -1654,6 +1705,10 @@ const PostModal = (function () {
     var commentDMData = collectCommentDMData();
     if (commentDMData) formData.append('comment_to_dm', JSON.stringify(commentDMData));
     else formData.append('comment_to_dm', '');
+
+    // Post Public toggle for private accounts
+    var publicPostCheck = el('pmPublicPost');
+    if (publicPostCheck) formData.append('is_public_post', publicPostCheck.checked ? '1' : '0');
 
     try {
       await InnovateAPI.apiRequest('/posts/' + editPostId, { method: 'PUT', body: formData, headers: {} });

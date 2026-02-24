@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Follow Requests • Innovate</title>
+  <link rel="stylesheet" href="/css/instagram.css">
+  <style>
+    .fr-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .fr-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .fr-back-btn {
+      background: none;
+      border: none;
+      color: var(--ig-primary-text);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+    }
+    .fr-back-btn:hover {
+      background: var(--ig-secondary-background);
+    }
+    .fr-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .fr-request-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--ig-border);
+      gap: 12px;
+    }
+    .fr-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      object-fit: cover;
+      cursor: pointer;
+    }
+    .fr-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .fr-username {
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .fr-username:hover {
+      text-decoration: underline;
+    }
+    .fr-bio {
+      font-size: 12px;
+      color: var(--ig-secondary-text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fr-time {
+      font-size: 11px;
+      color: var(--ig-secondary-text);
+    }
+    .fr-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .fr-btn-accept {
+      background: var(--ig-blue, #0095f6);
+      color: white;
+      border: none;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .fr-btn-accept:hover {
+      background: #1877f2;
+    }
+    .fr-btn-decline {
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      border: 1px solid var(--ig-border);
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .fr-btn-decline:hover {
+      background: var(--ig-border);
+    }
+    .fr-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--ig-secondary-text);
+    }
+    .fr-empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    .fr-empty h3 {
+      color: var(--ig-primary-text);
+      margin-bottom: 8px;
+    }
+    .fr-accepted {
+      color: #4caf50;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .fr-declined {
+      color: var(--ig-secondary-text);
+      font-weight: 600;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="ig-top-nav">
+    <div class="ig-nav-container">
+      <a href="/home" class="ig-logo">Innovate</a>
+      <div></div>
+      <div class="ig-nav-icons">
+        <div class="ig-nav-icon" onclick="window.location.href='/home'">
+          <svg aria-label="Home" fill="none" height="24" viewBox="0 0 24 24" width="24">
+            <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="ig-main">
+    <div class="fr-container">
+      <div class="fr-header">
+        <button class="fr-back-btn" onclick="window.location.href='/settings'">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="fr-title">Follow Requests</div>
+      </div>
+      <div id="requestsList"></div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="ig-bottom-nav">
+    <a href="/home" class="ig-bottom-nav-item">
+      <svg aria-label="Home" viewBox="0 0 24 24" width="24">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Home</span>
+    </a>
+    <a href="/communities" class="ig-bottom-nav-item">
+      <svg aria-label="Communities" viewBox="0 0 24 24" width="24">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Communities</span>
+    </a>
+    <a href="/settings" class="ig-bottom-nav-item active">
+      <svg aria-label="Profile" viewBox="0 0 24 24" width="24">
+        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+        <path d="M5.5 21v-2a7.5 7.5 0 0 1 13 0v2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span class="ig-bottom-nav-label">Profile</span>
+    </a>
+  </nav>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/instagram-theme.js"></script>
+  <script>
+    InnovateAPI.requireAuth();
+    InnovateAPI.initializePage();
+
+    async function loadFollowRequests() {
+      const list = document.getElementById('requestsList');
+      try {
+        const data = await InnovateAPI.apiRequest('/users/follow-requests/pending');
+        const requests = data.requests || [];
+
+        if (requests.length === 0) {
+          list.innerHTML = `
+            <div class="fr-empty">
+              <div class="fr-empty-icon">👥</div>
+              <h3>No Follow Requests</h3>
+              <p>When people request to follow you, you'll see them here.</p>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = requests.map(r => `
+          <div class="fr-request-item" id="fr-${r.id}">
+            <img src="${InnovateAPI.getUserAvatar(r.profile_picture)}" alt="${r.username}" class="fr-avatar" onclick="window.location.href='/profile/${r.requester_id}'" onerror="this.src='/images/default-avatar.svg'">
+            <div class="fr-info">
+              <div class="fr-username" onclick="window.location.href='/profile/${r.requester_id}'">${r.username}</div>
+              <div class="fr-bio">${r.bio || ''}</div>
+              <div class="fr-time">${timeAgo(r.created_at)}</div>
+            </div>
+            <div class="fr-actions" id="fr-actions-${r.id}">
+              <button class="fr-btn-accept" onclick="acceptRequest(${r.id}, '${r.username}')">Confirm</button>
+              <button class="fr-btn-decline" onclick="declineRequest(${r.id})">Delete</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading follow requests:', error);
+        list.innerHTML = '<div class="fr-empty"><p>Error loading requests</p></div>';
+      }
+    }
+
+    async function acceptRequest(requestId, username) {
+      try {
+        await InnovateAPI.apiRequest(`/users/follow-requests/${requestId}/accept`, { method: 'POST' });
+        const actions = document.getElementById(`fr-actions-${requestId}`);
+        actions.innerHTML = '<span class="fr-accepted">✓ Accepted</span>';
+        InnovateAPI.showAlert(`${username} can now see your posts`, 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to accept request', 'error');
+      }
+    }
+
+    async function declineRequest(requestId) {
+      try {
+        await InnovateAPI.apiRequest(`/users/follow-requests/${requestId}/decline`, { method: 'POST' });
+        const actions = document.getElementById(`fr-actions-${requestId}`);
+        actions.innerHTML = '<span class="fr-declined">Deleted</span>';
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to decline request', 'error');
+      }
+    }
+
+    function timeAgo(dateStr) {
+      const now = new Date();
+      const date = new Date(dateStr);
+      const diff = Math.floor((now - date) / 1000);
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+      return Math.floor(diff / 604800) + 'w ago';
+    }
+
+    loadFollowRequests();
+  </script>
+</body>
+</html>

@@ -526,6 +526,10 @@ app.get('/settings', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'settings.html'));
 });
 
+app.get('/follow-requests', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'follow-requests.html'));
+});
+
 app.get('/social-service', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'social-service.html'));
 });

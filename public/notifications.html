@@ -92,6 +92,26 @@
     .ai-speaker-icon { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #667eea; animation: speaker-pulse 1.5s infinite; }
     @keyframes speaker-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
+    /* ===== FOLLOW REQUESTS SECTION ===== */
+    .follow-requests-banner { padding: 12px 16px; border-bottom: 1px solid var(--ig-border); display: none; }
+    .follow-requests-banner.visible { display: block; }
+    .fr-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .fr-header-title { font-size: 16px; font-weight: 700; color: var(--ig-primary-text); }
+    .fr-header-count { font-size: 13px; color: var(--ig-blue); font-weight: 600; cursor: pointer; }
+    .fr-list { display: flex; flex-direction: column; gap: 10px; }
+    .fr-item { display: flex; align-items: center; gap: 12px; }
+    .fr-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; cursor: pointer; }
+    .fr-info { flex: 1; min-width: 0; }
+    .fr-username { font-size: 14px; font-weight: 600; color: var(--ig-primary-text); cursor: pointer; }
+    .fr-username:hover { text-decoration: underline; }
+    .fr-time { font-size: 12px; color: var(--ig-secondary-text); }
+    .fr-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .fr-btn-confirm { background: var(--ig-blue); color: white; border: none; border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .fr-btn-confirm:hover { opacity: 0.9; }
+    .fr-btn-delete { background: var(--ig-secondary-background); color: var(--ig-primary-text); border: 1px solid var(--ig-border); border-radius: 8px; padding: 7px 16px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .fr-btn-delete:hover { background: var(--ig-hover); }
+    .fr-empty { text-align: center; padding: 12px; color: var(--ig-secondary-text); font-size: 13px; }
+
     /* ===== PRIORITY BADGES ===== */
     .priority-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
     .priority-badge.p-high { background: rgba(244,67,54,0.15); color: #f44336; }
@@ -281,6 +301,15 @@
 
     <!-- NOTIFICATIONS TAB -->
     <div class="notif-tab-panel active" id="panelNotifications">
+      <!-- Follow Requests Section -->
+      <div class="follow-requests-banner" id="followRequestsBanner">
+        <div class="fr-header">
+          <div class="fr-header-title"><i class="fas fa-user-clock" style="margin-right:6px; color: var(--ig-blue);"></i>Follow Requests</div>
+          <span class="fr-header-count" id="frSeeAll" style="display:none;" onclick="toggleFollowRequestsExpanded()">See all</span>
+        </div>
+        <div class="fr-list" id="followRequestsList"></div>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px 8px;">
         <h2 style="font-size: 20px; font-weight: 600; margin: 0;">Notifications</h2>
         <div style="display: flex; gap: 8px;">
@@ -2618,9 +2647,9 @@
     }
 
     if (notificationsSocket) {
-      notificationsSocket.on('notification:receive', function() { loadNotifications(); });
-      notificationsSocket.on('new_notification', function() { loadNotifications(); });
-      notificationsSocket.on('notification', function() { loadNotifications(); });
+      notificationsSocket.on('notification:receive', function() { loadNotifications(); loadFollowRequests(); });
+      notificationsSocket.on('new_notification', function() { loadNotifications(); loadFollowRequests(); });
+      notificationsSocket.on('notification', function() { loadNotifications(); loadFollowRequests(); });
     }
 
     function createNotificationElement(notification) {
@@ -2642,6 +2671,9 @@
       } else if (notification.type === 'crosspath_match') {
         var username = notification.username || 'Someone';
         notificationText = notification.content.replace(username, '<span class="ig-notification-username">' + username + '</span>');
+      } else if (notification.type === 'follow_request') {
+        notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> requested to follow you.';
+        actionButton = '<div class="ig-notification-action" style="display: flex; gap: 8px;"><button class="ig-follow-btn" onclick="acceptFollowRequestFromNotif(' + notification.sender_id + ', this, event)" style="padding: 7px 14px; font-size: 13px;">Confirm</button><button class="ig-following-btn" onclick="declineFollowRequestFromNotif(' + notification.sender_id + ', this, event)" style="padding: 7px 14px; font-size: 13px;">Delete</button></div>';
       } else if (notification.type === 'community_join') {
         notificationText = '<span class="ig-notification-username">' + (notification.username || 'Someone') + '</span> joined your community.';
       } else if (notification.type === 'join_request') {
@@ -2772,6 +2804,129 @@
       });
     }
 
+    // ===================== FOLLOW REQUESTS =====================
+    var allFollowRequests = [];
+    var frExpanded = false;
+
+    function loadFollowRequests() {
+      InnovateAPI.apiRequest('/users/follow-requests/pending').then(function(data) {
+        allFollowRequests = data.requests || [];
+        renderFollowRequests();
+      }).catch(function(err) {
+        console.error('Failed to load follow requests:', err);
+      });
+    }
+
+    function renderFollowRequests() {
+      var banner = document.getElementById('followRequestsBanner');
+      var list = document.getElementById('followRequestsList');
+      var seeAll = document.getElementById('frSeeAll');
+      if (!allFollowRequests.length) {
+        banner.classList.remove('visible');
+        return;
+      }
+      banner.classList.add('visible');
+      var toShow = frExpanded ? allFollowRequests : allFollowRequests.slice(0, 3);
+      seeAll.style.display = allFollowRequests.length > 3 ? '' : 'none';
+      seeAll.textContent = frExpanded ? 'Show less' : 'See all (' + allFollowRequests.length + ')';
+      list.innerHTML = '';
+      toShow.forEach(function(req) {
+        var avatar = InnovateAPI.getUserAvatar(req.profile_picture);
+        var timeStr = formatTimeAgo(req.created_at);
+        var div = document.createElement('div');
+        div.className = 'fr-item';
+        div.id = 'fr-item-' + req.id;
+        div.innerHTML = '<img src="' + avatar + '" class="fr-avatar" onclick="window.location.href=\'/profile/' + req.requester_id + '\'" alt="">' +
+          '<div class="fr-info">' +
+            '<div class="fr-username" onclick="window.location.href=\'/profile/' + req.requester_id + '\'">' + (req.username || 'User') + '</div>' +
+            '<div class="fr-time">' + timeStr + '</div>' +
+          '</div>' +
+          '<div class="fr-actions">' +
+            '<button class="fr-btn-confirm" onclick="acceptFollowRequest(' + req.id + ', ' + req.requester_id + ', this, event)">Confirm</button>' +
+            '<button class="fr-btn-delete" onclick="declineFollowRequest(' + req.id + ', this, event)">Delete</button>' +
+          '</div>';
+        list.appendChild(div);
+      });
+    }
+
+    function toggleFollowRequestsExpanded() {
+      frExpanded = !frExpanded;
+      renderFollowRequests();
+    }
+
+    function acceptFollowRequest(requestId, requesterId, btn, event) {
+      if (event) event.stopPropagation();
+      var item = document.getElementById('fr-item-' + requestId);
+      var actions = btn.closest('.fr-actions');
+      actions.innerHTML = '<span style="color: var(--ig-blue); font-weight: 600; font-size: 13px;"><i class="fas fa-check-circle"></i></span>';
+      InnovateAPI.apiRequest('/users/follow-requests/' + requestId + '/accept', { method: 'POST' }).then(function() {
+        setTimeout(function() {
+          allFollowRequests = allFollowRequests.filter(function(r) { return r.id !== requestId; });
+          renderFollowRequests();
+          loadNotifications();
+        }, 800);
+      }).catch(function(err) {
+        InnovateAPI.showAlert('Failed to accept request', 'error');
+        loadFollowRequests();
+      });
+    }
+
+    function declineFollowRequest(requestId, btn, event) {
+      if (event) event.stopPropagation();
+      var item = document.getElementById('fr-item-' + requestId);
+      var actions = btn.closest('.fr-actions');
+      actions.innerHTML = '<span style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;"><i class="fas fa-times-circle"></i></span>';
+      InnovateAPI.apiRequest('/users/follow-requests/' + requestId + '/decline', { method: 'POST' }).then(function() {
+        setTimeout(function() {
+          allFollowRequests = allFollowRequests.filter(function(r) { return r.id !== requestId; });
+          renderFollowRequests();
+        }, 800);
+      }).catch(function(err) {
+        InnovateAPI.showAlert('Failed to decline request', 'error');
+        loadFollowRequests();
+      });
+    }
+
+    // Accept/decline from inline notification buttons
+    function acceptFollowRequestFromNotif(senderId, btn, event) {
+      if (event) event.stopPropagation();
+      var actionDiv = btn.closest('.ig-notification-action');
+      actionDiv.innerHTML = '<span style="color: var(--ig-blue); font-weight: 600; font-size: 13px;"><i class="fas fa-spinner fa-spin"></i></span>';
+      // Find the request ID by sender
+      InnovateAPI.apiRequest('/users/follow-requests/pending').then(function(data) {
+        var req = (data.requests || []).find(function(r) { return r.requester_id === senderId; });
+        if (req) {
+          return InnovateAPI.apiRequest('/users/follow-requests/' + req.id + '/accept', { method: 'POST' });
+        } else {
+          throw new Error('Request not found');
+        }
+      }).then(function() {
+        actionDiv.innerHTML = '<span style="color: var(--ig-blue); font-weight: 600; font-size: 13px;"><i class="fas fa-check-circle"></i> Accepted</span>';
+        loadFollowRequests();
+      }).catch(function(err) {
+        actionDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-size: 13px;">Failed</span>';
+      });
+    }
+
+    function declineFollowRequestFromNotif(senderId, btn, event) {
+      if (event) event.stopPropagation();
+      var actionDiv = btn.closest('.ig-notification-action');
+      actionDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;"><i class="fas fa-spinner fa-spin"></i></span>';
+      InnovateAPI.apiRequest('/users/follow-requests/pending').then(function(data) {
+        var req = (data.requests || []).find(function(r) { return r.requester_id === senderId; });
+        if (req) {
+          return InnovateAPI.apiRequest('/users/follow-requests/' + req.id + '/decline', { method: 'POST' });
+        } else {
+          throw new Error('Request not found');
+        }
+      }).then(function() {
+        actionDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-weight: 600; font-size: 13px;"><i class="fas fa-times-circle"></i> Declined</span>';
+        loadFollowRequests();
+      }).catch(function(err) {
+        actionDiv.innerHTML = '<span style="color: var(--ig-secondary-text); font-size: 13px;">Failed</span>';
+      });
+    }
+
     // ===================== HASH NAV =====================
     function initFromHash() {
       if (window.location.hash === '#reminders') switchTab('reminders');
@@ -2780,6 +2935,7 @@
     // ===================== INIT =====================
     loadUserInfo();
     loadNotifications();
+    loadFollowRequests();
     checkDueReminders();
     initFromHash();
   </script>
