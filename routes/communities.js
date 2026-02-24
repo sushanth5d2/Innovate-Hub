@@ -205,10 +205,17 @@ router.post('/:communityId/join', authMiddleware, (req, res) => {
           return res.status(500).json({ error: 'Error joining community' });
         }
 
-        // Notify admin
+        // Delete any old community_join notification from this user for this community to prevent duplicates
         db.run(
-          'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-          [community.admin_id, 'community_join', 'joined your community', communityId]
+          'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ? AND created_by = ?',
+          [community.admin_id, 'community_join', communityId, userId],
+          function() {
+            // Notify admin
+            db.run(
+              'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+              [community.admin_id, 'community_join', 'joined your community', communityId, userId]
+            );
+          }
         );
 
         res.json({ success: true });
@@ -1469,10 +1476,16 @@ router.post('/:id/accept-invite', authMiddleware, (req, res) => {
               return res.status(500).json({ error: 'Error joining community' });
             }
 
-            // Notify the admin that user accepted
+            // Delete old notification for this action to prevent duplicates, then notify admin
             db.run(
-              'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-              [community.admin_id, 'community_join', 'accepted your invitation and joined', communityId]
+              'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ? AND created_by = ?',
+              [community.admin_id, 'community_join', communityId, userId],
+              function() {
+                db.run(
+                  'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+                  [community.admin_id, 'community_join', 'accepted your invitation and joined', communityId, userId]
+                );
+              }
             );
 
             res.json({ success: true, message: 'Successfully joined the community' });
@@ -1508,26 +1521,33 @@ router.post('/:id/invite', authMiddleware, (req, res) => {
           return res.status(500).json({ error: 'Error fetching community' });
         }
 
-        // Create notification for invited user
+        // Delete any existing invite notification for this user/community to prevent duplicates
         db.run(
-          'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-          [userId, 'community_invite', `You've been invited to join ${community.name}`, communityId],
-          function(err) {
-            if (err) {
-              return res.status(500).json({ error: 'Error sending invitation' });
-            }
+          'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+          [userId, 'community_invite', communityId],
+          function() {
+            // Create notification for invited user
+            db.run(
+              'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+              [userId, 'community_invite', `You've been invited to join ${community.name}`, communityId, inviterId],
+              function(err) {
+                if (err) {
+                  return res.status(500).json({ error: 'Error sending invitation' });
+                }
 
-            // Emit socket notification
-            const io = req.app.get('io');
-            if (io) {
-              io.to(`user_${userId}`).emit('notification:receive', {
-                type: 'community_invite',
-                content: `You've been invited to join ${community.name}`,
-                communityId: communityId
-              });
-            }
+                // Emit socket notification
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`user_${userId}`).emit('notification:receive', {
+                    type: 'community_invite',
+                    content: `You've been invited to join ${community.name}`,
+                    communityId: communityId
+                  });
+                }
 
-            res.json({ success: true });
+                res.json({ success: true });
+              }
+            );
           }
         );
       });

@@ -181,6 +181,8 @@ router.post('/send', authMiddleware, (req, res, next) => {
           original_filename: originalFilename,
           sender_username: sender.username,
           sender_picture: sender.profile_picture,
+          is_message_request: isMessageRequest,
+          message_request_status: messageRequestStatus,
           created_at: new Date().toISOString()
         };
 
@@ -190,14 +192,15 @@ router.post('/send', authMiddleware, (req, res, next) => {
         io.to(`user_${senderId}`).emit('new_message', { ...messageData, is_own: true });
 
         // Create notification
+        const notifType = isMessageRequest ? 'message_request' : 'message';
         db.run(
           `INSERT INTO notifications (user_id, type, content, related_id, created_by, created_at)
-           VALUES (?, 'message', ?, ?, ?, datetime('now'))`,
-          [receiver_id, `New message from ${sender.username}`, messageId, senderId]
+           VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+          [receiver_id, notifType, `New message from ${sender.username}`, messageId, senderId]
         );
 
         io.to(`user_${receiver_id}`).emit('new_notification', {
-          type: 'message',
+          type: notifType,
           content: `New message from ${sender.username}`,
           created_at: new Date().toISOString()
         });
@@ -357,35 +360,80 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
     expiresAt = now.toISOString();
   }
 
-  const query = `
-    INSERT INTO messages (sender_id, receiver_id, content, attachments, timer, expires_at, reply_to_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
+  // Check if receiver has a private account and sender is not a follower
+  const insertMessage = (isMessageRequest, messageRequestStatus) => {
+    const query = `
+      INSERT INTO messages (sender_id, receiver_id, content, attachments, timer, expires_at, reply_to_id, is_message_request, message_request_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-  db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt, reply_to_id || null], function(err) {
-    if (err) {
-      return res.status(500).json({ error: 'Error sending message' });
-    }
+    db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt, reply_to_id || null, isMessageRequest, messageRequestStatus], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error sending message' });
+      }
 
-    // Create notification
-    db.run(
-      'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-      [receiver_id, 'message', 'sent you a message', senderId]
-    );
+      const messageId = this.lastID;
 
-    res.json({
-      success: true,
-      message: {
-        id: this.lastID,
+      // Create notification
+      db.run(
+        'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+        [receiver_id, isMessageRequest ? 'message_request' : 'message', 'sent you a message', messageId, senderId]
+      );
+
+      // Emit socket event
+      const io = req.app.get('io');
+      const messageData = {
+        id: messageId,
         sender_id: senderId,
         receiver_id,
         content,
         attachments,
         timer: timer || null,
         expires_at: expiresAt,
+        is_message_request: isMessageRequest,
+        message_request_status: messageRequestStatus,
         created_at: new Date().toISOString()
-      }
+      };
+
+      io.to(`user_${receiver_id}`).emit('new_message', messageData);
+      io.to(`user_${senderId}`).emit('new_message', { ...messageData, is_own: true });
+
+      res.json({
+        success: true,
+        message: messageData
+      });
     });
+  };
+
+  // Check receiver's privacy setting
+  db.get('SELECT is_private FROM users WHERE id = ?', [receiver_id], (err, receiverUser) => {
+    if (err || !receiverUser) {
+      return insertMessage(0, null);
+    }
+
+    if (receiverUser.is_private) {
+      // Check if sender follows the receiver (receiver accepted them)
+      db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [senderId, receiver_id], (err, follow) => {
+        if (!follow) {
+          // Check if there's an existing accepted conversation
+          db.get(`SELECT id FROM messages WHERE 
+            ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+            AND is_message_request = 0
+            LIMIT 1`, [senderId, receiver_id, receiver_id, senderId], (err, existingConvo) => {
+            if (!existingConvo) {
+              // Not a follower and no existing conversation — message request
+              insertMessage(1, 'pending');
+            } else {
+              insertMessage(0, null);
+            }
+          });
+        } else {
+          insertMessage(0, null);
+        }
+      });
+    } else {
+      insertMessage(0, null);
+    }
   });
 });
 

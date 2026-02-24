@@ -16,7 +16,7 @@ router.get('/', authMiddleware, (req, res) => {
       (n.created_by IS NOT NULL AND u.id = n.created_by)
       OR (
         n.created_by IS NULL
-        AND n.type IN ('follow', 'message', 'crosspath', 'crosspath_accepted', 'crosspath_match', 'community_join')
+        AND n.type IN ('follow', 'follow_request', 'follow_accepted', 'message', 'crosspath', 'crosspath_accepted', 'crosspath_match', 'community_join')
         AND u.id = n.related_id
       )
     )

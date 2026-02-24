@@ -3188,6 +3188,16 @@
         return;
       }
       
+      // If this is a message request, don't show in normal chat — update Requests badge instead
+      if (data.is_message_request) {
+        loadMessageRequestCount();
+        // If user is on Requests tab, refresh that list
+        if (document.getElementById('requestsTab')?.classList.contains('active')) {
+          loadMessageRequests();
+        }
+        return;
+      }
+      
       if (data.sender_id === currentContactId) {
         const messagesContainer = document.getElementById('chatMessages');
         const messageEl = document.createElement('div');

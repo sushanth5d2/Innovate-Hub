@@ -367,53 +367,80 @@ router.post('/:userId/follow', authMiddleware, (req, res) => {
     }
 
     if (targetUser.is_private) {
-      // Private account: create a follow request instead of instant follow
-      db.run(
-        'INSERT OR IGNORE INTO follow_requests (requester_id, target_id, status) VALUES (?, ?, ?)',
-        [followerId, followingId, 'pending'],
-        function(err) {
-          if (err) {
-            return res.status(500).json({ error: 'Error sending follow request' });
-          }
-
-          // Create follow request notification
-          db.run(
-            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-            [followingId, 'follow_request', 'requested to follow you', followerId]
-          );
-
-          // Emit real-time notification
-          const io = req.app.get('io');
-          if (io) {
-            io.to(`user-${followingId}`).emit('notification:received', {
-              type: 'follow_request',
-              content: 'requested to follow you',
-              related_id: followerId
-            });
-          }
-
-          res.json({ success: true, status: 'requested' });
+      // Private account: check if already requested or already following
+      db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [followerId, followingId], (err, existingFollow) => {
+        if (existingFollow) {
+          return res.json({ success: true, status: 'following' }); // already following
         }
-      );
+        db.get('SELECT id FROM follow_requests WHERE requester_id = ? AND target_id = ? AND status = ?', [followerId, followingId, 'pending'], (err, existingReq) => {
+          if (existingReq) {
+            return res.json({ success: true, status: 'requested' }); // already requested
+          }
+          db.run(
+            'INSERT OR IGNORE INTO follow_requests (requester_id, target_id, status) VALUES (?, ?, ?)',
+            [followerId, followingId, 'pending'],
+            function(err) {
+              if (err) {
+                return res.status(500).json({ error: 'Error sending follow request' });
+              }
+
+              // Delete any old follow_request notifications to prevent duplicates, then create new
+              db.run(
+                'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+                [followingId, 'follow_request', followerId],
+                function() {
+                  db.run(
+                    'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+                    [followingId, 'follow_request', 'requested to follow you', followerId]
+                  );
+                }
+              );
+
+              // Emit real-time notification
+              const io = req.app.get('io');
+              if (io) {
+                io.to(`user-${followingId}`).emit('notification:received', {
+                  type: 'follow_request',
+                  content: 'requested to follow you',
+                  related_id: followerId
+                });
+              }
+
+              res.json({ success: true, status: 'requested' });
+            }
+          );
+        });
+      });
     } else {
-      // Public account: instant follow
-      db.run(
-        'INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)',
-        [followerId, followingId],
-        function(err) {
-          if (err) {
-            return res.status(500).json({ error: 'Error following user' });
-          }
-
-          // Create notification
-          db.run(
-            'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
-            [followingId, 'follow', 'started following you', followerId]
-          );
-
-          res.json({ success: true, status: 'following' });
+      // Public account: check if already following
+      db.get('SELECT id FROM followers WHERE follower_id = ? AND following_id = ?', [followerId, followingId], (err, existingFollow) => {
+        if (existingFollow) {
+          return res.json({ success: true, status: 'following' }); // already following, no crash
         }
-      );
+        db.run(
+          'INSERT OR IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)',
+          [followerId, followingId],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: 'Error following user' });
+            }
+
+            // Delete any old follow notifications to prevent duplicates, then create new
+            db.run(
+              'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+              [followingId, 'follow', followerId],
+              function() {
+                db.run(
+                  'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
+                  [followingId, 'follow', 'started following you', followerId]
+                );
+              }
+            );
+
+            res.json({ success: true, status: 'following' });
+          }
+        );
+      });
     }
   });
 });
@@ -437,6 +464,18 @@ router.delete('/:userId/follow', authMiddleware, (req, res) => {
       db.run(
         'DELETE FROM follow_requests WHERE requester_id = ? AND target_id = ?',
         [followerId, followingId]
+      );
+
+      // Delete the follow notification sent to the other user
+      db.run(
+        'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+        [followingId, 'follow', followerId]
+      );
+
+      // Delete any follow_request notification too
+      db.run(
+        'DELETE FROM notifications WHERE user_id = ? AND type = ? AND related_id = ?',
+        [followingId, 'follow_request', followerId]
       );
 
       res.json({ success: true });
