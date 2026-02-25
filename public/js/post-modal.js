@@ -418,9 +418,9 @@ const PostModal = (function () {
   // ========== OPEN EDIT ==========
   function openEdit(postId) {
     mode = 'edit';
-    editPostId = postId;
     editPostData = null;
     resetAll();
+    editPostId = postId;
 
     el('pmTitle').textContent = 'Edit Post';
     el('pmShareBtn').textContent = 'Save';
@@ -1100,33 +1100,34 @@ const PostModal = (function () {
     var data = { name: name.value.trim() };
     var contactCb = el('pmCbContactMe');
     if (contactCb && contactCb.checked) {
-      data.contact = {};
+      data.contact_me = { enabled: true };
       var linksGroup = el('pmCbLinksGroup');
       if (linksGroup) {
-        data.contact.links = Array.from(linksGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
+        data.contact_me.links = Array.from(linksGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
       }
       var emailsGroup = el('pmCbEmailsGroup');
       if (emailsGroup) {
-        data.contact.emails = Array.from(emailsGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
+        data.contact_me.emails = Array.from(emailsGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
       }
       var phonesGroup = el('pmCbPhonesGroup');
       if (phonesGroup) {
-        data.contact.phones = Array.from(phonesGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
+        data.contact_me.phones = Array.from(phonesGroup.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
       }
     }
     var dmCb = el('pmCbDM');
     if (dmCb && dmCb.checked) {
       var dmMsg = el('pmCbDMMessage');
-      data.dm = { message: dmMsg ? dmMsg.value.trim() : '' };
+      data.dm = { enabled: true, message: dmMsg ? dmMsg.value.trim() : '' };
     }
     var regCb = el('pmCbRegister');
     if (regCb && regCb.checked) {
       var regLink = el('pmCbRegisterLink');
-      data.register = { link: regLink ? regLink.value.trim() : '' };
+      data.register = { enabled: true, link: regLink ? regLink.value.trim() : '' };
     }
     var hireCb = el('pmCbHireMe');
     if (hireCb && hireCb.checked) {
-      data.hire = {
+      data.hire_me = {
+        enabled: true,
         fields: {
           name: el('pmCbHireName') ? el('pmCbHireName').checked : false,
           email: el('pmCbHireEmail') ? el('pmCbHireEmail').checked : false,
@@ -1137,7 +1138,7 @@ const PostModal = (function () {
       };
       var cfList = el('pmCbCustomFieldsList');
       if (cfList) {
-        data.hire.customFields = Array.from(cfList.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
+        data.hire_me.customFields = Array.from(cfList.querySelectorAll('input')).map(function (i) { return i.value.trim(); }).filter(Boolean);
       }
     }
     return data;
@@ -1148,9 +1149,10 @@ const PostModal = (function () {
     if (!cdmToggle || !cdmToggle.checked) return null;
 
     var data = {
-      requireFollow: el('pmCdmRequireFollow') ? el('pmCdmRequireFollow').checked : true,
-      notFollowingMsg: el('pmCdmNotFollowMsg') ? el('pmCdmNotFollowMsg').value.trim() : '',
-      dmMessage: el('pmCdmDMMessage') ? el('pmCdmDMMessage').value.trim() : '',
+      enabled: true,
+      require_follow: el('pmCdmRequireFollow') ? el('pmCdmRequireFollow').checked : true,
+      not_following_msg: el('pmCdmNotFollowMsg') ? el('pmCdmNotFollowMsg').value.trim() : '',
+      dm_message: el('pmCdmDMMessage') ? el('pmCdmDMMessage').value.trim() : '',
       items: []
     };
 
@@ -1172,37 +1174,41 @@ const PostModal = (function () {
     var cb = (typeof customButton === 'string') ? JSON.parse(customButton) : customButton;
     if (!cb || !cb.name) return;
 
+    // Normalize legacy field names
+    var contactData = cb.contact_me || cb.contact || null;
+    var hireData = cb.hire_me || cb.hire || null;
+
     var name = el('pmCbButtonName');
     if (name) name.value = cb.name;
 
-    if (cb.contact) {
+    if (contactData) {
       var contactCb = el('pmCbContactMe');
       if (contactCb) { contactCb.checked = true; toggleCBSection(prefix + 'pmCbContactFields'); }
-      if (cb.contact.links) {
+      if (contactData.links) {
         var linksGroup = el('pmCbLinksGroup');
         if (linksGroup) {
           var inputs = linksGroup.querySelectorAll('input');
-          cb.contact.links.forEach(function (link, i) {
+          contactData.links.forEach(function (link, i) {
             if (i === 0 && inputs[0]) { inputs[0].value = link; }
             else { addCBField(prefix + 'pmCbLinksGroup', 'url', 'https://...'); var newInputs = linksGroup.querySelectorAll('input'); if (newInputs[i]) newInputs[i].value = link; }
           });
         }
       }
-      if (cb.contact.emails) {
+      if (contactData.emails) {
         var emailsGroup = el('pmCbEmailsGroup');
         if (emailsGroup) {
           var inputs = emailsGroup.querySelectorAll('input');
-          cb.contact.emails.forEach(function (email, i) {
+          contactData.emails.forEach(function (email, i) {
             if (i === 0 && inputs[0]) { inputs[0].value = email; }
             else { addCBField(prefix + 'pmCbEmailsGroup', 'email', 'email@example.com'); }
           });
         }
       }
-      if (cb.contact.phones) {
+      if (contactData.phones) {
         var phonesGroup = el('pmCbPhonesGroup');
         if (phonesGroup) {
           var inputs = phonesGroup.querySelectorAll('input');
-          cb.contact.phones.forEach(function (phone, i) {
+          contactData.phones.forEach(function (phone, i) {
             if (i === 0 && inputs[0]) { inputs[0].value = phone; }
             else { addCBField(prefix + 'pmCbPhonesGroup', 'tel', '+1234567890'); }
           });
@@ -1224,14 +1230,14 @@ const PostModal = (function () {
       if (regLink && cb.register.link) regLink.value = cb.register.link;
     }
 
-    if (cb.hire) {
+    if (hireData) {
       var hireCb = el('pmCbHireMe');
       if (hireCb) { hireCb.checked = true; toggleCBSection(prefix + 'pmCbHireMeFields'); }
-      if (cb.hire.fields) {
-        if (el('pmCbHireName')) el('pmCbHireName').checked = !!cb.hire.fields.name;
-        if (el('pmCbHireEmail')) el('pmCbHireEmail').checked = !!cb.hire.fields.email;
-        if (el('pmCbHireContact')) el('pmCbHireContact').checked = !!cb.hire.fields.contact;
-        if (el('pmCbHireResume')) el('pmCbHireResume').checked = !!cb.hire.fields.resume;
+      if (hireData.fields) {
+        if (el('pmCbHireName')) el('pmCbHireName').checked = !!hireData.fields.name;
+        if (el('pmCbHireEmail')) el('pmCbHireEmail').checked = !!hireData.fields.email;
+        if (el('pmCbHireContact')) el('pmCbHireContact').checked = !!hireData.fields.contact;
+        if (el('pmCbHireResume')) el('pmCbHireResume').checked = !!hireData.fields.resume;
       }
     }
   }
@@ -1245,13 +1251,15 @@ const PostModal = (function () {
     if (toggle) { toggle.checked = true; toggleCBSection(prefix + 'pmCommentDMFields'); }
 
     var reqFollow = el('pmCdmRequireFollow');
-    if (reqFollow) reqFollow.checked = cdm.requireFollow !== false;
+    if (reqFollow) reqFollow.checked = (cdm.require_follow !== undefined ? cdm.require_follow : cdm.requireFollow) !== false;
 
     var notFollowMsg = el('pmCdmNotFollowMsg');
-    if (notFollowMsg && cdm.notFollowingMsg) notFollowMsg.value = cdm.notFollowingMsg;
+    var nfMsg = cdm.not_following_msg || cdm.notFollowingMsg || '';
+    if (notFollowMsg && nfMsg) notFollowMsg.value = nfMsg;
 
     var dmMsg = el('pmCdmDMMessage');
-    if (dmMsg && cdm.dmMessage) dmMsg.value = cdm.dmMessage;
+    var dMsg = cdm.dm_message || cdm.dmMessage || '';
+    if (dmMsg && dMsg) dmMsg.value = dMsg;
 
     if (cdm.items && cdm.items.length > 0) {
       var itemsList = el('pmCdmItemsList');

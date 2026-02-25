@@ -183,6 +183,7 @@ router.get('/', authMiddleware, (req, res) => {
               files: post.files ? JSON.parse(post.files) : [],
               hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
               custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+              comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
               user_has_liked: post.user_has_liked > 0,
               is_saved: post.is_saved > 0,
               poll: {
@@ -227,6 +228,7 @@ router.get('/', authMiddleware, (req, res) => {
           files: post.files ? JSON.parse(post.files) : [],
           hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
           custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+          comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
           user_has_liked: post.user_has_liked > 0,
           is_saved: post.is_saved > 0,
           poll: null,
@@ -710,6 +712,7 @@ router.get('/:postId', authMiddleware, (req, res) => {
     try { post.files = post.files ? JSON.parse(post.files) : []; } catch(e) { post.files = []; }
     try { post.hashtags = post.hashtags ? JSON.parse(post.hashtags) : []; } catch(e) { post.hashtags = []; }
     try { post.custom_button = post.custom_button ? JSON.parse(post.custom_button) : null; } catch(e) { post.custom_button = null; }
+    try { post.comment_to_dm = post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null; } catch(e) { post.comment_to_dm = null; }
     
     // Get poll data if exists
     db.get('SELECT * FROM polls WHERE post_id = ?', [postId], (err2, poll) => {
@@ -1169,7 +1172,7 @@ router.put('/:postId', authMiddleware, upload.fields([
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button, is_public_post } = req.body;
+  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button, comment_to_dm, is_public_post } = req.body;
 
   db.get('SELECT * FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, post) => {
     if (err || !post) {
@@ -1238,6 +1241,12 @@ router.put('/:postId', authMiddleware, upload.fields([
     if (custom_button !== undefined) {
       updateFields.push('custom_button = ?');
       updateValues.push(custom_button || null);
+    }
+
+    // Comment-to-DM
+    if (comment_to_dm !== undefined) {
+      updateFields.push('comment_to_dm = ?');
+      updateValues.push(comment_to_dm || null);
     }
 
     // Post Public toggle for private accounts
@@ -1551,9 +1560,10 @@ router.delete('/:postId', authMiddleware, (req, res) => {
 // Always send DM with buttons when someone comments
 function sendCommentDMWithButtons(db, postOwnerId, commenterId, cdmConfig, ownerUsername, postId, io) {
   const items = cdmConfig.items || [];
-  const requireFollow = cdmConfig.require_follow || false;
-  const notFollowMsg = cdmConfig.not_following_msg || '';
-  const dmMessage = cdmConfig.dm_message || '';
+  // Normalize legacy camelCase field names
+  const requireFollow = cdmConfig.require_follow || cdmConfig.requireFollow || false;
+  const notFollowMsg = cdmConfig.not_following_msg || cdmConfig.notFollowingMsg || '';
+  const dmMessage = cdmConfig.dm_message || cdmConfig.dmMessage || '';
 
   let dmContent = `[CDM_BUTTONS]\n`;
   dmContent += `owner::@${ownerUsername}\n`;

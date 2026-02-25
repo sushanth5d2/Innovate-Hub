@@ -4142,16 +4142,21 @@
       const currentUser = InnovateAPI.getCurrentUser();
       const isOwnPost = currentUser && currentUser.id == postUserId;
 
+      // Normalize legacy field names: contact → contact_me, hire → hire_me
+      if (config.contact && !config.contact_me) config.contact_me = config.contact;
+      if (config.hire && !config.hire_me) config.hire_me = config.hire;
+
       // === Direct-open shortcut ===
       // If only Register link is configured, open it directly
-      const hasContact = config.contact_me && config.contact_me.enabled && (
+      // Tolerate missing "enabled" — if the sub-object exists, treat it as enabled
+      const hasContact = config.contact_me && (config.contact_me.enabled !== false) && (
         (config.contact_me.links && config.contact_me.links.length) ||
         (config.contact_me.emails && config.contact_me.emails.length) ||
         (config.contact_me.phones && config.contact_me.phones.length)
       );
-      const hasRegister = config.register && config.register.enabled && config.register.link;
-      const hasDM = config.dm && config.dm.enabled && !isOwnPost;
-      const hasHireMe = config.hire_me && config.hire_me.enabled && !isOwnPost;
+      const hasRegister = config.register && (config.register.enabled !== false) && config.register.link;
+      const hasDM = config.dm && (config.dm.enabled !== false) && !isOwnPost;
+      const hasHireMe = config.hire_me && (config.hire_me.enabled !== false) && !isOwnPost;
       const enabledCount = [hasContact, hasRegister, hasDM, hasHireMe].filter(Boolean).length;
 
       // If only one action enabled, open it directly
@@ -4177,7 +4182,7 @@
       let sections = '';
 
       // Contact Me section
-      if (config.contact_me && config.contact_me.enabled) {
+      if (config.contact_me && config.contact_me.enabled !== false) {
         let items = '';
         (config.contact_me.links || []).forEach(link => {
           items += `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="cb-contact-item">
@@ -4206,7 +4211,7 @@
       }
 
       // Register section
-      if (config.register && config.register.enabled && config.register.link) {
+      if (config.register && config.register.enabled !== false && config.register.link) {
         sections += `<div class="cb-modal-section">
           <div class="cb-modal-section-title">📝 Register</div>
           <a href="${escapeHtml(config.register.link)}" target="_blank" rel="noopener" class="cb-contact-item" style="color: var(--ig-blue); font-weight: 600;">
@@ -4217,7 +4222,7 @@
       }
 
       // DM section
-      if (config.dm && config.dm.enabled && !isOwnPost) {
+      if (config.dm && config.dm.enabled !== false && !isOwnPost) {
         const prefilledMsg = config.dm.message ? escapeHtml(config.dm.message) : '';
         sections += `<div class="cb-modal-section">
           <div class="cb-modal-section-title">💬 Send Message</div>
@@ -4229,7 +4234,7 @@
       }
 
       // Hire Me section
-      if (config.hire_me && config.hire_me.enabled && !isOwnPost) {
+      if (config.hire_me && config.hire_me.enabled !== false && !isOwnPost) {
         let formFields = '';
         const fields = config.hire_me.fields || [];
         

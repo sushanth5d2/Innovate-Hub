@@ -452,9 +452,21 @@ const PostRenderer = (function () {
         : '')
 
       + (post.custom_button
-        ? '<button class="cb-post-button" data-post-id="' + post.id + '" data-user-id="' + post.user_id + '" data-config="' + encodeURIComponent(JSON.stringify(post.custom_button)) + '" onclick="openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">'
-          + (post.custom_button.name || 'Action')
+        ? '<button class="cb-post-button" data-post-id="' + post.id + '" data-user-id="' + post.user_id + '" data-config="' + encodeURIComponent(JSON.stringify(post.custom_button)) + '" onclick="event.stopPropagation(); try { openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config)); } catch(e) { console.error(\'Custom btn error:\', e); }">'
+          + escapeHtml(post.custom_button.name || 'Action')
           + '</button>'
+        : '')
+
+      // Comment-to-DM indicator
+      + (post.comment_to_dm && post.comment_to_dm.enabled
+        ? '<div class="cdm-feed-prompt" onclick="openCommentsModal(' + post.id + ')" style="margin: 0 16px 12px; padding: 10px 14px; background: linear-gradient(135deg, rgba(131,58,180,0.1), rgba(253,29,29,0.1), rgba(252,176,69,0.1)); border: 1px solid rgba(131,58,180,0.2); border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;">'
+          + '<span style="font-size: 18px;">💬</span>'
+          + '<span style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">Comment to get a DM with '
+          + (post.comment_to_dm.items && post.comment_to_dm.items.length > 0
+            ? post.comment_to_dm.items.length + ' link' + (post.comment_to_dm.items.length > 1 ? 's' : '')
+            : 'exclusive content')
+          + '</span>'
+          + '</div>'
         : '')
 
       + '<div class="ig-post-separator"></div>';
@@ -610,15 +622,21 @@ const PostRenderer = (function () {
     // Custom button
     var customBtnHtml = '';
     if (post.custom_button) {
-      customBtnHtml = '<button class="ig-cseries-custom-btn" data-post-id="' + post.id + '" data-user-id="' + post.user_id + '" data-config="' + encodeURIComponent(JSON.stringify(post.custom_button)) + '" onclick="event.stopPropagation(); openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config))">'
-        + (post.custom_button.name || 'Action')
+      customBtnHtml = '<button class="ig-cseries-custom-btn"'
+        + ' data-post-id="' + post.id + '"'
+        + ' data-user-id="' + post.user_id + '"'
+        + ' data-config="' + encodeURIComponent(JSON.stringify(post.custom_button)) + '"'
+        + ' onclick="event.stopPropagation(); event.preventDefault(); try { openCustomButtonModal(Number(this.dataset.postId), Number(this.dataset.userId), decodeURIComponent(this.dataset.config)); } catch(e) { console.error(e); }"'
+        + ' ontouchend="event.stopPropagation();"'
+        + '>'
+        + escapeHtml(post.custom_button.name || 'Action')
         + '</button>';
     }
 
     // Contact / Interested buttons
     var contactBtnsHtml = '';
     if (post.enable_contact || post.enable_interested) {
-      contactBtnsHtml = '<div class="ig-cseries-contact-btns" onclick="event.stopPropagation()">'
+      contactBtnsHtml = '<div class="ig-cseries-contact-btns" onclick="event.stopPropagation()" ontouchend="event.stopPropagation()">'
         + (post.enable_contact ? '<button onclick="handleContactMe(' + post.id + ')">📞 Contact Me</button>' : '')
         + (post.enable_interested ? '<button onclick="handleInterested(' + post.id + ')">⭐ Interested</button>' : '')
         + '</div>';
@@ -641,7 +659,20 @@ const PostRenderer = (function () {
       }
     }
 
-    var hasFeatures = pollHtml || customBtnHtml || contactBtnsHtml || attachHtml;
+    // Comment-to-DM indicator for fullscreen
+    var cdmHtml = '';
+    if (post.comment_to_dm && post.comment_to_dm.enabled) {
+      var cdmItemCount = (post.comment_to_dm.items && post.comment_to_dm.items.length) || 0;
+      var cdmLabel = cdmItemCount > 0 ? cdmItemCount + ' link' + (cdmItemCount > 1 ? 's' : '') : 'exclusive content';
+      cdmHtml = '<button class="ig-cseries-cdm-prompt" onclick="event.stopPropagation(); ' + fnOpenComments + '(' + post.id + ')"'
+        + ' ontouchend="event.stopPropagation();"'
+        + ' style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:linear-gradient(135deg,rgba(131,58,180,0.25),rgba(253,29,29,0.2),rgba(252,176,69,0.2));border:1px solid rgba(255,255,255,0.2);border-radius:10px;cursor:pointer;color:#fff;font-size:13px;font-weight:600;text-align:left;pointer-events:auto;touch-action:manipulation;">'
+        + '<span style="font-size:18px;">💬</span>'
+        + '<span>Comment to get a DM with ' + cdmLabel + '</span>'
+        + '</button>';
+    }
+
+    var hasFeatures = pollHtml || customBtnHtml || contactBtnsHtml || attachHtml || cdmHtml;
 
     // Action buttons
     var actionsHtml = '<div class="ig-cseries-actions">';
@@ -695,14 +726,14 @@ const PostRenderer = (function () {
         + '<button class="ig-cseries-caption-more" data-full-caption="' + encodedCaption + '" onclick="' + fnExpandCaption + '(' + post.id + ')">... more</button>';
     }
 
-    bottomHtml += '<div class="ig-cseries-details" id="' + idPrefix + 'details-' + post.id + '">'
-      + (timeAgo ? '<div class="ig-cseries-time">' + timeAgo + '</div>' : '')
-      + (hasFeatures ? '<div class="ig-cseries-features" style="margin-top:6px;">' + pollHtml + customBtnHtml + contactBtnsHtml + attachHtml + '</div>' : '')
-      + '<div class="ig-cseries-music"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>'
-      + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + username + ' · Original audio</span></div>'
-      + '</div></div>';
+    // Features (poll, custom button, contact, attachments, CDM) — always visible, outside "more"
+    if (hasFeatures) {
+      bottomHtml += '<div class="ig-cseries-features" style="margin-top:6px;">' + pollHtml + customBtnHtml + contactBtnsHtml + attachHtml + cdmHtml + '</div>';
+    }
 
-    // Progress bar (video only)
+    bottomHtml += '<div class="ig-cseries-details" id="' + idPrefix + 'details-' + post.id + '">' 
+      + (timeAgo ? '<div class="ig-cseries-time">' + timeAgo + '</div>' : '')
+      + '</div></div>';
     var progressHtml = '';
     if (post.video_url) {
       progressHtml = '<div class="ig-cseries-progress-bar-container" data-post-id="' + post.id + '" onclick="' + fnSeekVideo + '(this, event)">'
@@ -756,15 +787,15 @@ const PostRenderer = (function () {
     var onClose = opts.onClose || ('close' + (idPrefix === 'pf-' ? 'ProfileFullScreen' : 'FullScreenPost'));
     var headerText = opts.headerText || ((posts[startIndex] && posts[startIndex].video_url) ? 'Creator Series' : 'Posts');
 
-    // Remove existing
+    // Remove existing viewer if any
     var existing = document.getElementById(viewerId);
     if (existing) existing.remove();
 
-    // Pause all feed videos
-    document.querySelectorAll('.ig-post-video-container video').forEach(function (v) {
-      v.pause();
-      v.muted = true;
-    });
+    // Disconnect feed observer and pause ALL videos to prevent overlap
+    if (window._feedVideoObserver) {
+      window._feedVideoObserver.disconnect();
+    }
+    pauseAllVideos();
 
     var viewer = document.createElement('div');
     viewer.id = viewerId;
@@ -806,11 +837,17 @@ const PostRenderer = (function () {
       });
     }).join('');
 
+    // First: scroll to the correct post INSTANTLY (no smooth scroll)
+    var postEls = content.querySelectorAll('.ig-fullscreen-post');
+    if (postEls[startIndex]) {
+      // Use scrollTop for instant positioning (no animation)
+      postEls[startIndex].scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+
+    // Then: after scroll settles, init carousels and video autoplay
     setTimeout(function () {
-      var postEls = content.querySelectorAll('.ig-fullscreen-post');
-      if (postEls[startIndex]) {
-        postEls[startIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
-      }
+      // Pause everything again (safety net)
+      pauseAllVideos();
 
       // Init carousels (home-style)
       if (!idPrefix) {
@@ -823,7 +860,8 @@ const PostRenderer = (function () {
       }
 
       setupVideoAutoplay(content, { idPrefix: idPrefix });
-    }, 100);
+      setupProgressBarInteraction(content);
+    }, 150);
   }
 
   /**
@@ -845,7 +883,7 @@ const PostRenderer = (function () {
     viewer.remove();
     document.body.style.overflow = '';
 
-    // Re-setup feed video autoplay
+    // Re-setup feed video autoplay (re-observe feed videos)
     setupFeedVideoAutoplay();
   }
 
@@ -891,7 +929,12 @@ const PostRenderer = (function () {
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         var video = entry.target;
-        if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.75) {
+          // Pause ALL other fullscreen videos first to prevent overlap
+          contentEl.querySelectorAll('.ig-fullscreen-post video').forEach(function (otherV) {
+            if (otherV !== video) otherV.pause();
+          });
+
           // Lazy load
           if (!video.src && video.dataset.src) {
             video.src = video.dataset.src;
@@ -920,7 +963,7 @@ const PostRenderer = (function () {
           video.pause();
         }
       });
-    }, { threshold: [0.6], root: contentEl });
+    }, { threshold: [0.75], root: contentEl });
 
     window[obKey] = observer;
     contentEl.querySelectorAll('.ig-fullscreen-post video').forEach(function (v) { observer.observe(v); });
@@ -942,17 +985,91 @@ const PostRenderer = (function () {
   // ======================== Video Controls ========================
 
   /**
-   * Seek video via progress bar click.
+   * Get clientX from mouse or touch event.
+   */
+  function getEventX(event) {
+    if (event.touches && event.touches.length > 0) return event.touches[0].clientX;
+    if (event.changedTouches && event.changedTouches.length > 0) return event.changedTouches[0].clientX;
+    return event.clientX;
+  }
+
+  /**
+   * Seek video via progress bar click/tap.
    */
   function seekVideo(container, event) {
     event.stopPropagation();
+    event.preventDefault();
     var post = container.closest('.ig-fullscreen-post');
     var video = post ? post.querySelector('video') : null;
     if (!video || !video.duration) return;
     var rect = container.getBoundingClientRect();
-    var x = event.clientX - rect.left;
+    var x = getEventX(event) - rect.left;
     var pct = Math.max(0, Math.min(1, x / rect.width));
     video.currentTime = pct * video.duration;
+  }
+
+  /**
+   * Set up touch/mouse drag-to-seek on all progress bars inside a container.
+   */
+  function setupProgressBarInteraction(contentEl) {
+    contentEl.querySelectorAll('.ig-cseries-progress-bar-container').forEach(function (bar) {
+      if (bar._seekBound) return; // already bound
+      bar._seekBound = true;
+
+      var postEl = bar.closest('.ig-fullscreen-post');
+      var video = postEl ? postEl.querySelector('video') : null;
+
+      function doSeek(clientX) {
+        if (!video) {
+          postEl = bar.closest('.ig-fullscreen-post');
+          video = postEl ? postEl.querySelector('video') : null;
+        }
+        if (!video || !video.duration || isNaN(video.duration)) return;
+        var rect = bar.getBoundingClientRect();
+        var x = clientX - rect.left;
+        var pct = Math.max(0, Math.min(1, x / rect.width));
+        video.currentTime = pct * video.duration;
+      }
+
+      // Touch events
+      bar.addEventListener('touchstart', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        bar.classList.add('dragging');
+        doSeek(e.touches[0].clientX);
+      }, { passive: false });
+
+      bar.addEventListener('touchmove', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (e.touches.length > 0) doSeek(e.touches[0].clientX);
+      }, { passive: false });
+
+      bar.addEventListener('touchend', function (e) {
+        e.stopPropagation();
+        bar.classList.remove('dragging');
+      });
+
+      // Mouse events
+      bar.addEventListener('mousedown', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        bar.classList.add('dragging');
+        doSeek(e.clientX);
+
+        function onMove(ev) {
+          ev.preventDefault();
+          doSeek(ev.clientX);
+        }
+        function onUp() {
+          bar.classList.remove('dragging');
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
   }
 
   /**
@@ -1257,10 +1374,21 @@ const PostRenderer = (function () {
    * Auto-play feed videos when they scroll into view.
    */
   function setupFeedVideoAutoplay() {
+    // Disconnect previous feed observer if any
+    if (window._feedVideoObserver) {
+      window._feedVideoObserver.disconnect();
+      window._feedVideoObserver = null;
+    }
+
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         var video = entry.target;
         if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+          // Do NOT play feed videos while a fullscreen viewer is open
+          if (document.querySelector('.ig-fullscreen-viewer')) {
+            video.pause();
+            return;
+          }
           video.muted = window._globalMuted;
           video.play().catch(function () {
             video.muted = true;
@@ -1276,7 +1404,17 @@ const PostRenderer = (function () {
       });
     }, { threshold: [0.6] });
 
+    window._feedVideoObserver = observer;
     document.querySelectorAll('.ig-post-video-container video').forEach(function (v) { observer.observe(v); });
+  }
+
+  /**
+   * Pause ALL videos on the page (feed + fullscreen + any other).
+   */
+  function pauseAllVideos() {
+    document.querySelectorAll('video').forEach(function (v) {
+      v.pause();
+    });
   }
 
   // ======================== Poll ========================
@@ -1442,12 +1580,14 @@ const PostRenderer = (function () {
     // Video autoplay
     setupVideoAutoplay: setupVideoAutoplay,
     setupFeedVideoAutoplay: setupFeedVideoAutoplay,
+    pauseAllVideos: pauseAllVideos,
     applyGlobalMuteState: applyGlobalMuteState,
 
     // Video controls
     seekVideo: seekVideo,
     toggleMute: toggleMute,
     handleTap: handleTap,
+    setupProgressBarInteraction: setupProgressBarInteraction,
 
     // Carousel (feed)
     initCarousel: initCarousel,
@@ -1533,6 +1673,215 @@ const PostRenderer = (function () {
 
   // Compact format alias
   window.formatCompact = formatCount;
+
+  // ======================== Custom Button Action Modal ========================
+  // Shared across home.html and profile.html — shows the action sheet when
+  // a user taps the custom button on a post (Register, Contact, DM, Hire Me).
+
+  function openCustomButtonModal(postId, postUserId, configJson) {
+    var config = typeof configJson === 'string' ? JSON.parse(configJson) : configJson;
+    var currentUser = _config.getUser ? _config.getUser() : null;
+    var isOwnPost = currentUser && currentUser.id == postUserId;
+
+    // Normalize legacy field names
+    if (config.contact && !config.contact_me) config.contact_me = config.contact;
+    if (config.hire && !config.hire_me) config.hire_me = config.hire;
+
+    // Detect enabled actions (tolerate missing "enabled")
+    var hasContact = config.contact_me && (config.contact_me.enabled !== false) && (
+      (config.contact_me.links && config.contact_me.links.length) ||
+      (config.contact_me.emails && config.contact_me.emails.length) ||
+      (config.contact_me.phones && config.contact_me.phones.length)
+    );
+    var hasRegister = config.register && (config.register.enabled !== false) && config.register.link;
+    var hasDM = config.dm && (config.dm.enabled !== false) && !isOwnPost;
+    var hasHireMe = config.hire_me && (config.hire_me.enabled !== false) && !isOwnPost;
+    var enabledCount = [hasContact, hasRegister, hasDM, hasHireMe].filter(Boolean).length;
+
+    // If only one action, open directly
+    if (enabledCount === 1) {
+      if (hasRegister) {
+        window.open(config.register.link, '_blank', 'noopener');
+        return;
+      }
+      if (hasContact) {
+        var c = config.contact_me;
+        var allItems = [].concat(c.links || [], (c.emails || []).map(function(e){return 'mailto:'+e;}), (c.phones || []).map(function(p){return 'tel:'+p;}));
+        if (allItems.length === 1) {
+          window.open(allItems[0], '_blank', 'noopener');
+          return;
+        }
+      }
+    }
+
+    // Remove existing modal
+    var existing = document.getElementById('cbActionModal');
+    if (existing) existing.remove();
+
+    var sections = '';
+
+    // Contact Me section
+    if (config.contact_me && config.contact_me.enabled !== false) {
+      var items = '';
+      (config.contact_me.links || []).forEach(function(link) {
+        items += '<a href="' + escapeHtml(link) + '" target="_blank" rel="noopener" class="cb-contact-item">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>'
+          + '<span>' + escapeHtml(link) + '</span></a>';
+      });
+      (config.contact_me.emails || []).forEach(function(email) {
+        items += '<a href="mailto:' + escapeHtml(email) + '" class="cb-contact-item">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1306c" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>'
+          + '<span>' + escapeHtml(email) + '</span></a>';
+      });
+      (config.contact_me.phones || []).forEach(function(phone) {
+        items += '<a href="tel:' + escapeHtml(phone) + '" class="cb-contact-item">'
+          + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00c853" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.42 19.42 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>'
+          + '<span>' + escapeHtml(phone) + '</span></a>';
+      });
+      if (items) {
+        sections += '<div class="cb-modal-section"><div class="cb-modal-section-title">\uD83D\uDCDE Contact Information</div>' + items + '</div>';
+      }
+    }
+
+    // Register section
+    if (config.register && config.register.enabled !== false && config.register.link) {
+      sections += '<div class="cb-modal-section"><div class="cb-modal-section-title">\uD83D\uDCDD Register</div>'
+        + '<a href="' + escapeHtml(config.register.link) + '" target="_blank" rel="noopener" class="cb-contact-item" style="color: var(--ig-blue); font-weight: 600;">'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
+        + '<span>Open Registration Page</span></a></div>';
+    }
+
+    // DM section
+    if (config.dm && config.dm.enabled !== false && !isOwnPost) {
+      var prefilledMsg = config.dm.message ? escapeHtml(config.dm.message) : '';
+      sections += '<div class="cb-modal-section"><div class="cb-modal-section-title">\uD83D\uDCAC Send Message</div>'
+        + '<div class="cb-dm-input-area">'
+        + '<textarea id="cbDMActionMsg" placeholder="Write your message..." rows="3">' + prefilledMsg + '</textarea>'
+        + '<button class="cb-submit-btn" onclick="sendCustomDM(' + postId + ', this)">Send Message</button>'
+        + '</div></div>';
+    }
+
+    // Hire Me section
+    if (config.hire_me && config.hire_me.enabled !== false && !isOwnPost) {
+      var formFields = '';
+      var fields = config.hire_me.fields || [];
+      if (fields.indexOf('name') !== -1) formFields += '<div class="cb-hire-form-group"><label>\uD83D\uDC64 Name</label><input type="text" id="cbHireFormName" placeholder="Your full name" required></div>';
+      if (fields.indexOf('email') !== -1) formFields += '<div class="cb-hire-form-group"><label>\uD83D\uDCE7 Email</label><input type="email" id="cbHireFormEmail" placeholder="your@email.com" required></div>';
+      if (fields.indexOf('contact') !== -1) formFields += '<div class="cb-hire-form-group"><label>\uD83D\uDCDE Contact Number</label><input type="tel" id="cbHireFormContact" placeholder="+1234567890"></div>';
+      if (fields.indexOf('resume_link') !== -1) formFields += '<div class="cb-hire-form-group"><label>\uD83D\uDCCE Resume Link</label><input type="url" id="cbHireFormResume" placeholder="https://drive.google.com/..."></div>';
+      (config.hire_me.custom_fields || []).forEach(function(fieldName, idx) {
+        formFields += '<div class="cb-hire-form-group"><label>\uD83D\uDCDD ' + escapeHtml(fieldName) + '</label><input type="text" class="cb-hire-custom-input" data-field-name="' + escapeHtml(fieldName) + '" placeholder="Enter ' + escapeHtml(fieldName) + '"></div>';
+      });
+      if (formFields) {
+        sections += '<div class="cb-modal-section"><div class="cb-modal-section-title">\uD83D\uDCBC Hire Me - Application Form</div>'
+          + '<form id="cbHireForm" onsubmit="submitHireForm(event, ' + postId + ')">'
+          + formFields
+          + '<button type="submit" class="cb-submit-btn">Submit Application</button></form></div>';
+      }
+    }
+
+    if (!sections) {
+      if (_config.showAlert) _config.showAlert('No actions available', 'info');
+      return;
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'cbActionModal';
+    modal.className = 'cb-modal-overlay';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    modal.innerHTML = '<div class="cb-modal" onclick="event.stopPropagation()">'
+      + '<div class="cb-modal-header"><h3 class="cb-modal-title">' + escapeHtml(config.name || 'Action') + '</h3>'
+      + '<button class="cb-modal-close" onclick="document.getElementById(\'cbActionModal\').remove()">\u00D7</button></div>'
+      + '<div class="cb-modal-body">' + sections + '</div></div>';
+    document.body.appendChild(modal);
+  }
+
+  function sendCustomDM(postId, btn) {
+    var textarea = document.getElementById('cbDMActionMsg');
+    var message = textarea ? textarea.value.trim() : '';
+    if (!message) {
+      if (_config.showAlert) _config.showAlert('Please enter a message', 'error');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    var doRequest = _config.apiRequest || function(url, opts) {
+      return fetch('/api' + url, Object.assign({}, opts, {
+        headers: Object.assign({ 'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Content-Type': 'application/json' }, (opts && opts.headers) || {})
+      })).then(function(r) { if (!r.ok) throw new Error('Request failed'); return r.json(); });
+    };
+
+    doRequest('/posts/' + postId + '/custom-button-action', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'dm', message: message })
+    }).then(function() {
+      if (_config.showAlert) _config.showAlert('Message sent successfully!', 'success');
+      var m = document.getElementById('cbActionModal');
+      if (m) m.remove();
+    }).catch(function(error) {
+      if (_config.showAlert) _config.showAlert(error.message || 'Failed to send message', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Send Message';
+    });
+  }
+
+  function submitHireForm(event, postId) {
+    event.preventDefault();
+    var form = document.getElementById('cbHireForm');
+    var submitBtn = form.querySelector('.cb-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    var hire_data = {};
+    var nameInput = document.getElementById('cbHireFormName');
+    var emailInput = document.getElementById('cbHireFormEmail');
+    var contactInput = document.getElementById('cbHireFormContact');
+    var resumeInput = document.getElementById('cbHireFormResume');
+
+    if (nameInput) hire_data.name = nameInput.value.trim();
+    if (emailInput) hire_data.email = emailInput.value.trim();
+    if (contactInput) hire_data.contact = contactInput.value.trim();
+    if (resumeInput) hire_data.resume_link = resumeInput.value.trim();
+
+    var customFields = {};
+    form.querySelectorAll('.cb-hire-custom-input').forEach(function(inp) {
+      var fieldName = inp.getAttribute('data-field-name');
+      if (fieldName && inp.value.trim()) customFields[fieldName] = inp.value.trim();
+    });
+    if (Object.keys(customFields).length > 0) hire_data.custom_fields = customFields;
+
+    if (!hire_data.name && !hire_data.email && !hire_data.contact && !hire_data.resume_link && Object.keys(customFields).length === 0) {
+      if (_config.showAlert) _config.showAlert('Please fill in at least one field', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Application';
+      return;
+    }
+
+    var doRequest = _config.apiRequest || function(url, opts) {
+      return fetch('/api' + url, Object.assign({}, opts, {
+        headers: Object.assign({ 'Authorization': 'Bearer ' + localStorage.getItem('token'), 'Content-Type': 'application/json' }, (opts && opts.headers) || {})
+      })).then(function(r) { if (!r.ok) throw new Error('Request failed'); return r.json(); });
+    };
+
+    doRequest('/posts/' + postId + '/custom-button-action', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'hire_me', hire_data: hire_data })
+    }).then(function() {
+      if (_config.showAlert) _config.showAlert('Application submitted successfully! Details sent to the post creator.', 'success');
+      var m = document.getElementById('cbActionModal');
+      if (m) m.remove();
+    }).catch(function(error) {
+      if (_config.showAlert) _config.showAlert(error.message || 'Failed to submit application', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Application';
+    });
+  }
+
+  // Expose custom button modal functions globally
+  window.openCustomButtonModal = openCustomButtonModal;
+  window.sendCustomDM = sendCustomDM;
+  window.submitHireForm = submitHireForm;
 
   return publicAPI;
 })();

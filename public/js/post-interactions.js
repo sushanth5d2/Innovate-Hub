@@ -2116,35 +2116,39 @@ const PostInteractions = (function () {
 
     nameInput.value = data.name;
 
-    if (data.contact_me && data.contact_me.enabled) {
+    // Normalize legacy field names
+    var contactData = data.contact_me || data.contact || null;
+    var hireData = data.hire_me || data.hire || null;
+
+    if (contactData && contactData.enabled !== false) {
       document.getElementById('editCbContactMe').checked = true;
       document.getElementById('editCbContactFields').style.display = 'block';
-      fillEditMultiField('editCbLinksGroup', 'url', 'https://...', data.contact_me.links || []);
-      fillEditMultiField('editCbEmailsGroup', 'email', 'email@example.com', data.contact_me.emails || []);
-      fillEditMultiField('editCbPhonesGroup', 'tel', '+1234567890', data.contact_me.phones || []);
+      fillEditMultiField('editCbLinksGroup', 'url', 'https://...', contactData.links || []);
+      fillEditMultiField('editCbEmailsGroup', 'email', 'email@example.com', contactData.emails || []);
+      fillEditMultiField('editCbPhonesGroup', 'tel', '+1234567890', contactData.phones || []);
     }
 
-    if (data.dm && data.dm.enabled) {
+    if (data.dm && data.dm.enabled !== false) {
       document.getElementById('editCbDM').checked = true;
       document.getElementById('editCbDMFields').style.display = 'block';
       document.getElementById('editCbDMMessage').value = data.dm.message || '';
     }
 
-    if (data.register && data.register.enabled) {
+    if (data.register && data.register.enabled !== false) {
       document.getElementById('editCbRegister').checked = true;
       document.getElementById('editCbRegisterFields').style.display = 'block';
       document.getElementById('editCbRegisterLink').value = data.register.link || '';
     }
 
-    if (data.hire_me && data.hire_me.enabled) {
+    if (hireData && hireData.enabled !== false) {
       document.getElementById('editCbHireMe').checked = true;
       document.getElementById('editCbHireMeFields').style.display = 'block';
-      var fields = data.hire_me.fields || [];
-      document.getElementById('editCbHireName').checked = fields.includes('name');
-      document.getElementById('editCbHireEmail').checked = fields.includes('email');
-      document.getElementById('editCbHireContact').checked = fields.includes('contact');
-      document.getElementById('editCbHireResume').checked = fields.includes('resume_link');
-      (data.hire_me.custom_fields || []).forEach(function (f) {
+      var fields = hireData.fields || [];
+      document.getElementById('editCbHireName').checked = Array.isArray(fields) ? fields.includes('name') : !!fields.name;
+      document.getElementById('editCbHireEmail').checked = Array.isArray(fields) ? fields.includes('email') : !!fields.email;
+      document.getElementById('editCbHireContact').checked = Array.isArray(fields) ? fields.includes('contact') : !!fields.contact;
+      document.getElementById('editCbHireResume').checked = Array.isArray(fields) ? fields.includes('resume_link') : !!fields.resume;
+      (hireData.custom_fields || hireData.customFields || []).forEach(function (f) {
         var row = document.createElement('div');
         row.className = 'cb-custom-field-row';
         row.innerHTML = '<input type="text" class="cp-input" value="' + f + '"><button type="button" class="cb-remove-btn" onclick="this.parentElement.remove()">×</button>';
@@ -2200,7 +2204,12 @@ const PostInteractions = (function () {
     if (!commentDM) return;
 
     var data = typeof commentDM === 'string' ? JSON.parse(commentDM) : commentDM;
-    if (!data || !data.enabled) return;
+    if (!data) return;
+
+    // Normalize legacy camelCase field names to snake_case
+    if (data.requireFollow !== undefined && data.require_follow === undefined) data.require_follow = data.requireFollow;
+    if (data.notFollowingMsg !== undefined && data.not_following_msg === undefined) data.not_following_msg = data.notFollowingMsg;
+    if (data.dmMessage !== undefined && data.dm_message === undefined) data.dm_message = data.dmMessage;
 
     enableChk.checked = true;
     fields.style.display = 'block';

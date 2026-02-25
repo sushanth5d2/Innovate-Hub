@@ -706,7 +706,7 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% - 36px);
   z-index: 10;
   cursor: pointer;
 }
@@ -2010,7 +2010,6 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
   background: #000;
   scroll-snap-type: y mandatory;
 }
@@ -2048,6 +2047,13 @@ body {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* Edge-to-edge cover on mobile only */
+@media (max-width: 768px) {
+  .ig-fullscreen-post .ig-cseries-media video {
+    object-fit: cover;
+  }
 }
 
 /* Carousel inside fullscreen */
@@ -2097,7 +2103,7 @@ body {
 .ig-cseries-actions {
   position: absolute;
   right: 8px;
-  bottom: 60px;
+  bottom: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2154,15 +2160,28 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 0 12px 2px;
+  padding: 0 12px 40px;
   padding-right: 56px;
-  background: linear-gradient(0deg, rgba(0,0,0,0.3) 0%, transparent 70%);
   z-index: 15;
   pointer-events: none;
 }
 
+/* Gradient background on pseudo-element so it never blocks clicks */
+.ig-cseries-bottom::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.3) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
 .ig-cseries-bottom > * {
   pointer-events: auto;
+  position: relative;
 }
 
 .ig-cseries-user-row {
@@ -2435,24 +2454,29 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  z-index: 25;
+  height: 36px;
+  z-index: 30;
   cursor: pointer;
   display: flex;
   align-items: flex-end;
+  padding-top: 24px;
+  box-sizing: border-box;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .ig-cseries-progress-track {
   width: 100%;
-  height: 2px;
-  background: rgba(255,255,255,0.25);
+  height: 3px;
+  background: rgba(255,255,255,0.3);
   position: relative;
   transition: height 0.15s;
 }
 
 .ig-cseries-progress-bar-container:hover .ig-cseries-progress-track,
-.ig-cseries-progress-bar-container:active .ig-cseries-progress-track {
-  height: 4px;
+.ig-cseries-progress-bar-container:active .ig-cseries-progress-track,
+.ig-cseries-progress-bar-container.dragging .ig-cseries-progress-track {
+  height: 8px;
 }
 
 .ig-cseries-progress-fill {
@@ -2464,12 +2488,37 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   pointer-events: none;
 }
 
+/* Show a scrubber dot on hover/drag */
+.ig-cseries-progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.ig-cseries-progress-bar-container:hover .ig-cseries-progress-fill::after,
+.ig-cseries-progress-bar-container.dragging .ig-cseries-progress-fill::after {
+  opacity: 1;
+}
+
 /* Fullscreen embedded features */
 .ig-cseries-features {
   margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 5;
+  touch-action: manipulation;
 }
 
 .ig-cseries-poll {
@@ -2539,6 +2588,11 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   cursor: pointer;
   width: 100%;
   transition: opacity 0.2s;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 2;
 }
 
 .ig-cseries-custom-btn:active {
@@ -2548,6 +2602,8 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
 .ig-cseries-contact-btns {
   display: flex;
   gap: 8px;
+  pointer-events: auto !important;
+  touch-action: manipulation;
 }
 
 .ig-cseries-contact-btns button {
@@ -2562,6 +2618,9 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.1);
 }
 
 .ig-cseries-contact-btns button:active {
@@ -2594,7 +2653,11 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   .ig-cseries-bottom {
     right: 0;
     padding-right: 48px;
-    background: linear-gradient(0deg, rgba(0,0,0,0.3) 0%, transparent 70%);
+    padding-bottom: 40px;
+  }
+
+  .ig-cseries-actions {
+    bottom: 100px;
   }
 
   .ig-post-image {
