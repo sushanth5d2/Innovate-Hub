@@ -518,6 +518,10 @@ app.get('/notifications', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'notifications.html'));
 });
 
+app.get('/post/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'home.html'));
+});
+
 app.get('/search', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'search.html'));
 });

@@ -1010,7 +1010,29 @@ const PostInteractions = (function () {
   function handleGentleReminder() {
     closePostActionsModal();
     var reminderModal = el('reminderModal');
-    if (reminderModal) reminderModal.style.display = 'flex';
+    if (!reminderModal) return;
+
+    // Set default date to today and time to current + 1 hour
+    var now = new Date();
+    now.setHours(now.getHours() + 1, 0, 0, 0);
+    var dateInput = el('reminderDateOnly');
+    var timeInput = el('reminderTimeOnly');
+    if (dateInput) dateInput.value = now.toISOString().split('T')[0];
+    if (timeInput) timeInput.value = now.toTimeString().slice(0, 5);
+
+    // Show post preview text
+    var preview = el('reminderPostPreview');
+    if (preview) {
+      preview.textContent = 'Loading post info...';
+      InnovateAPI.apiRequest('/posts/' + currentPostIdForActions).then(function(res) {
+        var post = res.post || res;
+        preview.textContent = post.content ? post.content.substring(0, 60) + (post.content.length > 60 ? '...' : '') : 'Post #' + currentPostIdForActions;
+      }).catch(function() {
+        preview.textContent = 'Post #' + currentPostIdForActions;
+      });
+    }
+
+    reminderModal.style.display = 'flex';
   }
 
   /**
@@ -2290,23 +2312,30 @@ const PostInteractions = (function () {
    * Submit a reminder.
    */
   async function submitReminder() {
-    var date = el('reminderDate').value;
-    var message = el('reminderMessage').value;
+    var dateVal = el('reminderDateOnly') ? el('reminderDateOnly').value : '';
+    var timeVal = el('reminderTimeOnly') ? el('reminderTimeOnly').value : '';
+    var message = el('reminderMessage') ? el('reminderMessage').value : '';
 
-    if (!date) {
-      InnovateAPI.showAlert('Please select a date and time', 'error');
+    if (!dateVal) {
+      InnovateAPI.showAlert('Please select a date', 'error');
       return;
     }
+
+    // Combine date and time into a datetime string
+    var reminderDate = dateVal;
+    var reminderTime = timeVal || '09:00';
+    var fullDateTime = reminderDate + 'T' + reminderTime;
 
     try {
       await InnovateAPI.apiRequest('/posts/' + currentPostIdForActions + '/reminder', {
         method: 'POST',
-        body: JSON.stringify({ reminder_date: date, message: message })
+        body: JSON.stringify({ reminder_date: fullDateTime, reminder_time: reminderTime, message: message })
       });
       closeReminderModal();
-      InnovateAPI.showAlert('Reminder set! Check the Events calendar.', 'success');
-      el('reminderDate').value = '';
-      el('reminderMessage').value = '';
+      InnovateAPI.showAlert('Reminder set! You can view it in Reminders.', 'success');
+      if (el('reminderDateOnly')) el('reminderDateOnly').value = '';
+      if (el('reminderTimeOnly')) el('reminderTimeOnly').value = '';
+      if (el('reminderMessage')) el('reminderMessage').value = '';
     } catch (error) {
       InnovateAPI.showAlert(error.message || 'Failed to set reminder', 'error');
     }

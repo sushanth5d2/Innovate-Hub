@@ -45,6 +45,7 @@ const PostModal = (function () {
   var PARALLEL_UPLOADS = 6;
   var pollColors = ['#0095f6', '#e1306c', '#833ab4', '#fd1d1d', '#f77737', '#50c878'];
   var hashtagDebounceTimer = null;
+  var mentionDebounceTimer = null;
 
   // ========== HELPERS ==========
   function el(id) {
@@ -102,6 +103,15 @@ const PostModal = (function () {
           '<div id="' + p + 'pmHashtagSuggestions" class="cp-hashtag-suggestions" style="display:none;">' +
             '<div class="cp-hashtag-header"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg><span>Suggested Hashtags</span></div>' +
             '<div id="' + p + 'pmHashtagList" class="cp-hashtag-list"></div>' +
+          '</div>' +
+
+          '<!-- @Mention Suggestions -->' +
+          '<div id="' + p + 'pmMentionSuggestions" style="display:none; background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 12px; margin: 4px 0 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 240px; overflow-y: auto;">' +
+            '<div style="padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--ig-secondary-text); display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--ig-border);">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+              '<span>Tag People</span>' +
+            '</div>' +
+            '<div id="' + p + 'pmMentionList"></div>' +
           '</div>' +
 
           '<!-- Trending Hashtags -->' +
@@ -1283,12 +1293,27 @@ const PostModal = (function () {
     var cc = el('pmCharCount');
     if (cc) cc.textContent = count;
 
-    // Hashtag detection
     var text = textarea.value;
     var cursorPos = textarea.selectionStart;
     var beforeCursor = text.substring(0, cursorPos);
-    var hashMatch = beforeCursor.match(/#(\w*)$/);
 
+    // @mention detection (takes priority over hashtags)
+    var mentionMatch = beforeCursor.match(/@(\w[\w.]*)$/);
+    if (mentionMatch && mentionMatch[1].length >= 1) {
+      showMentionSuggestions(mentionMatch[1]);
+      // Hide hashtag suggestions while mentioning
+      clearTimeout(hashtagDebounceTimer);
+      var hSug = el('pmHashtagSuggestions');
+      if (hSug) hSug.style.display = 'none';
+      return;
+    } else {
+      clearTimeout(mentionDebounceTimer);
+      var mSug = el('pmMentionSuggestions');
+      if (mSug) mSug.style.display = 'none';
+    }
+
+    // Hashtag detection
+    var hashMatch = beforeCursor.match(/#(\w*)$/);
     if (hashMatch && hashMatch[1].length >= 1) {
       showHashtagSuggestions(hashMatch[1]);
     } else {
@@ -1330,6 +1355,52 @@ const PostModal = (function () {
     textarea.selectionStart = textarea.selectionEnd = newBefore.length;
     var sugEl = el('pmHashtagSuggestions');
     if (sugEl) sugEl.style.display = 'none';
+    onCaptionInput(textarea);
+  }
+
+  // ========== @MENTION SUGGESTIONS ==========
+  function showMentionSuggestions(query) {
+    clearTimeout(mentionDebounceTimer);
+    mentionDebounceTimer = setTimeout(function () {
+      InnovateAPI.apiRequest('/search/users?q=' + encodeURIComponent(query) + '&limit=6').then(function (data) {
+        var container = el('pmMentionSuggestions');
+        var list = el('pmMentionList');
+        if (!container || !list) return;
+        var users = data.users || data || [];
+        if (!users.length) { container.style.display = 'none'; return; }
+
+        list.innerHTML = users.map(function (u) {
+          var uname = u.username || u.name || u;
+          var avatar = u.avatar || u.profile_image || '/images/default-avatar.svg';
+          var displayName = u.display_name || u.full_name || uname;
+          return '<button class="cp-mention-btn" onclick="PostModal.insertMention(\'' + uname.replace(/'/g, "\\'") + '\')" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; background: none; border: none; cursor: pointer; text-align: left; color: var(--ig-primary-text); transition: background 0.15s;" onmouseover="this.style.background=\'var(--ig-hover)\'" onmouseout="this.style.background=\'none\'">'
+            + '<img src="' + avatar + '" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" onerror="this.src=\'/images/default-avatar.svg\'">'
+            + '<div style="flex: 1; min-width: 0;">'
+            + '<div style="font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + uname + '</div>'
+            + (displayName !== uname ? '<div style="font-size: 12px; color: var(--ig-secondary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + displayName + '</div>' : '')
+            + '</div></button>';
+        }).join('');
+        container.style.display = '';
+      }).catch(function () {
+        var container = el('pmMentionSuggestions');
+        if (container) container.style.display = 'none';
+      });
+    }, 250);
+  }
+
+  function insertMention(username) {
+    var textarea = el('pmCaption');
+    if (!textarea) return;
+    var text = textarea.value;
+    var cursorPos = textarea.selectionStart;
+    var beforeCursor = text.substring(0, cursorPos);
+    var afterCursor = text.substring(cursorPos);
+    var newBefore = beforeCursor.replace(/@\w[\w.]*$/, '@' + username + ' ');
+    textarea.value = newBefore + afterCursor;
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+    var container = el('pmMentionSuggestions');
+    if (container) container.style.display = 'none';
     onCaptionInput(textarea);
   }
 
@@ -1758,6 +1829,7 @@ const PostModal = (function () {
     addCDMItem: addCDMItem,
     onCaptionInput: onCaptionInput,
     insertHashtag: insertHashtag,
+    insertMention: insertMention,
     toggleTrending: toggleTrending
   };
 })();

@@ -79,12 +79,21 @@ router.get('/', authMiddleware, (req, res) => {
     (err, rows) => {
       if (!err && rows) {
         rows.forEach(r => {
+          // Extract time from reminder_date if it contains T (datetime format)
+          let reminderTime = null;
+          let reminderDateOnly = r.reminder_date;
+          if (r.reminder_date && r.reminder_date.includes('T')) {
+            const parts = r.reminder_date.split('T');
+            reminderDateOnly = parts[0];
+            reminderTime = parts[1] ? parts[1].substring(0, 5) : null;
+          }
+          const postSnippet = r.post_content ? r.post_content.substring(0, 100) : '';
           allReminders.push({
             id: r.id,
-            title: r.message || 'Post Reminder',
-            description: r.post_content ? r.post_content.substring(0, 100) : 'Gentle reminder for a post',
-            reminder_date: r.reminder_date,
-            reminder_time: null,
+            title: r.message || 'Remind me',
+            description: postSnippet || 'Post reminder',
+            reminder_date: reminderDateOnly,
+            reminder_time: reminderTime,
             type: 'post_reminder',
             source: 'gentle_reminder',
             source_type: 'post',

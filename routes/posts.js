@@ -1077,43 +1077,46 @@ router.post('/:postId/reminder', authMiddleware, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { reminder_date, message } = req.body;
+  const { reminder_date, reminder_time, message } = req.body;
 
   if (!reminder_date) {
     return res.status(400).json({ error: 'Reminder date is required' });
   }
 
-  db.run(
-    'INSERT INTO gentle_reminders (user_id, post_id, reminder_date, message) VALUES (?, ?, ?, ?)',
-    [userId, postId, reminder_date, message || ''],
-    function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Error creating reminder' });
-      }
-
-      // Also create an event for the reminder
-      db.run(
-        'INSERT INTO events (creator_id, title, description, event_date, location) VALUES (?, ?, ?, ?, ?)',
-        [userId, 'Reminder', message || 'Gentle reminder from post', reminder_date, 'From Post'],
-        (err) => {
-          if (err) console.error('Error creating event for reminder:', err);
-        }
-      );
-
-      // Also create a unified reminder entry
-      db.run(
-        `INSERT INTO user_reminders (user_id, title, description, reminder_date, type, source_type, source_id, color)
-         VALUES (?, ?, ?, ?, 'post_reminder', 'post', ?, '#ff6b6b')`,
-        [userId, message || 'Post Reminder', 'Gentle reminder from post', reminder_date, postId],
-        (err) => {
-          if (err) console.error('Error creating unified reminder:', err);
-        }
-      );
-
-      res.json({ success: true, reminderId: this.lastID });
+  // First fetch the post content for proper reminder details
+  db.get('SELECT content, images FROM posts WHERE id = ?', [postId], (err, post) => {
+    if (err || !post) {
+      return res.status(404).json({ error: 'Post not found' });
     }
-  );
+
+    const postContent = post.content ? post.content.substring(0, 100) : '';
+    const reminderTitle = message || 'Remind me';
+    const reminderDesc = postContent || 'Post reminder';
+    const timeStr = reminder_time || (reminder_date.includes('T') ? reminder_date.split('T')[1].substring(0, 5) : null);
+
+    db.run(
+      'INSERT INTO gentle_reminders (user_id, post_id, reminder_date, message) VALUES (?, ?, ?, ?)',
+      [userId, postId, reminder_date, message || ''],
+      function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Error creating reminder' });
+        }
+
+        // Also create a unified reminder entry with proper data
+        db.run(
+          `INSERT INTO user_reminders (user_id, title, description, reminder_date, reminder_time, type, source_type, source_id, color)
+           VALUES (?, ?, ?, ?, ?, 'post_reminder', 'post', ?, '#ff6b6b')`,
+          [userId, reminderTitle, reminderDesc, reminder_date.split('T')[0], timeStr, postId],
+          (err) => {
+            if (err) console.error('Error creating unified reminder:', err);
+          }
+        );
+
+        res.json({ success: true, reminderId: this.lastID });
+      }
+    );
+  });
 });
 
 // Create instant meeting

@@ -355,9 +355,17 @@ const PostRenderer = (function () {
       var votesObj = post.poll.votes;
       var totalVotes = typeof votesObj === 'object' && !Array.isArray(votesObj) ? Object.values(votesObj).reduce(function (a, b) { return a + b; }, 0) : (Array.isArray(votesObj) ? votesObj.reduce(function (a, b) { return a + b; }, 0) : 0);
       var userVoted = post.poll.user_voted || null;
+      var pollExpanded = userVoted ? 'true' : 'false';
       pollHtml = ''
-        + '<div class="ig-poll" data-post-id="' + post.id + '" style="margin: 12px 16px; padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;" onclick="event.stopPropagation()">'
-        + '<div style="font-weight: 600; margin-bottom: 12px;">' + post.poll.question + '</div>'
+        + '<div class="ig-poll-wrapper" data-post-id="' + post.id + '" style="margin: 8px 16px 12px;">'
+        + '<button class="ig-poll-toggle-btn" onclick="event.stopPropagation(); togglePollExpand(this)" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 10px; cursor: pointer; color: var(--ig-primary-text); font-size: 14px; font-weight: 600; transition: all 0.2s;">'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>'
+        + '<span>' + escapeHtml(post.poll.question) + '</span>'
+        + '<span style="margin-left: auto; font-size: 12px; color: var(--ig-secondary-text);">' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>'
+        + '<svg class="ig-poll-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-secondary-text)" stroke-width="2" style="transition: transform 0.2s; flex-shrink: 0;' + (pollExpanded === 'true' ? ' transform: rotate(180deg);' : '') + '"><polyline points="6 9 12 15 18 9"/></svg>'
+        + '</button>'
+        + '<div class="ig-poll-options-panel" style="' + (pollExpanded === 'true' ? '' : 'display: none;') + ' margin-top: 8px;">'
+        + '<div class="ig-poll" data-post-id="' + post.id + '" style="padding: 12px; background: var(--ig-secondary-background); border-radius: 8px;" onclick="event.stopPropagation()">'
         + post.poll.options.map(function (option, idx) {
             var voteCount = typeof votesObj === 'object' && !Array.isArray(votesObj) ? (votesObj[option] || 0) : (Array.isArray(votesObj) ? (votesObj[idx] || 0) : 0);
             var percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
@@ -377,6 +385,7 @@ const PostRenderer = (function () {
         + '<div style="margin-top: 8px; font-size: 12px; color: var(--ig-secondary-text); display: flex; justify-content: space-between;">'
         + '<span>' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>'
         + (userVoted ? '<span style="color: var(--ig-blue);">You voted</span>' : '')
+        + '</div></div>'
         + '</div></div>';
     }
 
@@ -430,18 +439,6 @@ const PostRenderer = (function () {
           + '</div>'
         : '')
 
-      + attachmentsHtml
-
-      + (commentsCount > 0
-        ? '<button class="ig-post-comments-btn" onclick="openCommentsModal(' + post.id + ')">View all ' + commentsCount + ' comments</button>'
-        : '')
-
-      + (post.recent_comments && post.recent_comments.length > 0
-        ? post.recent_comments.map(function (rc) {
-            return '<div class="ig-inline-comment"><span class="ig-inline-comment-user">' + rc.username + '</span><span class="ig-inline-comment-text">' + rc.content + '</span></div>';
-          }).join('')
-        : '')
-
       + pollHtml
 
       + (post.enable_contact || post.enable_interested
@@ -457,16 +454,16 @@ const PostRenderer = (function () {
           + '</button>'
         : '')
 
-      // Comment-to-DM indicator
-      + (post.comment_to_dm && post.comment_to_dm.enabled
-        ? '<div class="cdm-feed-prompt" onclick="openCommentsModal(' + post.id + ')" style="margin: 0 16px 12px; padding: 10px 14px; background: linear-gradient(135deg, rgba(131,58,180,0.1), rgba(253,29,29,0.1), rgba(252,176,69,0.1)); border: 1px solid rgba(131,58,180,0.2); border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;">'
-          + '<span style="font-size: 18px;">💬</span>'
-          + '<span style="font-size: 13px; font-weight: 600; color: var(--ig-primary-text);">Comment to get a DM with '
-          + (post.comment_to_dm.items && post.comment_to_dm.items.length > 0
-            ? post.comment_to_dm.items.length + ' link' + (post.comment_to_dm.items.length > 1 ? 's' : '')
-            : 'exclusive content')
-          + '</span>'
-          + '</div>'
+      + attachmentsHtml
+
+      + (commentsCount > 0
+        ? '<button class="ig-post-comments-btn" onclick="openCommentsModal(' + post.id + ')">View all ' + commentsCount + ' comments</button>'
+        : '')
+
+      + (post.recent_comments && post.recent_comments.length > 0
+        ? post.recent_comments.map(function (rc) {
+            return '<div class="ig-inline-comment"><span class="ig-inline-comment-user">' + rc.username + '</span><span class="ig-inline-comment-text">' + rc.content + '</span></div>';
+          }).join('')
         : '')
 
       + '<div class="ig-post-separator"></div>';
@@ -597,14 +594,22 @@ const PostRenderer = (function () {
         + '<p style="color:#fff;font-size:22px;font-weight:600;text-align:center;text-shadow:0 2px 8px rgba(0,0,0,0.3);max-width:80%;">' + escapeHtml(captionText).substring(0, 200) + '</p></div>';
     }
 
-    // Poll HTML (fullscreen style)
+    // Poll HTML (fullscreen style) - collapsible
     var pollHtml = '';
     if (post.poll) {
       var votesObj = post.poll.votes;
       var totalVotes = typeof votesObj === 'object' && !Array.isArray(votesObj) ? Object.values(votesObj).reduce(function (a, b) { return a + b; }, 0) : (Array.isArray(votesObj) ? votesObj.reduce(function (a, b) { return a + b; }, 0) : 0);
       var userVoted = post.poll.user_voted || null;
-      pollHtml = '<div class="ig-cseries-poll" data-post-id="' + post.id + '" onclick="event.stopPropagation()">'
-        + '<div class="poll-question">' + post.poll.question + '</div>'
+      var fsPollExpanded = userVoted ? 'true' : 'false';
+      pollHtml = '<div class="ig-poll-wrapper" style="margin-bottom: 6px;">'
+        + '<button class="ig-poll-toggle-btn" onclick="event.stopPropagation(); togglePollExpand(this)" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; cursor: pointer; color: #fff; font-size: 13px; font-weight: 600; transition: all 0.2s; pointer-events: auto;">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ig-blue)" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="15" y="8" width="6" height="13" rx="1"/><rect x="9" y="11" width="6" height="10" rx="1"/></svg>'
+        + '<span style="flex: 1; text-align: left;">' + escapeHtml(post.poll.question) + '</span>'
+        + '<span style="font-size: 11px; color: rgba(255,255,255,0.5);">' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>'
+        + '<svg class="ig-poll-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" style="transition: transform 0.2s; flex-shrink: 0;' + (fsPollExpanded === 'true' ? ' transform: rotate(180deg);' : '') + '"><polyline points="6 9 12 15 18 9"/></svg>'
+        + '</button>'
+        + '<div class="ig-poll-options-panel" style="' + (fsPollExpanded === 'true' ? '' : 'display: none;') + ' margin-top: 6px; pointer-events: auto;">'
+        + '<div class="ig-cseries-poll" data-post-id="' + post.id + '" onclick="event.stopPropagation()">'
         + post.poll.options.map(function (option, oIdx) {
             var voteCount = typeof votesObj === 'object' && !Array.isArray(votesObj) ? (votesObj[option] || 0) : (Array.isArray(votesObj) ? (votesObj[oIdx] || 0) : 0);
             var percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
@@ -616,6 +621,7 @@ const PostRenderer = (function () {
         + '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);display:flex;justify-content:space-between;">'
         + '<span>' + totalVotes + ' vote' + (totalVotes !== 1 ? 's' : '') + '</span>'
         + (userVoted ? '<span style="color:var(--ig-blue);">You voted</span>' : '')
+        + '</div></div>'
         + '</div></div>';
     }
 
@@ -659,20 +665,10 @@ const PostRenderer = (function () {
       }
     }
 
-    // Comment-to-DM indicator for fullscreen
+    // Comment-to-DM indicator removed (hidden)
     var cdmHtml = '';
-    if (post.comment_to_dm && post.comment_to_dm.enabled) {
-      var cdmItemCount = (post.comment_to_dm.items && post.comment_to_dm.items.length) || 0;
-      var cdmLabel = cdmItemCount > 0 ? cdmItemCount + ' link' + (cdmItemCount > 1 ? 's' : '') : 'exclusive content';
-      cdmHtml = '<button class="ig-cseries-cdm-prompt" onclick="event.stopPropagation(); ' + fnOpenComments + '(' + post.id + ')"'
-        + ' ontouchend="event.stopPropagation();"'
-        + ' style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:linear-gradient(135deg,rgba(131,58,180,0.25),rgba(253,29,29,0.2),rgba(252,176,69,0.2));border:1px solid rgba(255,255,255,0.2);border-radius:10px;cursor:pointer;color:#fff;font-size:13px;font-weight:600;text-align:left;pointer-events:auto;touch-action:manipulation;">'
-        + '<span style="font-size:18px;">💬</span>'
-        + '<span>Comment to get a DM with ' + cdmLabel + '</span>'
-        + '</button>';
-    }
 
-    var hasFeatures = pollHtml || customBtnHtml || contactBtnsHtml || attachHtml || cdmHtml;
+    var hasFeatures = pollHtml || customBtnHtml || contactBtnsHtml || attachHtml;
 
     // Action buttons
     var actionsHtml = '<div class="ig-cseries-actions">';
@@ -726,9 +722,9 @@ const PostRenderer = (function () {
         + '<button class="ig-cseries-caption-more" data-full-caption="' + encodedCaption + '" onclick="' + fnExpandCaption + '(' + post.id + ')">... more</button>';
     }
 
-    // Features (poll, custom button, contact, attachments, CDM) — always visible, outside "more"
+    // Features (poll, custom button, contact, attachments) — always visible, outside "more"
     if (hasFeatures) {
-      bottomHtml += '<div class="ig-cseries-features" style="margin-top:6px;">' + pollHtml + customBtnHtml + contactBtnsHtml + attachHtml + cdmHtml + '</div>';
+      bottomHtml += '<div class="ig-cseries-features" style="margin-top:6px;">' + pollHtml + customBtnHtml + contactBtnsHtml + attachHtml + '</div>';
     }
 
     bottomHtml += '<div class="ig-cseries-details" id="' + idPrefix + 'details-' + post.id + '">' 
@@ -1420,6 +1416,20 @@ const PostRenderer = (function () {
   // ======================== Poll ========================
 
   /**
+   * Toggle poll expand/collapse when clicking the Vote/Poll button.
+   */
+  function togglePollExpand(btn) {
+    var wrapper = btn.closest('.ig-poll-wrapper');
+    if (!wrapper) return;
+    var panel = wrapper.querySelector('.ig-poll-options-panel');
+    var chevron = btn.querySelector('.ig-poll-chevron');
+    if (!panel) return;
+    var isVisible = panel.style.display !== 'none';
+    panel.style.display = isVisible ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isVisible ? '' : 'rotate(180deg)';
+  }
+
+  /**
    * Vote on a poll.
    */
   async function votePoll(postId, pollId, option) {
@@ -1620,6 +1630,7 @@ const PostRenderer = (function () {
     // Poll
     votePoll: votePoll,
     updatePollUI: updatePollUI,
+    togglePollExpand: togglePollExpand,
 
     // Contact / Interested
     handleContactMe: handleContactMe,
