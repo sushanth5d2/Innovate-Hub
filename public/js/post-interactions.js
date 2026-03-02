@@ -988,7 +988,7 @@ const PostInteractions = (function () {
         formData.append('existing_video', post.video_url);
       }
 
-      var createRes = await fetch('/posts', {
+      var createRes = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + InnovateAPI.getToken() },
         body: formData

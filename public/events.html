@@ -266,7 +266,12 @@
               </button>
             </div>
 
-            <div id="ordersList" style="display:flex; flex-direction:column; gap: 14px; max-height: 65vh; overflow-y: auto; padding-right: 4px;"></div>
+            <!-- Search Orders -->
+            <div style="margin-bottom: 16px;">
+              <input type="text" id="ordersSearchInput" placeholder="🔍 Search by username..." oninput="filterOrderCards(this.value)" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: var(--ig-primary-text); font-size: 14px; outline: none; transition: border-color 0.2s; box-sizing: border-box;" onfocus="this.style.borderColor='#f59e0b'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'" />
+            </div>
+
+            <div id="ordersList" style="display:flex; flex-direction:column; gap: 14px; max-height: 60vh; overflow-y: auto; padding-right: 4px;"></div>
           </div>
         </div>
       </div>
@@ -656,12 +661,16 @@
 
               <!-- Section 3: Current Staff List -->
               <div>
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                   <div style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;">👥</div>
                   <div>
                     <div style="font-weight: 900; font-size: 16px; color: var(--ig-primary-text);">Active Staff (<span id="staffCount">0</span>)</div>
                     <div style="font-size: 12px; color: var(--ig-secondary-text);">Manage your security team</div>
                   </div>
+                </div>
+                <!-- Search Staff -->
+                <div style="margin-bottom: 14px;">
+                  <input type="text" id="staffSearchInput" placeholder="🔍 Search staff by name or username..." oninput="filterStaffCards(this.value)" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1.5px solid rgba(102,126,234,0.3); background: rgba(0,0,0,0.3); color: var(--ig-primary-text); font-size: 13px; outline: none; transition: border-color 0.2s; box-sizing: border-box;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='rgba(102,126,234,0.3)'" />
                 </div>
                 <div id="staffList" style="max-height: 400px; overflow-y: auto; padding-right: 4px;"></div>
               </div>

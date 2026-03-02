@@ -606,17 +606,30 @@
   }
 
   // ===== INIT =====
+  var _initRetries = 0;
+  var MAX_INIT_RETRIES = 10;
+
   function init() {
-    if (!InnovateAPI || !InnovateAPI.isAuthenticated || !InnovateAPI.isAuthenticated()) return;
+    // Retry if InnovateAPI isn't ready yet (may load async on some pages)
+    if (!window.InnovateAPI || !InnovateAPI.isAuthenticated) {
+      _initRetries++;
+      if (_initRetries <= MAX_INIT_RETRIES) {
+        setTimeout(init, 1000);
+      }
+      return;
+    }
+    // Not logged in — no banners needed
+    if (!InnovateAPI.isAuthenticated()) return;
+
     checkDueReminders();
     setInterval(checkDueReminders, POLL_INTERVAL);
     listenToSocket();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 500); });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 800); });
   } else {
-    setTimeout(init, 500);
+    setTimeout(init, 800);
   }
 
   // Expose for manual use

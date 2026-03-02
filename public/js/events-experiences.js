@@ -1289,6 +1289,10 @@
 
     modal.style.display = 'flex';
     
+    // Clear search
+    var searchInput = document.getElementById('ordersSearchInput');
+    if (searchInput) searchInput.value = '';
+    
     // Initialize active tab styling
     const activeTab = document.getElementById('orderTabPending');
     if (activeTab) {
@@ -2059,6 +2063,29 @@ let html5QrCode = null;
   // Expose deleteStaff to global for inline onclick
   window.deleteStaff = deleteStaff;
   window.copyScannerURL = copyScannerURL;
+
+  // ===== Search / Filter Functions =====
+  window.filterOrderCards = function(query) {
+    const q = (query || '').toLowerCase().trim();
+    const cards = document.querySelectorAll('#ordersList .order-card');
+    cards.forEach(function(card) {
+      if (!q) { card.style.display = ''; return; }
+      const text = card.textContent.toLowerCase();
+      card.style.display = text.includes(q) ? '' : 'none';
+    });
+  };
+
+  window.filterStaffCards = function(query) {
+    const q = (query || '').toLowerCase().trim();
+    const list = document.getElementById('staffList');
+    if (!list) return;
+    const cards = list.children;
+    for (var i = 0; i < cards.length; i++) {
+      if (!q) { cards[i].style.display = ''; continue; }
+      var text = cards[i].textContent.toLowerCase();
+      cards[i].style.display = text.includes(q) ? '' : 'none';
+    }
+  };
 
   // ===== Create Event Modal =====
   function openCreateEvent() {

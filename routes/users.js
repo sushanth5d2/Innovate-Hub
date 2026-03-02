@@ -14,7 +14,7 @@ router.get('/:userId', authMiddleware, (req, res) => {
     SELECT 
       u.id, u.username, u.email, u.bio, u.skills, u.interests, u.fullname,
       u.favorite_teams, u.profile_picture, u.created_at, u.is_private,
-      (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_archived = 0) as post_count,
+      (SELECT COUNT(*) FROM posts WHERE user_id = u.id AND is_archived = 0 AND is_story = 0) as post_count,
       (SELECT COUNT(*) FROM followers WHERE following_id = u.id) as followers_count,
       (SELECT COUNT(*) FROM followers WHERE follower_id = u.id) as following_count,
       (SELECT COUNT(*) FROM followers WHERE follower_id = ? AND following_id = u.id) as is_following,
