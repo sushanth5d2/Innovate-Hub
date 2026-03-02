@@ -57,6 +57,12 @@
     .left-tabs {
       display: flex;
       border-bottom: 1px solid var(--ig-border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .left-tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .left-tab {
@@ -71,11 +77,20 @@
       background: none;
       border: none;
       transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .left-tab.active {
       color: var(--ig-blue);
       border-bottom-color: var(--ig-blue);
+    }
+
+    @media (max-width: 768px) {
+      .left-tab {
+        flex: none;
+        padding: 12px 16px;
+        font-size: 13px;
+      }
     }
 
     .left-content {
@@ -1450,6 +1465,34 @@
       padding: 24px;
     }
 
+    @media (max-width: 768px) {
+      .modal-overlay {
+        align-items: stretch;
+        justify-content: stretch;
+        background: var(--ig-primary-background);
+      }
+      .modal-content {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-content .modal-header {
+        border-radius: 0 !important;
+        flex-shrink: 0;
+      }
+      .modal-content form {
+        flex: 1;
+        overflow-y: auto;
+        max-height: none !important;
+        padding: 16px !important;
+      }
+    }
+
     .modal-header {
       display: flex;
       justify-content: space-between;
@@ -2078,8 +2121,8 @@
           <button class="ws-icon-btn mobile-back-btn" onclick="toggleLeftSidebar()" style="margin-right: 8px; display: none;" id="menuBtn">
             <i class="fas fa-arrow-left"></i>
           </button>
-          <img id="centerHeaderAvatar" src="" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border); margin-right: 8px; display: none;">
-          <div>
+          <img id="centerHeaderAvatar" src="" onclick="toggleRightSidebar()" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ig-border); margin-right: 8px; display: none; cursor: pointer;">
+          <div onclick="toggleRightSidebar()" style="cursor: pointer;">
             <h2 class="header-title" id="centerTitle">Announcements</h2>
             <p class="header-subtitle" id="centerSubtitle">Community updates and news</p>
           </div>
@@ -2874,60 +2917,66 @@
     }
     
     function openAnnouncementsFolder() {
+      // Show center panel on mobile
+      const centerPanel = document.getElementById('communityCenter');
+      if (window.innerWidth <= 768 && centerPanel) {
+        centerPanel.classList.add('mobile-active');
+      }
+
       const centerContent = document.getElementById('centerContent');
       
       centerContent.innerHTML = `
-        <div style="padding: 24px; max-width: 900px; margin: 0 auto;">
-          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-            <div style="width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+        <div style="padding: 16px; max-width: 900px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--ig-border); flex-wrap: wrap;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; flex-shrink: 0;">
               <i class="fas fa-bullhorn"></i>
             </div>
-            <div style="flex: 1;">
-              <h2 style="margin: 0; font-size: 22px;">Announcements</h2>
-              <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
+            <div style="flex: 1; min-width: 0;">
+              <h2 style="margin: 0; font-size: 18px;">Announcements</h2>
+              <div style="color: var(--ig-secondary-text); font-size: 13px; margin-top: 2px;">
                 All announcement attachments and files
               </div>
             </div>
-            <button class="btn btn-primary" onclick="switchLeftTab('announcements')">
-              <i class="fas fa-arrow-right"></i> View Announcements
+            <button class="btn btn-primary" onclick="switchLeftTab('announcements')" style="font-size: 13px; padding: 8px 14px; white-space: nowrap;">
+              <i class="fas fa-arrow-right"></i> View
             </button>
           </div>
           
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
             <!-- Images Section -->
-            <div onclick="loadAnnouncementFiles('images')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div onclick="loadAnnouncementFiles('images')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-image"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Images</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Photos from announcements</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Images</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Photos from announcements</p>
             </div>
 
             <!-- Videos Section -->
-            <div onclick="loadAnnouncementFiles('videos')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div onclick="loadAnnouncementFiles('videos')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-video"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Videos</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Video attachments</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Videos</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Video attachments</p>
             </div>
 
             <!-- Documents Section -->
-            <div onclick="loadAnnouncementFiles('documents')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div onclick="loadAnnouncementFiles('documents')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-file-alt"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Documents</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">PDFs, docs, and files</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Documents</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">PDFs, docs, and files</p>
             </div>
 
             <!-- Links Section -->
-            <div onclick="loadAnnouncementFiles('links')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div onclick="loadAnnouncementFiles('links')" style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-link"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Links</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Shared links from announcements</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Links</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Shared links from announcements</p>
             </div>
           </div>
 
@@ -2948,70 +2997,75 @@
       const group = state.groups.find(g => g.id == groupId);
       if (!group) return;
 
+      // Show center panel on mobile
+      const centerPanel = document.getElementById('communityCenter');
+      if (window.innerWidth <= 768 && centerPanel) {
+        centerPanel.classList.add('mobile-active');
+      }
+
       const centerContent = document.getElementById('centerContent');
       
       centerContent.innerHTML = `
-        <div style="padding: 24px; max-width: 900px; margin: 0 auto;">
-          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--ig-border);">
-            <div style="width: 56px; height: 56px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+        <div style="padding: 16px; max-width: 900px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--ig-border); flex-wrap: wrap;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; flex-shrink: 0;">
               <i class="fas fa-folder-open"></i>
             </div>
-            <div style="flex: 1;">
-              <h2 style="margin: 0; font-size: 22px;">${group.name}</h2>
-              <div style="color: var(--ig-secondary-text); font-size: 14px; margin-top: 4px;">
+            <div style="flex: 1; min-width: 0;">
+              <h2 style="margin: 0; font-size: 18px;">${group.name}</h2>
+              <div style="color: var(--ig-secondary-text); font-size: 13px; margin-top: 2px;">
                 Group folder · ${group.description || 'No description'}
               </div>
             </div>
-            <button class="btn btn-primary" onclick="selectGroup(${group.id})">
-              <i class="fas fa-arrow-right"></i> Open Group
+            <button class="btn btn-primary" onclick="selectGroup(${group.id})" style="font-size: 13px; padding: 8px 14px; white-space: nowrap;">
+              <i class="fas fa-arrow-right"></i> Open
             </button>
           </div>
           
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
-            <!-- Files Section - FIXED: Goes directly to folders view -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="openGroupFolderView(${group.id});">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
+            <!-- Files Section -->
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onclick="openGroupFolderView(${group.id});">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-file-alt"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Files</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Documents, images, and more</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Files</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Documents, images, and more</p>
             </div>
 
             <!-- Links Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; openFolder('links');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; openFolder('links');">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-link"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Links</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Shared links and resources</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Links</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Shared links and resources</p>
             </div>
 
             <!-- Tasks Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='tasks'; selectGroup(${group.id}); switchCenterTab('tasks');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='tasks'; selectGroup(${group.id}); switchCenterTab('tasks');">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-tasks"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">To-Do</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Group tasks and assignments</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">To-Do</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Group tasks and assignments</p>
             </div>
 
             <!-- Notes Section -->
-            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='notes'; selectGroup(${group.id}); switchCenterTab('notes');">
-              <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; margin-bottom: 12px;">
+            <div style="background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onclick="state.currentGroupId=${group.id}; state.currentView='notes'; selectGroup(${group.id}); switchCenterTab('notes');">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; margin-bottom: 10px;">
                 <i class="fas fa-sticky-note"></i>
               </div>
-              <h3 style="margin: 0 0 8px 0; font-size: 16px;">Notes</h3>
-              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 13px;">Collaborative documents</p>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px;">Notes</h3>
+              <p style="margin: 0; color: var(--ig-secondary-text); font-size: 12px;">Collaborative documents</p>
             </div>
           </div>
 
-          <div style="margin-top: 24px; padding: 20px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px;">
-            <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--ig-secondary-text);">
+          <div style="margin-top: 20px; padding: 16px; background: var(--ig-secondary-background); border: 1px solid var(--ig-border); border-radius: 12px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--ig-secondary-text);">
               <i class="fas fa-info-circle"></i> About Folders
             </h3>
-            <p style="margin: 0; font-size: 13px; color: var(--ig-secondary-text); line-height: 1.6;">
-              Each group has its own dedicated folder to organize files, links, tasks, and notes. 
-              Click on any section above or use the "Open Group" button to access the full workspace.
+            <p style="margin: 0; font-size: 12px; color: var(--ig-secondary-text); line-height: 1.5;">
+              Each group has its own dedicated folder to organize files, links, tasks, and notes.
             </p>
           </div>
         </div>
@@ -3719,6 +3773,12 @@
         
         // Load GitHub view
         renderGitHubView();
+
+        // Auto-show center panel on mobile for GitHub (single-view, no left list items)
+        const centerPanel = document.getElementById('communityCenter');
+        if (window.innerWidth <= 768 && centerPanel) {
+          centerPanel.classList.add('mobile-active');
+        }
       }
     }
 
