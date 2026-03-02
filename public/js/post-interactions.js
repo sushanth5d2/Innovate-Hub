@@ -2303,8 +2303,11 @@ const PostInteractions = (function () {
   function closeReminderModal(event) {
     var p = getPrefix();
     var modalId = p ? p + 'ReminderModal' : 'reminderModal';
-    if (!event || event.target.id === modalId) {
-      document.getElementById(modalId).style.display = 'none';
+    var modal = document.getElementById(modalId);
+    if (!modal) return;
+    // Close if: no event (button click), or clicking the backdrop overlay itself
+    if (!event || event.target === modal || event.target.id === modalId) {
+      modal.style.display = 'none';
     }
   }
 
@@ -2332,7 +2335,18 @@ const PostInteractions = (function () {
         body: JSON.stringify({ reminder_date: fullDateTime, reminder_time: reminderTime, message: message })
       });
       closeReminderModal();
-      InnovateAPI.showAlert('Reminder set! You can view it in Reminders.', 'success');
+      // Use banner notification if available, else fallback
+      if (window.NotificationBanner && window.NotificationBanner.show) {
+        window.NotificationBanner.show({
+          type: 'reminder',
+          title: 'Reminder Set! ✅',
+          message: 'Scheduled for ' + new Date(fullDateTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          duration: 4000,
+          onClick: function() { window.location.href = '/notifications'; }
+        });
+      } else {
+        InnovateAPI.showAlert('Reminder set! You can view it in Reminders.', 'success');
+      }
       if (el('reminderDateOnly')) el('reminderDateOnly').value = '';
       if (el('reminderTimeOnly')) el('reminderTimeOnly').value = '';
       if (el('reminderMessage')) el('reminderMessage').value = '';

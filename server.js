@@ -280,9 +280,11 @@ io.on('connection', (socket) => {
     connectedUsers.set(userId, socket.id);
     socket.userId = userId;
     
-    // Join user-specific room for receiving messages
+    // Join user-specific rooms for receiving messages/notifications
+    // Some routes use user_${id} (underscore) and some use user-${id} (hyphen)
     socket.join(`user_${userId}`);
-    console.log(`User ${userId} joined room user_${userId}, socket: ${socket.id}`);
+    socket.join(`user-${userId}`);
+    console.log(`User ${userId} joined rooms user_${userId} & user-${userId}, socket: ${socket.id}`);
     
     // Broadcast online status
     io.emit('user:online', userId);

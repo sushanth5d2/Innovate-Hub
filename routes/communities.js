@@ -1244,11 +1244,16 @@ function createJoinRequest(communityId, userId, community, db, req, res) {
               // Emit socket event for real-time notification
               const io = req.app.get('io');
               if (io) {
-                io.to(`user_${community.admin_id}`).emit('notification:receive', {
-                  type: 'join_request',
-                  content: `${user.username} requested to join ${community.name}`,
-                  related_id: communityId,
-                  created_at: new Date().toISOString()
+                db.get('SELECT profile_picture FROM users WHERE id = ?', [userId], (e2, uInfo) => {
+                  io.to(`user_${community.admin_id}`).emit('notification:receive', {
+                    type: 'join_request',
+                    content: `${user.username} requested to join ${community.name}`,
+                    related_id: communityId,
+                    created_by: userId,
+                    username: user.username,
+                    profile_picture: uInfo ? uInfo.profile_picture : '',
+                    created_at: new Date().toISOString()
+                  });
                 });
               }
             }
@@ -1538,10 +1543,16 @@ router.post('/:id/invite', authMiddleware, (req, res) => {
                 // Emit socket notification
                 const io = req.app.get('io');
                 if (io) {
-                  io.to(`user_${userId}`).emit('notification:receive', {
-                    type: 'community_invite',
-                    content: `You've been invited to join ${community.name}`,
-                    communityId: communityId
+                  db.get('SELECT username, profile_picture FROM users WHERE id = ?', [inviterId], (e2, inviter) => {
+                    io.to(`user_${userId}`).emit('notification:receive', {
+                      type: 'community_invite',
+                      content: `You've been invited to join ${community.name}`,
+                      communityId: communityId,
+                      related_id: communityId,
+                      created_by: inviterId,
+                      username: inviter ? inviter.username : '',
+                      profile_picture: inviter ? inviter.profile_picture : ''
+                    });
                   });
                 }
 
@@ -1614,7 +1625,9 @@ router.put('/:communityId/members/:userId/role', authMiddleware, (req, res) => {
                 io.to(`user_${targetUserId}`).emit('notification:receive', {
                   type: 'community_role_change',
                   content: message,
-                  communityId: communityId
+                  communityId: communityId,
+                  related_id: communityId,
+                  created_by: userId
                 });
               }
             }
@@ -1689,7 +1702,9 @@ router.delete('/:communityId/members/:userId', authMiddleware, (req, res) => {
               io.to(`user_${targetUserId}`).emit('notification:receive', {
                 type: 'community_removed',
                 content: 'You have been removed from the community',
-                communityId: communityId
+                communityId: communityId,
+                related_id: communityId,
+                created_by: userId
               });
             }
 

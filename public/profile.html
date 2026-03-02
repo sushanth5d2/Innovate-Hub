@@ -2587,6 +2587,7 @@
   <!-- Edit Post Modal removed — now unified in PostModal (post-modal.js) -->
   <div id="pfPostModalContainer"></div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/post-interactions.js"></script>
@@ -3791,7 +3792,7 @@
       }
     }
 
-    function renderIgGrid(tab) {
+    async function renderIgGrid(tab) {
       const grid = document.getElementById('pf-ig-grid');
       if (!grid) return;
       let posts = [];
@@ -3801,7 +3802,14 @@
       } else if (tab === 'reels') {
         posts = allProfilePosts.filter(p => p.video_url);
       } else if (tab === 'tagged') {
-        posts = [];
+        // Fetch tagged posts from API
+        try {
+          const taggedData = await InnovateAPI.apiRequest('/posts/tagged/' + portfolioUserId);
+          posts = taggedData.posts || [];
+        } catch(e) {
+          console.error('Error loading tagged posts:', e);
+          posts = [];
+        }
       }
 
       if (posts.length === 0) {
@@ -4156,5 +4164,6 @@
     initPortfolio();
   </script>
   <script src="/js/shared-tasks-notes.js"></script>
+  <script src="/js/notification-banner.js"></script>
 </body>
 </html>

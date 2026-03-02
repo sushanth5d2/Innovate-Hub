@@ -396,13 +396,26 @@ router.post('/:userId/follow', authMiddleware, (req, res) => {
                 }
               );
 
-              // Emit real-time notification
+              // Emit real-time notification with sender info
               const io = req.app.get('io');
               if (io) {
-                io.to(`user-${followingId}`).emit('notification:received', {
-                  type: 'follow_request',
-                  content: 'requested to follow you',
-                  related_id: followerId
+                db.get('SELECT username, profile_picture FROM users WHERE id = ?', [followerId], (e2, senderInfo) => {
+                  io.to(`user-${followingId}`).emit('notification:received', {
+                    type: 'follow_request',
+                    content: 'requested to follow you',
+                    related_id: followerId,
+                    created_by: followerId,
+                    username: senderInfo ? senderInfo.username : '',
+                    profile_picture: senderInfo ? senderInfo.profile_picture : ''
+                  });
+                  io.to(`user_${followingId}`).emit('notification:receive', {
+                    type: 'follow_request',
+                    content: 'requested to follow you',
+                    related_id: followerId,
+                    created_by: followerId,
+                    username: senderInfo ? senderInfo.username : '',
+                    profile_picture: senderInfo ? senderInfo.profile_picture : ''
+                  });
                 });
               }
 
@@ -436,6 +449,23 @@ router.post('/:userId/follow', authMiddleware, (req, res) => {
                 );
               }
             );
+
+            // Emit socket notification for follow
+            const io = req.app.get('io');
+            if (io) {
+              db.get('SELECT username, profile_picture FROM users WHERE id = ?', [followerId], (e2, senderInfo) => {
+                var followNotif = {
+                  type: 'follow',
+                  content: 'started following you',
+                  related_id: followerId,
+                  created_by: followerId,
+                  username: senderInfo ? senderInfo.username : '',
+                  profile_picture: senderInfo ? senderInfo.profile_picture : ''
+                };
+                io.to(`user_${followingId}`).emit('notification:receive', followNotif);
+                io.to(`user-${followingId}`).emit('notification:received', followNotif);
+              });
+            }
 
             res.json({ success: true, status: 'following' });
           }
@@ -538,10 +568,17 @@ router.post('/follow-requests/:requestId/accept', authMiddleware, (req, res) => 
 
       const io = req.app.get('io');
       if (io) {
-        io.to(`user-${request.requester_id}`).emit('notification:received', {
-          type: 'follow_accepted',
-          content: 'accepted your follow request',
-          related_id: userId
+        db.get('SELECT username, profile_picture FROM users WHERE id = ?', [userId], (e2, senderInfo) => {
+          var acceptNotif = {
+            type: 'follow_accepted',
+            content: 'accepted your follow request',
+            related_id: userId,
+            created_by: userId,
+            username: senderInfo ? senderInfo.username : '',
+            profile_picture: senderInfo ? senderInfo.profile_picture : ''
+          };
+          io.to(`user-${request.requester_id}`).emit('notification:received', acceptNotif);
+          io.to(`user_${request.requester_id}`).emit('notification:receive', acceptNotif);
         });
       }
 

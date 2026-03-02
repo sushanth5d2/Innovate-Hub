@@ -50,9 +50,13 @@ function sendDirectMessage(req, db, senderId, receiverId, content) {
 
           try {
             io.to(`user_${receiverId}`).emit('new_message', messageData);
-            io.to(`user_${receiverId}`).emit('new_notification', {
+            io.to(`user_${receiverId}`).emit('notification:receive', {
               type: 'message',
               content: sender?.username ? `New message from ${sender.username}` : 'New message',
+              created_by: senderId,
+              sender_id: senderId,
+              username: sender?.username || '',
+              profile_picture: sender?.profile_picture || '',
               created_at: createdAtIso
             });
           } catch {

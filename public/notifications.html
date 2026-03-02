@@ -579,6 +579,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
+  <script src="/js/notification-banner.js"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -825,7 +826,7 @@
         '</div>' +
         '<div class="g-card-actions">' +
           (isCustom ? '<button class="g-card-btn" onclick="event.stopPropagation(); editReminder(' + r.id + ')" title="Edit"><i class="fas fa-pen"></i></button>' : '') +
-          (isCustom ? '<button class="g-card-btn" onclick="event.stopPropagation(); showSnoozeMenu(this, ' + r.id + ')" title="Snooze"><i class="fas fa-clock-rotate-left"></i></button>' : '') +
+          ((isCustom || r.type === 'post_reminder') ? '<button class="g-card-btn" onclick="event.stopPropagation(); showSnoozeMenu(this, ' + r.id + ')" title="Snooze"><i class="fas fa-clock-rotate-left"></i></button>' : '') +
           (isCustom ? '<button class="g-card-btn del-btn" onclick="event.stopPropagation(); deleteReminder(' + r.id + ')" title="Delete"><i class="fas fa-trash-alt"></i></button>' :
             r.type === 'post_reminder' ? '<button class="g-card-btn del-btn" onclick="event.stopPropagation(); deleteGentleReminder(' + r.id + ')" title="Delete"><i class="fas fa-trash-alt"></i></button>' : '') +
         '</div>' +

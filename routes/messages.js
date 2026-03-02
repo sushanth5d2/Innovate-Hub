@@ -202,11 +202,17 @@ router.post('/send', authMiddleware, (req, res, next) => {
           [receiver_id, notifType, `New message from ${sender.username}`, messageId, senderId]
         );
 
-        io.to(`user_${receiver_id}`).emit('new_notification', {
+        var msgNotif = {
           type: notifType,
-          content: `New message from ${sender.username}`,
+          content: messageContent || 'sent you a message',
+          created_by: senderId,
+          username: sender.username,
+          profile_picture: sender.profile_picture,
+          sender_id: senderId,
+          receiver_id: receiver_id,
           created_at: new Date().toISOString()
-        });
+        };
+        io.to(`user_${receiver_id}`).emit('notification:receive', msgNotif);
 
         res.json({ success: true, message: messageData });
       }
@@ -400,6 +406,20 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
 
       io.to(`user_${receiver_id}`).emit('new_message', messageData);
       io.to(`user_${senderId}`).emit('new_message', { ...messageData, is_own: true });
+
+      // Emit notification:receive for notification banners (with sender info)
+      db.get('SELECT username, profile_picture FROM users WHERE id = ?', [senderId], (e2, senderInfo) => {
+        io.to(`user_${receiver_id}`).emit('notification:receive', {
+          type: isMessageRequest ? 'message_request' : 'message',
+          content: content || 'sent you a message',
+          created_by: senderId,
+          username: senderInfo ? senderInfo.username : '',
+          profile_picture: senderInfo ? senderInfo.profile_picture : '',
+          sender_id: senderId,
+          receiver_id: receiver_id,
+          created_at: new Date().toISOString()
+        });
+      });
 
       res.json({
         success: true,

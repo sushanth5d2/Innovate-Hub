@@ -1371,8 +1371,8 @@ const PostModal = (function () {
 
         list.innerHTML = users.map(function (u) {
           var uname = u.username || u.name || u;
-          var avatar = u.avatar || u.profile_image || '/images/default-avatar.svg';
-          var displayName = u.display_name || u.full_name || uname;
+          var avatar = u.profile_picture || u.avatar || u.profile_image || '/images/default-avatar.svg';
+          var displayName = u.fullname || u.display_name || u.full_name || uname;
           return '<button class="cp-mention-btn" onclick="PostModal.insertMention(\'' + uname.replace(/'/g, "\\'") + '\')" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; background: none; border: none; cursor: pointer; text-align: left; color: var(--ig-primary-text); transition: background 0.15s;" onmouseover="this.style.background=\'var(--ig-hover)\'" onmouseout="this.style.background=\'none\'">'
             + '<img src="' + avatar + '" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" onerror="this.src=\'/images/default-avatar.svg\'">'
             + '<div style="flex: 1; min-width: 0;">'

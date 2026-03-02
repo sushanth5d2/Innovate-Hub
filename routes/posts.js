@@ -492,10 +492,42 @@ router.post('/', authMiddleware, (req, res, next) => {
         }
       }
 
+      const newPostId = this.lastID;
+
+      // Extract @mentions from content and send notifications
+      if (content) {
+        const mentions = content.match(/@(\w[\w.]*)/g);
+        if (mentions) {
+          const uniqueMentions = [...new Set(mentions.map(m => m.substring(1)))];
+          uniqueMentions.forEach(mentionedUsername => {
+            db.get('SELECT id FROM users WHERE username = ?', [mentionedUsername], (mErr, mentionedUser) => {
+              if (mErr || !mentionedUser || mentionedUser.id === userId) return;
+              db.get('SELECT username, profile_picture FROM users WHERE id = ?', [userId], (mErr2, sender) => {
+                db.run(
+                  'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
+                  [mentionedUser.id, 'mention', `${sender?.username || 'Someone'} mentioned you in a post`, newPostId, userId]
+                );
+                const io = req.app.get('io');
+                if (io) {
+                  io.to(`user_${mentionedUser.id}`).emit('notification:receive', {
+                    type: 'mention',
+                    content: `${sender?.username || 'Someone'} mentioned you in a post`,
+                    post_id: newPostId,
+                    created_by: userId,
+                    username: sender ? sender.username : '',
+                    profile_picture: sender ? sender.profile_picture : ''
+                  });
+                }
+              });
+            });
+          });
+        }
+      }
+
       res.json({
         success: true,
         post: {
-          id: this.lastID,
+          id: newPostId,
           content,
           images,
           files,
@@ -664,14 +696,18 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
               [post.user_id, 'like', 'liked your post', postId, userId]
             );
 
-            // Emit socket notification
+            // Emit socket notification with sender info
             const io = req.app.get('io');
             if (io) {
-              io.to(`user_${post.user_id}`).emit('notification:receive', {
-                type: 'like',
-                content: 'liked your post',
-                post_id: postId,
-                created_by: userId
+              db.get('SELECT username, profile_picture FROM users WHERE id = ?', [userId], (e2, sender) => {
+                io.to(`user_${post.user_id}`).emit('notification:receive', {
+                  type: 'like',
+                  content: 'liked your post',
+                  post_id: postId,
+                  created_by: userId,
+                  username: sender ? sender.username : '',
+                  profile_picture: sender ? sender.profile_picture : ''
+                });
               });
             }
           }
@@ -680,6 +716,46 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
         });
       });
     }
+  });
+});
+
+// Get posts where a user is tagged (@mentioned)
+router.get('/tagged/:userId', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { userId: taggedUserId } = req.params;
+  const currentUserId = req.user.userId;
+
+  // First get the username for that user
+  db.get('SELECT username FROM users WHERE id = ?', [taggedUserId], (err, user) => {
+    if (err || !user) return res.status(404).json({ error: 'User not found' });
+
+    const username = user.username;
+    db.all(`
+      SELECT p.*, u.username, u.profile_picture,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+        (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+        (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+        (SELECT COUNT(*) FROM saved_posts WHERE post_id = p.id AND user_id = ?) as is_saved
+      FROM posts p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = p.user_id)
+      LEFT JOIN blocked_users b2 ON (b2.blocker_id = p.user_id AND b2.blocked_id = ?)
+      WHERE p.is_archived = 0 AND b1.id IS NULL AND b2.id IS NULL
+        AND p.content LIKE ?
+      ORDER BY p.created_at DESC
+      LIMIT 50
+    `, [currentUserId, currentUserId, currentUserId, currentUserId, `%@${username}%`], (err2, rows) => {
+      if (err2) return res.status(500).json({ error: 'Error fetching tagged posts' });
+
+      const posts = (rows || []).map(p => {
+        try { p.images = JSON.parse(p.images || '[]'); } catch(e) { p.images = []; }
+        try { p.files = JSON.parse(p.files || '[]'); } catch(e) { p.files = []; }
+        try { p.custom_button = p.custom_button ? JSON.parse(p.custom_button) : null; } catch(e) { p.custom_button = null; }
+        return p;
+      });
+
+      res.json({ success: true, posts });
+    });
   });
 });
 
@@ -928,14 +1004,18 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
             [post.user_id, 'comment', 'commented on your post', postId, userId]
           );
 
-          // Emit socket notification
+          // Emit socket notification with sender info
           const io = req.app.get('io');
           if (io) {
-            io.to(`user_${post.user_id}`).emit('notification:receive', {
-              type: 'comment',
-              content: 'commented on your post',
-              post_id: postId,
-              created_by: userId
+            db.get('SELECT username, profile_picture FROM users WHERE id = ?', [userId], (e2, sender) => {
+              io.to(`user_${post.user_id}`).emit('notification:receive', {
+                type: 'comment',
+                content: 'commented on your post',
+                post_id: postId,
+                created_by: userId,
+                username: sender ? sender.username : '',
+                profile_picture: sender ? sender.profile_picture : ''
+              });
             });
           }
         }

@@ -266,7 +266,21 @@
       color: white;
       font-size: 48px;
       margin: 0 auto 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+    .right-avatar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    /* DP Lightbox */
+    .dp-lightbox-overlay { position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; animation: dpFadeIn 0.2s ease; }
+    .dp-lightbox-overlay img { max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); object-fit: contain; animation: dpZoomIn 0.25s cubic-bezier(0.22,1,0.36,1); }
+    .dp-lightbox-close { position: absolute; top: 20px; right: 24px; background: rgba(255,255,255,0.15); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .dp-lightbox-close:hover { background: rgba(255,255,255,0.3); }
+    @keyframes dpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes dpZoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
     .right-name {
       font-size: 18px;
@@ -2098,7 +2112,7 @@
       </button>
       
       <div class="right-header">
-        <div class="right-avatar" id="rightAvatar">
+        <div class="right-avatar" id="rightAvatar" onclick="showDPLightbox(this)">
           <i class="fas fa-users"></i>
         </div>
         <div class="right-name" id="rightName">Community Name</div>
@@ -2807,9 +2821,19 @@
       const content = document.getElementById('leftContent');
       const centerContent = document.getElementById('centerContent');
       
-      // Always show Announcements folder first
+      // Search bar for folders
       let foldersHTML = `
-        <div class="group-item" onclick="openAnnouncementsFolder()">
+        <div style="padding: 8px 12px 4px 12px; position: relative;">
+          <i class="fas fa-search" style="position: absolute; left: 22px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text); font-size: 13px;"></i>
+          <input type="text" id="folderSearchInput" placeholder="Search folders..." 
+            oninput="filterFolderItems(this.value)"
+            style="width: 100%; padding: 8px 10px 8px 32px; border-radius: 8px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 13px; outline: none; box-sizing: border-box;">
+        </div>
+      `;
+
+      // Always show Announcements folder first
+      foldersHTML += `
+        <div class="group-item folder-item" onclick="openAnnouncementsFolder()">
           <div class="group-avatar" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
             <i class="fas fa-bullhorn"></i>
           </div>
@@ -2824,7 +2848,7 @@
       // Add group folders
       if (state.groups.length > 0) {
         foldersHTML += state.groups.map(group => `
-          <div class="group-item" onclick="openGroupFolder(${group.id})">
+          <div class="group-item folder-item" onclick="openGroupFolder(${group.id})">
             <div class="group-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <i class="fas fa-folder"></i>
             </div>
@@ -4309,6 +4333,12 @@
               Group Members
             </h3>
             <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">View all members in this group</p>
+            <div style="margin-top: 12px; position: relative;">
+              <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text); font-size: 14px;"></i>
+              <input type="text" id="groupMembersSearch" placeholder="Search members..." 
+                oninput="filterGroupMembers(this.value)"
+                style="width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none; box-sizing: border-box;">
+            </div>
           </div>
           <div class="members-modal-body" id="readOnlyMembersList">
             <div style="text-align: center; padding: 40px;">
@@ -5020,7 +5050,7 @@
             
             <!-- Members Tab -->
             <div id="membersTab" class="group-settings-content" style="display: ${isAdmin ? 'none' : 'block'};">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <div style="font-size: 16px; font-weight: 600; color: var(--ig-primary-text);">
                   <i class="fas fa-users"></i> Group Members
                 </div>
@@ -5031,6 +5061,12 @@
                   Add Members
                 </button>
                 ` : ''}
+              </div>
+              <div style="position: relative; margin-bottom: 16px;">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text); font-size: 14px;"></i>
+                <input type="text" placeholder="Search members..." 
+                  oninput="filterSettingsMembers(this.value)"
+                  style="width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none; box-sizing: border-box;">
               </div>
               <div id="membersList"></div>
             </div>
@@ -10370,6 +10406,12 @@
               Community Members
             </h3>
             <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Manage your community members and roles</p>
+            <div style="margin-top: 12px; position: relative;">
+              <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ig-secondary-text); font-size: 14px;"></i>
+              <input type="text" id="communityMembersSearch" placeholder="Search members..." 
+                oninput="filterCommunityMembers(this.value)"
+                style="width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--ig-border); background: var(--ig-secondary-background); color: var(--ig-primary-text); font-size: 14px; outline: none; box-sizing: border-box;">
+            </div>
           </div>
           <div class="members-modal-body" id="membersList">
             <div style="text-align: center; padding: 40px;">
@@ -11138,6 +11180,72 @@
       if (rightSidebar) {
         rightSidebar.classList.toggle('mobile-active');
       }
+    }
+
+    // DP Lightbox — show community/group profile picture enlarged
+    function showDPLightbox(avatarEl) {
+      const img = avatarEl.querySelector('img');
+      if (!img || !img.src) return; // no image, just icon fallback
+      const overlay = document.createElement('div');
+      overlay.className = 'dp-lightbox-overlay';
+      overlay.innerHTML = `
+        <button class="dp-lightbox-close" onclick="this.parentElement.remove()">&times;</button>
+        <img src="${img.src}" alt="Profile Picture">
+      `;
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.remove();
+      });
+      document.body.appendChild(overlay);
+    }
+
+    // Search/filter members in Community Members modal
+    function filterCommunityMembers(query) {
+      const listDiv = document.getElementById('membersList');
+      if (!listDiv) return;
+      const cards = listDiv.querySelectorAll('.member-card');
+      const q = query.toLowerCase().trim();
+      cards.forEach(card => {
+        const name = card.querySelector('.member-name');
+        const text = name ? name.textContent.toLowerCase() : '';
+        card.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
+    }
+
+    // Search/filter members in Group Members modal
+    function filterGroupMembers(query) {
+      const listDiv = document.getElementById('readOnlyMembersList');
+      if (!listDiv) return;
+      const cards = listDiv.querySelectorAll('.member-card');
+      const q = query.toLowerCase().trim();
+      cards.forEach(card => {
+        const name = card.querySelector('.member-name');
+        const text = name ? name.textContent.toLowerCase() : '';
+        card.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
+    }
+
+    // Search/filter members in Group Settings members tab
+    function filterSettingsMembers(query) {
+      const listDiv = document.getElementById('membersList');
+      if (!listDiv) return;
+      const cards = listDiv.querySelectorAll('.member-card, [class*="member"]');
+      const q = query.toLowerCase().trim();
+      cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
+    }
+
+    // Search/filter folders in the Folders tab left sidebar
+    function filterFolderItems(query) {
+      const items = document.querySelectorAll('.folder-item');
+      const q = query.toLowerCase().trim();
+      items.forEach(item => {
+        const name = item.querySelector('.group-name');
+        const desc = item.querySelector('.group-desc');
+        const text = ((name ? name.textContent : '') + ' ' + (desc ? desc.textContent : '')).toLowerCase();
+        item.style.display = (!q || text.includes(q)) ? '' : 'none';
+      });
     }
 
     // Theme toggle function

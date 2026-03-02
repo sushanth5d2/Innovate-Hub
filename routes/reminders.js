@@ -565,6 +565,44 @@ router.put('/:id/notified', authMiddleware, (req, res) => {
   );
 });
 
+// ==================== SNOOZE REMINDER ====================
+
+/**
+ * PUT /api/reminders/:id/snooze
+ * Snoozes a reminder by X minutes — resets is_notified and updates the date/time.
+ * Body: { minutes: 5|15|30|60|180 }
+ */
+router.put('/:id/snooze', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { minutes } = req.body;
+
+  const snoozeMinutes = parseInt(minutes) || 5;
+  const now = new Date();
+  const snoozeTime = new Date(now.getTime() + snoozeMinutes * 60000);
+
+  const newDate = snoozeTime.toISOString().split('T')[0]; // YYYY-MM-DD
+  const newTime = snoozeTime.toTimeString().substring(0, 5); // HH:MM
+
+  db.run(
+    `UPDATE user_reminders 
+     SET is_notified = 0, is_dismissed = 0, 
+         reminder_date = ?, reminder_time = ?
+     WHERE id = ? AND user_id = ?`,
+    [newDate, newTime, id, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error snoozing reminder' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Reminder not found' });
+      }
+      res.json({ success: true, snoozed_until: `${newDate} ${newTime}` });
+    }
+  );
+});
+
 // ==================== AI PREVIEW (smart parse + conflict check) ====================
 
 /**
