@@ -5,24 +5,122 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Communities - Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
+  <link rel="stylesheet" href="/css/experiences.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <style>
-    /* Community Card Animations */
-    .community-banner {
+    :root {
+      --comm-card-radius: 18px;
+      --comm-card-bg: rgba(255, 255, 255, 0.04);
+      --comm-card-border: rgba(255, 255, 255, 0.08);
+    }
+
+    .comm-card {
+      border-radius: var(--comm-card-radius);
+      overflow: hidden;
+      border: 1px solid var(--comm-card-border);
+      background: var(--comm-card-bg);
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .comm-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.16);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .comm-card-media {
+      height: 180px;
+      position: relative;
+      overflow: hidden;
+    }
+    .comm-card-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
       transition: transform 0.3s ease;
     }
-    
-    .ig-post:hover .community-banner {
+    .comm-card:hover .comm-card-media img {
       transform: scale(1.05);
     }
-    
+    .comm-card-media .comm-no-banner {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 56px;
+      opacity: 0.4;
+    }
+    .comm-card-chip {
+      position: absolute;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.12);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .comm-card-body {
+      padding: 14px 14px 16px;
+    }
+    .comm-card-title {
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      font-size: 15px;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--ig-primary-text);
+    }
+    .comm-card-meta {
+      color: var(--ig-secondary-text);
+      font-size: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .comm-card-desc {
+      color: var(--ig-secondary-text);
+      font-size: 12px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .comm-card-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .comm-card-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+    }
+
     /* Loading animation */
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-    
     .loading {
       animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
@@ -30,67 +128,43 @@
 </head>
 <body>
   <!-- Top Navigation -->
-  <nav class="ig-top-nav">
-    <div class="ig-nav-container">
-      <a href="/home" class="ig-logo">Innovate</a>
-      
-      <div class="ig-search-box">
-        <input type="text" class="ig-search-input" placeholder="Search communities..." id="search-input" oninput="searchCommunities()">
+  <header class="exp-topbar">
+    <div class="exp-topbar-inner">
+      <a class="exp-brand" href="/home">Innovate</a>
+
+      <div class="exp-search exp-search-desktop" title="Search">
+        <span style="opacity:0.7;">🔎</span>
+        <input id="search-input" type="text" placeholder="Search communities..." oninput="searchCommunities()" />
       </div>
-      
-      <div class="ig-nav-icons">
-        <div class="ig-nav-icon" onclick="window.location.href='/home'">
-          <svg aria-label="Home" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
-          </svg>
-        </div>
-        
-        <div class="ig-nav-icon" onclick="openCreateModal()">
-          <svg aria-label="New community" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M2 12v3.45c0 2.849.698 4.005 1.606 4.944.94.909 2.098 1.608 4.946 1.608h6.896c2.848 0 4.006-.7 4.946-1.608C21.302 19.455 22 18.3 22 15.45V8.552c0-2.849-.698-4.006-1.606-4.945C19.454 2.7 18.296 2 15.448 2H8.552c-2.848 0-4.006.699-4.946 1.607C2.698 4.547 2 5.703 2 8.552Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
-            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="6.545" x2="17.455" y1="12.001" y2="12.001"></line>
-            <line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="12.003" x2="12.003" y1="6.545" y2="17.455"></line>
-          </svg>
-        </div>
-        
-        <div class="ig-nav-icon" onclick="window.location.href='/notifications'">
-          <svg aria-label="Notifications" fill="currentColor" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M16.792 3.904A4.989 4.989 0 0 1 21.5 9.122c0 3.072-2.652 4.959-5.197 7.222-2.512 2.243-3.865 3.469-4.303 3.752-.477-.309-2.143-1.823-4.303-3.752C5.141 14.072 2.5 12.167 2.5 9.122a4.989 4.989 0 0 1 4.708-5.218 4.21 4.21 0 0 1 3.675 1.941c.84 1.175.98 1.763 1.12 1.763s.278-.588 1.11-1.766a4.17 4.17 0 0 1 3.679-1.938m0-2a6.04 6.04 0 0 0-4.797 2.127 6.052 6.052 0 0 0-4.787-2.127A6.985 6.985 0 0 0 .5 9.122c0 3.61 2.55 5.827 5.015 7.97.283.246.569.494.853.747l1.027.918a44.998 44.998 0 0 0 3.518 3.018 2 2 0 0 0 2.174 0 45.263 45.263 0 0 0 3.626-3.115l.922-.824c.293-.26.59-.519.885-.774 2.334-2.025 4.98-4.32 4.98-7.94a6.985 6.985 0 0 0-6.708-7.218Z"></path>
-          </svg>
-        </div>
-        
-        <div class="ig-nav-icon" onclick="window.location.href='/profile'">
-          <img id="navProfilePic" src="/images/default-avatar.svg" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+
+      <div class="exp-actions">
+        <button class="exp-icon-btn exp-search-mobile-btn" id="mobileSearchBtn" type="button" title="Search" style="display: none;">🔎</button>
+        <button class="exp-icon-btn" type="button" title="Create community" onclick="openCreateModal()">＋</button>
+        <a class="exp-icon-btn" href="/notifications" title="Notifications" style="text-decoration:none;">🔔</a>
+      </div>
+
+      <!-- Mobile search overlay -->
+      <div class="exp-search-mobile-overlay" id="mobileSearchOverlay" style="display: none;">
+        <div class="exp-search-mobile-container">
+          <button class="exp-icon-btn" id="closeMobileSearch" type="button">←</button>
+          <input id="searchInputMobile" type="text" placeholder="Search communities..." oninput="handleMobileSearch()" style="flex: 1; border: none; background: transparent; color: var(--ig-primary-text); font-size: 15px; outline: none;" />
         </div>
       </div>
     </div>
-  </nav>
+  </header>
 
   <!-- Main Content -->
-  <main class="ig-main" style="max-width: 1200px; padding: 24px 20px;">
-    <div style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-      <div>
-        <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Communities</h1>
-        <p style="margin: 0; color: var(--ig-secondary-text); font-size: 15px;">Discover and join communities that match your interests</p>
-      </div>
-      <button onclick="openCreateModal()" style="padding: 12px 24px; background: linear-gradient(135deg, var(--ig-blue), #0081e6); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 149, 246, 0.3); transition: all 0.2s; display: flex; align-items: center; gap: 8px; font-size: 15px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0, 149, 246, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 149, 246, 0.3)'">
-        <i class="fas fa-plus-circle"></i> Create Community
-      </button>
-    </div>
-    
-    <!-- Tabs -->
-    <div style="margin-bottom: 24px; border-bottom: 1px solid var(--ig-border);">
-      <div style="display: flex; gap: 32px;">
-        <button id="tab-all" onclick="switchTab('all')" style="background: none; border: none; padding: 12px 0; font-size: 15px; font-weight: 600; color: var(--ig-primary-text); cursor: pointer; position: relative; transition: color 0.2s; border-bottom: 2px solid var(--ig-blue);">
-          All Communities
-        </button>
-        <button id="tab-joined" onclick="switchTab('joined')" style="background: none; border: none; padding: 12px 0; font-size: 15px; font-weight: 600; color: var(--ig-secondary-text); cursor: pointer; position: relative; transition: color 0.2s; border-bottom: 2px solid transparent;">
-          Joined
-        </button>
+  <main class="exp-main exp-page">
+    <div>
+      <div class="exp-title">Communities</div>
+      <div class="exp-subtitle">Discover and join communities that match your interests</div>
+      <div class="exp-tabs" role="tablist">
+        <button class="exp-tab active" id="tab-all" data-comm-tab="all" onclick="switchTab('all')" type="button">All Communities</button>
+        <button class="exp-tab" id="tab-joined" data-comm-tab="joined" onclick="switchTab('joined')" type="button">Joined</button>
       </div>
     </div>
-    
-    <div id="communities-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;">
+
+    <div id="communities-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px; margin-top: 18px;">
       <!-- Communities will be loaded here -->
     </div>
   </main>
@@ -237,7 +311,8 @@
     </a>
   </nav>
 
-  <script src=\"/socket.io/socket.io.js\"></script>\n  <script src=\"/js/app.js\"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
   <script>
     function navigateToProfile(e) {
       e.preventDefault();
@@ -256,21 +331,10 @@
     function switchTab(tab) {
       currentTab = tab;
       
-      // Update tab styles
-      const tabAll = document.getElementById('tab-all');
-      const tabJoined = document.getElementById('tab-joined');
-      
-      if (tab === 'all') {
-        tabAll.style.color = 'var(--ig-primary-text)';
-        tabAll.style.borderBottom = '2px solid var(--ig-blue)';
-        tabJoined.style.color = 'var(--ig-secondary-text)';
-        tabJoined.style.borderBottom = '2px solid transparent';
-      } else {
-        tabJoined.style.color = 'var(--ig-primary-text)';
-        tabJoined.style.borderBottom = '2px solid var(--ig-blue)';
-        tabAll.style.color = 'var(--ig-secondary-text)';
-        tabAll.style.borderBottom = '2px solid transparent';
-      }
+      // Update tab styles - use exp-tab active class toggling
+      document.querySelectorAll('.exp-tab[data-comm-tab]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.commTab === tab);
+      });
       
       // Reload communities with filter
       loadCommunities();
@@ -278,6 +342,34 @@
   </script>
 
   <script src="/js/instagram-theme.js"></script>
+  <script>
+    // Mobile search toggle
+    (function() {
+      const mobileBtn = document.getElementById('mobileSearchBtn');
+      const overlay = document.getElementById('mobileSearchOverlay');
+      const closeBtn = document.getElementById('closeMobileSearch');
+      const mobileInput = document.getElementById('searchInputMobile');
+      if (mobileBtn && overlay && closeBtn && mobileInput) {
+        mobileBtn.addEventListener('click', () => {
+          overlay.style.display = 'block';
+          mobileInput.focus();
+        });
+        closeBtn.addEventListener('click', () => {
+          overlay.style.display = 'none';
+          mobileInput.value = '';
+          // Reset search
+          document.getElementById('search-input').value = '';
+          searchCommunities();
+        });
+      }
+    })();
+
+    function handleMobileSearch() {
+      const val = document.getElementById('searchInputMobile').value;
+      document.getElementById('search-input').value = val;
+      searchCommunities();
+    }
+  </script>
   <script>
     const socket = io();
 
@@ -355,83 +447,80 @@
 
       communities.forEach(community => {
         const card = document.createElement('div');
-        card.className = 'ig-post';
-        card.style.cursor = 'pointer';
-        card.style.transition = 'all 0.3s ease';
-        card.style.overflow = 'hidden';
-        card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-        
-        // Add hover effect
-        card.onmouseenter = () => {
-          card.style.transform = 'translateY(-4px)';
-          card.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
-        };
-        card.onmouseleave = () => {
-          card.style.transform = 'translateY(0)';
-          card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-        };
+        card.className = 'comm-card';
         
         // Determine button text and action based on community privacy, membership, and request status
         let buttonText = 'Join';
         let buttonAction = `toggleJoin(${community.id}, this, event, ${community.is_public})`;
-        let buttonStyle = 'background: linear-gradient(135deg, var(--ig-blue), #0081e6); color: white; border: none; box-shadow: 0 2px 8px rgba(0, 149, 246, 0.3);';
+        let buttonStyle = 'background: linear-gradient(135deg, var(--ig-blue), #0081e6); color: white; border: none;';
         let buttonDisabled = '';
         
         if (community.is_member) {
-          buttonText = '<i class="fas fa-check-circle"></i> Joined';
-          buttonStyle = 'background: transparent; color: var(--ig-primary-text); border: 2px solid var(--ig-border);';
+          buttonText = '✓ Joined';
+          buttonStyle = 'background: transparent; color: var(--ig-primary-text); border: 1.5px solid var(--comm-card-border);';
         } else if (community.join_request_status === 'pending') {
-          buttonText = '<i class="fas fa-clock"></i> Pending';
-          buttonStyle = 'background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; cursor: not-allowed; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);';
+          buttonText = '⏳ Pending';
+          buttonStyle = 'background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); cursor: not-allowed;';
           buttonDisabled = 'disabled';
         } else if (!community.is_public) {
-          buttonText = '<i class="fas fa-lock"></i> Request to Join';
-          buttonStyle = 'background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);';
+          buttonText = '🔒 Request to Join';
+          buttonStyle = 'background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3);';
         }
+
+        // Chips
+        const chips = [];
+        if (!community.is_public) {
+          chips.push('<div class="comm-card-chip" style="top:10px;right:10px;background:rgba(0,0,0,0.6);color:#fff;">🔒 Private</div>');
+        }
+        if (community.is_member && currentTab === 'all') {
+          chips.push('<div class="comm-card-chip" style="top:10px;left:10px;background:rgba(16,185,129,0.8);color:#fff;">✓ Member</div>');
+        }
+
+        // Random gradient for no-banner
+        const gradColors = ['#833AB4','#FD1D1D','#F77737','#4F5BD5','#962FBF','#F09433','#0095f6','#10b981'];
+        const g1 = gradColors[Math.floor(Math.random()*gradColors.length)];
+        const g2 = gradColors[Math.floor(Math.random()*gradColors.length)];
+        
+        const mediaContent = community.banner_image 
+          ? `<img src="${community.banner_image}" alt="${(community.name || '').replace(/"/g, '&quot;')}" loading="lazy" onerror="this.onerror=null; this.remove();" />`
+          : `<div class="comm-no-banner" style="background: linear-gradient(135deg, ${g1}, ${g2});">👥</div>`;
+
+        const memberCount = community.member_count || 0;
+        const teamChip = community.team_name ? `<span>•</span><span>🏆 ${community.team_name}</span>` : '';
+        const privacyChip = community.is_public ? 'Public' : 'Private';
         
         card.innerHTML = `
-          <div style="padding: 0; overflow: hidden;">
-            <div style="height: 180px; background: linear-gradient(135deg, ${getRandomColor()}, ${getRandomColor()}); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-              ${community.banner_image ? `<img src="${community.banner_image}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease;" class="community-banner">` : `<div style="font-size: 64px; opacity: 0.5; color: rgba(0,0,0,0.6); text-shadow: 0 2px 4px rgba(255,255,255,0.3);">👥</div>`}
-              ${!community.is_public ? '<div style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); color: white; padding: 8px 14px; border-radius: 24px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><i class="fas fa-lock"></i> Private</div>' : ''}
-              ${community.is_member && currentTab === 'all' ? '<div style="position: absolute; top: 12px; left: 12px; background: linear-gradient(135deg, #10b981, #059669); backdrop-filter: blur(10px); color: white; padding: 8px 14px; border-radius: 24px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);"><i class="fas fa-check-circle"></i> Joined</div>' : ''}
-              <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.4), transparent);">
-                <h3 style="margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.3; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.8);">${community.name}</h3>
-                ${community.team_name ? `<div style="color: rgba(255,255,255,0.9); font-size: 13px; margin-top: 4px; display: flex; align-items: center; gap: 6px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.6);"><i class="fas fa-trophy"></i> ${community.team_name}</div>` : ''}
-              </div>
+          <div class="comm-card-media">
+            ${!community.banner_image ? `<div class="comm-no-banner" style="background: linear-gradient(135deg, ${g1}, ${g2});">👥</div>` : `<img src="${community.banner_image}" alt="${(community.name || '').replace(/"/g, '&quot;')}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=comm-no-banner style=background:linear-gradient(135deg,${g1},${g2})>👥</div>';" />`}
+            ${chips.join('')}
+          </div>
+          <div class="comm-card-body">
+            <div class="comm-card-title">${community.name}</div>
+            <div class="comm-card-meta">
+              <span>👥 ${memberCount} members</span>
+              <span>•</span>
+              <span>${privacyChip}</span>
+              ${teamChip}
             </div>
-            <div style="padding: 20px; background: var(--ig-primary-background);">
-              <div style="display: flex; gap: 16px; margin-bottom: 14px; font-size: 13px; color: var(--ig-secondary-text);">
-                <span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-users"></i> <strong style="color: var(--ig-primary-text);">${community.member_count || 0}</strong> members</span>
-                ${community.is_public ? '<span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-globe"></i> Public</span>' : '<span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-lock"></i> Private</span>'}
-              </div>
-              ${community.description ? `<p style="color: var(--ig-secondary-text); font-size: 14px; margin: 0 0 18px 0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${community.description}</p>` : '<div style="margin-bottom: 18px;"></div>'}
-              <button class="ig-action-btn ${community.is_member ? 'joined' : ''}" onclick="${buttonAction}" style="width: 100%; padding: 12px; ${buttonStyle} border-radius: 10px; font-weight: 600; font-size: 14px; transition: all 0.2s;" ${buttonDisabled} onmouseover="if(!this.disabled) this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';">
-                ${buttonText}
-              </button>
-            </div>
+            ${community.description ? `<div class="comm-card-desc">${community.description}</div>` : ''}
+            <button class="comm-card-btn" onclick="${buttonAction}" style="${buttonStyle}" ${buttonDisabled}>
+              ${buttonText}
+            </button>
           </div>
         `;
         
         card.onclick = (e) => {
-          if (!e.target.classList.contains('ig-action-btn')) {
-            // Check if it's a private community and user is not a member
-            if (!community.is_public && !community.is_member && community.join_request_status !== 'pending') {
-              // Show message to request access instead of navigating
-              InnovateAPI.showAlert('This is a private community. Click "Request to Join" button to send a join request.', 'info');
-              return;
-            }
-            
-            // If pending request, show message
-            if (!community.is_member && community.join_request_status === 'pending') {
-              InnovateAPI.showAlert('Your join request is pending approval from the community admin.', 'info');
-              return;
-            }
-            
-            // Only navigate if user is a member or community is public
-            if (community.is_member || community.is_public) {
-              window.location.href = `/community/${community.id}`;
-            }
+          if (e.target.closest('.comm-card-btn')) return;
+          if (!community.is_public && !community.is_member && community.join_request_status !== 'pending') {
+            InnovateAPI.showAlert('This is a private community. Click "Request to Join" button to send a join request.', 'info');
+            return;
+          }
+          if (!community.is_member && community.join_request_status === 'pending') {
+            InnovateAPI.showAlert('Your join request is pending approval from the community admin.', 'info');
+            return;
+          }
+          if (community.is_member || community.is_public) {
+            window.location.href = '/community/' + community.id;
           }
         };
         
