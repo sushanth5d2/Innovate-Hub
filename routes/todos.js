@@ -39,7 +39,7 @@ router.post('/', authMiddleware, (req, res) => {
 
   const query = `
     INSERT INTO todos (user_id, title, items, tags, priority, due_date, completed)
-    VALUES (?, ?, ?, ?, ?, ?, 0)
+    VALUES (?, ?, ?, ?, ?, ?, FALSE)
   `;
 
   db.run(
@@ -102,7 +102,7 @@ router.post('/from-image', authMiddleware, upload.single('image'), async (req, r
 
     const query = `
       INSERT INTO todos (user_id, title, items, tags, priority, due_date, completed, image_source)
-      VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+      VALUES (?, ?, ?, ?, ?, ?, FALSE, ?)
     `;
 
     db.run(

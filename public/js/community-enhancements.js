@@ -631,24 +631,26 @@ async function deleteMessage(postId) {
       throw new Error(response?.error || 'Failed to delete message');
     }
     
-    // Update message in UI
+    // Remove message from DOM immediately
     const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
     if (messageEl) {
-      const contentEl = messageEl.querySelector('.message-content');
-      if (contentEl) {
-        contentEl.textContent = '[Message deleted]';
-        contentEl.style.fontStyle = 'italic';
-        contentEl.style.color = 'var(--ig-secondary-text)';
-      }
-      
-      // Remove actions
-      const actionsEl = messageEl.querySelector('.message-actions');
-      if (actionsEl) {
-        actionsEl.remove();
-      }
+      messageEl.style.transition = 'opacity 0.3s, max-height 0.3s';
+      messageEl.style.opacity = '0';
+      messageEl.style.maxHeight = '0';
+      messageEl.style.overflow = 'hidden';
+      setTimeout(() => messageEl.remove(), 300);
     }
     
+    // Close any open context menus or modals
+    document.querySelector('.ig-modal-overlay')?.remove();
+    document.querySelector('.context-menu')?.remove();
+    
     InnovateAPI.showAlert('Message deleted', 'success');
+    
+    // Reload chat view to ensure consistency
+    if (window.loadChatView) {
+      setTimeout(() => window.loadChatView(state.currentGroupId), 400);
+    }
   } catch (error) {
     console.error('Error deleting message:', error);
     InnovateAPI.showAlert('Failed to delete message', 'error');

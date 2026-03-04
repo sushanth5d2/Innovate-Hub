@@ -3,7 +3,7 @@
   "appName": "Innovate Hub",
   "webDir": "public",
   "server": {
-    "url": "http://localhost:3000",
+    "url": "https://automatic-acorn-x577qr6p6xjq2pj57-3000.app.github.dev",
     "cleartext": true,
     "androidScheme": "https"
   },

@@ -15,7 +15,7 @@ function requireEventCreator(db, eventId, userId) {
     db.get('SELECT id, creator_id FROM events WHERE id = ?', [eventId], (err, row) => {
       if (err) return reject(err);
       if (!row) return resolve({ ok: false, reason: 'not_found' });
-      if (row.creator_id !== userId) return resolve({ ok: false, reason: 'forbidden' });
+      if (row.creator_id != userId) return resolve({ ok: false, reason: 'forbidden' });
       return resolve({ ok: true });
     });
   });
@@ -377,7 +377,7 @@ router.post('/:eventId/crosspath/enable', authMiddleware, async (req, res) => {
     // Insert or update location
     db.run(
       `INSERT INTO crosspath_locations (user_id, event_id, latitude, longitude, is_active, last_updated)
-       VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+       VALUES (?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP)
        ON CONFLICT(user_id, event_id) 
        DO UPDATE SET latitude = ?, longitude = ?, is_active = 1, last_updated = CURRENT_TIMESTAMP`,
       [userId, eventId, latitude, longitude, latitude, longitude],
@@ -544,7 +544,7 @@ function checkProximityAndNotify(req, db, userId, eventId, latitude, longitude) 
               // Create new match
               db.run(
                 `INSERT INTO crosspath_matches (event_id, user1_id, user2_id, distance_meters, notification_sent)
-                 VALUES (?, ?, ?, ?, 0)`,
+                 VALUES (?, ?, ?, ?, FALSE)`,
                 [eventId, userId, other.user_id, Math.round(distance)],
                 function(err) {
                   if (!err) {
@@ -940,7 +940,7 @@ router.post('/:eventId/rsvp', authMiddleware, (req, res) => {
             ? `accepted your event invite for "${event.title}"`
             : `declined your event invite for "${event.title}"`;
 
-          if (event.creator_id && event.creator_id !== userId) {
+          if (event.creator_id && event.creator_id != userId) {
             db.run(
               'INSERT INTO notifications (user_id, type, content, related_id) VALUES (?, ?, ?, ?)',
               [event.creator_id, 'event_rsvp', notificationContent, eventId]

@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
             (SELECT COUNT(*) FROM group_messages WHERE group_id = g.id AND is_read = 0 AND sender_id != ?) as unread_count
      FROM group_conversations g
      INNER JOIN group_members m ON (m.group_id = g.id AND m.user_id = ?)
-     ORDER BY COALESCE(last_message_time, g.created_at) DESC`,
+     ORDER BY COALESCE((SELECT created_at FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), g.created_at) DESC`,
     [userId, userId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch groups' });
@@ -613,7 +613,7 @@ router.delete('/:groupId', (req, res) => {
       [groupId, userId],
       (roleErr, member) => {
         if (roleErr) return res.status(500).json({ error: 'Failed to authorize' });
-        const isCreator = group.creator_id === userId;
+        const isCreator = group.creator_id == userId;
         const isAdmin = !!member && member.role === 'admin';
         if (!isCreator && !isAdmin) {
           return res.status(403).json({ error: 'Only the creator or an admin can delete this group' });

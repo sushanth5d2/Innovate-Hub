@@ -228,7 +228,7 @@ router.put('/donations/:id', authMiddleware, upload.fields([
       return res.status(404).json({ error: 'Donation not found' });
     }
 
-    if (donation.user_id !== userId) {
+    if (donation.user_id != userId) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -270,7 +270,7 @@ router.delete('/donations/:id', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Donation not found' });
     }
 
-    if (donation.user_id !== userId) {
+    if (donation.user_id != userId) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -295,7 +295,7 @@ router.post('/donations/:id/pickup', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Donation not found' });
     }
 
-    if (donation.user_id === userId) {
+    if (donation.user_id == userId) {
       return res.status(400).json({ error: 'You cannot pick up your own donation' });
     }
 

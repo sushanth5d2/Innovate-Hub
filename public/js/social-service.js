@@ -1540,8 +1540,8 @@ async function loadMapSettings() {
     const response = await InnovateAPI.apiRequest('/social-service/map-settings');
     if (response.success && response.settings) {
       mapSettings = {
-        showOnMap: response.settings.show_on_map === 1,
-        proximityNotifications: response.settings.proximity_notifications === 1,
+        showOnMap: response.settings.show_on_map == 1 || response.settings.show_on_map === true,
+        proximityNotifications: response.settings.proximity_notifications == 1 || response.settings.proximity_notifications === true,
         proximityDistance: response.settings.proximity_distance || 500
       };
       

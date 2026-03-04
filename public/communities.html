@@ -996,7 +996,7 @@
           if (response.ok) {
             const data = await response.json();
             const profilePic = document.getElementById('navProfilePic');
-            if (data.user && data.user.profile_picture) {
+            if (profilePic && data.user && data.user.profile_picture) {
               profilePic.src = data.user.profile_picture;
             }
           }

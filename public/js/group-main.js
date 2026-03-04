@@ -163,7 +163,7 @@ async function loadGroupData() {
     // Update group type with privacy badge
     const sidebarType = document.getElementById('sidebar-group-type');
     if (sidebarType) {
-      if (group.is_public === 0) {
+      if (group.is_public == 0 || group.is_public === false) {
         sidebarType.textContent = '🔒 Private Group';
       } else {
         sidebarType.textContent = '🌐 Public Group';

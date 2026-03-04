@@ -1,10 +1,13 @@
-require('dotenv').config();
+// Load environment from single .env file
+// Switch NODE_ENV in .env between 'development' and 'production'
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const path = require('path');
 const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -27,20 +30,35 @@ const io = socketIo(server, {
 // Make io accessible to routes
 app.set('io', io);
 
-// Trust proxy (required for rate limiting in development containers)
-app.set('trust proxy', 1);
+const isProd = process.env.NODE_ENV === 'production';
 
-// Security middleware
+// Trust proxy (needed behind nginx/load balancer in production, and in dev containers)
+app.set('trust proxy', isProd ? 1 : 1);
+
+// Security middleware - stricter in production
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable for now to allow inline scripts
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy: isProd ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.socket.io", "https://cdnjs.cloudflare.com", "https://cdn.quilljs.com", "https://unpkg.com"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://cdn.quilljs.com", "https://unpkg.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "wss:", "ws:", "https:", process.env.PYTHON_ML_SERVICE_URL || 'http://localhost:5000'].filter(Boolean),
+      mediaSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"]
+    }
+  } : false,
+  crossOriginEmbedderPolicy: false,
+  hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false
 }));
 
-// Rate limiting (relaxed in development)
-const isProd = (process.env.NODE_ENV === 'production');
+// Rate limiting (relaxed in development, strict in production)
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)),
-  max: parseInt(process.env.RATE_LIMIT_MAX || (isProd ? 100 : 1000)),
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || 1000),
+  max: parseInt(process.env.RATE_LIMIT_MAX || (isProd ? 1000 : 10000)),
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many requests from this IP, please try again later.',
@@ -50,8 +68,8 @@ const limiter = rateLimit({
 });
 
 const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)),
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || (isProd ? 5 : 20)),
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 1000),
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || (isProd ? 30 : 100)),
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many login attempts, please try again later.',
@@ -70,13 +88,21 @@ app.use(compression());
 // Performance monitoring
 app.use(responseTimeLogger);
 
-// Middleware
+// CORS - environment-aware
+const corsOrigins = process.env.ALLOWED_ORIGINS || '*';
 app.use(cors({
-  origin: '*',
-  credentials: true
+  origin: isProd
+    ? corsOrigins.split(',').map(o => o.trim())
+    : '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+// Body parsing - smaller limits in production to prevent abuse
+const bodyLimit = isProd ? '10mb' : '100mb';
+app.use(express.json({ limit: bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 app.use(cookieParser());
 
 // Serve static files

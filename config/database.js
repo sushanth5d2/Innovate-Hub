@@ -1,10 +1,340 @@
 const sqlite3 = require('sqlite3').verbose();
-const { Pool } = require('pg');
+const pg = require('pg');
+const { Pool } = pg;
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+// Make PostgreSQL return BIGINT/BIGSERIAL (OID 20) as JavaScript numbers
+// instead of strings. This avoids === comparison failures throughout the app.
+pg.types.setTypeParser(20, (val) => parseInt(val, 10));
+
 let db;
+
+// ============================================================
+// PostgreSQL compatibility wrapper
+// Provides SQLite-style db.get(), db.run(), db.all(), db.serialize()
+// so all existing route code works unchanged with PostgreSQL.
+// ============================================================
+function createPgWrapper(pool) {
+  const wrapper = {
+    _pool: pool,
+
+    // Convert ? placeholders to $1, $2, ... for PostgreSQL
+    // Also translate SQLite-specific SQL to PostgreSQL equivalents
+    _convertQuery(sql) {
+      let idx = 0;
+      let pgSql = sql.replace(/\?/g, () => `$${++idx}`);
+      
+      // SQLite -> PostgreSQL SQL translations
+
+      // Helper: extract balanced parentheses content for datetime(...)
+      function extractDatetimeCall(str, startIdx) {
+        // startIdx points to the '(' after 'datetime'
+        let depth = 1;
+        let i = startIdx + 1;
+        while (i < str.length && depth > 0) {
+          if (str[i] === '(') depth++;
+          else if (str[i] === ')') depth--;
+          i++;
+        }
+        return depth === 0 ? str.substring(startIdx + 1, i - 1) : null;
+      }
+
+      function convertDatetimeInner(inner) {
+        inner = inner.trim();
+        // datetime('now') -> NOW()
+        if (/^'now'$/i.test(inner)) return 'NOW()';
+
+        // datetime('now', modifier, ...) with static modifiers like '-1 day', '+5 hours', '+30 minutes'
+        if (/^'now'\s*,/i.test(inner)) {
+          const modPart = inner.replace(/^'now'\s*,\s*/i, '');
+
+          // Dynamic: '+' || $N || ' seconds'  ->  ($N * INTERVAL '1 second')
+          const dynMatch = modPart.match(/'\+'\s*\|\|\s*(\$\d+)\s*\|\|\s*'(\s*\w+)'/);
+          if (dynMatch) {
+            return `NOW() + (${dynMatch[1]} * INTERVAL '1${dynMatch[2]}')`;
+          }
+
+          // Static modifiers: extract all quoted strings like '-1 day', '+30 minutes'
+          const mods = modPart.match(/'([^']+)'/g);
+          if (mods) {
+            const parts = mods.map(m => {
+              const val = m.replace(/'/g, '').trim();
+              if (val.startsWith('-')) return `- INTERVAL '${val.slice(1).trim()}'`;
+              if (val.startsWith('+')) return `+ INTERVAL '${val.slice(1).trim()}'`;
+              return `+ INTERVAL '${val}'`;
+            });
+            return 'NOW() ' + parts.join(' ');
+          }
+        }
+
+        // datetime(column_expr) -> (column_expr)::timestamptz
+        return `(${inner})::timestamptz`;
+      }
+
+      // Replace all datetime(...) calls handling nested parentheses
+      const dtRe = /\bdatetime\s*\(/gi;
+      let dtMatch;
+      while ((dtMatch = dtRe.exec(pgSql)) !== null) {
+        const openIdx = dtMatch.index + dtMatch[0].length - 1; // index of '('
+        const inner = extractDatetimeCall(pgSql, openIdx);
+        if (inner !== null) {
+          const fullMatch = pgSql.substring(dtMatch.index, openIdx + inner.length + 2);
+          const replacement = convertDatetimeInner(inner);
+          pgSql = pgSql.substring(0, dtMatch.index) + replacement + pgSql.substring(dtMatch.index + fullMatch.length);
+          dtRe.lastIndex = dtMatch.index + replacement.length;
+        }
+      }
+
+      pgSql = pgSql
+        // SQLite RANDOM() returns big int; (ABS(RANDOM()) % N) / N.0 -> RANDOM() (PG returns 0-1 float)
+        .replace(/\(ABS\(RANDOM\(\)\)\s*%\s*\d+\)\s*\/\s*[\d.]+/gi, 'RANDOM()')
+        // INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL PRIMARY KEY (for inline CREATE TABLE)
+        .replace(/\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b/gi, 'SERIAL PRIMARY KEY')
+        // Remaining AUTOINCREMENT -> (not needed, SERIAL/BIGSERIAL handles it)
+        .replace(/AUTOINCREMENT/gi, '')
+        // INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
+        .replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO')
+        // INSERT OR REPLACE -> INSERT ... ON CONFLICT DO UPDATE (handled below after VALUES)
+        .replace(/INSERT\s+OR\s+REPLACE\s+INTO/gi, 'INSERT INTO')
+        // Boolean comparisons: column = 0 -> column = FALSE, column = 1 -> column = TRUE
+        // Match known boolean columns used in this project
+        .replace(/\b(is_archived|is_story|is_private|is_online|is_public_post|is_public|is_pinned|is_read|pinned|completed|is_anonymous|is_admin|is_approved|is_active|is_featured|e2e_enabled|is_dismissed|is_notified|is_recurring|is_deleted|is_deleted_by_sender|is_deleted_by_receiver|is_edited|is_message_request|notification_sent|is_muted|is_hidden|is_verified|is_blocked|show_on_map|proximity_notifications|is_locked|is_sent|enable_contact|enable_interested|is_creator_series)\s*=\s*0\b/gi, '$1 = FALSE')
+        .replace(/\b(is_archived|is_story|is_private|is_online|is_public_post|is_public|is_pinned|is_read|pinned|completed|is_anonymous|is_admin|is_approved|is_active|is_featured|e2e_enabled|is_dismissed|is_notified|is_recurring|is_deleted|is_deleted_by_sender|is_deleted_by_receiver|is_edited|is_message_request|notification_sent|is_muted|is_hidden|is_verified|is_blocked|show_on_map|proximity_notifications|is_locked|is_sent|enable_contact|enable_interested|is_creator_series)\s*=\s*1\b/gi, '$1 = TRUE')
+        // BOOLEAN DEFAULT 0 -> BOOLEAN DEFAULT FALSE
+        .replace(/BOOLEAN\s+DEFAULT\s+0/gi, 'BOOLEAN DEFAULT FALSE')
+        .replace(/BOOLEAN\s+DEFAULT\s+1/gi, 'BOOLEAN DEFAULT TRUE')
+        // DATETIME type -> TIMESTAMP (PG doesn't have DATETIME type)
+        .replace(/\bDATETIME\b(?!\s*\()/gi, 'TIMESTAMP')
+        // ADD COLUMN -> ADD COLUMN IF NOT EXISTS (PG errors on duplicate columns)
+        .replace(/ADD\s+COLUMN\s+(?!IF\s+NOT\s+EXISTS)/gi, 'ADD COLUMN IF NOT EXISTS ');
+
+      // Handle INSERT OR IGNORE: add ON CONFLICT DO NOTHING (if no ON CONFLICT already)
+      if (/INSERT\s+INTO\b/i.test(pgSql) && !/ON\s+CONFLICT/i.test(pgSql)) {
+        // Check if the original SQL had INSERT OR IGNORE
+        if (/INSERT\s+OR\s+IGNORE/i.test(sql)) {
+          pgSql = pgSql.replace(/(VALUES\s*\([^)]*\))/i, '$1 ON CONFLICT DO NOTHING');
+        }
+        // Check if the original SQL had INSERT OR REPLACE
+        if (/INSERT\s+OR\s+REPLACE/i.test(sql)) {
+          // Table-specific conflict resolution (PG requires explicit conflict target for DO UPDATE)
+          const tableMatch = pgSql.match(/INSERT\s+INTO\s+(\S+)/i);
+          const tableName = tableMatch ? tableMatch[1].toLowerCase() : '';
+          
+          // Map tables to their unique constraint columns and columns to update
+          const replaceMap = {
+            'group_poll_votes': { conflict: '(poll_id, user_id)', update: ['option_index'] },
+            'community_group_join_requests': { conflict: '(group_id, user_id)', update: ['status'] },
+            // These tables have all inserted columns as the unique key – nothing to update
+            'group_message_reactions': null,
+            'announcement_reactions': null,
+            'post_actions': null,
+          };
+          
+          const mapping = replaceMap[tableName];
+          if (mapping === null) {
+            // All columns are the unique key – treat as INSERT OR IGNORE
+            pgSql = pgSql.replace(/(VALUES\s*\([^)]*\))/i, '$1 ON CONFLICT DO NOTHING');
+          } else if (mapping) {
+            const setCols = mapping.update.map(c => `${c} = EXCLUDED.${c}`).join(', ');
+            pgSql = pgSql.replace(/(VALUES\s*\([^)]*\))/i, `$1 ON CONFLICT ${mapping.conflict} DO UPDATE SET ${setCols}`);
+          } else {
+            // Unknown table – fallback to DO NOTHING (safer than crashing)
+            pgSql = pgSql.replace(/(VALUES\s*\([^)]*\))/i, '$1 ON CONFLICT DO NOTHING');
+          }
+        }
+      }
+      
+      return pgSql;
+    },
+
+    // Known boolean column names for parameter conversion
+    _boolCols: new Set([
+      'is_archived','is_story','is_private','is_online','is_public_post','is_public',
+      'is_pinned','is_read','pinned','completed','is_anonymous','is_admin','is_approved',
+      'is_active','is_featured','e2e_enabled','is_dismissed','is_notified','is_recurring',
+      'is_deleted','is_deleted_by_sender','is_deleted_by_receiver','is_edited',
+      'is_message_request','notification_sent','is_muted','is_hidden','is_verified',
+      'is_blocked','show_on_map','proximity_notifications','is_locked','is_sent',
+      'enable_contact','enable_interested','is_creator_series'
+    ]),
+
+    // Convert 0/1 integer parameters to true/false when they target boolean columns
+    _convertBoolParams(pgSql, params) {
+      if (!params || params.length === 0) return params;
+      const newParams = [...params];
+
+      // 1) SET/WHERE: bool_col = $N  or  COALESCE($N, bool_col)
+      const boolColPattern = [...wrapper._boolCols].join('|');
+      const setWhereRe = new RegExp(`\\b(${boolColPattern})\\s*=\\s*\\$(\\d+)`, 'gi');
+      let m;
+      while ((m = setWhereRe.exec(pgSql)) !== null) {
+        const idx = parseInt(m[2]) - 1;
+        if (idx >= 0 && idx < newParams.length) {
+          if (newParams[idx] === 0) newParams[idx] = false;
+          else if (newParams[idx] === 1) newParams[idx] = true;
+        }
+      }
+
+      // 2) INSERT: match column list to VALUES parameter positions
+      const insertMatch = pgSql.match(/INSERT\s+INTO\s+\S+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+      if (insertMatch) {
+        const cols = insertMatch[1].split(',').map(c => c.trim().toLowerCase());
+        const vals = insertMatch[2].split(',').map(v => v.trim());
+        cols.forEach((col, i) => {
+          if (wrapper._boolCols.has(col) && vals[i]) {
+            const pMatch = vals[i].match(/^\$(\d+)$/);
+            if (pMatch) {
+              const idx = parseInt(pMatch[1]) - 1;
+              if (idx >= 0 && idx < newParams.length) {
+                if (newParams[idx] === 0) newParams[idx] = false;
+                else if (newParams[idx] === 1) newParams[idx] = true;
+              }
+            }
+          }
+        });
+      }
+
+      // 3) COALESCE($N, bool_col) pattern used in UPDATEs
+      const coalesceRe = new RegExp(`COALESCE\\s*\\(\\s*\\$(\\d+)\\s*,\\s*(${boolColPattern})\\s*\\)`, 'gi');
+      while ((m = coalesceRe.exec(pgSql)) !== null) {
+        const idx = parseInt(m[1]) - 1;
+        if (idx >= 0 && idx < newParams.length) {
+          if (newParams[idx] === 0) newParams[idx] = false;
+          else if (newParams[idx] === 1) newParams[idx] = true;
+        }
+      }
+
+      return newParams;
+    },
+
+    // db.get(sql, [params], callback) - returns single row
+    get(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      const pgSql = wrapper._convertQuery(sql);
+      const pgParams = wrapper._convertBoolParams(pgSql, params || []);
+      pool.query(pgSql, pgParams)
+        .then(result => {
+          callback(null, result.rows[0] || null);
+        })
+        .catch(err => {
+          console.error('[PG get] Error:', err.message, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
+          callback(err);
+        });
+    },
+
+    // db.all(sql, [params], callback) - returns array of rows
+    all(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      const pgSql = wrapper._convertQuery(sql);
+      const pgParams = wrapper._convertBoolParams(pgSql, params || []);
+      pool.query(pgSql, pgParams)
+        .then(result => {
+          callback(null, result.rows);
+        })
+        .catch(err => {
+          console.error('[PG all] Error:', err.message, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
+          callback(err);
+        });
+    },
+
+    // db.run(sql, [params], callback) - executes INSERT/UPDATE/DELETE
+    // SQLite callback gets `this.lastID` and `this.changes`
+    run(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      let pgSql = wrapper._convertQuery(sql);
+      const pgParams = wrapper._convertBoolParams(pgSql, params || []);
+
+      // For INSERT, add RETURNING id to get lastID
+      const isInsert = /^\s*INSERT\s/i.test(pgSql);
+      if (isInsert && !/RETURNING/i.test(pgSql)) {
+        pgSql = pgSql.replace(/;?\s*$/, ' RETURNING id');
+      }
+
+      pool.query(pgSql, pgParams)
+        .then(result => {
+          if (callback) {
+            // Mimic SQLite's `this` context with lastID and changes
+            const context = {
+              lastID: (result.rows && result.rows[0]) ? result.rows[0].id : null,
+              changes: result.rowCount || 0
+            };
+            callback.call(context, null);
+          }
+        })
+        .catch(err => {
+          console.error('[PG run] Error:', err.message, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
+          if (callback) callback(err);
+        });
+    },
+
+    // db.serialize(fn) - SQLite runs queries serially; pg Pool already handles this
+    serialize(fn) {
+      if (fn) fn();
+    },
+
+    // db.query() - passthrough for raw pg queries (used by schema init)
+    query(...args) {
+      return pool.query(...args);
+    },
+
+    // db.close() - end pool
+    close(callback) {
+      pool.end().then(() => {
+        if (callback) callback(null);
+      }).catch(err => {
+        if (callback) callback(err);
+      });
+    },
+
+    // db.prepare(sql) - SQLite prepared statements compatibility
+    // Returns an object with .run(params, cb) and .finalize(cb)
+    prepare(sql) {
+      const pgSql = wrapper._convertQuery(sql);
+      return {
+        run(...args) {
+          let params = [];
+          let callback;
+          if (args.length >= 1 && typeof args[args.length - 1] === 'function') {
+            callback = args.pop();
+          }
+          params = args;
+          const converted = wrapper._convertBoolParams(pgSql, params);
+          // Re-index placeholders for each call (pgSql already has $1, $2, etc.)
+          pool.query(pgSql, converted)
+            .then(result => {
+              if (callback) {
+                const context = {
+                  lastID: (result.rows && result.rows[0]) ? result.rows[0].id : null,
+                  changes: result.rowCount || 0
+                };
+                callback.call(context, null);
+              }
+            })
+            .catch(err => {
+              if (callback) callback(err);
+            });
+        },
+        finalize(callback) {
+          // No-op for PostgreSQL - prepared statements don't need finalizing
+          if (callback) callback(null);
+        }
+      };
+    }
+  };
+
+  return wrapper;
+}
 
 // Initialize database based on environment
 const initDatabase = () => {
@@ -23,13 +353,15 @@ const initDatabase = () => {
       }
     });
   } else if (dbType === 'postgresql') {
-    db = new Pool({
+    const pool = new Pool({
       host: process.env.PG_HOST,
       port: process.env.PG_PORT,
       user: process.env.PG_USER,
       password: process.env.PG_PASSWORD,
       database: process.env.PG_DATABASE,
     });
+    // Wrap the pool with SQLite-compatible API
+    db = createPgWrapper(pool);
     console.log('Connected to PostgreSQL database');
     createTablesPostgres();
   }
@@ -1820,8 +2152,34 @@ const createTablesPostgres = async () => {
     }
 
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-    await db.query(schemaSql);
-    console.log('PostgreSQL tables ensured');
+    
+    // Split into individual statements and run each separately
+    // This handles FK ordering issues (tables referencing not-yet-created tables)
+    const statements = schemaSql
+      .split(';')
+      .map(s => s.replace(/--[^\n]*/g, '').trim())  // Strip SQL comments then trim
+      .filter(s => s.length > 0);
+    
+    let created = 0;
+    let skipped = 0;
+    
+    // Run twice - first pass creates independent tables, second pass catches FK deps
+    for (let pass = 0; pass < 2; pass++) {
+      for (const stmt of statements) {
+        try {
+          await db.query(stmt + ';');
+          if (pass === 0) created++;
+        } catch (err) {
+          if (pass === 0) skipped++;
+          // Silently skip on first pass, log on second pass if still failing
+          if (pass === 1 && !err.message.includes('already exists')) {
+            console.warn('Schema statement warning:', err.message.substring(0, 100));
+          }
+        }
+      }
+    }
+    
+    console.log(`PostgreSQL tables ensured (${created} created, ${skipped} resolved on 2nd pass)`);
   } catch (error) {
     console.error('Failed to initialize PostgreSQL schema:', error);
   }

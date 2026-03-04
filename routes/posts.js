@@ -49,7 +49,7 @@ router.post('/upload/chunk', authMiddleware, chunkUpload.single('chunk'), (req, 
   }
 
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-  if (meta.userId !== req.user.userId) {
+  if (meta.userId != req.user.userId) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
@@ -77,7 +77,7 @@ router.post('/upload/finalize', authMiddleware, (req, res) => {
   }
 
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-  if (meta.userId !== req.user.userId) {
+  if (meta.userId != req.user.userId) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
@@ -501,7 +501,7 @@ router.post('/', authMiddleware, (req, res, next) => {
           const uniqueMentions = [...new Set(mentions.map(m => m.substring(1)))];
           uniqueMentions.forEach(mentionedUsername => {
             db.get('SELECT id FROM users WHERE username = ?', [mentionedUsername], (mErr, mentionedUser) => {
-              if (mErr || !mentionedUser || mentionedUser.id === userId) return;
+              if (mErr || !mentionedUser || mentionedUser.id == userId) return;
               db.get('SELECT username, profile_picture FROM users WHERE id = ?', [userId], (mErr2, sender) => {
                 db.run(
                   'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
@@ -690,7 +690,7 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
 
         // Create notification for post owner
         db.get('SELECT user_id, likes_count FROM posts WHERE id = ?', [postId], (err, post) => {
-          if (post && post.user_id !== userId) {
+          if (post && post.user_id != userId) {
             db.run(
               'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
               [post.user_id, 'like', 'liked your post', postId, userId]
@@ -854,7 +854,7 @@ router.post('/:postId/action', authMiddleware, (req, res) => {
 
     // Create notification for post owner
     db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
-      if (post && post.user_id !== userId) {
+      if (post && post.user_id != userId) {
         const notificationContent = action_type === 'contact' 
           ? 'wants to contact you' 
           : 'is interested in your post';
@@ -893,7 +893,7 @@ router.post('/:postId/custom-button-action', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    if (post.user_id === userId) {
+    if (post.user_id == userId) {
       return res.status(400).json({ error: 'Cannot perform this action on your own post' });
     }
 
@@ -998,7 +998,7 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
 
       // Create notification for post owner
       db.get('SELECT user_id, comment_to_dm, username FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [postId], (err, post) => {
-        if (post && post.user_id !== userId) {
+        if (post && post.user_id != userId) {
           db.run(
             'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
             [post.user_id, 'comment', 'commented on your post', postId, userId]
@@ -1021,7 +1021,7 @@ router.post('/:postId/comments', authMiddleware, (req, res) => {
         }
 
         // Comment-to-DM: always send DM with buttons to commenter
-        if (post && post.comment_to_dm && post.user_id !== userId) {
+        if (post && post.comment_to_dm && post.user_id != userId) {
           try {
             const cdmConfig = JSON.parse(post.comment_to_dm);
             if (cdmConfig.enabled) {
@@ -1098,7 +1098,7 @@ router.post('/:postId/interact', authMiddleware, (req, res) => {
 
     // Create notification for post owner
     db.get('SELECT user_id FROM posts WHERE id = ?', [postId], (err, post) => {
-      if (post && post.user_id !== userId) {
+      if (post && post.user_id != userId) {
         const notificationContent = type === 'interested' 
           ? 'is interested in your post'
           : type === 'contact'
@@ -1473,7 +1473,7 @@ router.delete('/:postId/comments/:commentId', authMiddleware, (req, res) => {
     db.get('SELECT user_id FROM post_comments WHERE id = ? AND post_id = ?', [commentId, postId], (err2, comment) => {
       if (err2 || !comment) return res.status(404).json({ error: 'Comment not found' });
 
-      if (comment.user_id !== userId && post.user_id !== userId) {
+      if (comment.user_id != userId && post.user_id != userId) {
         return res.status(403).json({ error: 'Not authorized to delete this comment' });
       }
 
@@ -1528,7 +1528,7 @@ router.post('/:postId/comments/:commentId/reply', authMiddleware, (req, res) => 
         db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [postId]);
 
         // Notify the comment author being replied to
-        if (targetComment.user_id !== userId) {
+        if (targetComment.user_id != userId) {
           db.run(
             'INSERT INTO notifications (user_id, type, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)',
             [targetComment.user_id, 'reply', 'replied to your comment', postId, userId]
@@ -1594,7 +1594,7 @@ router.post('/:postId/mention', authMiddleware, (req, res) => {
   db.get('SELECT id FROM users WHERE username = ?', [mentioned_username], (err, mentionedUser) => {
     if (err || !mentionedUser) return res.status(404).json({ error: 'User not found' });
 
-    if (mentionedUser.id === userId) return res.json({ success: true }); // Don't notify self
+    if (mentionedUser.id == userId) return res.json({ success: true }); // Don't notify self
 
     db.get('SELECT username FROM users WHERE id = ?', [userId], (err2, sender) => {
       db.run(

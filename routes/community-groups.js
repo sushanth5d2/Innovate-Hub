@@ -197,7 +197,7 @@ router.get('/community-groups/:groupId', authMiddleware, (req, res) => {
     }
     
     // Check if user is community admin
-    group.is_community_admin = (group.community_admin_id === userId) || (group.community_role === 'admin');
+    group.is_community_admin = (group.community_admin_id == userId) || (group.community_role === 'admin');
     
     res.json({ success: true, group });
   });
@@ -399,7 +399,7 @@ router.delete('/community-groups/:groupId', authMiddleware, (req, res) => {
         return res.status(404).json({ error: 'Group not found' });
       }
       
-      if (group.creator_id !== userId && group.community_admin_id !== userId) {
+      if (group.creator_id != userId && group.community_admin_id != userId) {
         return res.status(403).json({ error: 'Only the creator or community admin can delete the group' });
       }
 
@@ -1476,7 +1476,7 @@ const editMessageHandler = (req, res) => {
         [postId, groupId],
         (err, post) => {
           if (err || !post) return res.status(404).json({ error: 'Message not found' });
-          if (post.user_id !== userId) {
+          if (post.user_id != userId) {
             return res.status(403).json({ error: 'You can only edit your own messages' });
           }
 
@@ -1655,7 +1655,7 @@ router.delete('/community-groups/:groupId/posts/:postId', authMiddleware, (req, 
         (err, post) => {
           if (err || !post) return res.status(404).json({ error: 'Message not found' });
 
-          const isAuthor = post.user_id === userId;
+          const isAuthor = post.user_id == userId;
           const isAdmin = member.role === 'admin';
 
           if (!isAuthor && !isAdmin) {
@@ -2063,7 +2063,7 @@ router.delete('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, 
       db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?', [pollId, groupId], (err, poll) => {
         if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
 
-        const isOwner = poll.user_id === userId;
+        const isOwner = poll.user_id == userId;
         const isAdmin = member.role === 'admin';
 
         if (!isOwner && !isAdmin) {
@@ -2182,7 +2182,7 @@ router.put('/community-groups/:groupId/polls/:pollId', authMiddleware, (req, res
       db.get('SELECT * FROM group_polls WHERE id = ? AND group_id = ?', [pollId, groupId], (err, poll) => {
         if (err || !poll) return res.status(404).json({ error: 'Poll not found' });
 
-        const isOwner = poll.user_id === userId;
+        const isOwner = poll.user_id == userId;
         const isAdmin = member.role === 'admin';
 
         if (!isOwner && !isAdmin) {
@@ -2290,7 +2290,7 @@ router.post('/community-groups/:groupId/members/:userId/promote', authMiddleware
             return res.status(403).json({ error: 'Not authorized' });
           }
 
-          const isCreator = group.creator_id === adminId;
+          const isCreator = group.creator_id == adminId;
           const isAdmin = adminMember.role === 'admin' || isCreator;
 
           if (!isAdmin) {
@@ -2298,7 +2298,7 @@ router.post('/community-groups/:groupId/members/:userId/promote', authMiddleware
           }
 
           // Prevent demoting the creator
-          if (group.creator_id === targetUserId && promote === false) {
+          if (group.creator_id == targetUserId && promote === false) {
             return res.status(403).json({ error: 'Cannot demote the group creator' });
           }
 
@@ -2342,7 +2342,7 @@ router.delete('/community-groups/:groupId/members/:userId', authMiddleware, (req
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2390,7 +2390,7 @@ router.post('/community-groups/:groupId/members/:userId/block', authMiddleware, 
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2449,7 +2449,7 @@ router.get('/community-groups/:groupId/blocked', authMiddleware, (req, res) => {
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === userId;
+      const isCreator = group.creator_id == userId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2496,7 +2496,7 @@ router.post('/community-groups/:groupId/members/:userId/unblock', authMiddleware
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2671,7 +2671,7 @@ router.get('/community-groups/:groupId/join-requests', authMiddleware, (req, res
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === userId;
+      const isCreator = group.creator_id == userId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2718,7 +2718,7 @@ router.post('/community-groups/:groupId/join-requests/:userId/approve', authMidd
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2772,7 +2772,7 @@ router.post('/community-groups/:groupId/join-requests/:userId/reject', authMiddl
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2839,7 +2839,7 @@ router.get('/community-groups/:groupId/requests', authMiddleware, (req, res) => 
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2887,7 +2887,7 @@ router.put('/community-groups/:groupId/requests/:userId', authMiddleware, (req, 
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -2977,7 +2977,7 @@ router.post('/community-groups/:groupId/members', authMiddleware, (req, res) => 
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {
@@ -3020,7 +3020,7 @@ router.delete('/community-groups/:groupId/blocked/:userId', authMiddleware, (req
         return res.status(404).json({ error: 'Group not found' });
       }
 
-      const isCreator = group.creator_id === adminId;
+      const isCreator = group.creator_id == adminId;
       const isAdmin = group.role === 'admin';
 
       if (!isCreator && !isAdmin) {

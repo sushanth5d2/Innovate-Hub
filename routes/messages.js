@@ -605,10 +605,10 @@ router.delete('/:messageId', authMiddleware, (req, res) => {
       return res.status(404).json({ error: 'Message not found' });
     }
 
-    if (message.sender_id === userId) {
-      db.run('UPDATE messages SET is_deleted_by_sender = 1 WHERE id = ?', [messageId]);
-    } else if (message.receiver_id === userId) {
-      db.run('UPDATE messages SET is_deleted_by_receiver = 1 WHERE id = ?', [messageId]);
+    if (message.sender_id == userId) {
+      db.run('UPDATE messages SET is_deleted_by_sender = TRUE WHERE id = ?', [messageId]);
+    } else if (message.receiver_id == userId) {
+      db.run('UPDATE messages SET is_deleted_by_receiver = TRUE WHERE id = ?', [messageId]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -747,8 +747,8 @@ router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
   const query = `
     UPDATE messages
     SET 
-      is_deleted_by_sender = CASE WHEN sender_id = ? THEN 1 ELSE is_deleted_by_sender END,
-      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN 1 ELSE is_deleted_by_receiver END
+      is_deleted_by_sender = CASE WHEN sender_id = ? THEN TRUE ELSE is_deleted_by_sender END,
+      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN TRUE ELSE is_deleted_by_receiver END
     WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
   `;
 
@@ -848,8 +848,8 @@ router.post('/conversations/:contactId/clear', authMiddleware, (req, res) => {
   const query = `
     UPDATE messages
     SET 
-      is_deleted_by_sender = CASE WHEN sender_id = ? THEN 1 ELSE is_deleted_by_sender END,
-      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN 1 ELSE is_deleted_by_receiver END
+      is_deleted_by_sender = CASE WHEN sender_id = ? THEN TRUE ELSE is_deleted_by_sender END,
+      is_deleted_by_receiver = CASE WHEN receiver_id = ? THEN TRUE ELSE is_deleted_by_receiver END
     WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
   `;
 

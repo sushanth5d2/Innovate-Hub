@@ -1,0 +1,4 @@
+# Placeholder - Add SSL certificates for production
+# Place fullchain.pem and privkey.pem here
+# You can use Let's Encrypt certbot to generate them:
+#   certbot certonly --standalone -d yourdomain.com

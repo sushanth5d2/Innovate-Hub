@@ -314,6 +314,79 @@
         link.classList.add('active');
       }
     });
+
+    // ---- Native mobile app behaviors ----
+    initMobileAppBehaviors();
+  }
+
+  function initMobileAppBehaviors() {
+    // 1. Prevent rubber-band overscroll (native feel)
+    document.body.style.overscrollBehavior = 'none';
+
+    // 2. Disable text selection on UI elements (like native)
+    const style = document.createElement('style');
+    style.textContent = `
+      button, a, .nav-item, .bottom-nav, .top-nav, .navbar,
+      .tab, .tab-btn, .story-item, .action-btn, .icon-btn {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Smooth page transitions */
+      body { 
+        -webkit-overflow-scrolling: touch;
+      }
+      /* Active tap feedback like native */
+      button:active, a:active, .nav-item:active, .tab:active, .tab-btn:active {
+        opacity: 0.7;
+        transition: opacity 0.1s;
+      }
+      /* Hide scrollbar for cleaner mobile look */
+      ::-webkit-scrollbar { width: 0; height: 0; }
+      /* Safe area insets for notched phones */
+      .bottom-nav, .bottom-navigation {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .top-nav, .top-navigation, .navbar {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    `;
+    document.head.appendChild(style);
+
+    // 3. Swipe right from left edge = go back (like native Android)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let swiping = false;
+
+    document.addEventListener('touchstart', function(e) {
+      const touch = e.touches[0];
+      // Only trigger from left 25px edge
+      if (touch.clientX < 25) {
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        swiping = true;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+      if (!swiping) return;
+      swiping = false;
+      const touch = e.changedTouches[0];
+      const diffX = touch.clientX - touchStartX;
+      const diffY = Math.abs(touch.clientY - touchStartY);
+      // Swipe right > 80px and more horizontal than vertical
+      if (diffX > 80 && diffX > diffY * 1.5) {
+        if (window.history.length > 1) {
+          window.history.back();
+        }
+      }
+    }, { passive: true });
+
+    // 4. Viewport meta for proper mobile rendering
+    let viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+    }
   }
 
   window.InnovateAPI = {

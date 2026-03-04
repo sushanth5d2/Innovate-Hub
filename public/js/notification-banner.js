@@ -472,6 +472,12 @@
     if (notif.is_own) return;
     if (type === 'message' && notif.sender_id && myId && String(notif.sender_id) === String(myId)) return;
 
+    // Don't show message notification if user is actively viewing that conversation
+    if (type === 'message' && window.location.pathname === '/messages') {
+      var activeContactId = window.currentContactId;
+      if (activeContactId && notif.sender_id && String(notif.sender_id) === String(activeContactId)) return;
+    }
+
     switch (type) {
       case 'mention':
         title = 'mentioned you';

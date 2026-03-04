@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.env
+.env.production
+.env.local
+*.db
+database/*.db
+uploads/*
+logs/*
+.git
+.gitignore
+*.md
+android/
+native-modules/
+.DS_Store

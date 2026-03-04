@@ -165,7 +165,7 @@ router.get('/:userId/saved', authMiddleware, (req, res) => {
   const userId = req.user.userId;
 
   // Only allow users to view their own saved posts
-  if (parseInt(req.params.userId) !== userId) {
+  if (parseInt(req.params.userId) != userId) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 

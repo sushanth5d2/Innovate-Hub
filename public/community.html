@@ -2684,6 +2684,13 @@
           state.groups = res.groups || [];
           console.log('Loaded groups:', state.groups);
           
+          // Pre-cache encryption keys from group data for message preview decryption
+          state.groups.forEach(group => {
+            if (group.encryption_key && !E2EEncryption.keys[group.id]) {
+              E2EEncryption.keys[group.id] = group.encryption_key;
+            }
+          });
+          
           document.getElementById('groupCountBadge').textContent = `(${state.groups.length})`;
           renderGroupsList();
         }
@@ -2806,7 +2813,7 @@
         const truncatedMsg = previewMsg.length > 30 ? previewMsg.substring(0, 30) + '...' : previewMsg;
         
         // Check if description is a URL and make it clickable
-        let displayDesc = group.description || 'No messages yet';
+        let displayDesc = group.description || (group.latest_message ? '💬 Encrypted message' : 'No messages yet');
         const urlPattern = /^(https?:\/\/[^\s]+)$/;
         if (urlPattern.test(displayDesc)) {
           displayDesc = `<a href="${displayDesc}" target="_blank" onclick="event.stopPropagation()" style="color: var(--ig-blue); text-decoration: none; font-weight: 500;">🔗 ${displayDesc}</a>`;
@@ -4085,7 +4092,7 @@
         // If user is not a member (is_member is 0 or undefined)
         if (!groupDetails.group.is_member || groupDetails.group.is_member === 0) {
           // Not a member - show join UI instead of auto-joining
-          if (groupDetails.group.is_public === 0) {
+          if (groupDetails.group.is_public == 0 || groupDetails.group.is_public === false) {
             // Private group - check if already has pending request
             if (groupDetails.group.join_request_status === 'pending') {
               // Already has pending request
@@ -4193,7 +4200,7 @@
         
         // Update name and meta
         document.getElementById('rightName').textContent = groupData.name;
-        const privacyLabel = groupData.is_public === 0 ? '🔒 Private Group' : '🌐 Public Group';
+        const privacyLabel = (groupData.is_public == 0 || groupData.is_public === false) ? '🔒 Private Group' : '🌐 Public Group';
         document.getElementById('rightMeta').textContent = privacyLabel;
         
         // Update description
@@ -4274,7 +4281,7 @@
             item.style.display = isAdmin ? 'flex' : 'none';
           } else if (text.includes('join requests')) {
             item.onclick = () => showGroupJoinRequests(groupId);
-            const shouldShow = isAdmin && groupData.is_public === 0;
+            const shouldShow = isAdmin && (groupData.is_public == 0 || groupData.is_public === false);
             item.style.display = shouldShow ? 'flex' : 'none';
             
             // Update join requests badge count if visible
@@ -10400,7 +10407,7 @@
                   <div style="font-weight: 600; margin-bottom: 4px;">Private Community</div>
                   <div style="font-size: 13px; color: var(--ig-secondary-text);">Require approval for new members</div>
                 </div>
-                <input type="checkbox" id="isPrivate" ${state.community.is_public === 0 ? 'checked' : ''} 
+                <input type="checkbox" id="isPrivate" ${(state.community.is_public == 0 || state.community.is_public === false) ? 'checked' : ''} 
                   style="width: 20px; height: 20px; cursor: pointer;">
               </label>
             </div>
@@ -10925,7 +10932,7 @@
           badge.textContent = count;
           
           // Show menu item for private communities (even if count is 0)
-          if (state.community && state.community.is_public === 0) {
+          if (state.community && (state.community.is_public == 0 || state.community.is_public === false)) {
             menuItem.style.display = 'flex';
             
             // Visual indicator: highlight if there are pending requests
@@ -10945,7 +10952,7 @@
         console.error('Error updating join requests badge:', error);
         // Still show the menu for private communities even if request fails
         const menuItem = document.getElementById('joinRequestsMenuItem');
-        if (state.community && state.community.is_public === 0 && state.community.admin_id === state.user.id) {
+        if (state.community && (state.community.is_public == 0 || state.community.is_public === false) && state.community.admin_id === state.user.id) {
           menuItem.style.display = 'flex';
         }
       }
@@ -11046,7 +11053,7 @@
         adminSection.style.display = 'block';
         
         // Show join requests only if community is private
-        if (state.community.is_public === 0) {
+        if (state.community.is_public == 0 || state.community.is_public === false) {
           updateJoinRequestsBadge();
         }
       } else {

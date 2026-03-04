@@ -232,7 +232,7 @@ router.post('/:communityId/leave', authMiddleware, (req, res) => {
 
   // Check if user is not admin
   db.get('SELECT admin_id FROM communities WHERE id = ?', [communityId], (err, community) => {
-    if (community && community.admin_id === userId) {
+    if (community && community.admin_id == userId) {
       return res.status(400).json({ error: 'Admin cannot leave the community. Transfer admin rights first.' });
     }
 
@@ -705,7 +705,7 @@ router.delete('/:communityId/announcements/:announcementId', authMiddleware, (re
         (e, existing) => {
           if (e || !existing) return res.status(404).json({ error: 'Announcement not found' });
 
-          const isAuthor = existing.author_id === userId;
+          const isAuthor = existing.author_id == userId;
           const isAdminOrMod = member.role === 'admin' || member.role === 'moderator';
 
           if (!isAuthor && !isAdminOrMod) {
@@ -775,7 +775,7 @@ router.post('/:communityId/announcements/:announcementId/vote', authMiddleware, 
           }
 
           // Remove any previous vote from this user
-          attachments.poll.votes = attachments.poll.votes.filter(vote => vote.userId !== userId);
+          attachments.poll.votes = attachments.poll.votes.filter(vote => vote.userId != userId);
 
           // Add new vote
           attachments.poll.votes.push({
@@ -1010,7 +1010,7 @@ router.delete('/:communityId/announcements/:announcementId/comments/:commentId',
       db.get('SELECT * FROM announcement_comments WHERE id = ?', [commentId], (err, comment) => {
         if (err || !comment) return res.status(404).json({ error: 'Comment not found' });
 
-        const isAuthor = comment.user_id === userId;
+        const isAuthor = comment.user_id == userId;
         const isAdminOrMod = ['admin', 'moderator'].includes(member.role);
 
         if (!isAuthor && !isAdminOrMod) {
