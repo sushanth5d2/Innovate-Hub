@@ -10,9 +10,10 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const { initDatabase } = require('./config/database');
 const { initRedis } = require('./config/cache');
+const logger = require('./config/logger');
+const authMiddleware = require('./middleware/auth');
 const { responseTimeLogger } = require('./middleware/performance');
 
 const app = express();
@@ -55,32 +56,10 @@ app.use(helmet({
   hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false
 }));
 
-// Rate limiting (relaxed in development, strict in production)
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || 1000),
-  max: parseInt(process.env.RATE_LIMIT_MAX || (isProd ? 1000 : 10000)),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again later.',
-  handler: (req, res, next, options) => {
-    res.status(options.statusCode).json({ error: options.message || 'Too many requests, please try again later.' });
-  }
-});
-
-const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 1000),
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || (isProd ? 30 : 100)),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many login attempts, please try again later.',
-  handler: (req, res, next, options) => {
-    res.status(options.statusCode).json({ error: options.message || 'Too many login attempts, please try again later.' });
-  }
-});
-
-app.use('/api/', limiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+// Rate limiting DISABLED — no per-IP limits in production
+// For 1Cr+ users, DDoS protection is handled at infrastructure level (CDN/WAF/Load Balancer)
+// NOT at the application layer. Application-level rate limiting blocks legitimate users at scale.
+// If needed, enable via nginx, Cloudflare, or AWS WAF instead.
 
 // Compression middleware
 app.use(compression());
@@ -91,9 +70,9 @@ app.use(responseTimeLogger);
 // CORS - environment-aware
 const corsOrigins = process.env.ALLOWED_ORIGINS || '*';
 app.use(cors({
-  origin: isProd
+  origin: isProd && corsOrigins !== '*'
     ? corsOrigins.split(',').map(o => o.trim())
-    : '*',
+    : true,   // true = reflect request origin (allows credentials; safer than '*' string)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -104,6 +83,17 @@ const bodyLimit = isProd ? '10mb' : '100mb';
 app.use(express.json({ limit: bodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 app.use(cookieParser());
+
+// Handle JSON parse errors gracefully (returns 400 instead of 500)
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request payload too large' });
+  }
+  next(err);
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -122,6 +112,25 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 
 // Initialize database (removed - will be called in startServer)
 // initDatabase();
+
+// Health check endpoint — used by Docker, load balancers, monitoring
+app.get('/api/health', async (req, res) => {
+  const checks = { status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() };
+  try {
+    const { getDb } = require('./config/database');
+    const db = getDb();
+    await new Promise((resolve, reject) => {
+      const q = process.env.DB_TYPE === 'postgresql' ? 'SELECT 1' : 'SELECT 1';
+      db.get(q, [], (err) => err ? reject(err) : resolve());
+    });
+    checks.database = 'connected';
+  } catch (e) {
+    checks.database = 'error';
+    checks.status = 'degraded';
+  }
+  const statusCode = checks.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(checks);
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -142,19 +151,71 @@ app.use('/api/portfolio', require('./routes/portfolio'));
 app.use('/api/shared', require('./routes/shared-tasks-notes'));
 app.use('/api', require('./routes/community-groups'));
 
-// Link preview endpoint
-app.get('/api/link-preview', async (req, res) => {
+// Link preview endpoint (SSRF-protected)
+app.get('/api/link-preview', authMiddleware, async (req, res) => {
   const url = req.query.url;
   if (!url) return res.json({ error: 'URL required' });
   
+  // Validate URL scheme
+  let parsed;
+  try { parsed = new URL(url); } catch { return res.json({ error: 'Invalid URL' }); }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return res.json({ error: 'Only HTTP(S) allowed' });
+
+  // SSRF protection: resolve hostname and block private/internal IPs
+  const dns = require('dns');
+  const isPrivateIP = (ip) => {
+    const parts = ip.split('.').map(Number);
+    if (parts.length === 4) {
+      if (parts[0] === 127) return true;                         // 127.x.x.x
+      if (parts[0] === 10) return true;                          // 10.x.x.x
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16-31.x.x
+      if (parts[0] === 192 && parts[1] === 168) return true;    // 192.168.x.x
+      if (parts[0] === 169 && parts[1] === 254) return true;    // 169.254.x.x (link-local)
+      if (parts[0] === 0) return true;                           // 0.x.x.x
+    }
+    // IPv6 loopback/private
+    if (ip === '::1' || ip === '::' || ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80')) return true;
+    return false;
+  };
+
   try {
-    const https = require(url.startsWith('https') ? 'https' : 'http');
+    const addresses = await new Promise((resolve, reject) => {
+      dns.resolve4(parsed.hostname, (err, addrs) => {
+        if (err) {
+          // Try as literal IP
+          const net = require('net');
+          if (net.isIP(parsed.hostname)) return resolve([parsed.hostname]);
+          return reject(err);
+        }
+        resolve(addrs);
+      });
+    });
+    if (addresses.some(isPrivateIP)) return res.json({ error: 'URL not allowed' });
+  } catch {
+    return res.json({ error: 'Could not resolve hostname' });
+  }
+
+  try {
     const fetchUrl = (targetUrl, redirectCount = 0) => new Promise((resolve, reject) => {
       if (redirectCount > 3) return reject(new Error('Too many redirects'));
+      // Re-validate redirect targets against SSRF
+      let rParsed;
+      try { rParsed = new URL(targetUrl); } catch { return reject(new Error('Invalid redirect URL')); }
+      if (!['http:', 'https:'].includes(rParsed.protocol)) return reject(new Error('Invalid redirect protocol'));
+
       const mod = targetUrl.startsWith('https') ? require('https') : require('http');
       const request = mod.get(targetUrl, { 
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InnovateBot/1.0)' },
-        timeout: 5000
+        timeout: 5000,
+        // Block connection to private IPs at socket level
+        lookup: (hostname, opts, cb) => {
+          dns.resolve4(hostname, (err, addrs) => {
+            if (err) return cb(err);
+            const safe = addrs.filter(a => !isPrivateIP(a));
+            if (safe.length === 0) return cb(new Error('Blocked private IP'));
+            cb(null, safe[0], 4);
+          });
+        }
       }, (response) => {
         if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
           return resolve(fetchUrl(response.headers.location, redirectCount + 1));
@@ -303,6 +364,7 @@ io.on('connection', (socket) => {
 
   // User joins with their userId
   socket.on('user:join', (userId) => {
+    if (!userId) return;
     connectedUsers.set(userId, socket.id);
     socket.userId = userId;
     
@@ -574,10 +636,14 @@ app.get('/group.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'group.html'));
 });
 
-// Error handling middleware
+// Global error handling middleware — catches all unhandled route errors
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  const status = err.status || err.statusCode || 500;
+  const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message;
+  logger.error({ err, method: req.method, url: req.originalUrl, status }, 'Request error');
+  if (!res.headersSent) {
+    res.status(status).json({ error: message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
@@ -591,12 +657,10 @@ async function startServer() {
     await initRedis();
     
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Visit http://localhost:${PORT}`);
-      console.log('Environment:', process.env.NODE_ENV || 'development');
+      logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, `Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.fatal({ err: error }, 'Failed to start server');
     process.exit(1);
   }
 }
@@ -604,12 +668,34 @@ async function startServer() {
 startServer();
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, closing server gracefully');
+function gracefulShutdown(signal) {
+  logger.info({ signal }, 'Graceful shutdown initiated');
   server.close(() => {
-    console.log('Server closed');
+    logger.info('Server closed');
     process.exit(0);
   });
+  // Force close after 10s
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch unhandled errors to prevent crashes
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ err: reason }, 'Unhandled Promise Rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught Exception');
+  // In production with PM2, exit so process manager restarts cleanly.
+  // In development/test, log but don't exit to allow debugging.
+  if (isProd && !process.env.RATE_LIMIT_SKIP_LOCAL) {
+    setTimeout(() => process.exit(1), 1000);
+  }
 });
 
 module.exports = { app, io };

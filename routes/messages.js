@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
 
 // Get conversations list
-router.get('/conversations', authMiddleware, (req, res) => {
+router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -31,6 +32,8 @@ router.get('/conversations', authMiddleware, (req, res) => {
       u.profile_picture,
       u.is_online,
       u.last_seen,
+      b1.id as b1_id,
+      b2.id as b2_id,
       m.content as last_message,
       m.type as last_message_type,
       m.original_filename as last_message_filename,
@@ -42,20 +45,26 @@ router.get('/conversations', authMiddleware, (req, res) => {
     FROM contact_messages cm
     JOIN users u ON u.id = cm.contact_id
     LEFT JOIN messages m ON m.id = cm.last_message_id
+    LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = cm.contact_id)
+    LEFT JOIN blocked_users b2 ON (b2.blocker_id = cm.contact_id AND b2.blocked_id = ?)
     ORDER BY m.created_at DESC
   `;
 
-  db.all(query, [userId, userId, userId, userId, userId, userId], (err, conversations) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId], (err, rows) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Error fetching conversations' });
     }
+    const conversations = rows.map(c => ({
+      ...c,
+      is_blocked: (c.b1_id !== null || c.b2_id !== null) ? 1 : 0
+    }));
     res.json({ success: true, conversations });
   });
-});
+}));
 
 // Get messages with a specific user
-router.get('/:contactId', authMiddleware, (req, res) => {
+router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -93,10 +102,10 @@ router.get('/:contactId', authMiddleware, (req, res) => {
 
     res.json({ success: true, messages, is_message_request: hasMessageRequest });
   });
-});
+}));
 
 // Send message
-router.post('/send', authMiddleware, (req, res, next) => {
+router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
   // Use multer middleware
   upload.fields([
     { name: 'file', maxCount: 1 },
@@ -113,6 +122,11 @@ router.post('/send', authMiddleware, (req, res, next) => {
     
     if (!receiver_id) {
       return res.status(400).json({ error: 'receiver_id is required' });
+    }
+
+    // Input validation
+    if (content && typeof content === 'string' && content.length > 10000) {
+      return res.status(400).json({ error: 'Message exceeds maximum length (10000 chars)' });
     }
     
     let messageContent = content;
@@ -152,10 +166,19 @@ router.post('/send', authMiddleware, (req, res, next) => {
     let isMessageRequest = 0;
     let messageRequestStatus = null;
 
+    // Check if either user has blocked the other
+    db.get(
+      'SELECT id FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)',
+      [senderId, receiver_id, receiver_id, senderId],
+      (blockErr, blocked) => {
+        if (blocked) {
+          return res.status(403).json({ error: 'Cannot send message to this user' });
+        }
+
     const checkAndSend = () => {
       const query = `
         INSERT INTO messages (sender_id, receiver_id, content, type, timer, expires_at, original_filename, is_message_request, message_request_status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
 
       db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename, isMessageRequest, messageRequestStatus], function(err) {
@@ -198,7 +221,7 @@ router.post('/send', authMiddleware, (req, res, next) => {
         const notifType = isMessageRequest ? 'message_request' : 'message';
         db.run(
           `INSERT INTO notifications (user_id, type, content, related_id, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
           [receiver_id, notifType, `New message from ${sender.username}`, messageId, senderId]
         );
 
@@ -251,13 +274,14 @@ router.post('/send', authMiddleware, (req, res, next) => {
       }
     });
 
+  }); // end blocked check
   });
-});
+}));
 
 // ===== MESSAGE REQUESTS =====
 
 // Get message requests (messages from non-followers to private accounts)
-router.get('/requests/list', authMiddleware, (req, res) => {
+router.get('/requests/list', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -292,10 +316,10 @@ router.get('/requests/list', authMiddleware, (req, res) => {
     }
     res.json({ success: true, requests: requests || [] });
   });
-});
+}));
 
 // Get message requests count
-router.get('/requests/count', authMiddleware, (req, res) => {
+router.get('/requests/count', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -309,10 +333,10 @@ router.get('/requests/count', authMiddleware, (req, res) => {
     }
     res.json({ success: true, count: result ? result.count : 0 });
   });
-});
+}));
 
 // Accept message request (move to regular inbox)
-router.post('/requests/:senderId/accept', authMiddleware, (req, res) => {
+router.post('/requests/:senderId/accept', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const senderId = parseInt(req.params.senderId);
@@ -326,10 +350,10 @@ router.post('/requests/:senderId/accept', authMiddleware, (req, res) => {
     }
     res.json({ success: true });
   });
-});
+}));
 
 // Delete message request
-router.delete('/requests/:senderId', authMiddleware, (req, res) => {
+router.delete('/requests/:senderId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const senderId = parseInt(req.params.senderId);
@@ -343,10 +367,10 @@ router.delete('/requests/:senderId', authMiddleware, (req, res) => {
     }
     res.json({ success: true });
   });
-});
+}));
 
 // Original send endpoint for backward compatibility
-router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
+router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((req, res) => {
   const db = getDb();
   const senderId = req.user.userId;
   const { receiver_id, content, timer, reply_to_id } = req.body;
@@ -458,10 +482,10 @@ router.post('/', authMiddleware, upload.array('attachments', 5), (req, res) => {
       insertMessage(0, null);
     }
   });
-});
+}));
 
 // Edit message
-router.put('/:messageId', authMiddleware, upload.single('file'), (req, res) => {
+router.put('/:messageId', authMiddleware, upload.single('file'), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
@@ -570,10 +594,10 @@ router.put('/:messageId', authMiddleware, upload.single('file'), (req, res) => {
       );
     }
   );
-});
+}));
 
 // Unsend message (delete for both)
-router.delete('/:messageId/unsend', authMiddleware, (req, res) => {
+router.delete('/:messageId/unsend', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
@@ -591,10 +615,10 @@ router.delete('/:messageId/unsend', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // Delete message (for self only)
-router.delete('/:messageId', authMiddleware, (req, res) => {
+router.delete('/:messageId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
@@ -615,10 +639,10 @@ router.delete('/:messageId', authMiddleware, (req, res) => {
 
     res.json({ success: true });
   });
-});
+}));
 
 // Pin/Unpin a message
-router.post('/:messageId/pin', authMiddleware, (req, res) => {
+router.post('/:messageId/pin', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
@@ -650,17 +674,21 @@ router.post('/:messageId/pin', authMiddleware, (req, res) => {
     if (hasPinDuration) {
       // Pinning with duration
       let pinExpiry = null;
-      if (pinDuration !== null && pinDuration !== undefined) {
-        // Calculate expiry time
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + parseInt(pinDuration));
-        pinExpiry = expiryDate.toISOString();
+      if (pinDuration !== null && pinDuration !== undefined && pinDuration !== 'forever') {
+        const days = parseInt(pinDuration);
+        if (!isNaN(days) && days > 0) {
+          // Calculate expiry time
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + days);
+          pinExpiry = expiryDate.toISOString();
+        }
+        // If NaN or 0, pin indefinitely (null expiry)
       }
       
       const updateQuery = `
         UPDATE messages 
         SET is_pinned = 1,
-            pinned_at = datetime('now'),
+            pinned_at = CURRENT_TIMESTAMP,
             pinned_by = ?,
             pin_expires_at = ?
         WHERE id = ?
@@ -700,10 +728,10 @@ router.post('/:messageId/pin', authMiddleware, (req, res) => {
       });
     }
   });
-});
+}));
 
 // Star/Favorite a message
-router.post('/:messageId/star', authMiddleware, (req, res) => {
+router.post('/:messageId/star', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { messageId } = req.params;
@@ -726,7 +754,7 @@ router.post('/:messageId/star', authMiddleware, (req, res) => {
       });
     } else {
       // Star
-      db.run('INSERT INTO starred_messages (user_id, message_id, starred_at) VALUES (?, ?, datetime("now"))', 
+      db.run('INSERT INTO starred_messages (user_id, message_id, starred_at) VALUES (?, ?, CURRENT_TIMESTAMP)', 
         [userId, messageId], 
         function(err) {
           if (err) {
@@ -736,10 +764,10 @@ router.post('/:messageId/star', authMiddleware, (req, res) => {
       });
     }
   });
-});
+}));
 
 // Delete entire conversation for current user
-router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
+router.delete('/conversations/:contactId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -758,10 +786,10 @@ router.delete('/conversations/:contactId', authMiddleware, (req, res) => {
     }
     res.json({ success: true });
   });
-});
+}));
 
 // Get starred messages for a conversation
-router.get('/conversations/:contactId/starred', authMiddleware, (req, res) => {
+router.get('/conversations/:contactId/starred', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -783,10 +811,10 @@ router.get('/conversations/:contactId/starred', authMiddleware, (req, res) => {
     }
     res.json({ success: true, messages: messages || [] });
   });
-});
+}));
 
 // Get media, links and docs for a conversation
-router.get('/conversations/:contactId/media', authMiddleware, (req, res) => {
+router.get('/conversations/:contactId/media', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -807,10 +835,10 @@ router.get('/conversations/:contactId/media', authMiddleware, (req, res) => {
     }
     res.json({ success: true, media: messages || [] });
   });
-});
+}));
 
 // Search messages in a conversation
-router.get('/conversations/:contactId/search', authMiddleware, (req, res) => {
+router.get('/conversations/:contactId/search', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -837,10 +865,10 @@ router.get('/conversations/:contactId/search', authMiddleware, (req, res) => {
     }
     res.json({ success: true, messages: messages || [] });
   });
-});
+}));
 
 // Clear chat (soft delete for current user)
-router.post('/conversations/:contactId/clear', authMiddleware, (req, res) => {
+router.post('/conversations/:contactId/clear', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -859,10 +887,10 @@ router.post('/conversations/:contactId/clear', authMiddleware, (req, res) => {
     }
     res.json({ success: true });
   });
-});
+}));
 
 // Set disappearing messages for a conversation
-router.post('/conversations/:contactId/disappearing', authMiddleware, (req, res) => {
+router.post('/conversations/:contactId/disappearing', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -882,8 +910,8 @@ router.post('/conversations/:contactId/disappearing', authMiddleware, (req, res)
     if (err) return res.status(500).json({ error: 'DB error' });
 
     db.run(`INSERT INTO disappearing_settings (user_id, contact_id, mode, duration, updated_at) 
-            VALUES (?, ?, ?, ?, datetime('now'))
-            ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=datetime('now')`,
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=CURRENT_TIMESTAMP`,
       [userId, contactId, mode, duration || 0, mode, duration || 0],
       function(err) {
         if (err) return res.status(500).json({ error: 'Error saving settings' });
@@ -891,10 +919,10 @@ router.post('/conversations/:contactId/disappearing', authMiddleware, (req, res)
       }
     );
   });
-});
+}));
 
 // Get disappearing messages setting
-router.get('/conversations/:contactId/disappearing', authMiddleware, (req, res) => {
+router.get('/conversations/:contactId/disappearing', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -913,10 +941,10 @@ router.get('/conversations/:contactId/disappearing', authMiddleware, (req, res) 
       res.json({ success: true, mode: row ? row.mode : 'off', duration: row ? row.duration : 0 });
     });
   });
-});
+}));
 
 // Toggle chat notifications mute
-router.post('/conversations/:contactId/mute', authMiddleware, (req, res) => {
+router.post('/conversations/:contactId/mute', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -940,10 +968,10 @@ router.post('/conversations/:contactId/mute', authMiddleware, (req, res) => {
       }
     );
   });
-});
+}));
 
 // Get mute status
-router.get('/conversations/:contactId/mute', authMiddleware, (req, res) => {
+router.get('/conversations/:contactId/mute', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
@@ -960,10 +988,10 @@ router.get('/conversations/:contactId/mute', authMiddleware, (req, res) => {
       res.json({ success: true, muted: row ? !!row.muted : false });
     });
   });
-});
+}));
 
 // Report a user
-router.post('/report/:userId', authMiddleware, (req, res) => {
+router.post('/report/:userId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const reporterId = req.user.userId;
   const { userId } = req.params;
@@ -987,6 +1015,6 @@ router.post('/report/:userId', authMiddleware, (req, res) => {
       }
     );
   });
-});
+}));
 
 module.exports = router;

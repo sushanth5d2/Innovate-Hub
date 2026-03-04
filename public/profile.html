@@ -2094,7 +2094,7 @@
     </section>
 
     <!-- Stats -->
-    <section class="pf-stats-row pf-reveal">
+    <section class="pf-stats-row pf-reveal" id="pf-stats-section">
       <div class="pf-stat-card pf-3d-tilt" style="cursor:pointer;" onclick="showAllPosts()">
         <div class="pf-stat-number" id="pf-posts-count">0</div>
         <div class="pf-stat-label">Posts</div>
@@ -2671,6 +2671,7 @@
     let isFollowing = false;
     let isPrivateAccount = false;
     let hasRequestedFollow = false;
+    let isBlockedUser = false;
 
     const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23262645'/%3E%3Ccircle cx='50' cy='35' r='18' fill='%23667eea'/%3E%3Cpath d='M20 85 Q20 60 50 60 Q80 60 80 85 Z' fill='%23667eea'/%3E%3C/svg%3E";
 
@@ -2746,6 +2747,7 @@
         isFollowing = !!user.is_following;
         isPrivateAccount = !!user.is_private;
         hasRequestedFollow = !!user.has_requested_follow;
+        isBlockedUser = !isOwnPortfolio && user.is_blocked > 0;
 
         // Parse JSON fields
         const skills = Array.isArray(user.skills) ? user.skills : (user.skills ? JSON.parse(user.skills) : []);
@@ -2765,6 +2767,30 @@
 
         // Render action buttons
         renderActionButtons();
+
+        // If blocked user, hide all content sections and stop here
+        if (isBlockedUser) {
+          ['pf-stats-section', 'pf-skills-section', 'pf-interests-section', 'pf-projects-section', 'pf-ig-posts-section'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
+          // Show blocked notice
+          const igSection = document.getElementById('pf-ig-posts-section');
+          if (igSection) {
+            const notice = document.createElement('div');
+            notice.id = 'pf-blocked-notice';
+            notice.style.cssText = 'text-align:center;padding:60px 20px;color:var(--pf-text2,#999);';
+            notice.innerHTML = `
+              <div style="font-size:48px;margin-bottom:16px;"><i class="fas fa-ban" style="color:#ed4956;"></i></div>
+              <div style="font-size:18px;font-weight:600;color:var(--pf-text,#fff);margin-bottom:8px;">You blocked this user</div>
+              <div style="font-size:14px;">Unblock them to see their profile and posts</div>
+            `;
+            igSection.parentNode.insertBefore(notice, igSection.nextSibling);
+          }
+          initScrollReveal();
+          initTilt3D();
+          return;
+        }
 
         // Show settings button and avatar overlay for own profile
         if (isOwnPortfolio) {
@@ -2837,6 +2863,13 @@
             <i class="fas fa-share-alt"></i> Share
           </button>
         `;
+      } else if (isBlockedUser) {
+        // Blocked user - show only Unblock button
+        container.innerHTML = `
+          <button class="pf-action-btn" id="pf-unblock-btn" onclick="unblockFromProfile()" style="background:#ed4956;color:#fff;">
+            <i class="fas fa-ban"></i> Unblock
+          </button>
+        `;
       } else {
         let followBtnClass, followBtnIcon, followBtnText;
         if (isFollowing) {
@@ -2867,7 +2900,26 @@
       }
 
       // Show private lock screen if private account and not following and not own profile
-      renderPrivateLockScreen();
+      if (!isBlockedUser) renderPrivateLockScreen();
+    }
+
+    // ===== UNBLOCK FROM PROFILE =====
+    async function unblockFromProfile() {
+      try {
+        await fetch(`/api/users/${portfolioUserId}/block`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        showToast('User unblocked');
+        isBlockedUser = false;
+        // Remove blocked notice
+        const notice = document.getElementById('pf-blocked-notice');
+        if (notice) notice.remove();
+        // Reload the full profile
+        window.location.reload();
+      } catch (err) {
+        showToast('Failed to unblock user');
+      }
     }
 
     // ===== PRIVATE LOCK SCREEN =====
@@ -3327,7 +3379,7 @@
         });
         if (!res.ok) throw new Error('Failed');
         const data = await res.json();
-        const users = data.blocked_users || [];
+        const users = data.blocked || data.blocked_users || [];
 
         document.getElementById('pf-list-title').textContent = 'Blocked Users';
         const body = document.getElementById('pf-list-body');

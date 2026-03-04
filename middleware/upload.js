@@ -15,35 +15,22 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = './uploads/files';
     
-    // Log for debugging
-    console.log('Upload middleware - req.path:', req.path);
-    console.log('Upload middleware - req.originalUrl:', req.originalUrl);
-    console.log('Upload middleware - fieldname:', file.fieldname);
-    
     // Check by field name first (most reliable)
     if (file.fieldname === 'profile_picture') {
       uploadPath = './uploads/profiles';
-      console.log('Using profiles folder (from fieldname)');
     } else if (file.fieldname === 'banner') {
       uploadPath = './uploads/community';
-      console.log('Using community folder (from fieldname)');
     } else if (file.fieldname === 'cover_photo') {
       uploadPath = './uploads/images';
-      console.log('Using images folder (from cover_photo fieldname)');
     }
     // Then check path-specific routes
     else if (req.path.includes('profile') || req.originalUrl.includes('profile')) {
       uploadPath = './uploads/profiles';
-      console.log('Using profiles folder (from path)');
-    } else if (req.path.includes('communit') || req.originalUrl.includes('communit') || req.path.includes('groups')) { // matches communities, community-groups, and groups
+    } else if (req.path.includes('communit') || req.originalUrl.includes('communit') || req.path.includes('groups')) {
       uploadPath = './uploads/community';
-      console.log('Using community folder (from path)');
     } else if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       uploadPath = './uploads/images';
-      console.log('Using images folder (generic)');
     }
-    
-    console.log('Final upload path:', uploadPath);
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
@@ -54,7 +41,7 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp|bmp|svg|pdf|doc|docx|txt|md|csv|json|xml|yaml|yml|js|ts|py|java|cpp|c|html|css|sql|sh|mp4|mov|webm|m4a|mp3|wav|xlsx|xls|pptx|ppt/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp|bmp|pdf|doc|docx|txt|md|csv|mp4|mov|webm|m4a|mp3|wav|xlsx|xls|pptx|ppt/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   
   // Check MIME types more comprehensively
@@ -81,10 +68,10 @@ const fileFilter = (req, file, cb) => {
   
   const mimetypeValid = allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('text/');
 
-  if (mimetypeValid || extname) {
+  if (mimetypeValid && extname) {
     return cb(null, true);
   } else {
-    console.log('Rejected file:', file.originalname, 'MIME:', file.mimetype);
+    // File rejected: invalid type
     cb(new Error(`Invalid file type: ${file.mimetype}. Only images, PDFs, documents, videos, and audio files are allowed.`));
   }
 };

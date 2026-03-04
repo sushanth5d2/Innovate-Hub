@@ -222,7 +222,7 @@ function createPgWrapper(pool) {
           callback(null, result.rows[0] || null);
         })
         .catch(err => {
-          console.error('[PG get] Error:', err.message, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
+          console.error('[PG get] Error:', err.message || err, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
           callback(err);
         });
     },
@@ -240,7 +240,7 @@ function createPgWrapper(pool) {
           callback(null, result.rows);
         })
         .catch(err => {
-          console.error('[PG all] Error:', err.message, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
+          console.error('[PG all] Error:', err.message || err, '\nSQL:', pgSql.substring(0, 200), '\nParams:', JSON.stringify(pgParams).substring(0, 100));
           callback(err);
         });
     },
@@ -359,6 +359,15 @@ const initDatabase = () => {
       user: process.env.PG_USER,
       password: process.env.PG_PASSWORD,
       database: process.env.PG_DATABASE,
+      max: parseInt(process.env.PG_POOL_MAX || 100),  // 100 connections for 50L+ users
+      idleTimeoutMillis: 30000,                         // Close idle clients after 30s
+      connectionTimeoutMillis: 10000,                   // 10s connection timeout
+      statement_timeout: 30000,                         // Kill queries running > 30s
+    });
+
+    // Log pool errors (don't crash)
+    pool.on('error', (err) => {
+      console.error('PostgreSQL pool error:', err.message);
     });
     // Wrap the pool with SQLite-compatible API
     db = createPgWrapper(pool);
@@ -2154,32 +2163,64 @@ const createTablesPostgres = async () => {
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     
     // Split into individual statements and run each separately
-    // This handles FK ordering issues (tables referencing not-yet-created tables)
     const statements = schemaSql
       .split(';')
       .map(s => s.replace(/--[^\n]*/g, '').trim())  // Strip SQL comments then trim
       .filter(s => s.length > 0);
     
-    let created = 0;
-    let skipped = 0;
+    // Multi-pass approach: keep retrying failed statements until all succeed or no progress
+    // This handles deep FK dependency chains (e.g., table A → B → C → users)
+    let pending = statements.map((stmt, i) => ({ stmt, index: i }));
+    let totalCreated = 0;
+    let pass = 0;
+    const maxPasses = 10;  // Safety limit
     
-    // Run twice - first pass creates independent tables, second pass catches FK deps
-    for (let pass = 0; pass < 2; pass++) {
-      for (const stmt of statements) {
+    while (pending.length > 0 && pass < maxPasses) {
+      pass++;
+      const stillPending = [];
+      let createdThisPass = 0;
+      
+      for (const item of pending) {
         try {
-          await db.query(stmt + ';');
-          if (pass === 0) created++;
+          await db.query(item.stmt + ';');
+          createdThisPass++;
         } catch (err) {
-          if (pass === 0) skipped++;
-          // Silently skip on first pass, log on second pass if still failing
-          if (pass === 1 && !err.message.includes('already exists')) {
-            console.warn('Schema statement warning:', err.message.substring(0, 100));
+          const msg = err.message || '';
+          // Only retry if it's a dependency issue (table doesn't exist yet)
+          if (msg.includes('does not exist') && !msg.includes('already exists')) {
+            stillPending.push(item);
+          } else if (!msg.includes('already exists')) {
+            // Log non-dependency, non-duplicate errors on later passes
+            if (pass > 2) {
+              console.warn('Schema statement warning:', msg.substring(0, 200));
+            }
+            stillPending.push(item);
           }
+          // If 'already exists', just skip it (table created in previous pass)
         }
       }
+      
+      totalCreated += createdThisPass;
+      
+      // If no progress was made this pass, stop (circular dep or permanent error)
+      if (createdThisPass === 0 && stillPending.length === pending.length) {
+        // Log remaining failures
+        for (const item of stillPending) {
+          try {
+            await db.query(item.stmt + ';');
+          } catch (err) {
+            if (!err.message.includes('already exists')) {
+              console.warn('Schema statement failed:', err.message.substring(0, 200));
+            }
+          }
+        }
+        break;
+      }
+      
+      pending = stillPending;
     }
     
-    console.log(`PostgreSQL tables ensured (${created} created, ${skipped} resolved on 2nd pass)`);
+    console.log(`PostgreSQL tables ensured (${totalCreated} created in ${pass} passes, ${pending.length} remaining)`);
   } catch (error) {
     console.error('Failed to initialize PostgreSQL schema:', error);
   }

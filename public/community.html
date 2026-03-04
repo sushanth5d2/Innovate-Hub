@@ -2518,7 +2518,7 @@
             votes: [] // Backend sends counts directly, not individual votes
           };
           // Just reload the announcement to get fresh data
-          if (state.currentLeftTab === 'announcements' && state.currentAnnouncementId === data.announcementId) {
+          if (state.currentLeftTab === 'announcements' && String(state.currentAnnouncementId) === String(data.announcementId)) {
             viewAnnouncement(data.announcementId);
           }
         }
@@ -3903,7 +3903,7 @@
       try {
         await InnovateAPI.apiRequest(`/community-groups/${groupId}/mark-read`, { method: 'POST' });
         // Update the local state immediately
-        const group = state.groups.find(g => g.id === groupId);
+        const group = state.groups.find(g => String(g.id) === String(groupId));
         if (group) {
           group.unread_count = 0;
         }
@@ -4168,7 +4168,7 @@
       console.log('loadGroupView completed');
       
       // Mark messages as read and refresh groups list
-      const currentGroup = state.groups.find(g => g.id === groupId);
+      const currentGroup = state.groups.find(g => String(g.id) === String(groupId));
       if (currentGroup && currentGroup.unread_count > 0) {
         try {
           await markGroupAsRead(groupId);
@@ -4208,7 +4208,7 @@
         
         // Update action buttons for group context
         const rightActions = document.querySelector('.right-actions');
-        const isAdmin = groupData.creator_id === currentUser.id || groupData.user_role === 'admin' || groupData.user_role === 'creator' || groupData.is_community_admin;
+        const isAdmin = String(groupData.creator_id) === String(currentUser.id) || groupData.user_role === 'admin' || groupData.user_role === 'creator' || groupData.is_community_admin;
         
         rightActions.innerHTML = `
           ${isAdmin ? `
@@ -4451,9 +4451,9 @@
             <div class="members-grid">
               ${data.members.map(member => {
                 const isAdmin = member.role === 'admin' || member.role === 'creator';
-                const isCreator = member.user_id === group.creator_id;
+                const isCreator = String(member.user_id) === String(group.creator_id);
                 const currentUser = InnovateAPI.getCurrentUser();
-                const isSelf = member.user_id === currentUser.id;
+                const isSelf = String(member.user_id) === String(currentUser.id);
                 
                 function formatJoinDate(dateStr) {
                   const date = new Date(dateStr);
@@ -5027,7 +5027,7 @@
 
     function showGroupSettingsModal(group) {
       const currentUser = InnovateAPI.getCurrentUser();
-      const isCreator = group.creator_id === currentUser.id;
+      const isCreator = String(group.creator_id) === String(currentUser.id);
       const isAdmin = isCreator || group.user_role === 'admin' || group.user_role === 'creator' || group.is_community_admin;
       
       const modal = document.createElement('div');
@@ -5208,7 +5208,7 @@
       document.getElementById('rightDescription').textContent = state.community.description || 'No description';
       
       // Reset action buttons based on permissions
-      const isCommunityAdmin = state.community && state.community.admin_id === state.user.id;
+      const isCommunityAdmin = state.community && String(state.community.admin_id) === String(state.user.id);
       const rightActions = document.querySelector('.right-actions');
       rightActions.innerHTML = `
         <div class="right-action" onclick="inviteMembers()">
@@ -5768,7 +5768,7 @@
       const isExpired = poll.isExpired;
       const hasVoted = poll.userVote !== undefined;
       const currentUserId = InnovateAPI.getCurrentUser()?.id;
-      const isOwner = currentUserId === poll.user_id;
+      const isOwner = String(currentUserId) === String(poll.user_id);
       const isAdmin = state.currentGroupIsAdmin || false;
 
       return `
@@ -7182,7 +7182,7 @@
       try {
         // Fetch the task details
         const tasks = await InnovateAPI.apiRequest(`/shared/tasks?context_type=group&context_id=${state.currentGroupId}`);
-        const task = tasks.tasks.find(t => t.id === taskId);
+        const task = tasks.tasks.find(t => String(t.id) === String(taskId));
         if (!task) {
           InnovateAPI.showAlert('Task not found', 'error');
           return;
@@ -8370,8 +8370,8 @@
         const membersList = document.getElementById('membersList');
         if (data.members && data.members.length > 0) {
           const currentUser = InnovateAPI.getCurrentUser();
-          const currentUserMember = data.members.find(m => m.user_id === currentUser.id);
-          const isCurrentUserCreator = group.creator_id === currentUser.id;
+          const currentUserMember = data.members.find(m => String(m.user_id) === String(currentUser.id));
+          const isCurrentUserCreator = String(group.creator_id) === String(currentUser.id);
           const isCurrentUserAdmin = isCurrentUserCreator || (currentUserMember && (currentUserMember.role === 'admin' || currentUserMember.role === 'creator')) || group.is_community_admin;
           
           // Helper to format join date properly
@@ -8388,8 +8388,8 @@
             <div class="members-grid">
               ${data.members.map(member => {
                 const isAdmin = member.role === 'admin' || member.role === 'creator';
-                const isSelf = member.user_id === currentUser.id;
-                const isCreator = member.user_id === group.creator_id;
+                const isSelf = String(member.user_id) === String(currentUser.id);
+                const isCreator = String(member.user_id) === String(group.creator_id);
                 
                 return `
                   <div class="member-card ${isAdmin ? 'member-admin' : ''}">
@@ -8862,7 +8862,7 @@
 
     // Invite Link Modal
     function showInviteLinkModal(groupId) {
-      const group = state.groups.find(g => g.id === groupId);
+      const group = state.groups.find(g => String(g.id) === String(groupId));
       if (!group) return;
       
       const inviteLink = `${window.location.origin}/community/${state.communityId}?groupId=${groupId}`;
@@ -9316,7 +9316,7 @@
       
       // Check if current user has voted
       const currentUserId = InnovateAPI.getCurrentUser()?.id;
-      const userVote = votes.find(v => v.userId === currentUserId);
+      const userVote = votes.find(v => String(v.userId) === String(currentUserId));
       const userVotedIndex = userVote ? userVote.optionIndex : -1;
       
       return `
@@ -10295,7 +10295,7 @@
     }
 
     function editGroup(groupId) {
-      const group = state.groups.find(g => g.id === groupId);
+      const group = state.groups.find(g => String(g.id) === String(groupId));
       if (!group) return;
 
       const modal = document.createElement('div');
@@ -10510,7 +10510,7 @@
         
         if (res.success && res.members.length > 0) {
           const currentUser = InnovateAPI.getCurrentUser();
-          const currentUserMember = res.members.find(m => m.user_id === currentUser.id);
+          const currentUserMember = res.members.find(m => String(m.user_id) === String(currentUser.id));
           const isCurrentUserAdmin = currentUserMember && currentUserMember.role === 'admin';
           
           // Helper to format join date properly
@@ -10527,8 +10527,8 @@
             <div class="members-grid">
               ${res.members.map(member => {
                 const isAdmin = member.role === 'admin';
-                const isSelf = member.user_id === currentUser.id;
-                const isCreator = member.user_id === state.community.admin_id;
+                const isSelf = String(member.user_id) === String(currentUser.id);
+                const isCreator = String(member.user_id) === String(state.community.admin_id);
                 
                 return `
                   <div class="member-card ${isAdmin ? 'member-admin' : ''}">
@@ -10952,7 +10952,7 @@
         console.error('Error updating join requests badge:', error);
         // Still show the menu for private communities even if request fails
         const menuItem = document.getElementById('joinRequestsMenuItem');
-        if (state.community && (state.community.is_public == 0 || state.community.is_public === false) && state.community.admin_id === state.user.id) {
+        if (state.community && (state.community.is_public == 0 || state.community.is_public === false) && String(state.community.admin_id) === String(state.user.id)) {
           menuItem.style.display = 'flex';
         }
       }
@@ -11047,7 +11047,7 @@
     // Update admin features visibility
     function updateAdminFeatures() {
       const adminSection = document.getElementById('adminOnlyFeatures');
-      const isAdmin = state.community && state.community.admin_id === state.user.id;
+      const isAdmin = state.community && String(state.community.admin_id) === String(state.user.id);
       
       if (isAdmin) {
         adminSection.style.display = 'block';
@@ -11067,7 +11067,7 @@
 
     function showGroupActions() {
       // Get current group and user info
-      const currentGroup = state.groups.find(g => g.id === state.currentGroupId);
+      const currentGroup = state.groups.find(g => String(g.id) === String(state.currentGroupId));
       if (!currentGroup) return;
       
       const currentUser = InnovateAPI.getCurrentUser();
@@ -11085,7 +11085,7 @@
       };
       
       // Determine if user is admin
-      const isAdmin = currentGroup.creator_id === currentUser.id || currentGroup.role === 'admin';
+      const isAdmin = String(currentGroup.creator_id) === String(currentUser.id) || currentGroup.role === 'admin';
       
       modal.innerHTML = `
         <div class="ig-modal" style="max-width: 400px; padding: 0; border-radius: 12px; background: var(--ig-primary-background);">
@@ -11164,7 +11164,7 @@
     }
 
     function showInviteLink(groupId) {
-      const group = state.groups.find(g => g.id === groupId);
+      const group = state.groups.find(g => String(g.id) === String(groupId));
       if (!group) return;
       
       // Create invite link

@@ -91,16 +91,31 @@ router.post('/checkin-staff/login', async (req, res) => {
   }
 
   try {
-    // Verify staff credentials
+    // Verify staff credentials (bcrypt hashed passwords)
     db.get(
       `SELECT s.*, e.title, e.event_date, e.location
        FROM event_checkin_staff s
        JOIN events e ON e.id = s.event_id
-       WHERE s.event_id = ? AND s.username = ? AND s.password = ? AND s.is_active = 1`,
-      [event_id, username, password],
-      (err, staff) => {
+       WHERE s.event_id = ? AND s.username = ? AND s.is_active = 1`,
+      [event_id, username],
+      async (err, staff) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!staff) return res.status(401).json({ error: 'Invalid credentials' });
+
+        // Compare password with bcrypt hash (supports legacy plaintext for migration)
+        const bcrypt = require('bcryptjs');
+        let passwordValid = false;
+        if (staff.password && staff.password.startsWith('$2')) {
+          passwordValid = await bcrypt.compare(password, staff.password);
+        } else {
+          // Legacy plaintext comparison — migrate on successful login
+          passwordValid = (staff.password === password);
+          if (passwordValid) {
+            const hashed = await bcrypt.genSalt(12).then(salt => bcrypt.hash(password, salt));
+            db.run('UPDATE event_checkin_staff SET password = ? WHERE id = ?', [hashed, staff.id]);
+          }
+        }
+        if (!passwordValid) return res.status(401).json({ error: 'Invalid credentials' });
 
         // Update last login
         db.run(
@@ -112,7 +127,7 @@ router.post('/checkin-staff/login', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
           { staffId: staff.id, eventId: staff.event_id, type: 'checkin_staff' },
-          process.env.JWT_SECRET || 'your-secret-key',
+          process.env.JWT_SECRET,
           { expiresIn: '12h' }
         );
 
@@ -158,10 +173,15 @@ router.post('/:eventId/checkin-staff', authMiddleware, async (req, res) => {
       return res.status(authz.reason === 'not_found' ? 404 : 403).json({ error: 'Not authorized' });
     }
 
+    // Hash staff password before storing
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     db.run(
       `INSERT INTO event_checkin_staff (event_id, username, password, full_name, created_by)
        VALUES (?, ?, ?, ?, ?)`,
-      [eventId, username, password, full_name || username, userId],
+      [eventId, username, hashedPassword, full_name || username, userId],
       function(err) {
         if (err) {
           if (err.message.includes('UNIQUE')) {
@@ -1650,7 +1670,7 @@ router.post('/:eventId/tickets/check-in', async (req, res) => {
     let authType = null;
     
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
       // Check if it's staff or user auth
       if (decoded.type === 'checkin_staff') {
@@ -1815,9 +1835,9 @@ router.put('/:eventId', authMiddleware, upload.single('cover_photo'), (req, res)
 
   db.run(
     `UPDATE events 
-     SET title = ?,
-         description = ?,
-         event_date = ?,
+     SET title = COALESCE(?, title),
+         description = COALESCE(?, description),
+         event_date = COALESCE(?, event_date),
          is_public = COALESCE(?, is_public),
          city = COALESCE(?, city),
          category = COALESCE(?, category),

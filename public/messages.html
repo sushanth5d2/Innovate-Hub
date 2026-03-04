@@ -1367,8 +1367,8 @@
             <img src="${InnovateAPI.getUserAvatar(conv.profile_picture)}" alt="${conv.username}" class="ig-conversation-avatar" style="cursor:pointer;">
           </div>
           <div class="ig-conversation-info">
-            <div class="ig-conversation-name">${conv.username}</div>
-            <div class="${messageClass}">${messagePreview}</div>
+            <div class="ig-conversation-name">${conv.username}${conv.is_blocked ? ' <span style="color:#ed4956;font-size:11px;font-weight:600;">• Blocked</span>' : ''}</div>
+            <div class="${messageClass}">${conv.is_blocked ? '<span style="color:#ed4956;font-style:italic;">Blocked</span>' : messagePreview}</div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
             <div class="ig-conversation-time">${conv.last_message_time ? formatTime(conv.last_message_time) : ''}</div>
@@ -7781,7 +7781,10 @@
         document.getElementById('contactInfoName').textContent = data.user.username || '';
         document.getElementById('contactInfoBio').textContent = data.user.bio || '';
         document.getElementById('contactInfoCreateGroupText').textContent = `Create group with ${data.user.username}`;
-        document.getElementById('contactInfoBlockText').textContent = `Block ${data.user.username}`;
+        const isBlocked = data.user.is_blocked > 0;
+        const blockTextEl = document.getElementById('contactInfoBlockText');
+        blockTextEl.textContent = isBlocked ? `Unblock ${data.user.username}` : `Block ${data.user.username}`;
+        blockTextEl.dataset.blocked = isBlocked ? '1' : '0';
         document.getElementById('contactInfoReportText').textContent = `Report ${data.user.username}`;
       } catch (e) {
         console.error('Error loading contact info:', e);
@@ -8244,13 +8247,42 @@
     // ========================
     async function blockUserFromPanel() {
       const username = contactInfoData?.username || 'this user';
-      if (!confirm(`Block ${username}? They won't be able to message you.`)) return;
-      try {
-        await InnovateAPI.apiRequest(`/users/${currentContactId}/block`, { method: 'POST' });
-        InnovateAPI.showAlert(`${username} blocked`, 'success');
-        closeContactInfo();
-      } catch (e) {
-        InnovateAPI.showAlert('Failed to block user', 'error');
+      const blockTextEl = document.getElementById('contactInfoBlockText');
+      const isCurrentlyBlocked = blockTextEl?.dataset.blocked === '1';
+
+      if (isCurrentlyBlocked) {
+        // UNBLOCK
+        try {
+          await InnovateAPI.apiRequest(`/users/${currentContactId}/block`, { method: 'DELETE' });
+          InnovateAPI.showAlert(`${username} unblocked`, 'success');
+          blockTextEl.textContent = `Block ${username}`;
+          blockTextEl.dataset.blocked = '0';
+          // Re-enable message input
+          const msgInput = document.getElementById('messageInput');
+          if (msgInput) msgInput.placeholder = 'Message...';
+          const sendBtn = document.getElementById('sendButton');
+          if (sendBtn) sendBtn.disabled = false;
+          if (typeof loadConversations === 'function') loadConversations();
+        } catch (e) {
+          InnovateAPI.showAlert('Failed to unblock user', 'error');
+        }
+      } else {
+        // BLOCK
+        if (!confirm(`Block ${username}? They won't be able to message you.`)) return;
+        try {
+          await InnovateAPI.apiRequest(`/users/${currentContactId}/block`, { method: 'POST' });
+          InnovateAPI.showAlert(`${username} blocked`, 'success');
+          blockTextEl.textContent = `Unblock ${username}`;
+          blockTextEl.dataset.blocked = '1';
+          // Disable the message input to prevent sending to blocked user
+          const msgInput = document.getElementById('messageInput');
+          if (msgInput) msgInput.placeholder = 'You blocked this user';
+          const sendBtn = document.getElementById('sendButton');
+          if (sendBtn) sendBtn.disabled = true;
+          if (typeof loadConversations === 'function') loadConversations();
+        } catch (e) {
+          InnovateAPI.showAlert('Failed to block user', 'error');
+        }
       }
     }
 

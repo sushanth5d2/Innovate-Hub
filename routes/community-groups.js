@@ -78,7 +78,6 @@ router.post('/communities/:communityId/groups', authMiddleware, upload.single('p
         const fileName = req.file.filename;
         const fileFolder = req.file.destination.replace('./uploads/', '');
         profilePicturePath = `/uploads/${fileFolder}/${fileName}`;
-        console.log('Group profile picture uploaded:', profilePicturePath);
       }
 
       // Create group with profile picture and privacy setting
@@ -334,7 +333,6 @@ router.put('/community-groups/:groupId', authMiddleware, upload.single('profile_
         const profilePicturePath = `/uploads/${fileFolder}/${fileName}`;
         updateFields.push('profile_picture = ?');
         updateValues.push(profilePicturePath);
-        console.log('Group profile picture uploaded:', profilePicturePath);
       }
 
       updateFields.push('updated_at = CURRENT_TIMESTAMP');
@@ -427,16 +425,10 @@ router.delete('/community-groups/:groupId', authMiddleware, (req, res) => {
 
 // Post in group
 router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next) => {
-  // Log all fields before multer processing
-  console.log('POST /community-groups/:groupId/posts - Starting request');
-  console.log('Headers:', req.headers['content-type']);
   next();
 }, upload.fields([
   { name: 'attachments', maxCount: 10 }
 ]), (req, res) => {
-  console.log('Multer processed. req.files:', req.files);
-  console.log('req.body:', req.body);
-  
   const db = getDb();
   const userId = req.user.userId;
   const groupId = req.params.groupId;
@@ -527,11 +519,6 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
           }
 
           // Create post
-          console.log('=== SAVING TO DATABASE ===');
-          console.log('Attachments array before stringify:', attachments);
-          console.log('Attachments JSON:', JSON.stringify(attachments));
-          console.log('Reply to:', reply_to);
-          
           db.run(
             `INSERT INTO community_group_posts (group_id, user_id, content, attachments, reply_to)
              VALUES (?, ?, ?, ?, ?)`,
@@ -578,11 +565,6 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
                     ...postRow,
                     attachments: postRow.attachments ? JSON.parse(postRow.attachments) : []
                   };
-
-                  console.log('=== SENDING TO CLIENT ===');
-                  console.log('Post row from DB:', postRow);
-                  console.log('Attachments from DB (raw):', postRow.attachments);
-                  console.log('Attachments parsed:', hydrated.attachments);
 
                   if (io) {
                     io.to(`community_group_${groupId}`).emit('community-group:post:new', hydrated);

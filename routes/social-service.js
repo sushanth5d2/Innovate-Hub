@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
@@ -73,7 +74,7 @@ function checkProximityNotifications(db, io, donationId, donationLat, donationLo
 }
 
 // Get stats
-router.get('/stats', authMiddleware, (req, res) => {
+router.get('/stats', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   
   db.get(`
@@ -88,10 +89,10 @@ router.get('/stats', authMiddleware, (req, res) => {
     }
     res.json({ success: true, stats });
   });
-});
+}));
 
 // Get all donations (donation tab)
-router.get('/donations', authMiddleware, (req, res) => {
+router.get('/donations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -115,10 +116,10 @@ router.get('/donations', authMiddleware, (req, res) => {
     }
     res.json({ success: true, donations });
   });
-});
+}));
 
 // Get user's own donations
-router.get('/my-donations', authMiddleware, (req, res) => {
+router.get('/my-donations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -143,10 +144,10 @@ router.get('/my-donations', authMiddleware, (req, res) => {
     }
     res.json({ success: true, donations });
   });
-});
+}));
 
 // Get user's picked donations (picked tab)
-router.get('/picked-donations', authMiddleware, (req, res) => {
+router.get('/picked-donations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -168,18 +169,18 @@ router.get('/picked-donations', authMiddleware, (req, res) => {
     }
     res.json({ success: true, donations });
   });
-});
+}));
 
 // Create donation
 router.post('/donations', authMiddleware, upload.fields([
   { name: 'images', maxCount: 5 }
-]), (req, res) => {
+]), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { title, description, address, latitude, longitude, category, city, phone } = req.body;
 
   // Process uploaded images
-  const images = req.files.images ? req.files.images.map(file => file.path) : [];
+  const images = (req.files && req.files.images) ? req.files.images.map(file => file.path) : [];
 
   const query = `
     INSERT INTO donations (user_id, title, description, images, address, latitude, longitude, category, city, phone)
@@ -211,12 +212,12 @@ router.post('/donations', authMiddleware, upload.fields([
 
     res.json({ success: true, donation_id: donationId });
   });
-});
+}));
 
 // Update donation
 router.put('/donations/:id', authMiddleware, upload.fields([
   { name: 'images', maxCount: 5 }
-]), (req, res) => {
+]), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -256,10 +257,10 @@ router.put('/donations/:id', authMiddleware, upload.fields([
       res.json({ success: true });
     });
   });
-});
+}));
 
 // Delete donation
-router.delete('/donations/:id', authMiddleware, (req, res) => {
+router.delete('/donations/:id', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -281,10 +282,10 @@ router.delete('/donations/:id', authMiddleware, (req, res) => {
       res.json({ success: true });
     });
   });
-});
+}));
 
 // Assign donation to user (pick it up)
-router.post('/donations/:id/pickup', authMiddleware, (req, res) => {
+router.post('/donations/:id/pickup', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -332,10 +333,10 @@ router.post('/donations/:id/pickup', authMiddleware, (req, res) => {
       });
     });
   });
-});
+}));
 
 // Unassign from a donation
-router.post('/donations/:id/unassign', authMiddleware, (req, res) => {
+router.post('/donations/:id/unassign', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -383,10 +384,10 @@ router.post('/donations/:id/unassign', authMiddleware, (req, res) => {
       });
     });
   });
-});
+}));
 
 // Old assign endpoint (kept for backwards compatibility)
-router.post('/donations/:id/assign', authMiddleware, (req, res) => {
+router.post('/donations/:id/assign', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -422,10 +423,10 @@ router.post('/donations/:id/assign', authMiddleware, (req, res) => {
       });
     });
   });
-});
+}));
 
 // Unassign donation
-router.delete('/donations/:id/assign', authMiddleware, (req, res) => {
+router.delete('/donations/:id/assign', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
@@ -440,18 +441,18 @@ router.delete('/donations/:id/assign', authMiddleware, (req, res) => {
 
     res.json({ success: true });
   });
-});
+}));
 
 // Upload completion photos
 router.post('/donations/:id/complete', authMiddleware, upload.fields([
   { name: 'completion_photos', maxCount: 5 }
-]), (req, res) => {
+]), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const donationId = req.params.id;
 
   // Process uploaded photos
-  const photos = req.files.completion_photos ? req.files.completion_photos.map(file => file.path) : [];
+  const photos = (req.files && req.files.completion_photos) ? req.files.completion_photos.map(file => file.path) : [];
 
   if (photos.length === 0) {
     return res.status(400).json({ error: 'At least one completion photo is required' });
@@ -495,10 +496,10 @@ router.post('/donations/:id/complete', authMiddleware, upload.fields([
       });
     });
   });
-});
+}));
 
 // Get donations for map view (only with location data)
-router.get('/map-donations', authMiddleware, (req, res) => {
+router.get('/map-donations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
 
   const query = `
@@ -522,10 +523,10 @@ router.get('/map-donations', authMiddleware, (req, res) => {
     }
     res.json({ success: true, donations });
   });
-});
+}));
 
 // Get user's map settings
-router.get('/map-settings', authMiddleware, (req, res) => {
+router.get('/map-settings', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -548,10 +549,10 @@ router.get('/map-settings', authMiddleware, (req, res) => {
     
     res.json({ success: true, settings });
   });
-});
+}));
 
 // Save user's map settings
-router.post('/map-settings', authMiddleware, (req, res) => {
+router.post('/map-settings', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { show_on_map, proximity_notifications, proximity_distance, user_latitude, user_longitude } = req.body;
@@ -592,6 +593,6 @@ router.post('/map-settings', authMiddleware, (req, res) => {
       );
     }
   });
-});
+}));
 
 module.exports = router;

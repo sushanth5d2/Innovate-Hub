@@ -114,7 +114,7 @@ router.get('/', authMiddleware, (req, res) => {
     `SELECT u.id as user_id, u.username, u.profile_picture, u.date_of_birth
      FROM followers f
      JOIN users u ON f.following_id = u.id
-     WHERE f.follower_id = ? AND u.date_of_birth IS NOT NULL AND u.date_of_birth != ''`,
+     WHERE f.follower_id = ? AND u.date_of_birth IS NOT NULL AND u.date_of_birth != '' AND LENGTH(CAST(u.date_of_birth AS TEXT)) >= 8`,
     [userId],
     (err, rows) => {
       if (!err && rows) {

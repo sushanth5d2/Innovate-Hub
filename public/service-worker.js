@@ -44,6 +44,18 @@ self.addEventListener('install', event => {
 
 // Cache and return requests
 self.addEventListener('fetch', event => {
+  const requestUrl = event.request.url;
+  
+  // Never cache API calls, Socket.IO, or POST/PUT/DELETE requests
+  if (
+    requestUrl.includes('/api/') ||
+    requestUrl.includes('/socket.io/') ||
+    event.request.method !== 'GET'
+  ) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {

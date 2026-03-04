@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { getDb } = require('../config/database');
+const { validateInput } = require('../middleware/validateInput');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -25,7 +26,8 @@ router.post('/upload/init', authMiddleware, (req, res) => {
   if (!fileName || !totalChunks) {
     return res.status(400).json({ error: 'fileName and totalChunks required' });
   }
-  const uploadId = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  const crypto = require('crypto');
+  const uploadId = Date.now() + '-' + crypto.randomBytes(16).toString('hex');
   const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
   fs.mkdirSync(tempDir, { recursive: true });
 
@@ -42,6 +44,11 @@ router.post('/upload/chunk', authMiddleware, chunkUpload.single('chunk'), (req, 
     return res.status(400).json({ error: 'uploadId and chunkIndex required' });
   }
 
+  // Prevent path traversal — reject uploadId containing path separators or ..
+  if (/[/\\]|\.\./.test(String(uploadId)) || /[/\\]|\.\./.test(String(chunkIndex))) {
+    return res.status(400).json({ error: 'Invalid uploadId or chunkIndex' });
+  }
+
   const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
   const metaPath = path.join(tempDir, 'meta.json');
   if (!fs.existsSync(metaPath)) {
@@ -49,12 +56,12 @@ router.post('/upload/chunk', authMiddleware, chunkUpload.single('chunk'), (req, 
   }
 
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-  if (meta.userId != req.user.userId) {
+  if (meta.userId !== req.user.userId && String(meta.userId) !== String(req.user.userId)) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
   if (req.file) {
-    const chunkPath = path.join(tempDir, `chunk_${chunkIndex}`);
+    const chunkPath = path.join(tempDir, `chunk_${parseInt(chunkIndex, 10)}`);
     fs.renameSync(req.file.path, chunkPath);
     meta.receivedChunks++;
     fs.writeFileSync(metaPath, JSON.stringify(meta));
@@ -70,6 +77,11 @@ router.post('/upload/finalize', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'uploadId required' });
   }
 
+  // Prevent path traversal
+  if (/[/\\]|\.\./.test(String(uploadId))) {
+    return res.status(400).json({ error: 'Invalid uploadId' });
+  }
+
   const tempDir = path.join(__dirname, '..', 'uploads', 'temp', uploadId);
   const metaPath = path.join(tempDir, 'meta.json');
   if (!fs.existsSync(metaPath)) {
@@ -77,7 +89,7 @@ router.post('/upload/finalize', authMiddleware, (req, res) => {
   }
 
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-  if (meta.userId != req.user.userId) {
+  if (meta.userId !== req.user.userId && String(meta.userId) !== String(req.user.userId)) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
 
@@ -162,106 +174,96 @@ router.get('/', authMiddleware, (req, res) => {
       return res.status(500).json({ error: 'Error fetching posts' });
     }
 
-    // Parse JSON fields and fetch polls
-    const processedPosts = [];
-    let pending = posts.length;
-
-    if (posts.length === 0) {
+    if (!posts || posts.length === 0) {
       return res.json({ success: true, posts: [] });
     }
 
-    posts.forEach(post => {
-      // Get poll data if exists
-      db.get('SELECT * FROM polls WHERE post_id = ?', [post.id], (err, poll) => {
-        if (poll) {
-          // Check if current user has voted on this poll
-          db.get('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, userId], (err2, userVote) => {
-            const parsedOptions = JSON.parse(poll.options);
-            const processedPost = {
-              ...post,
-              images: post.images ? JSON.parse(post.images) : [],
-              files: post.files ? JSON.parse(post.files) : [],
-              hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
-              custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
-              comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
-              user_has_liked: post.user_has_liked > 0,
-              is_saved: post.is_saved > 0,
-              poll: {
-                ...poll,
-                options: parsedOptions,
-                votes: JSON.parse(poll.votes),
-                user_voted: userVote ? parsedOptions[userVote.option_index] : null
-              },
-              recent_comments: [],
-              recent_liker: null
-            };
-            // Fetch last 2 comments for inline display
-            db.all(
-              `SELECT c.id, c.content, c.created_at, c.user_id, u.username, u.profile_picture
-               FROM post_comments c JOIN users u ON c.user_id = u.id
-               WHERE c.post_id = ? AND c.parent_id IS NULL
-               ORDER BY c.created_at DESC LIMIT 2`,
-              [post.id],
-              (errC, recentComments) => {
-                processedPost.recent_comments = (recentComments || []).reverse();
-                db.get(
-                  `SELECT u.username FROM post_likes pl JOIN users u ON pl.user_id = u.id WHERE pl.post_id = ? ORDER BY pl.created_at DESC LIMIT 1`,
-                  [post.id],
-                  (errL, liker) => {
-                    processedPost.recent_liker = liker ? liker.username : null;
-                    processedPosts.push(processedPost);
-                    pending--;
-                    if (pending === 0) {
-                      processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                      res.json({ success: true, posts: processedPosts });
-                    }
-                  }
-                );
-              }
-            );
-          });
-          return;
-        }
-        const processedPost = {
-          ...post,
-          images: post.images ? JSON.parse(post.images) : [],
-          files: post.files ? JSON.parse(post.files) : [],
-          hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
-          custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
-          comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
-          user_has_liked: post.user_has_liked > 0,
-          is_saved: post.is_saved > 0,
-          poll: null,
-          recent_comments: [],
-          recent_liker: null
-        };
+    const postIds = posts.map(p => p.id);
+    const placeholders = postIds.map(() => '?').join(',');
 
-        // Fetch last 2 comments for inline display
-        db.all(
-          `SELECT c.id, c.content, c.created_at, c.user_id, u.username, u.profile_picture
-           FROM post_comments c JOIN users u ON c.user_id = u.id
-           WHERE c.post_id = ? AND c.parent_id IS NULL
-           ORDER BY c.created_at DESC LIMIT 2`,
-          [post.id],
-          (errC, recentComments) => {
-            processedPost.recent_comments = (recentComments || []).reverse();
-            // Fetch one recent liker username
-            db.get(
-              `SELECT u.username FROM post_likes pl JOIN users u ON pl.user_id = u.id WHERE pl.post_id = ? ORDER BY pl.created_at DESC LIMIT 1`,
-              [post.id],
-              (errL, liker) => {
-                processedPost.recent_liker = liker ? liker.username : null;
-                processedPosts.push(processedPost);
-                pending--;
-                if (pending === 0) {
-                  processedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    // Batch query 1: All polls for these posts
+    db.all(`SELECT * FROM polls WHERE post_id IN (${placeholders})`, postIds, (errP, polls) => {
+      if (errP) polls = [];
+      const pollMap = {};
+      (polls || []).forEach(p => { pollMap[p.post_id] = p; });
+
+      const pollIds = (polls || []).map(p => p.id);
+      const pollPlaceholders = pollIds.length > 0 ? pollIds.map(() => '?').join(',') : '0';
+
+      // Batch query 2: Current user's poll votes
+      db.all(
+        `SELECT poll_id, option_index FROM poll_votes WHERE poll_id IN (${pollPlaceholders}) AND user_id = ?`,
+        [...pollIds, userId],
+        (errV, votes) => {
+          if (errV) votes = [];
+          const voteMap = {};
+          (votes || []).forEach(v => { voteMap[v.poll_id] = v.option_index; });
+
+          // Batch query 3: Recent 2 comments per post (using a wider fetch and grouping in JS)
+          db.all(
+            `SELECT c.id, c.content, c.created_at, c.user_id, c.post_id, u.username, u.profile_picture
+             FROM post_comments c JOIN users u ON c.user_id = u.id
+             WHERE c.post_id IN (${placeholders}) AND c.parent_id IS NULL
+             ORDER BY c.post_id, c.created_at DESC`,
+            postIds,
+            (errC, allComments) => {
+              if (errC) allComments = [];
+              const commentMap = {};
+              (allComments || []).forEach(c => {
+                if (!commentMap[c.post_id]) commentMap[c.post_id] = [];
+                if (commentMap[c.post_id].length < 2) commentMap[c.post_id].push(c);
+              });
+
+              // Batch query 4: Most recent liker per post
+              db.all(
+                `SELECT pl.post_id, u.username
+                 FROM post_likes pl JOIN users u ON pl.user_id = u.id
+                 WHERE pl.post_id IN (${placeholders})
+                 ORDER BY pl.post_id, pl.created_at DESC`,
+                postIds,
+                (errL, allLikers) => {
+                  if (errL) allLikers = [];
+                  const likerMap = {};
+                  (allLikers || []).forEach(l => {
+                    if (!likerMap[l.post_id]) likerMap[l.post_id] = l.username;
+                  });
+
+                  // Assemble all posts
+                  const processedPosts = posts.map(post => {
+                    const poll = pollMap[post.id] || null;
+                    let pollData = null;
+                    if (poll) {
+                      const parsedOptions = JSON.parse(poll.options);
+                      const userVoteIdx = voteMap[poll.id];
+                      pollData = {
+                        ...poll,
+                        options: parsedOptions,
+                        votes: JSON.parse(poll.votes),
+                        user_voted: userVoteIdx !== undefined ? parsedOptions[userVoteIdx] : null
+                      };
+                    }
+                    return {
+                      ...post,
+                      images: post.images ? JSON.parse(post.images) : [],
+                      files: post.files ? JSON.parse(post.files) : [],
+                      hashtags: post.hashtags ? JSON.parse(post.hashtags) : [],
+                      custom_button: post.custom_button ? JSON.parse(post.custom_button) : null,
+                      comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
+                      user_has_liked: post.user_has_liked > 0,
+                      is_saved: post.is_saved > 0,
+                      poll: pollData,
+                      recent_comments: (commentMap[post.id] || []).reverse(),
+                      recent_liker: likerMap[post.id] || null
+                    };
+                  });
+
                   res.json({ success: true, posts: processedPosts });
                 }
-              }
-            );
-          }
-        );
-      });
+              );
+            }
+          );
+        }
+      );
     });
   });
 });
@@ -355,6 +357,12 @@ router.post('/', authMiddleware, (req, res, next) => {
 }, (req, res) => {
   const db = getDb();
   const userId = req.user.userId;
+
+  // Input validation — cap field lengths
+  if (req.body.content && req.body.content.length > 50000) {
+    return res.status(400).json({ error: 'Content exceeds maximum length (50000 chars)' });
+  }
+
   const { 
     content, 
     is_story, 
@@ -756,6 +764,47 @@ router.get('/tagged/:userId', authMiddleware, (req, res) => {
 
       res.json({ success: true, posts });
     });
+  });
+});
+
+// Get creator series feed
+router.get('/series', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const offset = (page - 1) * limit;
+
+  const query = `
+    SELECT p.*, u.username, u.profile_picture,
+      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+      (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+      (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+      (SELECT COUNT(*) FROM saved_posts WHERE post_id = p.id AND user_id = ?) as is_saved
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = p.user_id)
+    LEFT JOIN blocked_users b2 ON (b2.blocker_id = p.user_id AND b2.blocked_id = ?)
+    WHERE p.is_creator_series = 1 AND p.is_archived = 0
+      AND b1.id IS NULL AND b2.id IS NULL
+    ORDER BY p.created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  db.all(query, [userId, userId, userId, userId, limit, offset], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error fetching series', detail: err.message });
+    }
+
+    const posts = (rows || []).map(p => {
+      try { p.images = JSON.parse(p.images || '[]'); } catch(e) { p.images = []; }
+      try { p.files = JSON.parse(p.files || '[]'); } catch(e) { p.files = []; }
+      try { p.hashtags = JSON.parse(p.hashtags || '[]'); } catch(e) { p.hashtags = []; }
+      try { p.custom_button = p.custom_button ? JSON.parse(p.custom_button) : null; } catch(e) { p.custom_button = null; }
+      return p;
+    });
+
+    res.json({ success: true, posts, page, limit });
   });
 });
 

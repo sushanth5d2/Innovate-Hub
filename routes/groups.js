@@ -6,9 +6,58 @@ const upload = require('../middleware/upload');
 
 router.use(authMiddleware);
 
+// Ensure schema columns exist (run once at module load, not per-request)
+let schemaReady = false;
+let schemaPromise = null;
+function ensureSchema() {
+  if (schemaReady) return Promise.resolve();
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = new Promise((resolve) => {
+    try {
+      const db = getDb();
+      const isPostgres = process.env.DB_TYPE === 'postgresql';
+      let pending = 0;
+      const done = () => { if (--pending <= 0) { schemaReady = true; resolve(); } };
+
+      if (isPostgres) {
+        pending = 4;
+        db.run(`ALTER TABLE group_conversations ADD COLUMN IF NOT EXISTS profile_picture TEXT DEFAULT ''`, () => done());
+        db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE`, () => done());
+        db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMP`, () => done());
+        db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS pinned_by INTEGER`, () => done());
+      } else {
+        // SQLite: check columns first via PRAGMA
+        pending = 2;
+        db.all(`PRAGMA table_info(group_conversations)`, (err, columns) => {
+          if (err || !columns) { done(); return; }
+          const hasProfilePicture = columns.some(c => c.name === 'profile_picture');
+          if (!hasProfilePicture) {
+            db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => done());
+          } else { done(); }
+        });
+        db.all(`PRAGMA table_info(group_messages)`, (err, columns) => {
+          if (err || !columns) { done(); return; }
+          let alterPending = 0;
+          const cols = (columns || []).map(c => c.name);
+          if (!cols.includes('is_pinned')) alterPending++;
+          if (!cols.includes('pinned_at')) alterPending++;
+          if (!cols.includes('pinned_by')) alterPending++;
+          if (alterPending === 0) { done(); return; }
+          const alterDone = () => { if (--alterPending <= 0) done(); };
+          if (!cols.includes('is_pinned')) db.run(`ALTER TABLE group_messages ADD COLUMN is_pinned BOOLEAN DEFAULT 0`, () => alterDone());
+          if (!cols.includes('pinned_at')) db.run(`ALTER TABLE group_messages ADD COLUMN pinned_at DATETIME`, () => alterDone());
+          if (!cols.includes('pinned_by')) db.run(`ALTER TABLE group_messages ADD COLUMN pinned_by INTEGER`, () => alterDone());
+        });
+      }
+    } catch (e) { schemaReady = true; resolve(); }
+  });
+  return schemaPromise;
+}
+
 // Create a group (supports multipart with profile_picture or JSON body)
-router.post('/', upload.single('profile_picture'), (req, res) => {
+router.post('/', upload.single('profile_picture'), async (req, res) => {
   const db = getDb();
+  await ensureSchema();
   const creatorId = req.user.userId || req.user.id;
   
   let name, member_ids, usernames;
@@ -24,8 +73,7 @@ router.post('/', upload.single('profile_picture'), (req, res) => {
     return res.status(400).json({ error: 'Group name is required' });
   }
 
-  // Ensure profile_picture column exists
-  db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
+  {
     const profilePic = req.file ? req.file.path.replace(/\\/g, '/').replace(/^\.?\/?/, '/') : '';
     
     db.run(
@@ -59,15 +107,14 @@ router.post('/', upload.single('profile_picture'), (req, res) => {
         });
       }
     );
-  });
+  }
 });
 
 // List groups for current user with previews and unread counts
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const db = getDb();
   const userId = req.user.userId || req.user.id;
-  // Ensure profile_picture column exists
-  db.run(`ALTER TABLE group_conversations ADD COLUMN profile_picture TEXT DEFAULT ''`, () => {
+  await ensureSchema();
   db.all(
     `SELECT g.id, g.name, g.created_at, g.profile_picture,
             (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as member_count,
@@ -84,7 +131,6 @@ router.get('/', (req, res) => {
       res.json({ success: true, groups: rows });
     }
   );
-  });
 });
 
 // Make/revoke admin for a group member
@@ -120,11 +166,20 @@ router.put('/:groupId/members/:userId/role', (req, res) => {
   );
 });
 
-// Get group messages
+// Get group messages (membership check)
 router.get('/:groupId/messages', (req, res) => {
   const db = getDb();
   const userId = req.user.userId || req.user.id;
   const groupId = parseInt(req.params.groupId, 10);
+
+  // Verify user is a member of this group
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+     UNION SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, userId, groupId, userId],
+    (err, member) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!member) return res.status(403).json({ error: 'Not a member of this group' });
 
   db.all(
     `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.attachments,
@@ -139,6 +194,7 @@ router.get('/:groupId/messages', (req, res) => {
       res.json({ success: true, messages: rows });
     }
   );
+    });
 });
 
 // Send a group message (text or simple content)
@@ -163,15 +219,20 @@ router.post('/:groupId/messages', (req, res) => {
       }
       
       if (!member) {
-        console.log('User', senderId, 'is not a member of group', groupId);
+        // User is not a member of this group
         return res.status(403).json({ error: 'You are not a member of this group' });
       }
       
       // User is a member, proceed with message
+      // Compute expires_at in JS to avoid PG parameter type inference issues
+      let expiresAt = null;
+      if (timer !== null && timer !== undefined && !isNaN(parseInt(timer))) {
+        expiresAt = new Date(Date.now() + parseInt(timer) * 1000).toISOString();
+      }
       db.run(
         `INSERT INTO group_messages (group_id, sender_id, content, type, timer, expires_at)
-         VALUES (?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN datetime('now', '+' || ? || ' seconds') ELSE NULL END)`,
-        [groupId, senderId, content, type, timer, timer, timer],
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [groupId, senderId, content, type, timer, expiresAt],
         function(err) {
           if (err) {
             console.error('Error inserting group message:', err);

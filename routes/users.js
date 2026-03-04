@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
 
 // Get user profile
-router.get('/:userId', authMiddleware, (req, res) => {
+router.get('/:userId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
   const currentUserId = req.user.userId;
@@ -41,10 +42,10 @@ router.get('/:userId', authMiddleware, (req, res) => {
 
     res.json({ success: true, user });
   });
-});
+}));
 
 // Get user's posts
-router.get('/:userId/posts', authMiddleware, (req, res) => {
+router.get('/:userId/posts', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
   const currentUserId = req.user.userId;
@@ -75,7 +76,7 @@ router.get('/:userId/posts', authMiddleware, (req, res) => {
     // Own profile — return all posts
     return fetchUserPosts(db, userId, currentUserId, res, false);
   }
-});
+}));
 
 function fetchUserPosts(db, userId, currentUserId, res, onlyPublicPosts) {
   let query = `
@@ -160,7 +161,7 @@ function fetchUserPosts(db, userId, currentUserId, res, onlyPublicPosts) {
 }
 
 // Get user's saved posts
-router.get('/:userId/saved', authMiddleware, (req, res) => {
+router.get('/:userId/saved', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -243,10 +244,10 @@ router.get('/:userId/saved', authMiddleware, (req, res) => {
       });
     });
   });
-});
+}));
 
 // Get followers
-router.get('/:userId/followers', authMiddleware, (req, res) => {
+router.get('/:userId/followers', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
 
@@ -264,10 +265,10 @@ router.get('/:userId/followers', authMiddleware, (req, res) => {
     }
     res.json({ success: true, followers });
   });
-});
+}));
 
 // Get following
-router.get('/:userId/following', authMiddleware, (req, res) => {
+router.get('/:userId/following', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
 
@@ -285,10 +286,10 @@ router.get('/:userId/following', authMiddleware, (req, res) => {
     }
     res.json({ success: true, following });
   });
-});
+}));
 
 // Update profile picture only
-router.post('/profile-picture', authMiddleware, upload.single('profile_picture'), (req, res) => {
+router.post('/profile-picture', authMiddleware, upload.single('profile_picture'), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -308,10 +309,10 @@ router.post('/profile-picture', authMiddleware, upload.single('profile_picture')
       res.json({ success: true, profile_picture });
     }
   );
-});
+}));
 
 // Update profile
-router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => {
+router.put('/', authMiddleware, upload.single('profile_picture'), asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { bio, skills, interests, favorite_teams, fullname, username } = req.body;
@@ -348,10 +349,10 @@ router.put('/', authMiddleware, upload.single('profile_picture'), (req, res) => 
     }
     res.json({ success: true, profile_picture });
   });
-});
+}));
 
 // Follow user (with private account support)
-router.post('/:userId/follow', authMiddleware, (req, res) => {
+router.post('/:userId/follow', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const followerId = req.user.userId;
   const followingId = parseInt(req.params.userId);
@@ -473,10 +474,10 @@ router.post('/:userId/follow', authMiddleware, (req, res) => {
       });
     }
   });
-});
+}));
 
 // Unfollow user (also cancels pending follow requests)
-router.delete('/:userId/follow', authMiddleware, (req, res) => {
+router.delete('/:userId/follow', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const followerId = req.user.userId;
   const followingId = parseInt(req.params.userId);
@@ -511,12 +512,12 @@ router.delete('/:userId/follow', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // ===== FOLLOW REQUEST ENDPOINTS =====
 
 // Get pending follow requests (for current user)
-router.get('/follow-requests/pending', authMiddleware, (req, res) => {
+router.get('/follow-requests/pending', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -533,10 +534,10 @@ router.get('/follow-requests/pending', authMiddleware, (req, res) => {
     }
     res.json({ success: true, requests: requests || [] });
   });
-});
+}));
 
 // Accept follow request
-router.post('/follow-requests/:requestId/accept', authMiddleware, (req, res) => {
+router.post('/follow-requests/:requestId/accept', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const requestId = parseInt(req.params.requestId);
@@ -585,10 +586,10 @@ router.post('/follow-requests/:requestId/accept', authMiddleware, (req, res) => 
       res.json({ success: true });
     });
   });
-});
+}));
 
 // Decline follow request
-router.post('/follow-requests/:requestId/decline', authMiddleware, (req, res) => {
+router.post('/follow-requests/:requestId/decline', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const requestId = parseInt(req.params.requestId);
@@ -611,10 +612,10 @@ router.post('/follow-requests/:requestId/decline', authMiddleware, (req, res) =>
       res.json({ success: true });
     });
   });
-});
+}));
 
 // Get follow request count
-router.get('/follow-requests/count', authMiddleware, (req, res) => {
+router.get('/follow-requests/count', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -624,10 +625,10 @@ router.get('/follow-requests/count', authMiddleware, (req, res) => {
     }
     res.json({ success: true, count: result ? result.count : 0 });
   });
-});
+}));
 
 // Block user
-router.post('/:userId/block', authMiddleware, (req, res) => {
+router.post('/:userId/block', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const blockerId = req.user.userId;
   const blockedId = parseInt(req.params.userId);
@@ -651,10 +652,10 @@ router.post('/:userId/block', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // Unblock user
-router.delete('/:userId/block', authMiddleware, (req, res) => {
+router.delete('/:userId/block', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const blockerId = req.user.userId;
   const blockedId = parseInt(req.params.userId);
@@ -669,10 +670,10 @@ router.delete('/:userId/block', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // Get blocked users
-router.get('/blocked/list', authMiddleware, (req, res) => {
+router.get('/blocked/list', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -690,10 +691,10 @@ router.get('/blocked/list', authMiddleware, (req, res) => {
     }
     res.json({ success: true, blocked });
   });
-});
+}));
 
 // Toggle private account
-router.put('/privacy', authMiddleware, (req, res) => {
+router.put('/privacy', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { is_private } = req.body;
@@ -721,10 +722,10 @@ router.put('/privacy', authMiddleware, (req, res) => {
       res.json({ success: true, is_private: is_private ? 1 : 0 });
     }
   );
-});
+}));
 
 // Toggle online status
-router.put('/online-status', authMiddleware, (req, res) => {
+router.put('/online-status', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { is_online } = req.body;
@@ -739,10 +740,10 @@ router.put('/online-status', authMiddleware, (req, res) => {
       res.json({ success: true, is_online: is_online ? 1 : 0 });
     }
   );
-});
+}));
 
 // Remove a follower (remove someone who follows you)
-router.delete('/:userId/remove-follower', authMiddleware, (req, res) => {
+router.delete('/:userId/remove-follower', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const currentUserId = req.user.userId;
   const followerToRemove = parseInt(req.params.userId);
@@ -757,10 +758,10 @@ router.delete('/:userId/remove-follower', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // Mute a user
-router.post('/:userId/mute', authMiddleware, (req, res) => {
+router.post('/:userId/mute', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const currentUserId = req.user.userId;
   const mutedUserId = parseInt(req.params.userId);
@@ -784,10 +785,10 @@ router.post('/:userId/mute', authMiddleware, (req, res) => {
       }
     );
   });
-});
+}));
 
 // Unmute a user
-router.delete('/:userId/mute', authMiddleware, (req, res) => {
+router.delete('/:userId/mute', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const currentUserId = req.user.userId;
   const mutedUserId = parseInt(req.params.userId);
@@ -800,10 +801,10 @@ router.delete('/:userId/mute', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
-});
+}));
 
 // Search users (for @mention and share)
-router.get('/search/query', authMiddleware, (req, res) => {
+router.get('/search/query', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { q } = req.query;
   const userId = req.user.userId;
@@ -824,10 +825,10 @@ router.get('/search/query', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ error: 'Error searching users' });
     res.json({ success: true, users: users || [] });
   });
-});
+}));
 
 // Get frequently messaged users (for share post)
-router.get('/frequent/messaged', authMiddleware, (req, res) => {
+router.get('/frequent/messaged', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
@@ -850,10 +851,10 @@ router.get('/frequent/messaged', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ error: 'Error fetching users' });
     res.json({ success: true, users: users || [] });
   });
-});
+}));
 
 // Get followers with follow-back status
-router.get('/:userId/followers-detailed', authMiddleware, (req, res) => {
+router.get('/:userId/followers-detailed', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
   const currentUserId = req.user.userId;
@@ -872,10 +873,10 @@ router.get('/:userId/followers-detailed', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ error: 'Error fetching followers' });
     res.json({ success: true, followers: followers || [] });
   });
-});
+}));
 
 // Get following with detailed info
-router.get('/:userId/following-detailed', authMiddleware, (req, res) => {
+router.get('/:userId/following-detailed', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const { userId } = req.params;
 
@@ -892,6 +893,6 @@ router.get('/:userId/following-detailed', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ error: 'Error fetching following' });
     res.json({ success: true, following: following || [] });
   });
-});
+}));
 
 module.exports = router;

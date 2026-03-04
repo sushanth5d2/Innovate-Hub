@@ -1,0 +1,106 @@
+
+# INNOVATE-HUB PRODUCTION READINESS AUDIT
+# Date: Wed Mar  4 12:27:09 UTC 2026
+# Server: http://localhost:3000 (PostgreSQL)
+
+
+Users: audit_user1_4242 (ID=57), audit_user2_4242 (ID=58)
+
+| # | Endpoint | Method | HTTP Code | Status | Response (truncated) |
+|---|----------|--------|-----------|--------|---------------------|
+| 1 | GET /api/posts/ — Feed | GET | 200 | PASS | {"success":true,"posts":[{"id":2,"user_id":1,"content":"<script>alert(\"xss\")</script>","images":[],"files":[],"video_url":null,"is_story":false,"is_archived":false,"scheduled_at":null,"expires_at":n |
+| 2 | POST /api/posts/ — Create text post | POST | 200 | PASS | {"success":true,"post":{"id":7,"content":"Audit test post from user 1 #audit","images":[],"files":[],"video_url":null,"is_story":0,"created_at":"2026-03-04T12:27:09.364Z"}} |
+| 3 | POST /api/posts/ — Creator series | POST | 200 | PASS | {"success":true,"post":{"id":8,"content":"Creator series post #series","images":[],"files":[],"video_url":null,"is_story":0,"created_at":"2026-03-04T12:27:09.413Z"}} |
+| 4 | POST /api/posts/ — Poll post | POST | 200 | PASS | {"success":true,"post":{"id":9,"content":"Poll post for audit","images":[],"files":[],"video_url":null,"is_story":0,"created_at":"2026-03-04T12:27:09.476Z"}} |
+| 5 | GET /api/posts/:id — Single post | GET | 200 | PASS | {"post":{"id":7,"user_id":57,"content":"Audit test post from user 1 #audit","images":[],"files":[],"video_url":null,"is_story":false,"is_archived":false,"scheduled_at":null,"expires_at":null,"likes_co |
+| 6 | POST /api/posts/:id/like — Like | POST | 200 | PASS | {"success":true,"liked":true,"likes_count":0} |
+| 7 | DELETE /api/posts/:id/like — Unlike | DELETE | 404 | FAIL | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot DELETE /api/posts/7/like</pre>
+</body>
+</html> |
+| 8 | POST /api/posts/:id/comments — Add comment | POST | 200 | PASS | {"success":true,"commentId":4} |
+| 9 | GET /api/posts/:id/comments | GET | 200 | PASS | {"success":true,"comments":[{"id":4,"post_id":7,"user_id":58,"content":"Great audit post!","created_at":"2026-03-04T12:27:09.589Z","parent_id":null,"username":"audit_user2_4242","profile_picture":null |
+| 10 | POST /api/posts/:id/save — Save | POST | 200 | PASS | {"success":true} |
+| 11 | DELETE /api/posts/:id/save — Unsave | DELETE | 200 | PASS | {"success":true} |
+| 12 | POST /api/posts/:id/share — Share | POST | 404 | FAIL | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot POST /api/posts/7/share</pre>
+</body>
+</html> |
+| 13 | GET /api/posts/stories | GET | 200 | PASS | {"success":true,"stories":[]} |
+| 14 | GET /api/posts/series | GET | 500 | FAIL | {"error":"Database error","detail":"invalid input syntax for type bigint: \"series\""} |
+| 15 | PUT /api/posts/:id — Edit post | PUT | 200 | PASS | {"success":true} |
+| 16 | DELETE /api/posts/:id — Delete post | DELETE | 200 | PASS | {"success":true} |
+| 17 | GET /api/messages/conversations | GET | 200 | PASS | {"success":true,"conversations":[]} |
+| 18 | POST /api/messages/send — Send message | POST | 200 | PASS | {"success":true,"message":{"id":4,"sender_id":57,"receiver_id":58,"content":"Hello from audit user 1","type":"text","timer":null,"expires_at":null,"original_filename":null,"sender_username":"audit_use |
+| 19 | GET /api/messages/:contactId | GET | 200 | PASS | {"success":true,"messages":[{"id":4,"sender_id":57,"receiver_id":58,"content":"Hello from audit user 1","attachments":[],"is_read":false,"is_deleted_by_sender":false,"is_deleted_by_receiver":false,"cr |
+| 20 | PUT /api/messages/:id — Edit | PUT | 200 | PASS | {"success":true,"message":{"id":"4","content":"Edited audit message","type":"text","original_filename":null}} |
+| 21 | DELETE /api/messages/:id — Delete | DELETE | 200 | PASS | {"success":true} |
+| 22 | POST /api/messages/:id/star — Star | POST | 500 | FAIL | {"error":"Error adding star"} |
+| 23 | POST /api/messages/:id/pin — Pin | POST | 200 | PASS | {"success":true,"pinned":false} |
+| 24 | GET starred messages | GET | 200 | PASS | {"success":true,"messages":[]} |
+| 25 | GET media messages | GET | 200 | PASS | {"success":true,"media":[]} |
+| 26 | GET search messages | GET | 200 | PASS | {"success":true,"messages":[{"id":4,"sender_id":57,"receiver_id":58,"content":"Edited audit message","attachments":null,"is_read":false,"is_deleted_by_sender":false,"is_deleted_by_receiver":false,"cre |
+| 27 | POST disappearing msgs | POST | 200 | PASS | {"success":true,"duration":3600} |
+| 28 | POST mute conversation | POST | 200 | PASS | {"success":true,"muted":false} |
+| 29 | GET /api/communities/ | GET | 200 | PASS | {"success":true,"communities":[{"id":6,"name":"CG_Comm_e575dd5c","description":"For group tests","team_name":"Test","banner_image":null,"is_public":true,"admin_id":48,"created_at":"2026-03-04T12:20:55 |
+| 30 | POST /api/communities/ — Create | POST | 200 | PASS | {"success":true,"community":{"id":7,"name":"Audit Community","description":"Testing community for audit","banner_image":null,"is_public":0,"admin_id":57}} |
+| 31 | GET /api/communities/:id | GET | 200 | PASS | {"success":true,"community":{"id":7,"name":"Audit Community","description":"Testing community for audit","team_name":null,"banner_image":null,"is_public":false,"admin_id":57,"created_at":"2026-03-04T1 |
+| 32 | POST /api/communities/:id/join | POST | 404 | FAIL | {"error":"Community not found or is private"} |
+| 33 | POST community post | POST | 200 | PASS | {"success":true,"post":{"id":1,"content":"Community audit post","images":[],"files":[],"created_at":"2026-03-04T12:27:10.361Z"}} |
+| 34 | GET community posts | GET | 200 | PASS | {"success":true,"posts":[{"id":1,"community_id":7,"user_id":57,"content":"Community audit post","images":[],"files":[],"created_at":"2026-03-04T12:27:10.359Z","updated_at":"2026-03-04T12:27:10.359Z"," |
+| 35 | GET community members | GET | 200 | PASS | {"success":true,"members":[{"id":10,"community_id":7,"user_id":57,"role":"admin","joined_at":"2026-03-04T12:27:10.272Z","username":"audit_user1_4242","profile_picture":null,"is_online":false}]} |
+| 36 | GET /api/events/ | GET | 200 | PASS | {"success":true,"events":[]} |
+| 37 | POST /api/events/ — Create | POST | 200 | PASS | {"success":true,"event":{"id":4,"title":"Audit Event","description":"Test event","event_date":"2026-06-01T10:00:00Z","is_public":1,"category":"social","location":"Test Venue","creator_id":57}} |
+| 38 | GET /api/events/:id | GET | 200 | PASS | {"success":true,"event":{"id":4,"creator_id":57,"title":"Audit Event","description":"Test event","event_date":"2026-06-01T10:00:00.000Z","is_public":true,"city":null,"category":"social","location":"Te |
+| 39 | POST /api/events/:id/rsvp | POST | 400 | FAIL | {"error":"Invalid RSVP status"} |
+| 40 | GET /api/events/:id/attendees | GET | 404 | FAIL | <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /api/events/4/attendees</pre>
+</body>
+</html> |
+| 41 | GET social-service stats | GET | 200 | PASS | {"success":true,"stats":{"total":0,"active":null,"completed":null}} |
+| 42 | POST /api/social-service/donations | POST | 500 | FAIL | {"error":"Internal server error"} |
+| 43 | GET donations | GET | 200 | PASS | {"success":true,"donations":[]} |
+| 44 | GET my-donations | GET | 200 | PASS | {"success":true,"donations":[]} |
+| 45 | GET /api/users/:id — Profile | GET | 200 | PASS | {"success":true,"user":{"id":58,"username":"audit_user2_4242","bio":null,"skills":[],"interests":[],"fullname":"Audit User 2","favorite_teams":[],"profile_picture":null,"created_at":"2026-03-04T12:27: |
+| 46 | GET /api/users/:id/posts | GET | 200 | PASS | {"success":true,"posts":[{"id":9,"user_id":57,"content":"Poll post for audit","images":[],"files":[],"video_url":null,"is_story":false,"is_archived":false,"scheduled_at":null,"expires_at":null,"likes_ |
+| 47 | POST /api/users/:id/follow | POST | 200 | PASS | {"success":true,"status":"following"} |
+| 48 | DELETE /api/users/:id/follow — Unfollow | DELETE | 200 | PASS | {"success":true} |
+| 49 | GET /api/users/:id/followers | GET | 200 | PASS | {"success":true,"followers":[]} |
+| 50 | GET /api/users/:id/following | GET | 200 | PASS | {"success":true,"following":[]} |
+| 51 | PUT /api/users/ — Update profile | PUT | 200 | PASS | {"success":true,"profile_picture":null} |
+| 52 | GET /api/users/blocked/list | GET | 200 | PASS | {"success":true,"blocked":[]} |
+| 53 | GET /api/notifications/ | GET | 200 | PASS | {"success":true,"notifications":[{"id":17,"user_id":57,"type":"comment","content":"commented on your post","related_id":7,"is_read":false,"created_at":"2026-03-04T12:27:09.593Z","created_by":58,"usern |
+| 54 | GET /api/search/users?q=audit | GET | 200 | PASS | {"success":true,"users":[{"id":55,"username":"audit_user1_1738","fullname":"Audit User 1","profile_picture":null,"bio":null,"is_following":0},{"id":51,"username":"audit_user1_5523","fullname":"Audit U |
+| 55 | GET /api/todos/ | GET | 200 | PASS | {"success":true,"todos":[]} |
+| 56 | POST /api/todos/ — Create | POST | 200 | PASS | {"success":true,"todo":{"id":4,"user_id":57,"title":"Audit Todo","priority":"medium","completed":0,"created_at":"2026-03-04T12:27:10.897Z"}} |
+| 57 | PUT /api/todos/:id — Update | PUT | 200 | PASS | {"success":true} |
+| 58 | GET /api/reminders/ | GET | 200 | PASS | {"success":true,"reminders":[]} |
+| 59 | POST /api/reminders/ — Create | POST | 200 | PASS | {"success":true,"reminder":{"id":4,"title":"Audit Reminder","reminder_date":"2026-06-01T10:00:00Z","reminder_time":"09:00","type":"custom","color":"#0095f6","priority":"low"}} |
+| 60 | GET /api/groups/ | GET | 200 | PASS | {"success":true,"groups":[]} |
+| 61 | POST /api/groups/ — Create | POST | 200 | PASS | {"success":true,"group":{"id":4,"name":"Audit Group","profile_picture":""}} |
+| 62 | GET /api/groups/:id/messages | GET | 200 | PASS | {"success":true,"messages":[]} |
+| 63 | POST /api/groups/:id/messages — Send | POST | 200 | PASS | {"success":true,"message":{"id":4,"group_id":4,"sender_id":57,"sender_username":"audit_user1_4242","content":"Audit group message","type":"text","attachments":null,"timer":null,"expires_at":null,"is_r |
+| 64 | GET /api/ai-chat/conversations | GET | 200 | PASS | {"conversations":[]} |
+| 65 | GET /api/ai-chat/models | GET | 200 | PASS | {"models":[{"id":"innovate-ai","name":"Innovate AI","provider":"innovate","description":"Our custom AI — smart, fast, and always available","available":true,"free":true,"local":false,"custom":true}, |
+| 66 | GET /api/portfolio/:userId/projects | GET | 200 | PASS | {"projects":[]} |
+| 67 | GET /api/shared/tasks | GET | 200 | PASS | {"success":true,"tasks":[]} |
+| 68 | POST /api/communities/:id/groups — Create | POST | 200 | PASS | {"success":true,"message":"Group created successfully","group":{"id":4,"community_id":"7","name":"Audit Sub Group","description":"Testing community group","profile_picture":null,"is_public":1}} |
+| 69 | GET /api/communities/:id/groups | GET | 200 | PASS | {"success":true,"groups":[{"id":4,"community_id":7,"name":"Audit Sub Group","description":"Testing community group","creator_id":57,"encryption_key":"000291cdac0496896958c4ee22e609b163c42d7953a3d02124 |

@@ -244,7 +244,6 @@ async function handleAIChatSend(req, res) {
     const file = req.files.file[0];
     originalFilename = file.originalname;
     fileMimeType = file.mimetype;
-    console.log('AI Chat - File uploaded:', originalFilename, 'MIME:', file.mimetype, 'Path:', file.path);
     
     attachmentUrl = file.mimetype.startsWith('image/')
       ? `/uploads/images/${file.filename}`
@@ -257,7 +256,6 @@ async function handleAIChatSend(req, res) {
     // Analyze the file for AI comprehension
     try {
       fileAnalysis = await fileAnalyzer.analyzeFile(file.path, file.mimetype, file.originalname);
-      console.log('AI Chat - File analysis:', fileAnalysis.type, 'canAnalyze:', fileAnalysis.canAnalyze, 'requiresVision:', fileAnalysis.requiresVision);
     } catch (err) {
       console.error('AI Chat - File analysis failed:', err.message);
     }
@@ -404,8 +402,6 @@ async function handleAIChatSend(req, res) {
 
     // ========== VISION: Image analysis via multimodal models ==========
     if (fileAnalysis?.requiresVision && fileAnalysis?.base64) {
-      console.log('[AI Chat] Routing to vision model for image analysis...');
-      
       // Build the prompt for image analysis
       const lastMsg = enrichedHistory[enrichedHistory.length - 1];
       if (lastMsg) {
@@ -430,8 +426,6 @@ async function handleAIChatSend(req, res) {
     }
     // ========== DOCUMENT: PDF, DOCX, text files ==========
     else if (fileAnalysis?.canAnalyze && fileAnalysis?.extractedText) {
-      console.log(`[AI Chat] Injecting extracted ${fileAnalysis.type} content (${fileAnalysis.extractedText.length} chars)...`);
-      
       // Inject the extracted document content into the conversation
       const docContext = `--- DOCUMENT CONTENT (${originalFilename}) ---\n${fileAnalysis.extractedText}\n--- END OF DOCUMENT ---`;
       

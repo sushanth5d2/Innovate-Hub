@@ -2179,7 +2179,7 @@
         });
         if (!res.ok) throw new Error('Failed');
         const data = await res.json();
-        const users = data.blocked_users || [];
+        const users = data.blocked || data.blocked_users || [];
 
         document.getElementById('pf-list-title').textContent = 'Blocked Users';
         const body = document.getElementById('pf-list-body');

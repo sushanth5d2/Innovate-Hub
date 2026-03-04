@@ -34,8 +34,12 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000
       },
-      instances: 'max',       // Use all CPU cores
-      exec_mode: 'cluster',   // Cluster mode for load balancing
+      // NOTE: Socket.IO requires sticky sessions or a Redis adapter for cluster mode.
+      // Using fork mode with single instance until @socket.io/redis-adapter is configured.
+      // To re-enable cluster: install @socket.io/redis-adapter, configure in server.js,
+      // then change back to instances: 'max' and exec_mode: 'cluster'
+      instances: 1,            // Single instance (Socket.IO compatible)
+      exec_mode: 'fork',       // Fork mode (Socket.IO compatible without Redis adapter)
       autorestart: true,
       max_restarts: 15,
       restart_delay: 5000,

@@ -18,6 +18,15 @@
  *   });
  */
 const PostInteractions = (function () {
+  // HTML escape helper to prevent XSS when rendering user content
+  function escapeHtmlPI(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
   'use strict';
 
   // ======================== Configuration ========================
@@ -343,13 +352,13 @@ const PostInteractions = (function () {
   function renderCommentItem(c, postId, postOwnerId, isReply) {
     var user = getUser();
     var userId = user ? user.id : null;
-    var isOwn = c.user_id === userId;
-    var isPostOwner = userId === postOwnerId;
+    var isOwn = String(c.user_id) === String(userId);
+    var isPostOwner = String(userId) === String(postOwnerId);
     var canDelete = isOwn || isPostOwner;
     var timeAgo = (typeof InnovateAPI !== 'undefined' && InnovateAPI.formatDate)
       ? InnovateAPI.formatDate(c.created_at)
       : '';
-    var contentWithMentions = (c.content || '').replace(
+    var contentWithMentions = escapeHtmlPI(c.content || '').replace(
       /@(\w+)/g,
       '<a href="/profile/$1" class="ig-comment-mention">@$1</a>'
     );
@@ -939,7 +948,7 @@ const PostInteractions = (function () {
       if (editItem) editItem.textContent = editLabel;
     }
 
-    if (ownerId === currentUserId) {
+    if (String(ownerId) === String(currentUserId)) {
       if (viewerActions) viewerActions.style.display = 'none';
       if (ownerActions) ownerActions.style.display = 'block';
     } else {

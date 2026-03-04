@@ -82,36 +82,19 @@ router.post('/', authMiddleware, (req, res, next) => {
   const userId = req.user.userId;
   const { name, description, team_name, is_public } = req.body;
   
-  console.log('=== CREATE COMMUNITY REQUEST ===');
-  console.log('User ID:', userId);
-  console.log('Body:', { name, description, team_name, is_public });
-  console.log('File uploaded:', req.file ? 'YES' : 'NO');
-  if (req.file) {
-    console.log('File details:', {
-      filename: req.file.filename,
-      path: req.file.path,
-      mimetype: req.file.mimetype,
-      size: req.file.size
-    });
-  }
-  
   let banner_image = null;
   if (req.file) {
-    // The upload middleware will place it in uploads/community/ folder
     banner_image = `/uploads/community/${req.file.filename}`;
-    console.log('Banner image path:', banner_image);
   }
   
   // Parse is_public - could be boolean, string '1'/'0', or string 'true'/'false'
-  const isPublicValue = (is_public === '1' || is_public === 1 || is_public === true || is_public === 'true') ? 1 : 0;
-  console.log('Parsed is_public value:', isPublicValue);
+  // Default to public (1) when not specified
+  const isPublicValue = (is_public === '0' || is_public === 0 || is_public === false || is_public === 'false') ? 0 : 1;
 
   const query = `
     INSERT INTO communities (name, description, team_name, banner_image, is_public, admin_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-
-  console.log('Executing query with values:', [name, description, team_name, banner_image, isPublicValue, userId]);
 
   db.run(query, [name, description, team_name, banner_image, isPublicValue, userId], function(err) {
     if (err) {
@@ -123,7 +106,6 @@ router.post('/', authMiddleware, (req, res, next) => {
     }
 
     const communityId = this.lastID;
-    console.log('Community created with ID:', communityId);
 
     // Add creator as admin member
     db.run(
@@ -147,7 +129,6 @@ router.post('/', authMiddleware, (req, res, next) => {
             admin_id: userId
           }
         };
-        console.log('Sending response:', response);
         res.json(response);
       }
     );
@@ -561,18 +542,7 @@ router.post('/:communityId/announcements', authMiddleware, upload.array('files',
   const { communityId } = req.params;
   const userId = req.user.userId;
   
-  console.log('📥 Raw req.body:', JSON.stringify(req.body, null, 2));
-  console.log('📥 req.body.attachments type:', typeof req.body.attachments);
-  console.log('📥 req.body.attachments value:', req.body.attachments);
-  
   const { title, body = '', is_pinned = 0, attachments: attachmentsJson } = req.body || {};
-
-  console.log('📥 Parsed values:', {
-    title,
-    body: body ? body.substring(0, 50) + '...' : '(empty)',
-    attachmentsJson,
-    filesCount: req.files ? req.files.length : 0
-  });
 
   if (!title) return res.status(400).json({ error: 'title is required' });
 
@@ -1339,7 +1309,6 @@ router.post('/:id/join-requests/:userId/approve', authMiddleware, (req, res) => 
             function(err) {
               if (err) {
                 // Ignore if already a member
-                console.log('Member already exists or error:', err);
               }
               
               // Clean up the join request after approval
