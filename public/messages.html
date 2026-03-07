@@ -1440,7 +1440,11 @@
         
         const isUnread = conv.unread_count > 0;
         const messageClass = isUnread ? 'ig-conversation-message unread' : 'ig-conversation-message';
-        const messagePreview = formatMessagePreview(conv.last_message, conv.last_message_type, conv.last_message_filename);
+        // E2E decrypt DM conversation preview
+        const decPreview = (typeof DMEncryption !== 'undefined' && conv.contact_id && conv.last_message_type !== 'image' && conv.last_message_type !== 'video' && conv.last_message_type !== 'file' && conv.last_message_type !== 'voice' && conv.last_message_type !== 'gif' && conv.last_message_type !== 'location')
+          ? DMEncryption.decrypt(conv.last_message || '', user.id, conv.contact_id)
+          : conv.last_message;
+        const messagePreview = formatMessagePreview(decPreview, conv.last_message_type, conv.last_message_filename);
         
         convEl.innerHTML = `
           <div title="View profile">
@@ -1602,7 +1606,9 @@
         // Add pinned message banner at the top (if any) - make it sticky
         if (pinnedMessages.length > 0) {
           const pinnedMsg = pinnedMessages[0]; // Show most recent pinned message
-          const pinnedContent = pinnedMsg.content || 'Message';
+          const pinnedRaw = pinnedMsg.content || 'Message';
+          const pinnedContent = (typeof DMEncryption !== 'undefined' && contactId)
+            ? DMEncryption.decrypt(pinnedRaw, user.id, contactId) : pinnedRaw;
           const truncatedContent = pinnedContent.length > 50 ? pinnedContent.substring(0, 50) + '...' : pinnedContent;
           
           const pinBanner = document.createElement('div');
@@ -1680,7 +1686,9 @@
           // Message bubble
           const messageEl = document.createElement('div');
           messageEl.dataset.messageId = msg.id;
-          messageEl.dataset.messageContent = msg.content;
+          messageEl.dataset.messageContent = (typeof DMEncryption !== 'undefined' && contactId)
+            ? DMEncryption.decrypt(msg.content || '', user.id, contactId)
+            : (msg.content || '');
           messageEl.dataset.isSent = isSent;
           messageEl.dataset.isPinned = msg.is_pinned ? 'true' : 'false';
           messageEl.dataset.isStarred = msg.is_starred ? 'true' : 'false';
@@ -1968,7 +1976,11 @@
             textWrapper.style.cssText = 'display: inline-block; width: 100%;';
             
             const textContent = document.createElement('div');
-            const msgText = msg.content || '';
+            // E2E decrypt DM messages
+            const rawMsgText = msg.content || '';
+            const msgText = (typeof DMEncryption !== 'undefined' && contactId)
+              ? DMEncryption.decrypt(rawMsgText, user.id, contactId)
+              : rawMsgText;
 
             // Check if this is a Hire Me application card (new or old format)
             if (msgText.includes('[HIRE_APPLICATION]')) {
@@ -2042,10 +2054,11 @@
           }
 
           // Long-press and context menu
+          const ctxContent = messageEl.dataset.messageContent || msg.content;
           let pressTimer;
           messageEl.addEventListener('touchstart', (e) => {
             pressTimer = setTimeout(() => {
-              showMessageContextMenu(e, msg.id, msg.content, isSent, msg.type);
+              showMessageContextMenu(e, msg.id, ctxContent, isSent, msg.type);
             }, 500);
           });
           messageEl.addEventListener('touchend', () => {
@@ -2056,7 +2069,7 @@
           });
           messageEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            showMessageContextMenu(e, msg.id, msg.content, isSent, msg.type);
+            showMessageContextMenu(e, msg.id, ctxContent, isSent, msg.type);
           });
           
           messageEl.addEventListener('click', (e) => {
@@ -2064,7 +2077,7 @@
             const target = e.target;
             if (target.tagName !== 'IMG' && target.tagName !== 'BUTTON' && target.tagName !== 'AUDIO' && 
                 target.tagName !== 'VIDEO' && !target.closest('a') && !target.closest('button')) {
-              showMessageContextMenu(e, msg.id, msg.content, isSent, msg.type);
+              showMessageContextMenu(e, msg.id, ctxContent, isSent, msg.type);
             }
           });
 
@@ -2384,9 +2397,11 @@
         if (content) {
           input.value = '';
           input.style.height = 'auto';
+          const captionEnc = (!currentGroupId && typeof DMEncryption !== 'undefined' && currentContactId)
+            ? DMEncryption.encrypt(content, user.id, currentContactId) : content;
           const textPayload = currentGroupId 
             ? { content, type: 'text' }
-            : { receiver_id: currentContactId, content };
+            : { receiver_id: currentContactId, content: captionEnc };
           const textEndpoint = currentGroupId 
             ? `/groups/${currentGroupId}/messages` 
             : '/messages';
@@ -2429,10 +2444,12 @@
               // Don't set headers - apiRequest will handle FormData automatically
             });
           } else {
-            // Text-only edit
+            // Text-only edit — E2E encrypt if DM
+            const editEncContent = (!currentGroupId && typeof DMEncryption !== 'undefined' && currentContactId)
+              ? DMEncryption.encrypt(content, user.id, currentContactId) : content;
             await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
               method: 'PUT',
-              body: JSON.stringify({ content })
+              body: JSON.stringify({ content: editEncContent })
             });
           }
           
@@ -2481,7 +2498,11 @@
         if (replyToMessageId) payload.reply_to_id = parseInt(replyToMessageId);
       } else {
         endpoint = '/messages';
-        payload = { receiver_id: currentContactId, content };
+        // E2E encrypt DM content
+        const encContent = (typeof DMEncryption !== 'undefined' && currentContactId)
+          ? DMEncryption.encrypt(content, user.id, currentContactId)
+          : content;
+        payload = { receiver_id: currentContactId, content: encContent };
         if (timer) payload.timer = parseInt(timer);
         if (replyToMessageId) payload.reply_to_id = parseInt(replyToMessageId);
       }
@@ -3558,7 +3579,11 @@
           textWrapper.style.cssText = 'display: inline-block; width: 100%;';
           
           const textContent = document.createElement('div');
-          textContent.innerHTML = linkifyText(data.content);
+          // E2E decrypt incoming real-time DM
+          const decryptedRtContent = (typeof DMEncryption !== 'undefined' && data.sender_id)
+            ? DMEncryption.decrypt(data.content, user.id, data.sender_id)
+            : data.content;
+          textContent.innerHTML = linkifyText(decryptedRtContent);
           
           textWrapper.appendChild(textContent);
           messageEl.appendChild(textWrapper);
@@ -3571,25 +3596,28 @@
         
         // Add data attributes and event listeners
         messageEl.dataset.messageId = data.id;
-        messageEl.dataset.messageContent = data.content;
+        messageEl.dataset.messageContent = (typeof DMEncryption !== 'undefined' && data.sender_id)
+          ? DMEncryption.decrypt(data.content, user.id, data.sender_id)
+          : data.content;
         messageEl.dataset.isSent = 'false';
         messageEl.dataset.isPinned = data.is_pinned ? 'true' : 'false';
         messageEl.dataset.isStarred = data.is_starred ? 'true' : 'false';
         
+        const decRtContent = messageEl.dataset.messageContent;
         messageEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          showMessageContextMenu(e, data.id, data.content, false, data.type);
+          showMessageContextMenu(e, data.id, decRtContent, false, data.type);
         });
         messageEl.addEventListener('click', (e) => {
           if (e.target.tagName !== 'IMG' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'AUDIO') {
-            showMessageContextMenu(e, data.id, data.content, false, data.type);
+            showMessageContextMenu(e, data.id, decRtContent, false, data.type);
           }
         });
         // Mobile long-press support
         let recvPressTimer;
         messageEl.addEventListener('touchstart', (e) => {
           recvPressTimer = setTimeout(() => {
-            showMessageContextMenu(e, data.id, data.content, false, data.type);
+            showMessageContextMenu(e, data.id, decRtContent, false, data.type);
           }, 500);
         });
         messageEl.addEventListener('touchend', () => clearTimeout(recvPressTimer));

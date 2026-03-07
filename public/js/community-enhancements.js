@@ -575,9 +575,16 @@ async function saveEditedMessage(postId) {
       return;
     }
     
+    // Re-encrypt edited content for E2E
+    let contentToSend = content;
+    if (typeof E2EEncryption !== 'undefined') {
+      await E2EEncryption.initForGroup(state.currentGroupId);
+      contentToSend = E2EEncryption.encrypt(content, state.currentGroupId);
+    }
+    
     const response = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/posts/${postId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ content: contentToSend })
     });
     
     if (!response || !response.success) {
@@ -941,13 +948,23 @@ async function doForwardToGroup(targetGroupId, groupName, postId) {
       ? [...window.selectedMessages]
       : (postId ? [postId] : []);
     
+    // Initialize E2E encryption for the target group
+    if (typeof E2EEncryption !== 'undefined') {
+      await E2EEncryption.initForGroup(targetGroupId);
+    }
+    
     let forwarded = 0;
     for (const pid of postIds) {
       const messageEl = document.querySelector(`[data-post-id="${pid}"]`);
       const content = messageEl?.querySelector('.message-content')?.textContent || '';
+      let forwardContent = `[Forwarded] ${content}`;
+      // Encrypt for the target group
+      if (typeof E2EEncryption !== 'undefined') {
+        forwardContent = E2EEncryption.encrypt(forwardContent, targetGroupId);
+      }
       await InnovateAPI.apiRequest(`/community-groups/${targetGroupId}/posts`, {
         method: 'POST',
-        body: JSON.stringify({ content: `[Forwarded] ${content}` })
+        body: JSON.stringify({ content: forwardContent })
       });
       forwarded++;
     }
