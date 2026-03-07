@@ -1743,11 +1743,13 @@ body {
 }
 
 .ig-modal {
-  background-color: transparent;
-  border-radius: 12px;
+  background-color: var(--ig-primary-background);
+  border-radius: 16px;
   min-width: 400px;
   max-width: 90%;
   animation: slideUp 0.3s ease;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
 
 @keyframes slideUp {
@@ -2733,18 +2735,8 @@ body:has(.ig-cseries-page) .ig-bottom-nav {
   transform: scale(0.9);
 }
 
-.ig-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-}
+/* Fallback: ig-modal used as standalone full-screen overlay */
+div.ig-modal.ig-modal-overlay {\n  position: fixed;\n  top: 0;\n  left: 0;\n  right: 0;\n  bottom: 0;\n  background: rgba(0, 0, 0, 0.8);\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  z-index: 10000;\n}
 
 .ig-btn-primary {
   background: var(--ig-blue);
