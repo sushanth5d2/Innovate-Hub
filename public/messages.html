@@ -2063,8 +2063,8 @@
           timeEl.className = 'ig-message-time';
           timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
           if (isSent) {
-            const statusIcon = msg.is_read ? '✓✓' : '✓';
-            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
+            const statusIcon = '✓';
+            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px;">${statusIcon}</span>`;
           } else {
             timeEl.textContent = formatMessageTime(msg.created_at);
           }
@@ -2351,8 +2351,8 @@
           timeEl.className = 'ig-message-time';
           timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
           if (isSent) {
-            const statusIcon = msg.is_read ? '✓✓' : '✓';
-            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px; color: ${msg.is_read ? '#0095f6' : 'inherit'};">${statusIcon}</span>`;
+            const statusIcon = '✓';
+            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px;">${statusIcon}</span>`;
           } else {
             timeEl.textContent = formatMessageTime(msg.created_at);
           }
@@ -2607,7 +2607,7 @@
         const statusEl = document.createElement('div');
         statusEl.className = 'ig-message-time';
         statusEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: flex-end;';
-        statusEl.innerHTML = `<span style="font-size: 11px;">Just now</span><span style="font-size: 10px;">✓✓</span>`;
+        statusEl.innerHTML = `<span style="font-size: 11px;">Just now</span><span style="font-size: 10px;">✓</span>`;
         messageEl.appendChild(statusEl);
         
         if (timer) {
@@ -3955,7 +3955,7 @@
             </div>
             <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
               <span style="font-size: 11px;">Just now</span>
-              <span style="font-size: 10px;">✓✓</span>
+              <span style="font-size: 10px;">✓</span>
             </div>
           `;
         } else if (fileType === 'video') {
@@ -3971,7 +3971,7 @@
             </div>
             <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
               <span style="font-size: 11px;">Just now</span>
-              <span style="font-size: 10px;">✓✓</span>
+              <span style="font-size: 10px;">✓</span>
             </div>
           `;
         } else {
@@ -3994,7 +3994,7 @@
             </div>
             <div class="ig-message-time" style="display: flex; align-items: center; gap: 4px; justify-content: flex-end;">
               <span style="font-size: 11px;">Just now</span>
-              <span style="font-size: 10px;">✓✓</span>
+              <span style="font-size: 10px;">✓</span>
             </div>
           `;
         }
