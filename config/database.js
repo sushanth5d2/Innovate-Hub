@@ -2148,6 +2148,18 @@ const migrateDatabase = () => {
       }
     });
 
+    // Add delivered_at and read_at timestamp columns for message info
+    db.run(`ALTER TABLE messages ADD COLUMN delivered_at TIMESTAMPTZ`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: delivered_at column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE messages ADD COLUMN read_at TIMESTAMPTZ`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: read_at column migration - ', err ? err.message : 'ok');
+      }
+    });
+
   });
 };
 

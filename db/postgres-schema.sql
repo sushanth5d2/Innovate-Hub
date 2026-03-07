@@ -681,7 +681,7 @@ CREATE TABLE IF NOT EXISTS messages (
         is_deleted_by_sender BOOLEAN DEFAULT FALSE,
         is_deleted_by_receiver BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, is_pinned BOOLEAN DEFAULT FALSE, pinned_at TIMESTAMPTZ, pinned_by INTEGER, pin_expires_at TIMESTAMPTZ, reply_to_id INTEGER, timer INTEGER, expires_at TIMESTAMPTZ, type TEXT DEFAULT 'text', original_filename TEXT, is_message_request BOOLEAN DEFAULT FALSE, message_request_status TEXT DEFAULT NULL,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, is_pinned BOOLEAN DEFAULT FALSE, pinned_at TIMESTAMPTZ, pinned_by INTEGER, pin_expires_at TIMESTAMPTZ, reply_to_id INTEGER, timer INTEGER, expires_at TIMESTAMPTZ, type TEXT DEFAULT 'text', original_filename TEXT, is_message_request BOOLEAN DEFAULT FALSE, message_request_status TEXT DEFAULT NULL, delivered_at TIMESTAMPTZ, read_at TIMESTAMPTZ,
         FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
       );

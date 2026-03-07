@@ -86,9 +86,9 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
       return res.status(500).json({ error: 'Error fetching messages' });
     }
 
-    // Mark messages as read
+    // Mark messages as read and set timestamps
     db.run(
-      'UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
+      'UPDATE messages SET is_read = 1, delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP), read_at = COALESCE(read_at, CURRENT_TIMESTAMP) WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
       [contactId, userId]
     );
 
@@ -596,6 +596,27 @@ router.put('/:messageId', authMiddleware, upload.single('file'), asyncHandler((r
   );
 }));
 
+// Get message info (sent, delivered, read times)
+router.get('/:messageId/info', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { messageId } = req.params;
+
+  db.get(
+    'SELECT id, sender_id, receiver_id, content, type, created_at, delivered_at, read_at, is_read FROM messages WHERE id = ? AND (sender_id = ? OR receiver_id = ?)',
+    [messageId, userId, userId],
+    (err, message) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error fetching message info' });
+      }
+      if (!message) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+      res.json({ success: true, message });
+    }
+  );
+}));
+
 // Unsend message (delete for both)
 router.delete('/:messageId/unsend', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
@@ -887,6 +908,42 @@ router.post('/conversations/:contactId/clear', authMiddleware, asyncHandler((req
     }
     res.json({ success: true });
   });
+}));
+
+// Clear chat for everyone (permanently delete all messages in conversation)
+router.post('/conversations/:contactId/clear-all', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  db.run(
+    `DELETE FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`,
+    [userId, contactId, contactId, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error clearing chat for everyone' });
+      }
+      res.json({ success: true, deleted: this.changes });
+    }
+  );
+}));
+
+// Delete chat for everyone (permanently delete entire conversation)
+router.delete('/conversations/:contactId/delete-all', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  db.run(
+    `DELETE FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`,
+    [userId, contactId, contactId, userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Error deleting chat for everyone' });
+      }
+      res.json({ success: true, deleted: this.changes });
+    }
+  );
 }));
 
 // Set disappearing messages for a conversation

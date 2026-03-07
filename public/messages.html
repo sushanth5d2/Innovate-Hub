@@ -559,12 +559,24 @@
           </svg>
           Info
         </button>
+        <button class="ig-message-context-item" onclick="enterSelectMode(event)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          Select
+        </button>
         <div class="ig-message-context-divider"></div>
         <button class="ig-message-context-item danger" onclick="deleteMessage(event)">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
-          Delete
+          Delete for me
+        </button>
+        <button class="ig-message-context-item danger" id="unsendBtn" onclick="unsendMessage(event)" style="display:none;">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          Delete for everyone
         </button>
       </div>
       
@@ -594,7 +606,7 @@
             <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
             </svg>
-            Delete
+            Delete for me
           </button>
           <button class="ig-message-action" onclick="editMessage()
 
@@ -606,9 +618,9 @@
           </button>
           <button class="ig-message-action" onclick="unsendMessage()" id="unsendBtn" style="display: none;">
             <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
-              <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"></path>
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
             </svg>
-            Unsend
+            Delete for everyone
           </button>
         </div>
       </div>
@@ -835,9 +847,17 @@
           <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           <span style="color: #ed4956; font-weight: 500;">Clear chat</span>
         </div>
-        <div onclick="deleteChatFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+        <div onclick="clearChatForEveryone()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="4" y1="4" x2="20" y2="20" stroke="#ed4956" stroke-width="2"></line></svg>
+          <span style="color: #ed4956; font-weight: 500;">Clear chat for everyone</span>
+        </div>
+        <div onclick="deleteChatFromPanel()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; border-bottom: 1px solid var(--ig-border);" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
           <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path></svg>
           <span style="color: #ed4956; font-weight: 500;">Delete chat</span>
+        </div>
+        <div onclick="deleteChatForEveryone()" style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="#ed4956" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path><line x1="4" y1="4" x2="20" y2="20" stroke="#ed4956" stroke-width="2"></line></svg>
+          <span style="color: #ed4956; font-weight: 500;">Delete chat for everyone</span>
         </div>
       </div>
     </div>
@@ -1826,11 +1846,12 @@
             }
           } else if (msg.type === 'todo') {
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            messageEl.style.maxWidth = '300px';
+            messageEl.style.maxWidth = '200px';
             messageEl.style.background = 'var(--ig-secondary-background)';
-            messageEl.style.borderRadius = '16px';
-            messageEl.style.padding = '14px';
+            messageEl.style.borderRadius = '12px';
+            messageEl.style.padding = '8px 10px';
             messageEl.style.color = 'var(--ig-primary-text)';
+            messageEl.style.overflow = 'hidden';
             try {
               const todo = JSON.parse(msg.content || '{}');
               const todoItems = todo.items || [];
@@ -1838,31 +1859,31 @@
               const totalCount = todoItems.length;
               const progressPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
               let html = `
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                  <div style="width: 32px; height: 32px; border-radius: 8px; background: #25D366; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                  <div style="width: 24px; height: 24px; border-radius: 6px; background: #25D366; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
                   </div>
                   <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 600; font-size: 15px;">${todo.title || 'TODO List'}</div>
-                    <div style="font-size: 11px; opacity: 0.6;">${totalCount > 0 ? doneCount + '/' + totalCount + ' completed' : (todo.description || 'Task')}</div>
+                    <div style="font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${todo.title || 'TODO List'}</div>
+                    <div style="font-size: 10px; opacity: 0.6;">${totalCount > 0 ? doneCount + '/' + totalCount + ' completed' : (todo.description || 'Task')}</div>
                   </div>
                 </div>`;
               if (totalCount > 0) {
-                html += `<div style="height: 3px; background: rgba(128,128,128,0.3); border-radius: 2px; margin-bottom: 10px; overflow: hidden;">
+                html += `<div style="height: 2px; background: rgba(128,128,128,0.3); border-radius: 2px; margin-bottom: 6px; overflow: hidden;">
                   <div style="height: 100%; width: ${progressPct}%; background: #25D366; border-radius: 2px; transition: width 0.3s;"></div>
                 </div>`;
                 todoItems.forEach((item, idx) => {
                   const checked = item.checked ? 'checked' : '';
                   const strikeStyle = item.checked ? 'text-decoration: line-through; opacity: 0.5;' : '';
-                  html += `<div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(128,128,128,0.1);" class="todo-msg-item">
-                    <input type="checkbox" ${checked} data-msg-id="${msg.id}" data-item-idx="${idx}" onchange="toggleTodoMsgItem(this)" style="width: 18px; height: 18px; accent-color: #25D366; cursor: pointer; flex-shrink: 0;">
-                    <span style="font-size: 14px; ${strikeStyle}">${item.text || ''}</span>
+                  html += `<div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(128,128,128,0.1);" class="todo-msg-item">
+                    <input type="checkbox" ${checked} data-msg-id="${msg.id}" data-item-idx="${idx}" onchange="toggleTodoMsgItem(this)" style="width: 16px; height: 16px; accent-color: #25D366; cursor: pointer; flex-shrink: 0;">
+                    <span style="font-size: 12px; ${strikeStyle}">${item.text || ''}</span>
                   </div>`;
                 });
               }
               const taskId = todo.shared_task_id || todo.todo_id;
               if (taskId) {
-                html += `<div style="margin-top: 8px; text-align: center;"><a href="/profile.html#tasks" style="font-size: 12px; color: #25D366; text-decoration: none;" onclick="event.stopPropagation();">View in Tasks →</a></div>`;
+                html += `<div style="margin-top: 6px; text-align: center;"><a href="/profile.html#tasks" style="font-size: 11px; color: #25D366; text-decoration: none;" onclick="event.stopPropagation();">View in Tasks →</a></div>`;
               }
               messageEl.innerHTML = html;
             } catch (_) {
@@ -2528,19 +2549,24 @@
       }
 
       try {
-        await InnovateAPI.apiRequest(endpoint, {
+        const sendResult = await InnovateAPI.apiRequest(endpoint, {
           method: 'POST',
           body: JSON.stringify(payload)
         });
+        const newMessageId = sendResult?.message?.id || sendResult?.id || Date.now();
         
         // Clear input
         input.value = '';
         input.style.height = 'auto';
         
-        // Add message to UI
+        // Add message to UI with wrapper (matching loadMessages structure)
         const messagesContainer = document.getElementById('chatMessages');
+        const wrapperEl = document.createElement('div');
+        wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
+        
         const messageEl = document.createElement('div');
         messageEl.className = 'ig-message ig-message-sent';
+        messageEl.dataset.messageId = newMessageId;
         messageEl.dataset.messageContent = content;
         messageEl.dataset.isSent = 'true';
         if (replyContext) {
@@ -2591,23 +2617,33 @@
           messageEl.appendChild(timerEl);
         }
         
-        // Add context menu support
+        // Add context menu support (incl. mobile long-press)
+        let pressTimer;
+        messageEl.addEventListener('touchstart', (e) => {
+          pressTimer = setTimeout(() => {
+            showMessageContextMenu(e, newMessageId, content, true, 'text');
+          }, 500);
+        });
+        messageEl.addEventListener('touchend', () => clearTimeout(pressTimer));
+        messageEl.addEventListener('touchmove', () => clearTimeout(pressTimer));
         messageEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          showMessageContextMenu(e, messageEl.dataset.messageId, content, true, 'text');
+          showMessageContextMenu(e, newMessageId, content, true, 'text');
         });
         messageEl.addEventListener('click', (e) => {
-          if (e.target.tagName !== 'BUTTON') {
-            showMessageContextMenu(e, messageEl.dataset.messageId, content, true, 'text');
+          if (e.target.tagName !== 'BUTTON' && !e.target.closest('a')) {
+            showMessageContextMenu(e, newMessageId, content, true, 'text');
           }
         });
         
-        // Remove placeholder if exists
-        if (messagesContainer.querySelector('[style*="text-align: center"]')) {
+        // Remove "No messages yet" placeholder if exists (only match the exact placeholder, not other elements)
+        const placeholder = messagesContainer.querySelector(':scope > [style*="text-align: center"][style*="padding: 40px"]');
+        if (placeholder && messagesContainer.children.length === 1) {
           messagesContainer.innerHTML = '';
         }
         
-        messagesContainer.appendChild(messageEl);
+        wrapperEl.appendChild(messageEl);
+        messagesContainer.appendChild(wrapperEl);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
         // Emit via socket
@@ -2628,17 +2664,10 @@
           if (isGroup) {
             loadGroupMessages(currentGroupId);
           } else {
-            // Only reload if we're in the same conversation
-            if (currentContactId) {
-              const scrollPos = messagesContainer.scrollHeight;
-              loadMessages(currentContactId).then(() => {
-                // Restore scroll position
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-              });
-            }
+            // Just refresh conversation sidebar — don't reload messages (causes flash/jump)
             loadConversations();
           }
-        }, 500);
+        }, 300);
       } catch (error) {
         console.error('Error sending message:', error);
         InnovateAPI.showAlert('Failed to send message', 'error');
@@ -3602,6 +3631,15 @@
             showMessageContextMenu(e, data.id, data.content, false, data.type);
           }
         });
+        // Mobile long-press support
+        let recvPressTimer;
+        messageEl.addEventListener('touchstart', (e) => {
+          recvPressTimer = setTimeout(() => {
+            showMessageContextMenu(e, data.id, data.content, false, data.type);
+          }, 500);
+        });
+        messageEl.addEventListener('touchend', () => clearTimeout(recvPressTimer));
+        messageEl.addEventListener('touchmove', () => clearTimeout(recvPressTimer));
         
         // Wrap received message with avatar (matching loadMessages style)
         const wrapperEl = document.createElement('div');
@@ -5711,6 +5749,10 @@
         starBtn.appendChild(textNode);
       }
       
+      // Show/hide Unsend button (only for sent messages)
+      const unsendBtn = document.getElementById('unsendBtn');
+      if (unsendBtn) unsendBtn.style.display = isSent ? 'flex' : 'none';
+      
       const menu = document.getElementById('messageContextMenu');
       
       // Position menu at cursor or touch point
@@ -5803,48 +5845,106 @@
     }
 
     async function forwardMessage(event) {
-      console.log('Forward message clicked', {selectedMessageId, selectedMessageContent});
       if (event) event.stopPropagation();
       hideMessageContextMenu();
-      
+      showForwardModal();
+    }
+
+    async function showForwardModal() {
+      let existing = document.getElementById('forwardModal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'forwardModal';
+      modal.style.cssText = 'position: fixed; inset: 0; z-index: 99999; display: flex; align-items: flex-end; justify-content: center;';
+      modal.innerHTML = `
+        <div onclick="closeForwardModal()" style="position: absolute; inset: 0; background: rgba(0,0,0,0.6);"></div>
+        <div style="position: relative; width: 100%; max-width: 420px; max-height: 75vh; background: var(--ig-secondary-background, #262626); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="padding: 16px; border-bottom: 1px solid var(--ig-border, #363636); display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 17px; font-weight: 600; color: var(--ig-primary-text, #fff);">Forward to</span>
+            <button onclick="closeForwardModal()" style="background: none; border: none; color: var(--ig-secondary-text, #a8a8a8); font-size: 22px; cursor: pointer; padding: 4px;">&times;</button>
+          </div>
+          <div style="padding: 8px 16px;">
+            <div style="display: flex; align-items: center; background: var(--ig-tertiary-background, #363636); border-radius: 10px; padding: 8px 12px; gap: 8px;">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" style="color: var(--ig-secondary-text, #a8a8a8); flex-shrink: 0;"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+              <input type="text" id="forwardSearch" placeholder="Search..." oninput="filterForwardContacts(this.value)" style="background: none; border: none; outline: none; color: var(--ig-primary-text, #fff); font-size: 14px; width: 100%;" />
+            </div>
+          </div>
+          <div id="forwardContactsList" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+            <div style="text-align: center; padding: 30px; color: var(--ig-secondary-text, #a8a8a8);">Loading...</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      loadForwardContacts();
+    }
+
+    function closeForwardModal() {
+      const modal = document.getElementById('forwardModal');
+      if (modal) modal.remove();
+    }
+
+    let forwardContactsCache = [];
+
+    async function loadForwardContacts() {
       try {
-        // For now, show a selection of recent conversations
-        console.log('Fetching conversations...');
         const response = await InnovateAPI.apiRequest('/messages/conversations');
-        console.log('Conversations response:', response);
-        
-        // Handle API response format
-        const conversationsList = response.conversations || response || [];
-        
-        if (!conversationsList || conversationsList.length === 0) {
-          InnovateAPI.showAlert('No conversations to forward to', 'error');
-          return;
+        const list = response.conversations || response || [];
+        forwardContactsCache = list;
+        renderForwardContacts(list);
+      } catch (err) {
+        document.getElementById('forwardContactsList').innerHTML = '<div style="text-align:center;padding:30px;color:#a8a8a8;">Failed to load contacts</div>';
+      }
+    }
+
+    function filterForwardContacts(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) return renderForwardContacts(forwardContactsCache);
+      const filtered = forwardContactsCache.filter(c => c.username.toLowerCase().includes(q));
+      renderForwardContacts(filtered);
+    }
+
+    function renderForwardContacts(contacts) {
+      const container = document.getElementById('forwardContactsList');
+      if (!contacts || contacts.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:30px;color:#a8a8a8;">No contacts found</div>';
+        return;
+      }
+      container.innerHTML = contacts.map(c => {
+        const pic = c.profile_picture || '/img/default-avatar.png';
+        const lastMsg = c.last_message ? (c.last_message.length > 35 ? c.last_message.substring(0, 35) + '...' : c.last_message) : '';
+        const safeUsername = (c.username || '').replace(/'/g, "\\'");
+        return `
+          <div onclick="doForwardTo(${c.contact_id}, '${safeUsername}')" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
+            <img src="${pic}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.src='/img/default-avatar.png'" />
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 15px; font-weight: 500; color: var(--ig-primary-text, #fff);">${c.username}</div>
+              <div style="font-size: 13px; color: var(--ig-secondary-text, #a8a8a8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${lastMsg}</div>
+            </div>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20" style="color: var(--ig-secondary-text, #a8a8a8); flex-shrink: 0;"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function doForwardTo(contactId, username) {
+      closeForwardModal();
+      try {
+        const msgIds = selectedMessages && selectedMessages.size > 0 ? [...selectedMessages] : [selectedMessageId];
+        let forwarded = 0;
+        for (const mid of msgIds) {
+          const el = document.querySelector(`[data-message-id="${mid}"]`);
+          const msgContent = el ? el.textContent.trim() : selectedMessageContent;
+          await InnovateAPI.apiRequest('/messages/send', {
+            method: 'POST',
+            body: JSON.stringify({ receiver_id: contactId, content: msgContent, type: 'text' })
+          });
+          forwarded++;
         }
-        
-        // Simple prompt for now (you can create a modal later)
-        const contactList = conversationsList.slice(0, 5).map((c, i) => `${i + 1}. ${c.username}`).join('\n');
-        const choice = prompt(`Forward message to:\n${contactList}\n\nEnter number (1-${Math.min(5, conversationsList.length)}):`);
-        
-        if (choice && !isNaN(choice) && choice >= 1 && choice <= Math.min(5, conversationsList.length)) {
-          const selectedContact = conversationsList[parseInt(choice) - 1];
-          console.log('Forwarding to:', selectedContact);
-          try {
-            await InnovateAPI.apiRequest('/messages', {
-              method: 'POST',
-              body: JSON.stringify({
-                receiver_id: selectedContact.contact_id,
-                content: selectedMessageContent
-              })
-            });
-            InnovateAPI.showAlert(`Message forwarded to ${selectedContact.username}`, 'success');
-          } catch (error) {
-            console.error('Forward error:', error);
-            InnovateAPI.showAlert('Failed to forward message: ' + error.message, 'error');
-          }
-        }
+        if (selectMode) exitSelectMode();
+        InnovateAPI.showAlert(`${forwarded > 1 ? forwarded + ' messages' : 'Message'} forwarded to ${username}`, 'success');
       } catch (error) {
-        console.error('Forward message error:', error);
-        InnovateAPI.showAlert('Error: ' + error.message, 'error');
+        InnovateAPI.showAlert('Failed to forward: ' + error.message, 'error');
       }
     }
 
@@ -6290,11 +6390,92 @@
     async function messageInfo(event) {
       if (event) event.stopPropagation();
       hideMessageContextMenu();
-      
-      // Show basic message info
-      const info = `Message ID: ${selectedMessageId}\nType: ${selectedMessageType || 'text'}\nContent: ${selectedMessageContent?.substring(0, 50)}...`;
-      alert(info);
-      // TODO: Show detailed modal with delivery time, read status, etc.
+      showMessageInfoModal(selectedMessageId);
+    }
+
+    async function showMessageInfoModal(messageId) {
+      let existing = document.getElementById('msgInfoModal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'msgInfoModal';
+      modal.style.cssText = 'position: fixed; inset: 0; z-index: 99999; display: flex; align-items: flex-end; justify-content: center;';
+      modal.innerHTML = `
+        <div onclick="closeMsgInfoModal()" style="position: absolute; inset: 0; background: rgba(0,0,0,0.6);"></div>
+        <div style="position: relative; width: 100%; max-width: 420px; background: var(--ig-secondary-background, #262626); border-radius: 16px 16px 0 0; overflow: hidden;">
+          <div style="padding: 16px; border-bottom: 1px solid var(--ig-border, #363636); display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 17px; font-weight: 600; color: var(--ig-primary-text, #fff);">Message info</span>
+            <button onclick="closeMsgInfoModal()" style="background: none; border: none; color: var(--ig-secondary-text, #a8a8a8); font-size: 22px; cursor: pointer; padding: 4px;">&times;</button>
+          </div>
+          <div id="msgInfoContent" style="padding: 16px;">
+            <div style="text-align: center; padding: 20px; color: var(--ig-secondary-text, #a8a8a8);">Loading...</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      try {
+        const response = await InnovateAPI.apiRequest(`/messages/${messageId}/info`);
+        const msg = response.message || response;
+        renderMsgInfo(msg);
+      } catch (err) {
+        document.getElementById('msgInfoContent').innerHTML = '<div style="color:#ed4956;padding:20px;text-align:center;">Failed to load info</div>';
+      }
+    }
+
+    function closeMsgInfoModal() {
+      const m = document.getElementById('msgInfoModal');
+      if (m) m.remove();
+    }
+
+    function renderMsgInfo(msg) {
+      const container = document.getElementById('msgInfoContent');
+      const formatTime = (ts) => {
+        if (!ts) return null;
+        const d = new Date(ts);
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+      };
+
+      const sentTime = formatTime(msg.created_at);
+      const deliveredTime = formatTime(msg.delivered_at);
+      const readTime = formatTime(msg.read_at);
+      const msgType = msg.type || 'text';
+      const preview = msg.content ? (msg.content.length > 80 ? msg.content.substring(0, 80) + '...' : msg.content) : '';
+
+      let html = '';
+
+      // Message preview bubble
+      if (msgType === 'image') {
+        html += `<div style="margin-bottom: 20px; border-radius: 10px; overflow: hidden;"><img src="${msg.content}" style="width: 100%; max-height: 150px; object-fit: cover;" /></div>`;
+      } else {
+        html += `<div style="background: var(--ig-tertiary-background, #363636); border-radius: 10px; padding: 10px 14px; margin-bottom: 20px; font-size: 14px; color: var(--ig-primary-text, #fff);">${preview || '<em>' + msgType + '</em>'}</div>`;
+      }
+
+      // Read (blue double-check)
+      html += `<div style="margin-bottom: 14px;">`;
+      html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${readTime ? '#53bdeb' : '#666'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12l5 5L18 5"/><path d="M7 12l5 5L24 5"/></svg><span style="font-size: 14px; font-weight: 600; color: var(--ig-primary-text, #fff);">Read</span></div>`;
+      html += `<div style="padding-left: 26px; font-size: 13px; color: var(--ig-secondary-text, #a8a8a8);">${readTime || '—'}</div>`;
+      html += `</div>`;
+
+      // Delivered (grey double-check)
+      html += `<div style="margin-bottom: 14px;">`;
+      html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${deliveredTime ? '#a8a8a8' : '#666'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12l5 5L18 5"/><path d="M7 12l5 5L24 5"/></svg><span style="font-size: 14px; font-weight: 600; color: var(--ig-primary-text, #fff);">Delivered</span></div>`;
+      html += `<div style="padding-left: 26px; font-size: 13px; color: var(--ig-secondary-text, #a8a8a8);">${deliveredTime || '—'}</div>`;
+      html += `</div>`;
+
+      // Sent (single check)
+      html += `<div style="margin-bottom: 14px;">`;
+      html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a8a8a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 5"/></svg><span style="font-size: 14px; font-weight: 600; color: var(--ig-primary-text, #fff);">Sent</span></div>`;
+      html += `<div style="padding-left: 26px; font-size: 13px; color: var(--ig-secondary-text, #a8a8a8);">${sentTime || '—'}</div>`;
+      html += `</div>`;
+
+      // Type badge
+      html += `<div style="border-top: 1px solid var(--ig-border, #363636); padding-top: 12px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">`;
+      html += `<span style="font-size: 13px; color: var(--ig-secondary-text, #a8a8a8);">Type</span>`;
+      html += `<span style="font-size: 13px; color: var(--ig-primary-text, #fff); background: var(--ig-tertiary-background, #363636); padding: 3px 10px; border-radius: 12px; text-transform: capitalize;">${msgType}</span>`;
+      html += `</div>`;
+
+      container.innerHTML = html;
     }
 
     async function deleteMessage(event) {
@@ -6326,6 +6507,282 @@
         InnovateAPI.showAlert('Message deleted', 'success');
       } catch (error) {
         InnovateAPI.showAlert('Failed to delete message', 'error');
+      }
+    }
+
+    // Unsend message (delete for both users)
+    async function unsendMessage(event) {
+      if (event) event.stopPropagation();
+      hideMessageContextMenu();
+      
+      if (!selectedMessageIsSent) {
+        InnovateAPI.showAlert('You can only unsend your own messages', 'error');
+        return;
+      }
+      
+      const confirmed = confirm('Unsend this message? It will be deleted for everyone.');
+      if (!confirmed) return;
+      
+      try {
+        const endpoint = currentGroupId
+          ? `/groups/${currentGroupId}/messages/${selectedMessageId}`
+          : `/messages/${selectedMessageId}/unsend`;
+        
+        await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
+        
+        const messageEl = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
+        if (messageEl) {
+          const wrapper = messageEl.closest('div[style*="flex-direction: column"]');
+          if (wrapper) wrapper.remove();
+        }
+        
+        // Notify other user via socket
+        const io = window.socket;
+        if (io && currentContactId) {
+          io.emit('message:unsend', { messageId: selectedMessageId, contactId: currentContactId });
+        }
+        
+        InnovateAPI.showAlert('Message unsent', 'success');
+      } catch (error) {
+        InnovateAPI.showAlert('Failed to unsend message', 'error');
+      }
+    }
+
+    // =====================================================
+    // MULTI-SELECT MODE
+    // =====================================================
+    let selectMode = false;
+    let selectedMessages = new Set();
+
+    function enterSelectMode(event) {
+      if (event) event.stopPropagation();
+      hideMessageContextMenu();
+      selectMode = true;
+      selectedMessages.clear();
+      
+      // Pre-select the message that was right-clicked
+      if (selectedMessageId) {
+        selectedMessages.add(selectedMessageId);
+      }
+      
+      const chatMessages = document.getElementById('chatMessages');
+      chatMessages.classList.add('select-mode');
+      
+      // Add select circles OUTSIDE each message wrapper (on the left)
+      document.querySelectorAll('[data-message-id]').forEach(msgEl => {
+        const wrapper = msgEl.parentElement;
+        if (!wrapper || wrapper.querySelector('.msg-select-circle')) return;
+        
+        const mid = parseInt(msgEl.dataset.messageId);
+        const circle = document.createElement('div');
+        circle.className = 'msg-select-circle';
+        circle.dataset.forMsg = mid;
+        circle.style.cssText = 'width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; margin-top: auto; margin-bottom: 6px;';
+        
+        if (selectedMessages.has(mid)) {
+          circle.style.background = '#25D366';
+          circle.style.borderColor = '#25D366';
+          circle.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        }
+        
+        circle.onclick = function(e) {
+          e.stopPropagation();
+          toggleSelectMessage(mid, circle);
+        };
+        
+        // Make the whole wrapper clickable for selection too
+        wrapper.style.cursor = 'pointer';
+        wrapper.dataset.selectHandler = 'true';
+        wrapper.addEventListener('click', function selectClick(e) {
+          if (!selectMode) return;
+          if (e.target.closest('.msg-select-circle') || e.target.type === 'checkbox') return;
+          e.preventDefault();
+          e.stopPropagation();
+          toggleSelectMessage(mid, circle);
+        });
+        
+        // Insert circle at the very beginning of the wrapper
+        wrapper.style.display = 'flex';
+        wrapper.style.alignItems = 'flex-end';
+        wrapper.style.gap = '8px';
+        wrapper.insertBefore(circle, wrapper.firstChild);
+      });
+      
+      showSelectToolbar();
+    }
+    
+    function toggleSelectMessage(mid, circle) {
+      if (selectedMessages.has(mid)) {
+        selectedMessages.delete(mid);
+        circle.style.background = 'transparent';
+        circle.style.borderColor = 'rgba(255,255,255,0.4)';
+        circle.innerHTML = '';
+      } else {
+        selectedMessages.add(mid);
+        circle.style.background = '#25D366';
+        circle.style.borderColor = '#25D366';
+        circle.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+      }
+      updateSelectToolbar();
+    }
+
+    function showSelectToolbar() {
+      let toolbar = document.getElementById('selectToolbar');
+      if (!toolbar) {
+        toolbar = document.createElement('div');
+        toolbar.id = 'selectToolbar';
+        toolbar.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: var(--ig-secondary-background); border-top: 1px solid var(--ig-border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 10001; box-shadow: 0 -2px 10px rgba(0,0,0,0.2);';
+        toolbar.innerHTML = `
+          <button onclick="exitSelectMode()" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; font-size: 14px; padding: 8px 12px; border-radius: 8px;">✕ Cancel</button>
+          <span id="selectCount" style="color: var(--ig-secondary-text); font-size: 13px;">0 selected</span>
+          <div style="display: flex; gap: 2px;">
+            <button onclick="forwardSelectedMessages()" title="Forward" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px;">
+              <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M21 10h-10a8 8 0 0 0-8 8v2M21 10l-6 6m6-6l-6-6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              Forward
+            </button>
+            <button onclick="deleteSelectedMessages()" title="Delete for me" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px;">
+              <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              Delete
+            </button>
+            <button onclick="unsendSelectedMessages()" title="Delete for everyone" style="background: none; border: none; color: #ed4956; cursor: pointer; padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px;">
+              <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span style="white-space: nowrap;">Delete all</span>
+            </button>
+          </div>
+        `;
+        document.body.appendChild(toolbar);
+      }
+      toolbar.style.display = 'flex';
+      updateSelectToolbar();
+      
+      // Hide the message input
+      const inputArea = document.querySelector('.ig-message-input-container');
+      if (inputArea) inputArea.style.display = 'none';
+    }
+
+    function updateSelectToolbar() {
+      const countEl = document.getElementById('selectCount');
+      if (countEl) countEl.textContent = selectedMessages.size + ' selected';
+    }
+
+    function exitSelectMode() {
+      selectMode = false;
+      selectedMessages.clear();
+      
+      const chatMessages = document.getElementById('chatMessages');
+      chatMessages.classList.remove('select-mode');
+      
+      // Remove all select circles and restore wrappers
+      document.querySelectorAll('.msg-select-circle').forEach(circle => circle.remove());
+      
+      // Hide toolbar
+      const toolbar = document.getElementById('selectToolbar');
+      if (toolbar) toolbar.style.display = 'none';
+      
+      // Show input again
+      const inputArea = document.querySelector('.ig-message-input-container');
+      if (inputArea) inputArea.style.display = '';
+    }
+
+    async function deleteSelectedMessages() {
+      if (selectedMessages.size === 0) {
+        InnovateAPI.showAlert('No messages selected', 'info');
+        return;
+      }
+      if (!confirm(`Delete ${selectedMessages.size} message(s) for you?`)) return;
+      
+      let deleted = 0;
+      for (const mid of selectedMessages) {
+        try {
+          const endpoint = currentGroupId ? `/groups/${currentGroupId}/messages/${mid}` : `/messages/${mid}`;
+          await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
+          const el = document.querySelector(`[data-message-id="${mid}"]`);
+          if (el) {
+            const wrapper = el.closest('div[style*="flex-direction: column"]');
+            if (wrapper) wrapper.remove();
+          }
+          deleted++;
+        } catch (_) {}
+      }
+      
+      exitSelectMode();
+      InnovateAPI.showAlert(`${deleted} message(s) deleted`, 'success');
+    }
+
+    async function unsendSelectedMessages() {
+      if (selectedMessages.size === 0) {
+        InnovateAPI.showAlert('No messages selected', 'info');
+        return;
+      }
+      if (!confirm(`Delete ${selectedMessages.size} message(s) for everyone? Only your sent messages can be deleted for everyone.`)) return;
+      
+      let unsent = 0;
+      for (const mid of selectedMessages) {
+        try {
+          await InnovateAPI.apiRequest(`/messages/${mid}/unsend`, { method: 'DELETE' });
+          const el = document.querySelector(`[data-message-id="${mid}"]`);
+          if (el) {
+            const wrapper = el.closest('div[style*="flex-direction: column"]');
+            if (wrapper) wrapper.remove();
+          }
+          unsent++;
+        } catch (_) {}
+      }
+      
+      exitSelectMode();
+      if (unsent > 0) InnovateAPI.showAlert(`${unsent} message(s) deleted for everyone`, 'success');
+      else InnovateAPI.showAlert('Could not delete any messages (only your sent messages can be deleted for everyone)', 'info');
+    }
+
+    async function forwardSelectedMessages() {
+      if (selectedMessages.size === 0) {
+        InnovateAPI.showAlert('No messages selected', 'info');
+        return;
+      }
+      // Open forward picker with all selected messages
+      showForwardModal();
+    }
+
+    // Clear chat for everyone
+    async function clearChatForEveryone() {
+      if (!confirm('This will permanently delete all messages for BOTH you and the other person. This cannot be undone. Continue?')) return;
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/clear-all`, { method: 'POST' });
+        InnovateAPI.showAlert('Chat cleared for everyone', 'success');
+        closeContactInfo();
+        document.getElementById('chatMessages').innerHTML = `
+          <div style="text-align: center; color: var(--ig-secondary-text); padding: 40px;">
+            <div style="font-size: 24px; margin-bottom: 8px;">💬</div>
+            <div>Chat cleared for everyone</div>
+          </div>
+        `;
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to clear chat for everyone', 'error');
+      }
+    }
+
+    // Delete chat for everyone
+    async function deleteChatForEveryone() {
+      if (!confirm('This will permanently delete the entire conversation for BOTH you and the other person. This cannot be undone. Continue?')) return;
+      try {
+        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/delete-all`, { method: 'DELETE' });
+        InnovateAPI.showAlert('Chat deleted for everyone', 'success');
+        closeContactInfo();
+        currentContactId = null;
+        document.getElementById('chatWindow').classList.remove('active');
+        document.getElementById('chatMessages').innerHTML = `
+          <div style="text-align: center; color: var(--ig-secondary-text); padding: 60px 40px; display: flex; flex-direction: column; align-items: center; gap: 24px;">
+            <div style="width: 96px; height: 96px; border-radius: 50%; background: var(--ig-secondary-background); display: flex; align-items: center; justify-content: center;">
+              <svg fill="none" height="56" viewBox="0 0 24 24" width="56" stroke="var(--ig-secondary-text)" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8 10h.01M12 10h.01M16 10h.01" stroke-width="2"></path></svg>
+            </div>
+            <div><div style="font-size: 20px; font-weight: 600; color: var(--ig-primary-text); margin-bottom: 8px;">Your messages</div><div style="font-size: 14px;">Select a conversation to start messaging</div></div>
+          </div>
+        `;
+        document.querySelector('.ig-top-nav')?.style.setProperty('display', '');
+        document.querySelector('.ig-bottom-nav')?.style.setProperty('display', '');
+        await loadConversations();
+      } catch (e) {
+        InnovateAPI.showAlert('Failed to delete chat for everyone', 'error');
       }
     }
 
