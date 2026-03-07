@@ -1017,4 +1017,66 @@ router.post('/report/:userId', authMiddleware, asyncHandler((req, res) => {
   });
 }));
 
+// Toggle a TODO item's checked state in a message
+router.patch('/:messageId/todo-toggle', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { messageId } = req.params;
+  const { itemIndex } = req.body;
+
+  if (itemIndex === undefined || itemIndex === null) {
+    return res.status(400).json({ error: 'itemIndex is required' });
+  }
+
+  db.get('SELECT * FROM messages WHERE id = ? AND (sender_id = ? OR receiver_id = ?)',
+    [messageId, userId, userId],
+    (err, msg) => {
+      if (err || !msg) return res.status(404).json({ error: 'Message not found' });
+      if (msg.type !== 'todo') return res.status(400).json({ error: 'Not a todo message' });
+
+      try {
+        const todo = JSON.parse(msg.content || '{}');
+        const items = todo.items || [];
+        const idx = parseInt(itemIndex);
+        if (idx < 0 || idx >= items.length) {
+          return res.status(400).json({ error: 'Invalid item index' });
+        }
+        items[idx].checked = !items[idx].checked;
+        todo.items = items;
+
+        db.run('UPDATE messages SET content = ? WHERE id = ?',
+          [JSON.stringify(todo), messageId],
+          function(updateErr) {
+            if (updateErr) return res.status(500).json({ error: 'Failed to update' });
+
+            // Also update the linked task in shared_tasks table if exists
+            if (todo.shared_task_id) {
+              const subtasks = items.map(i => ({ text: i.text, completed: i.checked }));
+              const allDone = subtasks.length > 0 && subtasks.every(i => i.completed);
+              const doneCount = subtasks.filter(i => i.completed).length;
+              const progress = subtasks.length > 0 ? Math.round((doneCount / subtasks.length) * 100) : 0;
+              db.run('UPDATE shared_tasks SET subtasks = ?, status = ?, progress = ? WHERE id = ?',
+                [JSON.stringify(subtasks), allDone ? 'done' : 'in_progress', progress, todo.shared_task_id],
+                () => {}
+              );
+            } else if (todo.todo_id) {
+              // Legacy: sync with old todos table
+              const todoItems = items.map(i => ({ text: i.text, completed: i.checked }));
+              const allDone = todoItems.every(i => i.completed);
+              db.run('UPDATE todos SET items = ?, completed = ? WHERE id = ?',
+                [JSON.stringify(todoItems), allDone ? true : false, todo.todo_id],
+                () => {}
+              );
+            }
+
+            res.json({ success: true, items });
+          }
+        );
+      } catch (_) {
+        res.status(400).json({ error: 'Invalid todo data' });
+      }
+    }
+  );
+});
+
 module.exports = router;

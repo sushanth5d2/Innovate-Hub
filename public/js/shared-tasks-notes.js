@@ -765,6 +765,124 @@ window.SharedTasksNotes = (function () {
     _editTask(taskId) {
       const task = config.tasks.find(t => t.id === taskId);
       if (task) openTaskModal(task);
+    },
+
+    /**
+     * Open the task creation modal and call onSave(taskData) with the form data
+     * instead of saving to SharedTasks API. Used by messages to send as message.
+     */
+    openTaskModalForMessage(onSave) {
+      const overlay = document.createElement('div');
+      overlay.className = 'stn-modal-overlay';
+      overlay.innerHTML = `
+        <div class="stn-modal">
+          <div class="stn-modal-header">
+            <h3>Create Task</h3>
+            <button class="stn-modal-close">&times;</button>
+          </div>
+          <div class="stn-modal-body">
+            <form id="stnTaskForm">
+              <div class="stn-form-group">
+                <label>Title *</label>
+                <input type="text" id="stnTaskTitle" placeholder="Enter task title" required>
+              </div>
+              <div class="stn-form-group">
+                <label>Description</label>
+                <textarea id="stnTaskDesc" placeholder="Add details"></textarea>
+              </div>
+              <div class="stn-form-row">
+                <div class="stn-form-group">
+                  <label>Due Date</label>
+                  <input type="date" id="stnTaskDue">
+                </div>
+                <div class="stn-form-group">
+                  <label>Priority</label>
+                  <select id="stnTaskPriority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              <div class="stn-form-group">
+                <label>Subtasks (Steps)</label>
+                <div id="stnSubtasksList"></div>
+                <button type="button" class="stn-btn stn-btn-text" id="stnAddSubtask">+ Add Step</button>
+              </div>
+              <div class="stn-form-group">
+                <label>Progress</label>
+                <div class="stn-progress-display">
+                  <span id="stnProgressPct">0%</span>
+                  <span id="stnProgressLabel">0 of 0 steps</span>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="stn-modal-footer">
+            <button class="stn-btn stn-btn-secondary stn-modal-cancel">Cancel</button>
+            <button class="stn-btn stn-btn-primary" id="stnSaveTask">Send Task</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      overlay.querySelector('.stn-modal-close').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('.stn-modal-cancel').addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      function recalcProgress() {
+        const items = overlay.querySelectorAll('.stn-subtask-item');
+        const total = items.length;
+        const done = Array.from(items).filter(el => el.querySelector('input[type="checkbox"]').checked).length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const pctEl = overlay.querySelector('#stnProgressPct');
+        const lblEl = overlay.querySelector('#stnProgressLabel');
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (lblEl) lblEl.textContent = `${done} of ${total} steps`;
+      }
+
+      function wireSubtaskEvents(root) {
+        root.querySelectorAll('.stn-subtask-remove').forEach(btn => {
+          btn.onclick = () => { btn.closest('.stn-subtask-item').remove(); recalcProgress(); };
+        });
+        root.querySelectorAll('.stn-subtask-item input[type="checkbox"]').forEach(cb => {
+          cb.onchange = () => recalcProgress();
+        });
+      }
+
+      overlay.querySelector('#stnAddSubtask').addEventListener('click', () => {
+        const list = overlay.querySelector('#stnSubtasksList');
+        const count = list.querySelectorAll('.stn-subtask-item').length + 1;
+        list.insertAdjacentHTML('beforeend', subtaskItemHtml({ text: '', completed: false }, count - 1));
+        wireSubtaskEvents(overlay);
+        recalcProgress();
+      });
+
+      // Add 2 initial steps
+      const list = overlay.querySelector('#stnSubtasksList');
+      list.insertAdjacentHTML('beforeend', subtaskItemHtml({ text: '', completed: false }, 0));
+      list.insertAdjacentHTML('beforeend', subtaskItemHtml({ text: '', completed: false }, 1));
+      wireSubtaskEvents(overlay);
+
+      overlay.querySelector('#stnSaveTask').addEventListener('click', () => {
+        const title = overlay.querySelector('#stnTaskTitle').value.trim();
+        if (!title) { InnovateAPI.showAlert('Title required', 'error'); return; }
+
+        const description = overlay.querySelector('#stnTaskDesc').value.trim();
+        const dueDate = overlay.querySelector('#stnTaskDue').value;
+        const priority = overlay.querySelector('#stnTaskPriority').value;
+        const subtaskEls = overlay.querySelectorAll('.stn-subtask-item');
+        const subtasksArr = Array.from(subtaskEls).map(el => ({
+          text: el.querySelector('input[type="text"]').value.trim(),
+          completed: el.querySelector('input[type="checkbox"]').checked
+        })).filter(s => s.text);
+
+        overlay.remove();
+        if (typeof onSave === 'function') {
+          onSave({ title, description, due_date: dueDate || null, priority, subtasks: subtasksArr });
+        }
+      });
     }
   };
 })();

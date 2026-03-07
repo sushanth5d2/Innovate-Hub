@@ -2833,6 +2833,12 @@
         // Load recent posts
         await loadRecentPosts();
 
+        // Check URL hash for auto-tab switching (e.g. #tasks, #notes)
+        const hash = window.location.hash.replace('#', '');
+        if (['tasks', 'notes', 'reels', 'tagged'].includes(hash)) {
+          switchIgTab(hash);
+        }
+
         // Animate reveal
         initScrollReveal();
         initTilt3D();
