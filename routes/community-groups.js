@@ -141,24 +141,36 @@ router.get('/communities/:communityId/groups', authMiddleware, (req, res) => {
       u.username as creator_username,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id) as member_count,
       (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) as is_member,
-      (SELECT content FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message,
-      (SELECT created_at FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1) as latest_message_time,
+      CASE 
+        WHEN (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) > 0
+        THEN (SELECT content FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1)
+        ELSE NULL
+      END as latest_message,
+      CASE 
+        WHEN (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) > 0
+        THEN (SELECT created_at FROM community_group_posts WHERE group_id = cg.id ORDER BY created_at DESC LIMIT 1)
+        ELSE NULL
+      END as latest_message_time,
       (SELECT COUNT(*) FROM pinned_groups WHERE group_id = cg.id AND user_id = ?) as is_pinned,
-      (
-        SELECT COUNT(*) 
-        FROM community_group_posts cgp
-        LEFT JOIN group_message_reads gmr ON gmr.group_id = cg.id AND gmr.user_id = ?
-        WHERE cgp.group_id = cg.id 
-        AND (gmr.last_read_message_id IS NULL OR cgp.id > gmr.last_read_message_id)
-        AND cgp.user_id != ?
-      ) as unread_count
+      CASE 
+        WHEN (SELECT COUNT(*) FROM community_group_members WHERE group_id = cg.id AND user_id = ?) > 0
+        THEN (
+          SELECT COUNT(*) 
+          FROM community_group_posts cgp
+          LEFT JOIN group_message_reads gmr ON gmr.group_id = cg.id AND gmr.user_id = ?
+          WHERE cgp.group_id = cg.id 
+          AND (gmr.last_read_message_id IS NULL OR cgp.id > gmr.last_read_message_id)
+          AND cgp.user_id != ?
+        )
+        ELSE 0
+      END as unread_count
     FROM community_groups cg
     JOIN users u ON cg.creator_id = u.id
     WHERE cg.community_id = ?
     ORDER BY is_pinned DESC, latest_message_time DESC, cg.created_at DESC
   `;
 
-  db.all(query, [userId, userId, userId, userId, communityId], (err, groups) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId, userId, communityId], (err, groups) => {
     if (err) {
       console.error('Error fetching groups:', err);
       return res.status(500).json({ error: 'Error fetching groups', details: err.message });
@@ -1662,6 +1674,48 @@ router.delete('/community-groups/:groupId/posts/:postId', authMiddleware, (req, 
               res.json({ success: true });
             }
           );
+        }
+      );
+    }
+  );
+});
+
+// ==================== UNSEND GROUP MESSAGE (hard delete for everyone) ====================
+router.delete('/community-groups/:groupId/posts/:postId/unsend', authMiddleware, (req, res) => {
+  const db = getDb();
+  const { groupId, postId } = req.params;
+  const userId = req.user.userId;
+
+  // Verify the user is a member
+  db.get('SELECT * FROM community_group_members WHERE group_id = ? AND user_id = ?',
+    [groupId, userId],
+    (err, member) => {
+      if (err || !member) return res.status(403).json({ error: 'You must be a member' });
+
+      // Only the author can unsend
+      db.get('SELECT * FROM community_group_posts WHERE id = ? AND group_id = ?',
+        [postId, groupId],
+        (err, post) => {
+          if (err || !post) return res.status(404).json({ error: 'Message not found' });
+
+          if (post.user_id != userId) {
+            return res.status(403).json({ error: 'Only the message author can unsend' });
+          }
+
+          // Hard delete the message
+          db.run('DELETE FROM community_group_posts WHERE id = ?', [postId], function(err) {
+            if (err) return res.status(500).json({ error: 'Error unsending message' });
+
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`community_group_${groupId}`).emit('message:unsent', {
+                groupId,
+                postId
+              });
+            }
+
+            res.json({ success: true });
+          });
         }
       );
     }

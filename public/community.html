@@ -2972,9 +2972,9 @@
       content.innerHTML = searchHtml + '<div id="groupsListContainer">' + sortedGroups.map(group => {
         const latestMsg = group.latest_message || '';
         
-        // Attempt decryption for preview if content appears encrypted
+        // Only show message preview for members (privacy: non-members should not see encrypted messages)
         let previewMsg = '';
-        if (latestMsg) {
+        if (latestMsg && group.is_member) {
           // Check if message looks encrypted
           if (latestMsg.includes('U2FsdGVk')) {
             // Try to decrypt if we have the key
@@ -11841,6 +11841,14 @@
       const hasContent = contentText && contentText.trim() !== '';
       const editedBadge = msg.is_edited ? '<span style="font-style: italic; opacity: 0.6; margin-left: 4px;">(edited)</span>' : '';
       
+      // Detect forwarded messages
+      let isForwarded = false;
+      if (contentText.startsWith('[Forwarded] ')) {
+        isForwarded = true;
+        contentText = contentText.substring(12);
+      }
+      const forwardedLabel = isForwarded ? `<div style="font-size: 11px; font-style: italic; opacity: 0.7; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 12 12)"/></svg> Forwarded</div>` : '';
+      
       // Extract URLs for link preview
       const urlRegex = /(https?:\/\/[^\s<]+)/g;
       const urls = contentText.match(urlRegex) || [];
@@ -11853,6 +11861,7 @@
             <div style="max-width: 70%;">
               <div style="padding: 12px 16px; border-radius: 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                 ${replyToHTML}
+                ${forwardedLabel}
                 <div class="message-content" style="word-wrap: break-word; white-space: pre-wrap; margin-bottom: 4px;">${hasContent ? linkify(contentText, true) : ''}</div>
                 ${attachmentsHTML}
                 <div id="${linkPreviewId}" style="margin-top: 8px;"></div>
@@ -11893,6 +11902,7 @@
                   ${senderName}
                 </div>
                 ${replyToHTML}
+                ${forwardedLabel}
                 <div class="message-content" style="word-wrap: break-word; white-space: pre-wrap; margin-bottom: 4px;">${hasContent ? linkify(contentText) : ''}</div>
                 ${attachmentsHTML}
                 <div id="${linkPreviewId}" style="margin-top: 8px;"></div>
@@ -12188,7 +12198,7 @@
   </script>
   
   <!-- Community Enhancements: Reactions, Comments, Message Actions, Polls -->
-  <script src="/js/community-enhancements.js"></script>
+  <script src="/js/community-enhancements.js?v=3"></script>
   <script>
     // Initialize enhanced features when socket connects
     if (typeof socket !== 'undefined' && socket) {

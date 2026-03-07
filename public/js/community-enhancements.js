@@ -342,67 +342,89 @@ function showMessageMenu(postId, isOwner, isAdmin, event) {
   menu.id = 'messageMenu';
   menu.style.cssText = `
     position: fixed;
-    bottom: ${window.innerHeight - event.clientY}px;
-    left: ${event.clientX - 200}px;
     background: var(--ig-primary-background);
     border: 1px solid var(--ig-border);
     border-radius: 12px;
-    padding: 8px;
-    min-width: 200px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    min-width: 220px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     z-index: 10000;
+    overflow: hidden;
     animation: slideUpFade 0.2s ease-out;
   `;
-  
-  const actions = [];
-  
-  if (isOwner) {
-    actions.push({
-      icon: 'fa-edit',
-      label: 'Edit Message',
-      color: 'var(--ig-blue)',
-      onClick: () => editMessage(postId)
-    });
-  }
-  
-  actions.push({
-    icon: 'fa-reply',
-    label: 'Reply',
-    color: 'var(--ig-primary-text)',
-    onClick: () => replyToMessage(postId)
-  });
   
   // Check if message is currently pinned
   const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
   const isPinned = messageEl?.dataset.pinned === 'true';
   
+  const actions = [];
+  
+  if (isOwner) {
+    actions.push({
+      svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+      label: 'Edit Message',
+      danger: false,
+      onClick: () => editMessage(postId)
+    });
+  }
+  
   actions.push({
-    icon: 'fa-thumbtack',
+    svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 0 1 5 5v1M3 10l4-4M3 10l4 4" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+    label: 'Reply',
+    danger: false,
+    onClick: () => replyToMessage(postId)
+  });
+  
+  actions.push({
+    svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4m-7-7H1m22 0h-4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
     label: isPinned ? 'Unpin Message' : 'Pin Message',
-    color: 'var(--ig-primary-text)',
+    danger: false,
     onClick: () => isPinned ? unpinMessage(postId) : showPinTimerModal(postId)
   });
   
   actions.push({
-    icon: 'fa-share',
+    svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 12 12)"></path></svg>',
     label: 'Forward',
-    color: 'var(--ig-primary-text)',
+    danger: false,
     onClick: () => forwardMessage(postId)
   });
+
+  actions.push({
+    svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+    label: 'Select',
+    danger: false,
+    onClick: () => enterMessageSelectMode(postId)
+  });
+
+  actions.push({ divider: true });
   
   if (isOwner || isAdmin) {
     actions.push({
-      icon: 'fa-trash',
+      svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
       label: 'Delete Message',
-      color: 'var(--ig-error)',
-      onClick: () => deleteMessage(postId)
+      danger: true,
+      onClick: () => showDeleteMessageModal(postId)
+    });
+  }
+  
+  if (isOwner) {
+    actions.push({
+      svg: '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+      label: 'Unsend for everyone',
+      danger: true,
+      onClick: () => showUnsendMessageModal(postId)
     });
   }
   
   actions.forEach(action => {
+    if (action.divider) {
+      const divider = document.createElement('div');
+      divider.style.cssText = 'height: 1px; background: var(--ig-border); margin: 4px 0;';
+      menu.appendChild(divider);
+      return;
+    }
     const btn = document.createElement('button');
     btn.innerHTML = `
-      <i class="fas ${action.icon}" style="width: 20px; color: ${action.color};"></i>
+      <span style="width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">${action.svg}</span>
       <span>${action.label}</span>
     `;
     btn.style.cssText = `
@@ -410,15 +432,15 @@ function showMessageMenu(postId, isOwner, isAdmin, event) {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 12px;
+      padding: 14px 18px;
       background: none;
       border: none;
-      border-radius: 8px;
-      color: var(--ig-primary-text);
+      color: ${action.danger ? 'var(--ig-error)' : 'var(--ig-primary-text)'};
       font-size: 14px;
       cursor: pointer;
       transition: background 0.2s;
       text-align: left;
+      min-height: 48px;
     `;
     btn.onmouseover = () => btn.style.background = 'var(--ig-hover)';
     btn.onmouseout = () => btn.style.background = 'none';
@@ -430,6 +452,15 @@ function showMessageMenu(postId, isOwner, isAdmin, event) {
   });
   
   document.body.appendChild(menu);
+  
+  // Position the menu near the click, ensuring it stays on screen
+  const menuRect = menu.getBoundingClientRect();
+  let top = event.clientY;
+  let left = event.clientX - menuRect.width;
+  if (left < 8) left = 8;
+  if (top + menuRect.height > window.innerHeight - 8) top = window.innerHeight - menuRect.height - 8;
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
   
   // Close on outside click
   setTimeout(() => {
@@ -613,8 +644,33 @@ async function saveEditedAttachment(postId) {
   }
 }
 
-async function deleteMessage(postId) {
-  if (!confirm('Delete this message? This cannot be undone.')) return;
+// Show delete confirmation modal (soft delete - shows as "message deleted")
+function showDeleteMessageModal(postId) {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 400px; border-radius: 16px; overflow: hidden;">
+      <div style="padding: 24px 24px 16px; text-align: center;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+          <svg fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2" width="24" height="24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700; color: var(--ig-primary-text);">Delete Message</h3>
+        <p style="margin: 0; font-size: 14px; color: var(--ig-secondary-text); line-height: 1.5;">This message will be replaced with "Message deleted" and can't be undone.</p>
+      </div>
+      <div style="padding: 0 24px 24px; display: flex; gap: 12px;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+          style="flex: 1; padding: 12px; border: 2px solid var(--ig-border); border-radius: 10px; background: transparent; color: var(--ig-primary-text); cursor: pointer; font-weight: 600; font-size: 14px;">Cancel</button>
+        <button onclick="confirmDeleteMessage(${postId})" 
+          style="flex: 1; padding: 12px; border: none; border-radius: 10px; background: var(--ig-error); color: white; cursor: pointer; font-weight: 600; font-size: 14px;">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function confirmDeleteMessage(postId) {
+  document.querySelector('.ig-modal-overlay')?.remove();
   
   try {
     const state = window.state || {};
@@ -641,13 +697,8 @@ async function deleteMessage(postId) {
       setTimeout(() => messageEl.remove(), 300);
     }
     
-    // Close any open context menus or modals
-    document.querySelector('.ig-modal-overlay')?.remove();
-    document.querySelector('.context-menu')?.remove();
-    
     InnovateAPI.showAlert('Message deleted', 'success');
     
-    // Reload chat view to ensure consistency
     if (window.loadChatView) {
       setTimeout(() => window.loadChatView(state.currentGroupId), 400);
     }
@@ -655,6 +706,74 @@ async function deleteMessage(postId) {
     console.error('Error deleting message:', error);
     InnovateAPI.showAlert('Failed to delete message', 'error');
   }
+}
+
+// Show unsend confirmation modal (hard delete - removes for everyone)
+function showUnsendMessageModal(postId) {
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 400px; border-radius: 16px; overflow: hidden;">
+      <div style="padding: 24px 24px 16px; text-align: center;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+          <svg fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2" width="24" height="24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700; color: var(--ig-primary-text);">Unsend Message</h3>
+        <p style="margin: 0; font-size: 14px; color: var(--ig-secondary-text); line-height: 1.5;">This will permanently remove the message for <strong>everyone</strong> in this group. This cannot be undone.</p>
+      </div>
+      <div style="padding: 0 24px 24px; display: flex; gap: 12px;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" 
+          style="flex: 1; padding: 12px; border: 2px solid var(--ig-border); border-radius: 10px; background: transparent; color: var(--ig-primary-text); cursor: pointer; font-weight: 600; font-size: 14px;">Cancel</button>
+        <button onclick="confirmUnsendMessage(${postId})" 
+          style="flex: 1; padding: 12px; border: none; border-radius: 10px; background: var(--ig-error); color: white; cursor: pointer; font-weight: 600; font-size: 14px;">Unsend</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function confirmUnsendMessage(postId) {
+  document.querySelector('.ig-modal-overlay')?.remove();
+  
+  try {
+    const state = window.state || {};
+    if (!state.currentGroupId) {
+      InnovateAPI.showAlert('Group ID not found', 'error');
+      return;
+    }
+    
+    const response = await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/posts/${postId}/unsend`, {
+      method: 'DELETE'
+    });
+    
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Failed to unsend message');
+    }
+    
+    // Remove message from DOM immediately
+    const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
+    if (messageEl) {
+      messageEl.style.transition = 'opacity 0.3s, max-height 0.3s';
+      messageEl.style.opacity = '0';
+      messageEl.style.maxHeight = '0';
+      messageEl.style.overflow = 'hidden';
+      setTimeout(() => messageEl.remove(), 300);
+    }
+    
+    InnovateAPI.showAlert('Message unsent for everyone', 'success');
+    
+    if (window.loadChatView) {
+      setTimeout(() => window.loadChatView(state.currentGroupId), 400);
+    }
+  } catch (error) {
+    console.error('Error unsending message:', error);
+    InnovateAPI.showAlert('Failed to unsend message', 'error');
+  }
+}
+
+async function deleteMessage(postId) {
+  showDeleteMessageModal(postId);
 }
 
 function replyToMessage(postId) {
@@ -722,11 +841,12 @@ function cancelReply() {
   }
 }
 
+let forwardGroupsCache = [];
+
 async function forwardMessage(postId) {
   const state = window.state || {};
   
   try {
-    // Get available groups
     const groupsRes = await InnovateAPI.apiRequest(`/communities/${state.communityId}/groups`);
     const groups = groupsRes.groups || [];
     
@@ -735,74 +855,105 @@ async function forwardMessage(postId) {
       return;
     }
     
-    // Get message content
-    const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
-    const content = messageEl?.querySelector('.message-content')?.textContent || '';
+    forwardGroupsCache = groups;
     
-    // Show forward modal
+    const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
+    let content = messageEl?.querySelector('.message-content')?.textContent || '';
+    
+    let existing = document.getElementById('communityForwardModal');
+    if (existing) existing.remove();
+    
     const modal = document.createElement('div');
-    modal.className = 'ig-modal-overlay';
+    modal.id = 'communityForwardModal';
+    modal.style.cssText = 'position: fixed; inset: 0; z-index: 99999; display: flex; align-items: flex-end; justify-content: center;';
     modal.innerHTML = `
-      <div class="ig-modal" style="max-width: 500px;">
-        <div style="padding: 24px; border-bottom: 1px solid var(--ig-border);">
-          <h3 style="margin: 0; font-size: 20px;">Forward Message</h3>
+      <div onclick="closeCommunityForwardModal()" style="position: absolute; inset: 0; background: rgba(0,0,0,0.6);"></div>
+      <div style="position: relative; width: 100%; max-width: 420px; max-height: 75vh; background: var(--ig-secondary-background, #262626); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="padding: 16px; border-bottom: 1px solid var(--ig-border, #363636); display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 17px; font-weight: 600; color: var(--ig-primary-text, #fff);">Forward to</span>
+          <button onclick="closeCommunityForwardModal()" style="background: none; border: none; color: var(--ig-secondary-text, #a8a8a8); font-size: 22px; cursor: pointer; padding: 4px;">&times;</button>
         </div>
-        <div style="padding: 24px;">
-          <p style="margin: 0 0 16px 0; color: var(--ig-secondary-text); font-size: 14px;">
-            Select a group to forward this message to:
-          </p>
-          <div style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;">
-            ${groups.map(g => `
-              <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--ig-hover)'" onmouseout="this.style.background='transparent'">
-                <input type="radio" name="forwardGroup" value="${g.id}" style="width: 18px; height: 18px; cursor: pointer;">
-                <span style="font-weight: 500;">${g.name}</span>
-              </label>
-            `).join('')}
+        <div style="padding: 8px 16px;">
+          <div style="display: flex; align-items: center; background: var(--ig-tertiary-background, #363636); border-radius: 10px; padding: 8px 12px; gap: 8px;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18" style="color: var(--ig-secondary-text, #a8a8a8); flex-shrink: 0;"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+            <input type="text" placeholder="Search..." oninput="filterForwardGroups(this.value)" style="background: none; border: none; outline: none; color: var(--ig-primary-text, #fff); font-size: 14px; width: 100%;" />
           </div>
-          <div style="display: flex; gap: 12px; justify-content: flex-end;">
-            <button onclick="this.closest('.ig-modal-overlay').remove()" 
-              style="padding: 10px 20px; border: 1px solid var(--ig-border); border-radius: 8px; background: transparent; color: var(--ig-primary-text); cursor: pointer;">
-              Cancel
-            </button>
-            <button onclick="confirmForward(${postId})" 
-              style="padding: 10px 20px; border: none; border-radius: 8px; background: var(--ig-blue); color: white; cursor: pointer; font-weight: 600;">
-              Forward
-            </button>
-          </div>
+        </div>
+        <div id="forwardGroupsList" style="flex: 1; overflow-y: auto; padding: 4px 0;">
+          <div style="text-align: center; padding: 30px; color: var(--ig-secondary-text, #a8a8a8);">Loading...</div>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+    renderForwardGroups(groups, postId);
   } catch (error) {
     console.error('Error loading groups for forward:', error);
     InnovateAPI.showAlert('Failed to load groups', 'error');
   }
 }
 
-async function confirmForward(postId) {
-  const selectedGroup = document.querySelector('input[name="forwardGroup"]:checked');
-  if (!selectedGroup) {
-    InnovateAPI.showAlert('Please select a group', 'error');
+function closeCommunityForwardModal() {
+  const modal = document.getElementById('communityForwardModal');
+  if (modal) modal.remove();
+}
+
+function filterForwardGroups(query) {
+  const q = query.toLowerCase().trim();
+  const postId = window._forwardPostId;
+  if (!q) return renderForwardGroups(forwardGroupsCache, postId);
+  const filtered = forwardGroupsCache.filter(g => g.name.toLowerCase().includes(q));
+  renderForwardGroups(filtered, postId);
+}
+
+function renderForwardGroups(groups, postId) {
+  window._forwardPostId = postId;
+  const container = document.getElementById('forwardGroupsList');
+  if (!container) return;
+  if (!groups || groups.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:30px;color:#a8a8a8;">No groups found</div>';
     return;
   }
-  
-  const targetGroupId = selectedGroup.value;
-  const messageEl = document.querySelector(`[data-post-id="${postId}"]`);
-  const content = messageEl?.querySelector('.message-content')?.textContent || '';
+  container.innerHTML = groups.map(g => {
+    const pic = g.avatar_url || g.profile_picture;
+    const initial = g.name.charAt(0).toUpperCase();
+    const avatarHtml = pic
+      ? `<img src="${pic}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div style="display:none;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);align-items:center;justify-content:center;color:white;font-weight:600;font-size:16px;">${initial}</div>`
+      : `<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:16px;">${initial}</div>`;
+    const memberCount = g.member_count ? `${g.member_count} members` : '';
+    return `
+      <div onclick="doForwardToGroup(${g.id}, '${g.name.replace(/'/g, "\\'")}'${postId ? ', ' + postId : ''})" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
+        ${avatarHtml}
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 15px; font-weight: 500; color: var(--ig-primary-text, #fff);">${g.name}</div>
+          <div style="font-size: 13px; color: var(--ig-secondary-text, #a8a8a8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${memberCount}</div>
+        </div>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20" style="color: var(--ig-secondary-text, #a8a8a8); flex-shrink: 0;"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    `;
+  }).join('');
+}
+
+async function doForwardToGroup(targetGroupId, groupName, postId) {
+  closeCommunityForwardModal();
   
   try {
-    // Send message to target group
-    const response = await InnovateAPI.apiRequest(`/community-groups/${targetGroupId}/posts`, {
-      method: 'POST',
-      body: JSON.stringify({ content: `[Forwarded] ${content}` })
-    });
+    const postIds = window.selectedMessages && window.selectedMessages.size > 0
+      ? [...window.selectedMessages]
+      : (postId ? [postId] : []);
     
-    if (response.success) {
-      document.querySelector('.ig-modal-overlay')?.remove();
-      InnovateAPI.showAlert('Message forwarded successfully', 'success');
-    } else {
-      throw new Error('Forward failed');
+    let forwarded = 0;
+    for (const pid of postIds) {
+      const messageEl = document.querySelector(`[data-post-id="${pid}"]`);
+      const content = messageEl?.querySelector('.message-content')?.textContent || '';
+      await InnovateAPI.apiRequest(`/community-groups/${targetGroupId}/posts`, {
+        method: 'POST',
+        body: JSON.stringify({ content: `[Forwarded] ${content}` })
+      });
+      forwarded++;
     }
+    
+    if (window.selectMode) exitSelectMode();
+    InnovateAPI.showAlert(`${forwarded > 1 ? forwarded + ' messages' : 'Message'} forwarded to ${groupName}`, 'success');
   } catch (error) {
     console.error('Error forwarding message:', error);
     InnovateAPI.showAlert('Failed to forward message', 'error');
@@ -1209,6 +1360,150 @@ function setupEnhancedSocketListeners(socket) {
   });
 }
 
+// ==================== MESSAGE SELECT MODE ====================
+window.selectedMessages = new Set();
+
+function enterMessageSelectMode(initialPostId) {
+  const state = window.state || {};
+  window.selectedMessages = new Set();
+  if (initialPostId) window.selectedMessages.add(initialPostId);
+  
+  // Add selection checkboxes to all messages
+  const messages = document.querySelectorAll('[data-post-id]');
+  messages.forEach(msg => {
+    if (msg.querySelector('.msg-select-checkbox')) return;
+    const postId = parseInt(msg.dataset.postId);
+    const checkbox = document.createElement('div');
+    checkbox.className = 'msg-select-checkbox';
+    checkbox.style.cssText = `
+      position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+      width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ig-border);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      background: ${window.selectedMessages.has(postId) ? 'var(--ig-blue)' : 'var(--ig-secondary-background)'};
+      transition: all 0.2s; z-index: 5;
+    `;
+    checkbox.innerHTML = window.selectedMessages.has(postId) ? '<svg fill="white" viewBox="0 0 24 24" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '';
+    checkbox.onclick = (e) => {
+      e.stopPropagation();
+      if (window.selectedMessages.has(postId)) {
+        window.selectedMessages.delete(postId);
+        checkbox.style.background = 'var(--ig-secondary-background)';
+        checkbox.innerHTML = '';
+      } else {
+        window.selectedMessages.add(postId);
+        checkbox.style.background = 'var(--ig-blue)';
+        checkbox.innerHTML = '<svg fill="white" viewBox="0 0 24 24" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+      }
+      updateSelectToolbar();
+    };
+    msg.style.position = 'relative';
+    msg.style.paddingLeft = '28px';
+    msg.insertBefore(checkbox, msg.firstChild);
+  });
+  
+  // Show selection toolbar
+  showSelectToolbar();
+  updateSelectToolbar();
+}
+
+function showSelectToolbar() {
+  let toolbar = document.getElementById('selectModeToolbar');
+  if (toolbar) toolbar.remove();
+  
+  toolbar = document.createElement('div');
+  toolbar.id = 'selectModeToolbar';
+  toolbar.style.cssText = `
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--ig-primary-background); border: 1px solid var(--ig-border);
+    border-radius: 16px; padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 9999; min-width: 280px;
+  `;
+  toolbar.innerHTML = `
+    <span id="selectCount" style="font-size: 13px; color: var(--ig-secondary-text); font-weight: 600; min-width: 90px;">0 selected</span>
+    <div style="flex: 1; display: flex; justify-content: center; gap: 8px;">
+      <button onclick="forwardSelectedMessages()" title="Forward" style="background: none; border: none; color: var(--ig-primary-text); cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='var(--ig-hover)'" onmouseout="this.style.background='none'">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 12 12)"></path></svg>
+      </button>
+      <button onclick="deleteSelectedMessages()" title="Delete" style="background: none; border: none; color: var(--ig-error); cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='var(--ig-hover)'" onmouseout="this.style.background='none'">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+    </div>
+    <button onclick="exitSelectMode()" style="background: none; border: none; color: var(--ig-secondary-text); cursor: pointer; padding: 8px; font-size: 18px; border-radius: 8px;" title="Cancel">&times;</button>
+  `;
+  document.body.appendChild(toolbar);
+}
+
+function updateSelectToolbar() {
+  const count = window.selectedMessages.size;
+  const el = document.getElementById('selectCount');
+  if (el) el.textContent = `${count} selected`;
+}
+
+function exitSelectMode() {
+  window.selectedMessages = new Set();
+  document.getElementById('selectModeToolbar')?.remove();
+  document.querySelectorAll('.msg-select-checkbox').forEach(cb => {
+    const parent = cb.parentElement;
+    if (parent) parent.style.paddingLeft = '';
+    cb.remove();
+  });
+}
+
+async function forwardSelectedMessages() {
+  if (window.selectedMessages.size === 0) {
+    InnovateAPI.showAlert('No messages selected', 'error');
+    return;
+  }
+  // Reuse the same forward modal — doForwardToGroup handles bulk via window.selectedMessages
+  forwardMessage(null);
+}
+
+async function deleteSelectedMessages() {
+  if (window.selectedMessages.size === 0) {
+    InnovateAPI.showAlert('No messages selected', 'error');
+    return;
+  }
+  
+  const count = window.selectedMessages.size;
+  const modal = document.createElement('div');
+  modal.className = 'ig-modal-overlay';
+  modal.innerHTML = `
+    <div class="ig-modal" style="max-width: 400px; border-radius: 16px; overflow: hidden;">
+      <div style="padding: 24px 24px 16px; text-align: center;">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+          <svg fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2" width="24" height="24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700;">Delete ${count} Message${count > 1 ? 's' : ''}?</h3>
+        <p style="margin: 0; font-size: 14px; color: var(--ig-secondary-text);">This cannot be undone.</p>
+      </div>
+      <div style="padding: 0 24px 24px; display: flex; gap: 12px;">
+        <button onclick="this.closest('.ig-modal-overlay').remove()" style="flex: 1; padding: 12px; border: 2px solid var(--ig-border); border-radius: 10px; background: transparent; color: var(--ig-primary-text); cursor: pointer; font-weight: 600;">Cancel</button>
+        <button onclick="confirmBulkDelete()" style="flex: 1; padding: 12px; border: none; border-radius: 10px; background: var(--ig-error); color: white; cursor: pointer; font-weight: 600;">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function confirmBulkDelete() {
+  document.querySelector('.ig-modal-overlay')?.remove();
+  const state = window.state || {};
+  let deleted = 0;
+  
+  for (const postId of window.selectedMessages) {
+    try {
+      await InnovateAPI.apiRequest(`/community-groups/${state.currentGroupId}/posts/${postId}`, { method: 'DELETE' });
+      const el = document.querySelector(`[data-post-id="${postId}"]`);
+      if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }
+      deleted++;
+    } catch (e) { /* skip */ }
+  }
+  
+  exitSelectMode();
+  InnovateAPI.showAlert(`${deleted} message${deleted > 1 ? 's' : ''} deleted`, 'success');
+  if (window.loadChatView) setTimeout(() => window.loadChatView(state.currentGroupId), 400);
+}
+
 // Make functions globally accessible
 window.showReactionPicker = showReactionPicker;
 window.addReaction = addReaction;
@@ -1224,10 +1519,21 @@ window.editMessage = editMessage;
 window.saveEditedMessage = saveEditedMessage;
 window.saveEditedAttachment = saveEditedAttachment;
 window.deleteMessage = deleteMessage;
+window.showDeleteMessageModal = showDeleteMessageModal;
+window.confirmDeleteMessage = confirmDeleteMessage;
+window.showUnsendMessageModal = showUnsendMessageModal;
+window.confirmUnsendMessage = confirmUnsendMessage;
 window.replyToMessage = replyToMessage;
 window.cancelReply = cancelReply;
 window.forwardMessage = forwardMessage;
-window.confirmForward = confirmForward;
+window.closeCommunityForwardModal = closeCommunityForwardModal;
+window.filterForwardGroups = filterForwardGroups;
+window.doForwardToGroup = doForwardToGroup;
+window.enterMessageSelectMode = enterMessageSelectMode;
+window.exitSelectMode = exitSelectMode;
+window.forwardSelectedMessages = forwardSelectedMessages;
+window.deleteSelectedMessages = deleteSelectedMessages;
+window.confirmBulkDelete = confirmBulkDelete;
 window.showPinTimerModal = showPinTimerModal;
 window.pinMessageWithDuration = pinMessageWithDuration;
 window.unpinMessage = unpinMessage;
