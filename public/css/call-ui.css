@@ -1,0 +1,594 @@
+/* ========== WhatsApp-Style Call UI ========== */
+
+#waCallModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+}
+
+/* Overlay */
+.wa-call-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  overflow: hidden;
+}
+
+.wa-call-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #1a1a2e 0%, #0d0d1a 50%, #000 100%);
+  z-index: -1;
+}
+
+.wa-call-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  padding: 40px 20px;
+}
+
+/* E2E Badge */
+.wa-call-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 20px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 40px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Avatar */
+.wa-call-avatar-ring {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(255,255,255,0.15);
+  margin-bottom: 20px;
+}
+
+.wa-call-avatar-ring.wa-ring-pulse {
+  animation: waPulseRing 2s ease-in-out infinite;
+}
+
+@keyframes waPulseRing {
+  0%, 100% { border-color: rgba(255,255,255,0.15); box-shadow: 0 0 0 0 rgba(0,149,246,0.3); }
+  50% { border-color: rgba(0,149,246,0.6); box-shadow: 0 0 0 20px rgba(0,149,246,0); }
+}
+
+.wa-call-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.wa-call-avatar-active {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255,255,255,0.15);
+}
+
+.wa-call-name {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.wa-call-status {
+  font-size: 15px;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+}
+
+.wa-call-timer {
+  font-size: 16px;
+  color: rgba(255,255,255,0.5);
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ========== Outgoing call bottom controls ========== */
+.wa-call-bottom-controls {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  z-index: 10;
+}
+
+.wa-call-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wa-call-btn svg {
+  width: 24px;
+  height: 24px;
+  padding: 14px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  transition: background 0.2s;
+}
+
+.wa-call-btn:hover svg {
+  background: rgba(255,255,255,0.2);
+}
+
+.wa-call-btn span {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+}
+
+.wa-call-btn.wa-call-end svg {
+  background: #ef4444;
+  padding: 16px;
+}
+
+.wa-call-btn.wa-call-end:hover svg {
+  background: #dc2626;
+}
+
+/* ========== Incoming call ========== */
+.wa-call-incoming-actions {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 80px;
+  z-index: 10;
+}
+
+.wa-call-action-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.wa-call-action-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+
+.wa-call-round {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.wa-call-round:hover {
+  transform: scale(1.08);
+}
+
+.wa-call-round.wa-reject {
+  background: #ef4444;
+  box-shadow: 0 4px 20px rgba(239,68,68,0.4);
+}
+
+.wa-call-round.wa-accept {
+  background: #22c55e;
+  box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+}
+
+/* ========== Active Call - Top Bar (WhatsApp style) ========== */
+.wa-call-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 70%, transparent 100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.wa-call-top-bar.wa-ui-hidden {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.wa-top-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  margin: -8px;
+  margin-right: 4px;
+  color: white;
+  display: flex;
+  align-items: center;
+}
+
+.wa-call-top-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.wa-call-top-timer {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.wa-call-top-e2e {
+  color: rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  padding: 8px;
+}
+
+/* ========== Active Call - Center Info ========== */
+.wa-call-center-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 4;
+  transition: opacity 0.3s ease;
+}
+
+/* Hide center info in video calls */
+.wa-call-center-info.wa-center-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ========== Active Call - Controls (Bottom) ========== */
+.wa-call-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 16px 32px;
+  z-index: 10;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.wa-call-controls.wa-ui-hidden {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+/* 4-button row: evenly spaced */
+.wa-call-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  width: 100%;
+  max-width: 340px;
+}
+
+/* Second row: Add button + End call */
+.wa-call-controls-row2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+
+.wa-ctrl-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+
+.wa-ctrl-btn:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.wa-ctrl-btn:active {
+  transform: scale(0.95);
+}
+
+.wa-ctrl-btn span {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 500;
+}
+
+.wa-ctrl-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.wa-ctrl-icon.wa-ctrl-active {
+  background: white;
+  color: #1a1a2e;
+}
+
+.wa-ctrl-active-btn span {
+  color: white;
+}
+
+/* End call button */
+.wa-end-call-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+  box-shadow: 0 4px 20px rgba(239,68,68,0.4);
+  flex-shrink: 0;
+}
+
+.wa-end-call-btn:hover {
+  transform: scale(1.08);
+  background: #dc2626;
+}
+
+.wa-end-call-btn:active {
+  transform: scale(0.95);
+}
+
+/* ========== Local Video PiP ========== */
+.wa-local-video-pip {
+  position: absolute;
+  bottom: 180px;
+  right: 16px;
+  width: 110px;
+  height: 150px;
+  border-radius: 14px;
+  object-fit: cover;
+  z-index: 5;
+  border: 2px solid rgba(255,255,255,0.25);
+  cursor: move;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  background: #000;
+}
+
+/* ========== Call Ended ========== */
+.wa-ended .wa-call-content {
+  animation: waFadeIn 0.3s ease-out;
+}
+
+@keyframes waFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ========== Participants ========== */
+.wa-participants {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.wa-participant-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.wa-participant-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ========== Mini Call Indicator (Minimized) ========== */
+.wa-call-mini-indicator {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 999998;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #1a8c3c;
+  border-radius: 28px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  cursor: pointer;
+  animation: waSlideIn 0.3s ease-out;
+}
+
+@keyframes waSlideIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wa-mini-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wa-mini-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wa-mini-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.wa-mini-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+}
+
+.wa-mini-timer {
+  font-size: 11px;
+  color: rgba(255,255,255,0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+.wa-mini-expand, .wa-mini-end {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  color: white;
+  border-radius: 50%;
+}
+
+.wa-mini-expand:hover { background: rgba(255,255,255,0.15); }
+
+.wa-mini-end {
+  background: #ef4444;
+  border-radius: 50%;
+  padding: 6px;
+}
+
+.wa-mini-end:hover { background: #dc2626; }
+
+/* ========== E2E badge in chat header ========== */
+.dm-e2e-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 480px) {
+  .wa-call-controls-grid {
+    max-width: 300px;
+  }
+  
+  .wa-ctrl-icon {
+    width: 46px;
+    height: 46px;
+  }
+  
+  .wa-end-call-btn {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .wa-local-video-pip {
+    width: 90px;
+    height: 120px;
+    bottom: 160px;
+    right: 12px;
+  }
+  
+  .wa-call-incoming-actions {
+    gap: 60px;
+  }
+}
+
+.dm-e2e-badge svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .wa-call-avatar {
+    width: 100px;
+    height: 100px;
+  }
+  .wa-call-avatar-ring {
+    width: 110px;
+    height: 110px;
+  }
+  .wa-call-name {
+    font-size: 22px;
+  }
+  .wa-call-incoming-actions {
+    gap: 60px;
+    bottom: 40px;
+  }
+  .wa-call-bottom-controls {
+    bottom: 30px;
+    gap: 16px;
+  }
+  .wa-call-controls-grid {
+    gap: 4px;
+  }
+  .wa-ctrl-btn {
+    padding: 6px 8px;
+    min-width: 52px;
+  }
+  .wa-ctrl-icon {
+    width: 44px;
+    height: 44px;
+  }
+  #waLocalVideo {
+    width: 100px !important;
+    height: 140px !important;
+  }
+}

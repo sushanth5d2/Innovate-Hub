@@ -6,6 +6,8 @@
   <title>Messages • Innovate</title>
   <link rel="stylesheet" href="/css/instagram.css">
   <link rel="stylesheet" href="/css/shared-tasks-notes.css">
+  <link rel="stylesheet" href="/css/call-ui.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <style>
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -363,6 +365,10 @@
           <div style="flex: 1; min-width: 0;">
             <div class="ig-chat-username" id="chatUsername" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Select a conversation</div>
             <div class="ig-chat-status" id="chatStatus"></div>
+            <div id="e2eBadge" style="display:none; align-items:center; gap:3px; font-size:11px; color:var(--ig-secondary-text); margin-top:1px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              <span>End-to-end encrypted</span>
+            </div>
           </div>
         </div>
         <div class="ig-chat-actions">
@@ -1231,72 +1237,14 @@
     }
   </script>
 
-  <!-- Call Modals -->
-  <!-- Incoming Call Modal -->
-  <div id="incomingCallModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 999999; align-items: center; justify-content: center;">
-    <div style="background: var(--ig-primary-background); border-radius: 20px; padding: 40px; text-align: center; max-width: 400px; width: 90%;">
-      <img id="incomingCallAvatar" src="" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 20px;">
-      <h2 id="incomingCallName" style="margin-bottom: 10px; color: var(--ig-primary-text);">User</h2>
-      <p id="incomingCallType" style="color: var(--ig-secondary-text); margin-bottom: 40px;">Incoming call...</p>
-      <div style="display: flex; gap: 20px; justify-content: center;">
-        <button onclick="rejectCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #ed4956; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-          <svg fill="white" height="30" viewBox="0 0 24 24" width="30">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm0-4h-2V7h2v8z"/>
-          </svg>
-        </button>
-        <button onclick="acceptCall()" style="width: 60px; height: 60px; border-radius: 50%; background: #0095f6; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-          <svg fill="white" height="30" viewBox="0 0 24 24" width="30">
-            <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Call Modal -->
-  <div id="activeCallModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 999999; flex-direction: column;">
-    <div style="flex: 1; position: relative; display: flex; align-items: center; justify-content: center;">
-      <video id="remoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
-      <video id="localVideo" autoplay playsinline muted style="position: absolute; bottom: 20px; right: 20px; width: 150px; height: 200px; border-radius: 12px; object-fit: cover; border: 2px solid white;"></video>
-      
-      <!-- Call info overlay -->
-      <div id="callInfoOverlay" style="position: absolute; top: 40px; left: 50%; transform: translateX(-50%); text-align: center; color: white; background: rgba(0,0,0,0.5); padding: 20px 30px; border-radius: 12px;">
-        <img id="activeCallAvatar" src="" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 12px;">
-        <h3 id="activeCallName" style="margin-bottom: 8px;">User</h3>
-        <p id="callDuration" style="opacity: 0.8; font-size: 14px;">00:00</p>
-      </div>
-    </div>
-    
-    <!-- Call controls -->
-    <div style="padding: 30px; display: flex; gap: 20px; justify-content: center; align-items: center; background: rgba(0,0,0,0.8);">
-      <button id="muteBtn" onclick="toggleMute()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Mute">
-        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
-          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-        </svg>
-      </button>
-      <button id="videoBtn" onclick="toggleVideo()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Video">
-        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
-          <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-        </svg>
-      </button>
-      <button onclick="endCall()" style="width: 70px; height: 70px; border-radius: 50%; background: #ed4956; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="End Call">
-        <svg fill="white" height="32" viewBox="0 0 24 24" width="32">
-          <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
-        </svg>
-      </button>
-      <button onclick="toggleSpeaker()" style="width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Speaker">
-        <svg fill="white" height="24" viewBox="0 0 24 24" width="24">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-        </svg>
-      </button>
-    </div>
-  </div>
+  <!-- Call UI is handled by call-manager.js -->
+  <div id="waCallModal" style="display:none;"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
+  <script src="/js/call-manager.js"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -1581,6 +1529,9 @@
       }
       
       if (chatUsernameEl) chatUsernameEl.textContent = username;
+      // Show E2E badge for DM conversations
+      const e2eBadge = document.getElementById('e2eBadge');
+      if (e2eBadge) e2eBadge.style.display = 'flex';
       // Reset chat status (clear AI status text)
       const chatStatusEl = document.getElementById('chatStatus');
       if (chatStatusEl) { chatStatusEl.textContent = ''; chatStatusEl.style.color = ''; }
@@ -2215,6 +2166,9 @@
         chatUsernameEl.style.cursor = 'pointer';
         chatUsernameEl.onclick = () => openGroupInfo();
       }
+      // Hide E2E badge for group chats
+      const e2eBadgeGroup = document.getElementById('e2eBadge');
+      if (e2eBadgeGroup) e2eBadgeGroup.style.display = 'none';
 
       document.querySelectorAll('.ig-conversation').forEach(el => el.classList.remove('active'));
 
@@ -3697,40 +3651,8 @@
       }
     });
     
-    // WebRTC call event listeners
-    socket.off('call:incoming');
-    socket.off('call:answered');
-    socket.off('call:ice-candidate');
-    socket.off('call:rejected');
-    socket.off('call:ended');
-    
-    console.log('Registering call event listeners...');
-    socket.on('call:incoming', (data) => {
-      console.log('call:incoming event received:', data);
-      showIncomingCall(data);
-    });
-
-    socket.on('call:answered', async (data) => {
-      if (peerConnection && data.answer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-      }
-    });
-
-    socket.on('call:ice-candidate', async (data) => {
-      if (peerConnection && data.candidate) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-      }
-    });
-
-    socket.on('call:rejected', () => {
-      InnovateAPI.showAlert('Call rejected', 'info');
-      cleanupCall();
-    });
-
-    socket.on('call:ended', () => {
-      InnovateAPI.showAlert('Call ended', 'info');
-      cleanupCall();
-    });
+    // WebRTC call event listeners - delegated to CallManager
+    callManager.setupSocketListeners(socket);
       
     // Emit user join
     socket.emit('user:join', user.id);
@@ -5367,331 +5289,39 @@
     });
 
     // Voice and Video Calling with WebRTC
-    let localStream = null;
-    let remoteStream = null;
-    let peerConnection = null;
-    let isCallActive = false;
-    let isVideoCall = false;
-    let isMuted = false;
-    let isVideoEnabled = true;
-    let callStartTime = null;
-    let callDurationInterval = null;
-    let currentCallContactId = null;
+    // ========== CALLS (delegated to CallManager) ==========
 
-    const configuration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    };
+    function _getContactInfo() {
+      const c = conversations.find(c => c.contact_id === currentContactId);
+      return {
+        username: c?.username || 'User',
+        profile_picture: c?.profile_picture
+      };
+    }
 
-    // Start voice call
     async function startVoiceCall() {
       if (!currentContactId) {
         InnovateAPI.showAlert('Please select a conversation first', 'error');
         return;
       }
-      isVideoCall = false;
-      await initiateCall(false);
+      callManager.startCall(currentContactId, _getContactInfo(), false);
     }
 
-    // Start video call
     async function startVideoCall() {
       if (!currentContactId) {
         InnovateAPI.showAlert('Please select a conversation first', 'error');
         return;
       }
-      isVideoCall = true;
-      await initiateCall(true);
+      callManager.startCall(currentContactId, _getContactInfo(), true);
     }
 
-    // Initiate call
-    async function initiateCall(video) {
-      try {
-        // Get user media
-        localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: video
-        });
-
-        // Set up call
-        currentCallContactId = currentContactId;
-        setupCallUI(video);
-        
-        // Create peer connection
-        peerConnection = new RTCPeerConnection(configuration);
-        
-        // Add local stream to peer connection
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-        });
-
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) {
-            InnovateAPI.getSocket().emit('call:ice-candidate', {
-              to: currentCallContactId,
-              candidate: event.candidate
-            });
-          }
-        };
-
-        // Handle remote stream
-        peerConnection.ontrack = (event) => {
-          if (!remoteStream) {
-            remoteStream = new MediaStream();
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-          }
-          remoteStream.addTrack(event.track);
-        };
-
-        // Create and send offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-
-        // Get contact info for call
-        const contactData = conversations.find(c => c.contact_id === currentCallContactId);
-        
-        console.log('Initiating call to user:', currentCallContactId);
-        console.log('Caller info:', { id: user.id, username: user.username });
-        
-        InnovateAPI.getSocket().emit('call:initiate', {
-          to: currentCallContactId,
-          from: user.id,
-          offer: offer,
-          isVideo: video,
-          caller: {
-            username: user.username,
-            profile_picture: user.profile_picture
-          }
-        });
-
-        showActiveCall(contactData?.username || 'User', contactData?.profile_picture);
-        
-      } catch (error) {
-        console.error('Error starting call:', error);
-        InnovateAPI.showAlert('Failed to access camera/microphone', 'error');
-      }
-    }
-
-    // Setup call UI
-    function setupCallUI(video) {
-      const localVideo = document.getElementById('localVideo');
-      const remoteVideo = document.getElementById('remoteVideo');
-      
-      if (localStream) {
-        localVideo.srcObject = localStream;
-        localVideo.style.display = video ? 'block' : 'none';
-      }
-      
-      remoteVideo.style.display = video ? 'block' : 'none';
-      
-      // Show/hide video button based on call type
-      document.getElementById('videoBtn').style.display = video ? 'flex' : 'none';
-    }
-
-    // Show active call UI
-    function showActiveCall(name, avatar) {
-      document.getElementById('activeCallModal').style.display = 'flex';
-      document.getElementById('activeCallName').textContent = name;
-      document.getElementById('activeCallAvatar').src = InnovateAPI.getUserAvatar(avatar);
-      
-      isCallActive = true;
-      callStartTime = Date.now();
-      
-      // Start duration counter
-      callDurationInterval = setInterval(updateCallDuration, 1000);
-    }
-
-    // Update call duration
-    function updateCallDuration() {
-      if (!callStartTime) return;
-      
-      const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
-      const minutes = Math.floor(elapsed / 60);
-      const seconds = elapsed % 60;
-      
-      document.getElementById('callDuration').textContent = 
-        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-
-    // Show incoming call
-    function showIncomingCall(data) {
-      console.log('Incoming call received:', data);
-      document.getElementById('incomingCallModal').style.display = 'flex';
-      document.getElementById('incomingCallName').textContent = data.caller.username;
-      document.getElementById('incomingCallAvatar').src = InnovateAPI.getUserAvatar(data.caller.profile_picture);
-      document.getElementById('incomingCallType').textContent = 
-        data.isVideo ? 'Incoming video call...' : 'Incoming voice call...';
-      
-      // Store call data for accepting
-      window.incomingCallData = data;
-    }
-
-    // Accept call
-    async function acceptCall() {
-      const data = window.incomingCallData;
-      if (!data) return;
-
-      try {
-        isVideoCall = data.isVideo;
-        currentCallContactId = data.from;
-        
-        // Get user media
-        localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: data.isVideo
-        });
-
-        // Hide incoming call modal
-        document.getElementById('incomingCallModal').style.display = 'none';
-        
-        // Setup call UI
-        setupCallUI(data.isVideo);
-        showActiveCall(data.caller.username, data.caller.profile_picture);
-
-        // Create peer connection
-        peerConnection = new RTCPeerConnection(configuration);
-        
-        // Add local stream
-        localStream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, localStream);
-        });
-
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) {
-            InnovateAPI.getSocket().emit('call:ice-candidate', {
-              to: currentCallContactId,
-              candidate: event.candidate
-            });
-          }
-        };
-
-        // Handle remote stream
-        peerConnection.ontrack = (event) => {
-          if (!remoteStream) {
-            remoteStream = new MediaStream();
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-          }
-          remoteStream.addTrack(event.track);
-        };
-
-        // Set remote description and create answer
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-
-        // Send answer
-        InnovateAPI.getSocket().emit('call:answer', {
-          to: data.from,
-          answer: answer
-        });
-
-      } catch (error) {
-        console.error('Error accepting call:', error);
-        InnovateAPI.showAlert('Failed to accept call', 'error');
-        rejectCall();
-      }
-    }
-
-    // Reject call
-    function rejectCall() {
-      const data = window.incomingCallData;
-      if (data) {
-        InnovateAPI.getSocket().emit('call:reject', {
-          to: data.from
-        });
-      }
-      
-      document.getElementById('incomingCallModal').style.display = 'none';
-      window.incomingCallData = null;
-    }
-
-    // End call
-    function endCall() {
-      // Send end call signal
-      if (currentCallContactId) {
-        InnovateAPI.getSocket().emit('call:end', {
-          to: currentCallContactId
-        });
-      }
-
-      // Clean up
-      cleanupCall();
-    }
-
-    // Cleanup call resources
-    function cleanupCall() {
-      // Stop all tracks
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-      }
-
-      if (remoteStream) {
-        remoteStream.getTracks().forEach(track => track.stop());
-        remoteStream = null;
-      }
-
-      // Close peer connection
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
-
-      // Clear duration interval
-      if (callDurationInterval) {
-        clearInterval(callDurationInterval);
-        callDurationInterval = null;
-      }
-
-      // Hide call UI
-      document.getElementById('activeCallModal').style.display = 'none';
-      document.getElementById('incomingCallModal').style.display = 'none';
-
-      // Reset state
-      isCallActive = false;
-      currentCallContactId = null;
-      callStartTime = null;
-      isMuted = false;
-      isVideoEnabled = true;
-    }
-
-    // Toggle mute
-    function toggleMute() {
-      if (!localStream) return;
-      
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        isMuted = !audioTrack.enabled;
-        
-        const muteBtn = document.getElementById('muteBtn');
-        muteBtn.style.background = isMuted ? '#ed4956' : 'rgba(255,255,255,0.2)';
-      }
-    }
-
-    // Toggle video
-    function toggleVideo() {
-      if (!localStream) return;
-      
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        isVideoEnabled = videoTrack.enabled;
-        
-        const videoBtn = document.getElementById('videoBtn');
-        videoBtn.style.background = !isVideoEnabled ? '#ed4956' : 'rgba(255,255,255,0.2)';
-        
-        document.getElementById('localVideo').style.display = isVideoEnabled ? 'block' : 'none';
-      }
-    }
-
-    // Toggle speaker (placeholder - browser handles audio output)
-    function toggleSpeaker() {
-      InnovateAPI.showAlert('Speaker toggle', 'info');
-    }
+    // Legacy compat stubs for any remaining onclick handlers
+    function endCall() { callManager.endCall(); }
+    function acceptCall() { callManager.acceptCall(); }
+    function rejectCall() { callManager.rejectCall(); }
+    function toggleMute() { callManager.toggleMute(); }
+    function toggleVideo() { callManager.toggleVideo(); }
+    function toggleSpeaker() { callManager.toggleSpeaker(); }
 
     // Scroll to specific message (for reply navigation)
     function scrollToMessage(messageId) {

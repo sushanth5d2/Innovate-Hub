@@ -494,6 +494,28 @@ io.on('connection', (socket) => {
     io.to(`user_${to}`).emit('call:ended');
   });
 
+  // Add member to active call signaling
+  socket.on('call:add-member-offer', (data) => {
+    const { to, offer, userId, username, profile_picture } = data;
+    io.to(`user_${to}`).emit('call:add-member-offer', {
+      fromSocketId: socket.id,
+      offer,
+      userId,
+      username,
+      profile_picture
+    });
+  });
+
+  socket.on('call:add-member-answer', (data) => {
+    const { to, answer } = data;
+    io.to(to).emit('call:add-member-answer', { fromSocketId: socket.id, answer });
+  });
+
+  socket.on('call:add-member-ice', (data) => {
+    const { to, candidate } = data;
+    io.to(to).emit('call:add-member-ice', { fromSocketId: socket.id, candidate });
+  });
+
   // === Group Call (WebRTC mesh) ===
   // Client joins a group call room to exchange offers/answers/ICE.
   socket.on('group-call:join', (data) => {
