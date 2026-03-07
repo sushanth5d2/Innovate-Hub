@@ -114,17 +114,25 @@ router.get('/', authMiddleware, (req, res) => {
     `SELECT u.id as user_id, u.username, u.profile_picture, u.date_of_birth
      FROM followers f
      JOIN users u ON f.following_id = u.id
-     WHERE f.follower_id = ? AND u.date_of_birth IS NOT NULL AND u.date_of_birth != '' AND LENGTH(CAST(u.date_of_birth AS TEXT)) >= 8`,
+     WHERE f.follower_id = ? AND u.date_of_birth IS NOT NULL`,
     [userId],
     (err, rows) => {
       if (!err && rows) {
         const currentYear = new Date().getFullYear();
         rows.forEach(r => {
           if (!r.date_of_birth) return;
-          // Parse the date_of_birth and create this year's birthday
-          const dob = new Date(r.date_of_birth);
-          if (isNaN(dob.getTime())) return;
-          const birthdayThisYear = new Date(currentYear, dob.getMonth(), dob.getDate());
+          // PG returns Date objects; SQLite returns strings - handle both
+          let month, day;
+          if (r.date_of_birth instanceof Date) {
+            month = r.date_of_birth.getUTCMonth();
+            day = r.date_of_birth.getUTCDate();
+          } else {
+            const parts = String(r.date_of_birth).split(/[-T]/);
+            month = parseInt(parts[1], 10) - 1;
+            day = parseInt(parts[2], 10);
+          }
+          if (isNaN(month) || isNaN(day)) return;
+          const birthdayThisYear = new Date(currentYear, month, day);
           // If birthday already passed this year, show next year's
           const now = new Date();
           if (birthdayThisYear < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
@@ -133,7 +141,7 @@ router.get('/', authMiddleware, (req, res) => {
           allReminders.push({
             id: `bday-${r.user_id}`,
             title: `🎂 ${r.username}'s Birthday`,
-            description: `${r.username}'s birthday is on ${dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`,
+            description: `${r.username}'s birthday is on ${new Date(currentYear, month, day).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`,
             reminder_date: birthdayThisYear.toISOString().split('T')[0],
             reminder_time: '00:00',
             type: 'birthday',
@@ -531,7 +539,7 @@ router.get('/due', authMiddleware, (req, res) => {
   db.all(
     `SELECT * FROM user_reminders
      WHERE user_id = ? AND is_dismissed = 0 AND is_notified = 0
-     AND datetime(reminder_date || ' ' || COALESCE(reminder_time, '09:00')) <= datetime(?)
+     AND (reminder_date || ' ' || COALESCE(reminder_time, '09:00'))::timestamp <= ?::timestamp
      ORDER BY reminder_date ASC`,
     [userId, now],
     (err, rows) => {
