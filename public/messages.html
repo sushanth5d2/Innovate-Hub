@@ -400,6 +400,16 @@
           </div>
         </div>
       </div>
+
+      <!-- Scroll-to-bottom floating button (WhatsApp/Instagram style) -->
+      <div id="scrollDownBtn" style="display: none; position: absolute; bottom: 80px; right: 20px; z-index: 50; cursor: pointer;" onclick="scrollToBottomAndDismiss()">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--ig-secondary-background, #262640); box-shadow: 0 2px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; border: 1px solid var(--ig-border, rgba(255,255,255,0.1)); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+          <svg fill="none" height="20" viewBox="0 0 24 24" width="20" stroke="var(--ig-primary-text, #fff)" stroke-width="2.5">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <div id="scrollDownBadge" style="display: none; position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; border-radius: 10px; background: #00a884; color: white; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; padding: 0 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>
+      </div>
       
       <!-- Reply/Edit Preview Container -->
       <div id="messagePreviewContainer" style="padding: 0 16px;"></div>
@@ -933,7 +943,7 @@
       <span style="font-weight: 600; font-size: 18px;">Disappearing messages</span>
     </div>
     <div style="padding: 16px;">
-      <p style="color: var(--ig-secondary-text); font-size: 13px; margin-bottom: 20px;">When enabled, new messages sent in this chat will disappear after the selected duration or after being read.</p>
+      <p style="color: var(--ig-secondary-text); font-size: 13px; margin-bottom: 20px;">When enabled, new messages sent in this chat will disappear after the selected duration or when you leave the chat.</p>
       <div id="disappearingOptions" style="display: flex; flex-direction: column; gap: 4px;">
         <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
           <input type="radio" name="disappearingMode" value="off" checked style="accent-color: #00a884; width: 18px; height: 18px;">
@@ -942,8 +952,8 @@
         <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
           <input type="radio" name="disappearingMode" value="on_read" style="accent-color: #00a884; width: 18px; height: 18px;">
           <div>
-            <div style="font-weight: 500;">Disappear after read</div>
-            <div style="font-size: 12px; color: var(--ig-secondary-text);">Messages disappear once seen by the recipient</div>
+            <div style="font-weight: 500;">Disappear on exit</div>
+            <div style="font-size: 12px; color: var(--ig-secondary-text);">Messages disappear when you leave the chat</div>
           </div>
         </label>
         <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--ig-secondary-background); border-radius: 12px; cursor: pointer;">
@@ -1471,8 +1481,67 @@
     let currentGroupId = null;
     let currentPartnerAvatar = null;
 
+    // Scroll tracking - WhatsApp/Instagram style: free scrolling, no forced scrolling
+    let userScrolledUp = false;
+    let lastMessageCount = 0;
+    let lastGroupMessageCount = 0;
+    let newMessageBadgeCount = 0;
+    let _isInitialLoad = true; // true when opening a chat for the first time
+
+    function isNearBottom(container) {
+      if (!container) return true;
+      const threshold = 150; // px from bottom
+      return (container.scrollHeight - container.scrollTop - container.clientHeight) < threshold;
+    }
+
+    // Show/hide the scroll-down floating button
+    function updateScrollDownButton() {
+      const btn = document.getElementById('scrollDownBtn');
+      const badge = document.getElementById('scrollDownBadge');
+      if (!btn) return;
+      if (userScrolledUp) {
+        btn.style.display = 'block';
+        if (newMessageBadgeCount > 0) {
+          badge.style.display = 'flex';
+          badge.textContent = newMessageBadgeCount > 99 ? '99+' : newMessageBadgeCount;
+        } else {
+          badge.style.display = 'none';
+        }
+      } else {
+        btn.style.display = 'none';
+        newMessageBadgeCount = 0;
+      }
+    }
+
+    function scrollToBottomAndDismiss() {
+      const container = document.getElementById('chatMessages');
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+      userScrolledUp = false;
+      newMessageBadgeCount = 0;
+      updateScrollDownButton();
+    }
+
+    // Setup scroll listener on chat messages container
+    function setupScrollTracking() {
+      const container = document.getElementById('chatMessages');
+      if (!container || container._scrollTracked) return;
+      container._scrollTracked = true;
+      container.addEventListener('scroll', () => {
+        userScrolledUp = !isNearBottom(container);
+        updateScrollDownButton();
+      }, { passive: true });
+    }
+
     // Open chat
     async function openChat(contactId, username, profilePicture) {
+      // Notify server about leaving previous chat (for disappear-on-exit)
+      await notifyLeaveChat();
+      userScrolledUp = false;
+      _isInitialLoad = true;
+      newMessageBadgeCount = 0;
+      
       currentContactId = contactId;
       currentGroupId = null;
       
@@ -1661,6 +1730,19 @@
           const prevMsg = data.messages[msgIndex - 1];
           const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id;
           const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
+
+          // Insert unread divider before the first unread message (only on initial load)
+          if (_isInitialLoad && data.first_unread_id && msg.id === data.first_unread_id) {
+            const divider = document.createElement('div');
+            divider.id = 'unread-divider';
+            divider.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0; margin: 4px 0;';
+            divider.innerHTML = `
+              <div style="flex: 1; height: 1px; background: #00a884;"></div>
+              <span style="font-size: 12px; font-weight: 600; color: #00a884; white-space: nowrap;">${data.unread_count} UNREAD MESSAGE${data.unread_count > 1 ? 'S' : ''}</span>
+              <div style="flex: 1; height: 1px; background: #00a884;"></div>
+            `;
+            messagesContainer.appendChild(divider);
+          }
 
           // Wrapper holds avatar + bubble
           const wrapperEl = document.createElement('div');
@@ -2075,8 +2157,34 @@
           messagesContainer.appendChild(wrapperEl);
         });
 
-        // Scroll to bottom after images load
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Track message count for smart polling
+        lastMessageCount = data.messages.length;
+
+        // Setup scroll tracking
+        setupScrollTracking();
+
+        // Scroll positioning: on initial load, scroll to unread divider or bottom
+        // On poll reload (not initial), preserve scroll position
+        const scrollToTarget = () => {
+          if (_isInitialLoad) {
+            const unreadDivider = document.getElementById('unread-divider');
+            if (unreadDivider) {
+              // Scroll to unread divider (WhatsApp style)
+              unreadDivider.scrollIntoView({ block: 'start' });
+              // Offset a bit so divider isn't at very top
+              messagesContainer.scrollTop = Math.max(0, messagesContainer.scrollTop - 20);
+            } else {
+              // No unread messages - scroll to bottom
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            _isInitialLoad = false;
+          }
+          // On poll reloads, don't touch scroll at all
+        };
+        
+        scrollToTarget();
+        
+        // Wait for images to load, then re-adjust scroll position
         const images = messagesContainer.querySelectorAll('img');
         let imagesLoaded = 0;
         const totalImages = images.length;
@@ -2084,22 +2192,16 @@
           images.forEach(img => {
             if (img.complete) {
               imagesLoaded++;
-              if (imagesLoaded >= totalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+              if (imagesLoaded >= totalImages && _isInitialLoad === false && document.getElementById('unread-divider')) {
+                // Re-scroll to divider after images loaded
+                document.getElementById('unread-divider')?.scrollIntoView({ block: 'start' });
+              }
             } else {
-              img.addEventListener('load', () => {
-                imagesLoaded++;
-                if (imagesLoaded >= totalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-              });
-              img.addEventListener('error', () => {
-                imagesLoaded++;
-                if (imagesLoaded >= totalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-              });
+              img.addEventListener('load', () => { imagesLoaded++; });
+              img.addEventListener('error', () => { imagesLoaded++; });
             }
           });
         }
-        // Also scroll again after a short delay as fallback
-        setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 300);
-        setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 800);
         
         // Start checking for expired messages
         checkExpiredMessages();
@@ -2113,6 +2215,12 @@
 
     // Open group chat
     async function openGroupChat(groupId, groupName) {
+      // Notify server about leaving previous chat (for disappear-on-exit)
+      await notifyLeaveChat();
+      userScrolledUp = false;
+      _isInitialLoad = true;
+      newMessageBadgeCount = 0;
+      
       // Leave the previous group's socket room if switching groups
       if (_previousGroupId && _previousGroupId !== groupId) {
         const socket = InnovateAPI.getSocket();
@@ -2268,6 +2376,15 @@
           const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
           const grpMsgText = msg.content || '';
           const msgType = msg.type || 'text';
+
+          // Insert unread divider before the first unread message
+          if (_isInitialLoad && data.first_unread_id && msg.id === data.first_unread_id) {
+            const unreadDiv = document.createElement('div');
+            unreadDiv.id = 'unread-divider';
+            unreadDiv.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 16px; margin: 12px 0;';
+            unreadDiv.innerHTML = `<div style="flex: 1; height: 1px; background: #00c853;"></div><span style="font-size: 12px; font-weight: 600; color: #00c853; white-space: nowrap;">${data.unread_count || ''} UNREAD MESSAGES</span><div style="flex: 1; height: 1px; background: #00c853;"></div>`;
+            messagesContainer.appendChild(unreadDiv);
+          }
 
           // Sender label (only for first message in a consecutive group from same sender)
           if (!isSent && isFirstInGroup) {
@@ -2436,8 +2553,29 @@
           messagesContainer.appendChild(wrapperEl);
         });
 
-        // Scroll to bottom after images load
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Track group message count for smart polling
+        lastGroupMessageCount = data.messages.length;
+
+        // Setup scroll tracking
+        setupScrollTracking();
+
+        // Scroll positioning: on initial load, scroll to unread divider or bottom
+        const grpScrollToTarget = () => {
+          if (_isInitialLoad) {
+            const unreadDivider = document.getElementById('unread-divider');
+            if (unreadDivider) {
+              unreadDivider.scrollIntoView({ block: 'start' });
+              messagesContainer.scrollTop = Math.max(0, messagesContainer.scrollTop - 20);
+            } else {
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            _isInitialLoad = false;
+          }
+        };
+
+        grpScrollToTarget();
+
+        // Wait for images to load, then re-adjust scroll position
         const grpImages = messagesContainer.querySelectorAll('img');
         let grpImagesLoaded = 0;
         const grpTotalImages = grpImages.length;
@@ -2445,15 +2583,12 @@
           grpImages.forEach(img => {
             if (img.complete) {
               grpImagesLoaded++;
-              if (grpImagesLoaded >= grpTotalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight;
             } else {
-              img.addEventListener('load', () => { grpImagesLoaded++; if (grpImagesLoaded >= grpTotalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight; });
-              img.addEventListener('error', () => { grpImagesLoaded++; if (grpImagesLoaded >= grpTotalImages) messagesContainer.scrollTop = messagesContainer.scrollHeight; });
+              img.addEventListener('load', () => { grpImagesLoaded++; });
+              img.addEventListener('error', () => { grpImagesLoaded++; });
             }
           });
         }
-        setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 300);
-        setTimeout(() => { messagesContainer.scrollTop = messagesContainer.scrollHeight; }, 800);
       } catch (error) {
         console.error('Error loading group messages:', error);
       }
@@ -2470,18 +2605,35 @@
       messages.forEach(messageEl => {
         const expiresAt = new Date(messageEl.dataset.expiresAt).getTime();
         if (now >= expiresAt) {
-          // Fade out and remove
-          messageEl.style.transition = 'opacity 0.5s';
-          messageEl.style.opacity = '0';
+          // Fade out and remove (also remove wrapper parent)
+          const wrapper = messageEl.parentElement;
+          const target = (wrapper && wrapper !== messagesContainer) ? wrapper : messageEl;
+          target.style.transition = 'opacity 0.5s, max-height 0.5s';
+          target.style.opacity = '0';
+          target.style.maxHeight = target.offsetHeight + 'px';
           setTimeout(() => {
-            messageEl.remove();
+            target.style.maxHeight = '0';
+            target.style.overflow = 'hidden';
+            target.style.padding = '0';
+            target.style.margin = '0';
+            setTimeout(() => target.remove(), 300);
           }, 500);
+          
+          // Also delete from server
+          const messageId = messageEl.dataset.messageId;
+          if (messageId) {
+            const isGroup = !!currentGroupId;
+            const endpoint = isGroup 
+              ? `/groups/${currentGroupId}/messages/${messageId}`
+              : `/messages/${messageId}`;
+            InnovateAPI.apiRequest(endpoint, { method: 'DELETE' }).catch(() => {});
+          }
         }
       });
     }
     
-    // Check expired messages every 5 seconds
-    setInterval(checkExpiredMessages, 5000);
+    // Check expired messages every 3 seconds
+    setInterval(checkExpiredMessages, 3000);
 
     // Send message
     async function sendMessage() {
@@ -2697,6 +2849,15 @@
           timerEl.style.cssText = 'font-size: 11px; opacity: 0.7; margin-top: 4px;';
           timerEl.textContent = `🕐 ${formatTimerDuration(parseInt(timer))}`;
           messageEl.appendChild(timerEl);
+          // Set expires_at from server response for client-side expiry tracking
+          const expiresAt = sendResult?.message?.expires_at || sendResult?.expires_at;
+          if (expiresAt) {
+            messageEl.dataset.expiresAt = expiresAt;
+          } else {
+            // Fallback: compute locally
+            const expiryDate = new Date(Date.now() + parseInt(timer) * 1000);
+            messageEl.dataset.expiresAt = expiryDate.toISOString();
+          }
         }
         
         // Add context menu support (incl. mobile long-press)
@@ -2752,7 +2913,21 @@
     }
 
     // Close chat (mobile)
+    // Notify server when leaving a chat (for disappear-on-exit mode)
+    async function notifyLeaveChat() {
+      try {
+        if (currentGroupId) {
+          await InnovateAPI.apiRequest(`/groups/${currentGroupId}/leave-chat`, { method: 'POST' });
+        } else if (currentContactId && currentContactId !== 'ai-assistant') {
+          await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/leave`, { method: 'POST' });
+        }
+      } catch (e) { /* ignore errors */ }
+    }
+
     function closeChat() {
+      // Notify server about leaving (for disappear-on-exit) and refresh sidebar
+      notifyLeaveChat().then(() => loadConversations());
+      
       document.getElementById('chatWindow').classList.remove('active');
       
       // Reset to default icon
@@ -3732,7 +3907,12 @@
         wrapperEl.appendChild(messageEl);
         
         messagesContainer.appendChild(wrapperEl);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (isNearBottom(messagesContainer)) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } else {
+          newMessageBadgeCount++;
+          updateScrollDownButton();
+        }
       }
       
       // Always reload conversations to update last message preview
@@ -3864,7 +4044,12 @@
         if (placeholder) placeholder.remove();
 
         messagesContainer.appendChild(wrapperEl);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (isNearBottom(messagesContainer)) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } else {
+          newMessageBadgeCount++;
+          updateScrollDownButton();
+        }
       }
 
       // Update sidebar conversation preview for the group
@@ -3932,6 +4117,16 @@
       }
     });
     
+    // Listen for disappearing setting changes from the other user
+    socket.on('disappearing:updated', (data) => {
+      // If we're currently chatting with this contact, update the UI
+      if (currentContactId && String(data.contactId) === String(currentContactId)) {
+        const statusText = data.mode === 'off' ? 'Off' : data.mode === 'on_read' ? 'Disappear on exit' : data.duration === 86400 ? '24 hours' : data.duration === 604800 ? '7 days' : data.duration === 7776000 ? '90 days' : 'Off';
+        const dmStatusEl = document.getElementById('contactInfoDisappearingStatus');
+        if (dmStatusEl) dmStatusEl.textContent = statusText;
+      }
+    });
+
     // WebRTC call event listeners - delegated to CallManager
     callManager.setupSocketListeners(socket);
       
@@ -4207,7 +4402,7 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
         // Reset file inputs so the same file can be selected again
-        document.querySelectorAll('.ig-attach-menu input[type="file"], .ig-chat-input-container input[type="file"]').forEach(input => {
+        document.querySelectorAll('.ig-attach-menu input[type=\"file\"], .ig-chat-input-container input[type=\"file\"]').forEach(input => {
           input.value = '';
         });
         
@@ -5532,14 +5727,48 @@
         }
       }, 10000);
       
-      // Poll active chat messages every second as fallback for socket failures
-      setInterval(() => {
-        if (currentGroupId && document.getElementById('chatWindow')?.classList.contains('active')) {
-          loadGroupMessages(currentGroupId);
-        } else if (currentContactId && document.getElementById('chatWindow')?.classList.contains('active')) {
-          loadMessages(currentContactId);
-        }
-      }, 1000);
+      // Poll active chat messages as fallback for socket failures
+      // Use smart polling: check for new messages without disrupting scroll position
+      setInterval(async () => {
+        const chatActive = document.getElementById('chatWindow')?.classList.contains('active');
+        if (!chatActive) return;
+        try {
+          if (currentGroupId) {
+            const checkData = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/messages?_t=${Date.now()}`, { cache: 'no-store' });
+            const newCount = checkData.messages?.length || 0;
+            if (newCount !== lastGroupMessageCount) {
+              const container = document.getElementById('chatMessages');
+              const wasAtBottom = isNearBottom(container);
+              const prevScrollHeight = container ? container.scrollHeight : 0;
+              const prevScrollTop = container ? container.scrollTop : 0;
+              await loadGroupMessages(currentGroupId);
+              if (!wasAtBottom && container) {
+                // Restore relative scroll position after DOM re-render
+                const newScrollHeight = container.scrollHeight;
+                container.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+                userScrolledUp = true;
+                updateScrollDownButton();
+              }
+            }
+          } else if (currentContactId) {
+            const checkData = await InnovateAPI.apiRequest(`/messages/${currentContactId}?_t=${Date.now()}`, { cache: 'no-store' });
+            const newCount = checkData.messages?.length || 0;
+            if (newCount !== lastMessageCount) {
+              const container = document.getElementById('chatMessages');
+              const wasAtBottom = isNearBottom(container);
+              const prevScrollHeight = container ? container.scrollHeight : 0;
+              const prevScrollTop = container ? container.scrollTop : 0;
+              await loadMessages(currentContactId);
+              if (!wasAtBottom && container) {
+                const newScrollHeight = container.scrollHeight;
+                container.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+                userScrolledUp = true;
+                updateScrollDownButton();
+              }
+            }
+          }
+        } catch (e) { /* ignore polling errors */ }
+      }, 3000);
       
       // Load user info and conversations
       loadUserInfo()
@@ -6717,6 +6946,7 @@
             <div>Chat cleared for everyone</div>
           </div>
         `;
+        await loadConversations();
       } catch (e) {
         InnovateAPI.showAlert('Failed to clear chat for everyone', 'error');
       }
@@ -8502,7 +8732,7 @@
         const dData = await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/disappearing`);
         const statusEl = document.getElementById('contactInfoDisappearingStatus');
         if (dData.mode === 'off') statusEl.textContent = 'Off';
-        else if (dData.mode === 'on_read') statusEl.textContent = 'Disappear after read';
+        else if (dData.mode === 'on_read') statusEl.textContent = 'Disappear on exit';
         else if (dData.mode === 'timer') {
           const d = dData.duration;
           if (d === 86400) statusEl.textContent = '24 hours';
@@ -8781,15 +9011,12 @@
         });
         InnovateAPI.showAlert('Disappearing messages updated', 'success');
         closeSubPanel('disappearingSettingsPanel');
-        // Update status text
-        const statusEl = document.getElementById('contactInfoDisappearingStatus');
-        if (statusEl) {
-          if (mode === 'off') statusEl.textContent = 'Off';
-          else if (mode === 'on_read') statusEl.textContent = 'Disappear after read';
-          else if (duration === 86400) statusEl.textContent = '24 hours';
-          else if (duration === 604800) statusEl.textContent = '7 days';
-          else if (duration === 7776000) statusEl.textContent = '90 days';
-        }
+        // Update status text for both DM and group info panels
+        const statusText = mode === 'off' ? 'Off' : mode === 'on_read' ? 'Disappear on exit' : duration === 86400 ? '24 hours' : duration === 604800 ? '7 days' : duration === 7776000 ? '90 days' : 'Off';
+        const dmStatusEl = document.getElementById('contactInfoDisappearingStatus');
+        const grpStatusEl = document.getElementById('groupInfoDisappearingStatus');
+        if (dmStatusEl) dmStatusEl.textContent = statusText;
+        if (grpStatusEl) grpStatusEl.textContent = statusText;
       } catch (e) {
         InnovateAPI.showAlert('Failed to save settings', 'error');
       }
@@ -8907,6 +9134,7 @@
             <div>Chat cleared</div>
           </div>
         `;
+        await loadConversations();
       } catch (e) {
         InnovateAPI.showAlert('Failed to clear chat', 'error');
       }
@@ -9094,6 +9322,22 @@
         const mediaData = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/media`);
         document.getElementById('groupInfoMediaCount').textContent = (mediaData.media || []).length;
       } catch (e) { /* ignore */ }
+
+      // Load disappearing messages status
+      try {
+        const dData = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/disappearing`);
+        const statusEl = document.getElementById('groupInfoDisappearingStatus');
+        if (statusEl) {
+          if (dData.mode === 'off') statusEl.textContent = 'Off';
+          else if (dData.mode === 'on_read') statusEl.textContent = 'Disappear on exit';
+          else if (dData.mode === 'timer') {
+            const d = dData.duration;
+            if (d === 86400) statusEl.textContent = '24 hours';
+            else if (d === 604800) statusEl.textContent = '7 days';
+            else if (d === 7776000) statusEl.textContent = '90 days';
+          }
+        }
+      } catch (e) { /* default to off */ }
     }
 
     function closeGroupInfo() {

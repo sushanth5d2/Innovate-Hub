@@ -11,21 +11,34 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
-  // First, get all unique contacts and their last message ID (exclude message requests)
+  // Get conversations from both messages and user_conversations table
+  // user_conversations persists even when messages are cleared
   const query = `
-    WITH contact_messages AS (
-      SELECT 
+    WITH all_contacts AS (
+      SELECT DISTINCT
         CASE 
           WHEN sender_id = ? THEN receiver_id
           ELSE sender_id
-        END as contact_id,
-        MAX(id) as last_message_id
+        END as contact_id
       FROM messages
       WHERE (sender_id = ? OR receiver_id = ?)
         AND (is_deleted_by_sender = 0 OR sender_id != ?)
         AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
         AND (is_message_request = 0 OR message_request_status = 'accepted')
-      GROUP BY contact_id
+      UNION
+      SELECT contact_id FROM user_conversations WHERE user_id = ?
+    ),
+    contact_last_msg AS (
+      SELECT 
+        ac.contact_id,
+        MAX(m.id) as last_message_id
+      FROM all_contacts ac
+      LEFT JOIN messages m ON (
+        ((m.sender_id = ? AND m.receiver_id = ac.contact_id) OR (m.sender_id = ac.contact_id AND m.receiver_id = ?))
+        AND (m.is_deleted_by_sender = 0 OR m.sender_id != ?)
+        AND (m.is_deleted_by_receiver = 0 OR m.receiver_id != ?)
+      )
+      GROUP BY ac.contact_id
     )
     SELECT 
       cm.contact_id,
@@ -43,15 +56,15 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
        WHERE sender_id = cm.contact_id 
        AND receiver_id = ? 
        AND is_read = 0) as unread_count
-    FROM contact_messages cm
+    FROM contact_last_msg cm
     JOIN users u ON u.id = cm.contact_id
     LEFT JOIN messages m ON m.id = cm.last_message_id
     LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = cm.contact_id)
     LEFT JOIN blocked_users b2 ON (b2.blocker_id = cm.contact_id AND b2.blocked_id = ?)
-    ORDER BY m.created_at DESC
+    ORDER BY COALESCE(m.created_at, '1970-01-01') DESC
   `;
 
-  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId], (err, rows) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId], (err, rows) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Error fetching conversations' });
@@ -95,26 +108,16 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
       [userId, contactId, contactId, userId]
     );
 
-    // Mark messages as read and set timestamps, then handle on_read disappearing
+    // Count unread messages BEFORE marking as read (messages from contact that are unread)
+    const unreadCount = messages.filter(m => m.sender_id == contactId && !m.is_read).length;
+    // Find ID of first unread message
+    const firstUnread = messages.find(m => m.sender_id == contactId && !m.is_read);
+    const firstUnreadId = firstUnread ? firstUnread.id : null;
+
+    // Mark messages as read and set timestamps
     db.run(
       'UPDATE messages SET is_read = 1, delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP), read_at = COALESCE(read_at, CURRENT_TIMESTAMP) WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
-      [contactId, userId],
-      function() {
-        // After marking read, check "on_read" disappearing mode
-        db.get(
-          `SELECT mode FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
-          [userId, contactId, contactId, userId],
-          (dsErr, dsSetting) => {
-            if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
-              // Delete all read messages in this conversation (both directions)
-              db.run(
-                `DELETE FROM messages WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND is_read = 1`,
-                [contactId, userId, userId, contactId]
-              );
-            }
-          }
-        );
-      }
+      [contactId, userId]
     );
 
     messages = messages.map(msg => ({
@@ -126,7 +129,7 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
     // Check if this is a message request conversation (any pending message request from this contact)
     const hasMessageRequest = messages.some(m => m.is_message_request === 1 && m.message_request_status === 'pending' && m.sender_id == contactId);
 
-    res.json({ success: true, messages, is_message_request: hasMessageRequest });
+    res.json({ success: true, messages, is_message_request: hasMessageRequest, unread_count: unreadCount, first_unread_id: firstUnreadId });
   });
 }));
 
@@ -235,6 +238,10 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
       }
 
       const messageId = this.lastID;
+
+      // Track conversation for both users (persists after clear/disappear)
+      db.run(`INSERT INTO user_conversations (user_id, contact_id) VALUES (?, ?) ON CONFLICT (user_id, contact_id) DO NOTHING`, [senderId, receiver_id]);
+      db.run(`INSERT INTO user_conversations (user_id, contact_id) VALUES (?, ?) ON CONFLICT (user_id, contact_id) DO NOTHING`, [receiver_id, senderId]);
 
     // Get the created message
     db.get(
@@ -476,6 +483,10 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
       }
 
       const messageId = this.lastID;
+
+      // Track conversation for both users (persists after clear/disappear)
+      db.run(`INSERT INTO user_conversations (user_id, contact_id) VALUES (?, ?) ON CONFLICT (user_id, contact_id) DO NOTHING`, [senderId, receiver_id]);
+      db.run(`INSERT INTO user_conversations (user_id, contact_id) VALUES (?, ?) ON CONFLICT (user_id, contact_id) DO NOTHING`, [receiver_id, senderId]);
 
       // Create notification
       db.run(
@@ -897,11 +908,11 @@ router.delete('/conversations/:contactId', authMiddleware, asyncHandler((req, re
     if (err) {
       return res.status(500).json({ error: 'Error deleting conversation' });
     }
+    // Remove from user_conversations so it disappears from the list
+    db.run(`DELETE FROM user_conversations WHERE user_id = ? AND contact_id = ?`, [userId, contactId]);
     res.json({ success: true });
   });
 }));
-
-// Get starred messages for a conversation
 router.get('/conversations/:contactId/starred', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
@@ -1035,6 +1046,8 @@ router.delete('/conversations/:contactId/delete-all', authMiddleware, asyncHandl
       if (err) {
         return res.status(500).json({ error: 'Error deleting chat for everyone' });
       }
+      // Remove from user_conversations for both users so it disappears from both lists
+      db.run(`DELETE FROM user_conversations WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?)`, [userId, contactId, contactId, userId]);
       res.json({ success: true, deleted: this.changes });
     }
   );
@@ -1066,7 +1079,21 @@ router.post('/conversations/:contactId/disappearing', authMiddleware, asyncHandl
       [userId, contactId, mode, duration || 0, mode, duration || 0],
       function(err) {
         if (err) return res.status(500).json({ error: 'Error saving settings' });
-        res.json({ success: true, mode, duration });
+        // Also save the same setting for the other user so it's shared
+        db.run(`INSERT INTO disappearing_settings (user_id, contact_id, mode, duration, updated_at) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=CURRENT_TIMESTAMP`,
+          [contactId, userId, mode, duration || 0, mode, duration || 0],
+          function(err2) {
+            if (err2) console.error('Error syncing disappearing setting for other user:', err2);
+            // Notify the other user via socket so their UI updates
+            const io = req.app.get('io');
+            if (io) {
+              io.to(`user-${contactId}`).emit('disappearing:updated', { contactId: userId, mode, duration: duration || 0 });
+            }
+            res.json({ success: true, mode, duration });
+          }
+        );
       }
     );
   });
@@ -1087,11 +1114,48 @@ router.get('/conversations/:contactId/disappearing', authMiddleware, asyncHandle
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, contact_id)
   )`, () => {
-    db.get('SELECT * FROM disappearing_settings WHERE user_id = ? AND contact_id = ?', [userId, contactId], (err, row) => {
+    db.get('SELECT * FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1', [userId, contactId, contactId, userId], (err, row) => {
       if (err) return res.status(500).json({ error: 'Error fetching settings' });
       res.json({ success: true, mode: row ? row.mode : 'off', duration: row ? row.duration : 0 });
     });
   });
+}));
+
+// Leave chat - handle disappear-on-exit mode (delete read messages when user exits the chat)
+router.post('/conversations/:contactId/leave', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { contactId } = req.params;
+
+  db.get(
+    `SELECT mode FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
+    [userId, contactId, contactId, userId],
+    (dsErr, dsSetting) => {
+      if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
+        // Soft-delete: mark messages as deleted for the exiting user only
+        // Messages sent BY this user: mark is_deleted_by_sender
+        db.run(
+          `UPDATE messages SET is_deleted_by_sender = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 1`,
+          [userId, contactId],
+          function(err1) {
+            if (err1) console.error('Error soft-deleting sent messages:', err1);
+            const sentDeleted = this.changes || 0;
+            // Messages received BY this user: mark is_deleted_by_receiver
+            db.run(
+              `UPDATE messages SET is_deleted_by_receiver = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 1`,
+              [contactId, userId],
+              function(err2) {
+                if (err2) console.error('Error soft-deleting received messages:', err2);
+                res.json({ success: true, deleted: sentDeleted + (this.changes || 0) });
+              }
+            );
+          }
+        );
+      } else {
+        res.json({ success: true, deleted: 0 });
+      }
+    }
+  );
 }));
 
 // Toggle chat notifications mute

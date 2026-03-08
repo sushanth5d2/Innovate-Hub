@@ -2171,6 +2171,19 @@ const migrateDatabase = () => {
       }
     });
 
+    // User conversations tracking table (persists even when messages are cleared)
+    db.run(`CREATE TABLE IF NOT EXISTS user_conversations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, contact_id)
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: user_conversations table - ', err ? err.message : 'ok');
+      }
+    });
+
   });
 };
 

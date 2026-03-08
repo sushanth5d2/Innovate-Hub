@@ -1204,6 +1204,9 @@ body {
   flex-direction: column;
   gap: 8px;
   background: transparent;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .ig-message {

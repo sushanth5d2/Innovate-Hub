@@ -143,14 +143,14 @@ router.get('/', async (req, res) => {
   db.all(
     `SELECT g.id, g.name, g.created_at, g.profile_picture,
             (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) as member_count,
-            (SELECT content FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1) as last_message,
-            (SELECT type FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1) as last_message_type,
-            (SELECT created_at FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1) as last_message_time,
-            (SELECT COUNT(*) FROM group_messages WHERE group_id = g.id AND is_read = 0 AND sender_id != ?) as unread_count
+            (SELECT content FROM group_messages gm2 WHERE gm2.group_id = g.id AND NOT EXISTS (SELECT 1 FROM deleted_group_messages dgm WHERE dgm.message_id = gm2.id AND dgm.user_id = ?) ORDER BY gm2.created_at DESC LIMIT 1) as last_message,
+            (SELECT type FROM group_messages gm2 WHERE gm2.group_id = g.id AND NOT EXISTS (SELECT 1 FROM deleted_group_messages dgm WHERE dgm.message_id = gm2.id AND dgm.user_id = ?) ORDER BY gm2.created_at DESC LIMIT 1) as last_message_type,
+            (SELECT created_at FROM group_messages gm2 WHERE gm2.group_id = g.id AND NOT EXISTS (SELECT 1 FROM deleted_group_messages dgm WHERE dgm.message_id = gm2.id AND dgm.user_id = ?) ORDER BY gm2.created_at DESC LIMIT 1) as last_message_time,
+            (SELECT COUNT(*) FROM group_messages gm2 WHERE gm2.group_id = g.id AND gm2.is_read = 0 AND gm2.sender_id != ? AND NOT EXISTS (SELECT 1 FROM deleted_group_messages dgm WHERE dgm.message_id = gm2.id AND dgm.user_id = ?)) as unread_count
      FROM group_conversations g
      INNER JOIN group_members m ON (m.group_id = g.id AND m.user_id = ?)
-     ORDER BY COALESCE((SELECT created_at FROM group_messages WHERE group_id = g.id ORDER BY created_at DESC LIMIT 1), g.created_at) DESC`,
-    [userId, userId],
+     ORDER BY COALESCE((SELECT created_at FROM group_messages gm2 WHERE gm2.group_id = g.id AND NOT EXISTS (SELECT 1 FROM deleted_group_messages dgm WHERE dgm.message_id = gm2.id AND dgm.user_id = ?) ORDER BY gm2.created_at DESC LIMIT 1), g.created_at) DESC`,
+    [userId, userId, userId, userId, userId, userId, userId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch groups' });
       const groups = (rows || []).map(g => ({ ...g, last_message: decryptMsg(g.last_message) }));
@@ -231,20 +231,10 @@ router.get('/:groupId/messages', async (req, res) => {
         [groupId]
       );
 
-      // Handle on_read disappearing: delete read messages from other senders
-      db.get(
-        `SELECT mode FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
-        [groupId],
-        (dsErr, dsSetting) => {
-          if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
-            // Mark all messages in this group as read by this user, then delete read messages from others
-            db.run(
-              `DELETE FROM group_messages WHERE group_id = ? AND sender_id != ? AND is_read = 1`,
-              [groupId, userId]
-            );
-          }
-        }
-      );
+      // Count unread messages BEFORE marking as read
+      const unreadCount = (rows || []).filter(m => m.sender_id != userId && !m.is_read).length;
+      const firstUnread = (rows || []).find(m => m.sender_id != userId && !m.is_read);
+      const firstUnreadId = firstUnread ? firstUnread.id : null;
 
       // Mark messages as read
       db.run(
@@ -254,7 +244,7 @@ router.get('/:groupId/messages', async (req, res) => {
 
       const decrypted = decryptRows(rows || []);
       decrypted.forEach(r => { if (r.reply_content) r.reply_content = decryptMsg(r.reply_content); });
-      res.json({ success: true, messages: decrypted });
+      res.json({ success: true, messages: decrypted, unread_count: unreadCount, first_unread_id: firstUnreadId });
     }
   );
     });
@@ -839,13 +829,15 @@ router.get('/:groupId/search', (req, res) => {
 
   if (!q) return res.json({ messages: [] });
 
+  const userId = req.user.userId || req.user.id;
   db.all(
     `SELECT gm.id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.created_at
      FROM group_messages gm
      INNER JOIN users u ON u.id = gm.sender_id
-     WHERE gm.group_id = ?
+     LEFT JOIN deleted_group_messages dgm ON (dgm.message_id = gm.id AND dgm.user_id = ?)
+     WHERE gm.group_id = ? AND dgm.id IS NULL
      ORDER BY gm.created_at DESC`,
-    [groupId],
+    [userId, groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Search failed' });
       const decrypted = decryptRows(rows || []);
@@ -861,24 +853,27 @@ router.get('/:groupId/media', (req, res) => {
   const db = getDb();
   const groupId = parseInt(req.params.groupId, 10);
 
+  const userId = req.user.userId || req.user.id;
   db.all(
-    `SELECT id, sender_id, content, type, created_at
-     FROM group_messages
-     WHERE group_id = ? AND type IN ('image', 'video', 'file', 'document')
-     ORDER BY created_at DESC
+    `SELECT gm.id, gm.sender_id, gm.content, gm.type, gm.created_at
+     FROM group_messages gm
+     LEFT JOIN deleted_group_messages dgm ON (dgm.message_id = gm.id AND dgm.user_id = ?)
+     WHERE gm.group_id = ? AND gm.type IN ('image', 'video', 'file', 'document') AND dgm.id IS NULL
+     ORDER BY gm.created_at DESC
      LIMIT 100`,
-    [groupId],
+    [userId, groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch media' });
       
       // Also get messages containing URLs for links tab
       db.all(
-        `SELECT id, sender_id, content, 'link' as type, created_at
-         FROM group_messages
-         WHERE group_id = ? AND type = 'text' AND content LIKE '%http%'
-         ORDER BY created_at DESC
+        `SELECT gm.id, gm.sender_id, gm.content, 'link' as type, gm.created_at
+         FROM group_messages gm
+         LEFT JOIN deleted_group_messages dgm ON (dgm.message_id = gm.id AND dgm.user_id = ?)
+         WHERE gm.group_id = ? AND gm.type = 'text' AND gm.content LIKE '%http%' AND dgm.id IS NULL
+         ORDER BY gm.created_at DESC
          LIMIT 50`,
-        [groupId],
+        [userId, groupId],
         (err2, linkRows) => {
           const allMedia = [...decryptRows(rows || []), ...decryptRows(linkRows || [])];
           res.json({ success: true, media: allMedia });
@@ -898,9 +893,10 @@ router.get('/:groupId/starred', (req, res) => {
     `SELECT gm.id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.created_at
      FROM group_messages gm
      INNER JOIN users u ON u.id = gm.sender_id
-     WHERE gm.group_id = ? AND gm.is_pinned = 1
+     LEFT JOIN deleted_group_messages dgm ON (dgm.message_id = gm.id AND dgm.user_id = ?)
+     WHERE gm.group_id = ? AND gm.is_pinned = 1 AND dgm.id IS NULL
      ORDER BY gm.created_at DESC`,
-    [groupId],
+    [userId, groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch starred messages' });
       res.json({ success: true, messages: decryptRows(rows || []) });
@@ -921,9 +917,13 @@ router.post('/:groupId/clear', (req, res) => {
     (err, member) => {
       if (!member) return res.status(403).json({ error: 'Not a group member' });
       
+      // Soft-delete: insert all group messages into deleted_group_messages for this user
       db.run(
-        `DELETE FROM group_messages WHERE group_id = ?`,
-        [groupId],
+        `INSERT INTO deleted_group_messages (user_id, message_id, deleted_at)
+         SELECT ?, id, CURRENT_TIMESTAMP FROM group_messages
+         WHERE group_id = ?
+         AND id NOT IN (SELECT message_id FROM deleted_group_messages WHERE user_id = ?)`,
+        [userId, groupId, userId],
         (err) => {
           if (err) return res.status(500).json({ error: 'Failed to clear chat' });
           res.json({ success: true });
@@ -1029,4 +1029,34 @@ router.get('/:groupId/disappearing', (req, res) => {
     }
     res.json({ mode: row?.mode || 'off', duration: row?.duration || 0 });
   });
+});
+
+// Leave group chat - handle disappear-on-exit mode
+router.post('/:groupId/leave-chat', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+
+  db.get(
+    `SELECT mode FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
+    [groupId],
+    (dsErr, dsSetting) => {
+      if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
+        // Soft-delete: insert into deleted_group_messages for this user only
+        db.run(
+          `INSERT INTO deleted_group_messages (user_id, message_id, deleted_at)
+           SELECT ?, id, CURRENT_TIMESTAMP FROM group_messages 
+           WHERE group_id = ? AND sender_id != ? AND is_read = 1
+           AND id NOT IN (SELECT message_id FROM deleted_group_messages WHERE user_id = ?)`,
+          [userId, groupId, userId, userId],
+          function(err) {
+            if (err) console.error('Error soft-deleting disappearing group messages:', err);
+            res.json({ success: true, deleted: this.changes || 0 });
+          }
+        );
+      } else {
+        res.json({ success: true, deleted: 0 });
+      }
+    }
+  );
 });
