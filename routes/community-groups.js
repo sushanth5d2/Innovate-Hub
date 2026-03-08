@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const mlClient = require('../services/ml-client');
 const crypto = require('crypto');
+const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
 
 // Create folder structure for a group
 function createGroupFolders(communityId, groupId) {
@@ -175,7 +176,8 @@ router.get('/communities/:communityId/groups', authMiddleware, (req, res) => {
       console.error('Error fetching groups:', err);
       return res.status(500).json({ error: 'Error fetching groups', details: err.message });
     }
-    res.json({ success: true, groups });
+    const decryptedGroups = (groups || []).map(g => ({ ...g, latest_message: decryptMsg(g.latest_message) }));
+    res.json({ success: true, groups: decryptedGroups });
   });
 });
 
@@ -534,7 +536,7 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
           db.run(
             `INSERT INTO community_group_posts (group_id, user_id, content, attachments, reply_to)
              VALUES (?, ?, ?, ?, ?)`,
-            [groupId, userId, postContent, JSON.stringify(attachments), reply_to || null],
+            [groupId, userId, encryptMsg(postContent), JSON.stringify(attachments), reply_to || null],
             function(err) {
               if (err) {
                 console.error('Database error:', err);
@@ -575,6 +577,8 @@ router.post('/community-groups/:groupId/posts', authMiddleware, (req, res, next)
 
                   const hydrated = {
                     ...postRow,
+                    content: decryptMsg(postRow.content),
+                    reply_to_content: decryptMsg(postRow.reply_to_content),
                     attachments: postRow.attachments ? JSON.parse(postRow.attachments) : []
                   };
 
@@ -648,6 +652,8 @@ router.get('/community-groups/:groupId/posts', authMiddleware, (req, res) => {
         // Parse attachments
         posts = posts.map(post => ({
           ...post,
+          content: decryptMsg(post.content),
+          reply_to_content: decryptMsg(post.reply_to_content),
           attachments: post.attachments ? JSON.parse(post.attachments) : []
         }));
 
@@ -1522,7 +1528,7 @@ const editMessageHandler = (req, res) => {
           else if (content && content.trim()) {
             db.run(
               'UPDATE community_group_posts SET content = ?, is_edited = 1, edited_at = CURRENT_TIMESTAMP WHERE id = ?',
-              [content.trim(), postId],
+              [encryptMsg(content.trim()), postId],
               function(err) {
                 if (err) return res.status(500).json({ error: 'Error updating message' });
 

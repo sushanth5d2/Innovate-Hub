@@ -1141,9 +1141,22 @@ const DMEncryption = {
       if (!encryptedText.includes('U2FsdGVk')) return encryptedText;
       const key = this._deriveKey(userId1, userId2);
       const decrypted = CryptoJS.AES.decrypt(encryptedText, key).toString(CryptoJS.enc.Utf8);
-      return decrypted || encryptedText;
+      if (decrypted) return decrypted;
+      // Try with string-coerced IDs in case of type mismatch during encryption
+      const key2 = this._deriveKey(String(userId1), String(userId2));
+      if (key2 !== key) {
+        const decrypted2 = CryptoJS.AES.decrypt(encryptedText, key2).toString(CryptoJS.enc.Utf8);
+        if (decrypted2) return decrypted2;
+      }
+      const key3 = this._deriveKey(Number(userId1), Number(userId2));
+      if (key3 !== key && key3 !== key2) {
+        const decrypted3 = CryptoJS.AES.decrypt(encryptedText, key3).toString(CryptoJS.enc.Utf8);
+        if (decrypted3) return decrypted3;
+      }
+      // Decryption failed — return friendly placeholder instead of ciphertext
+      return '🔒 Encrypted message';
     } catch (e) {
-      return encryptedText;
+      return '🔒 Encrypted message';
     }
   }
 };

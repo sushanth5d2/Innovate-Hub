@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
+const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
 
 // Get conversations list
 router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
@@ -57,6 +58,7 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
     }
     const conversations = rows.map(c => ({
       ...c,
+      last_message: decryptMsg(c.last_message),
       is_blocked: (c.b1_id !== null || c.b2_id !== null) ? 1 : 0
     }));
     res.json({ success: true, conversations });
@@ -78,6 +80,7 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
     JOIN users sender ON m.sender_id = sender.id
     WHERE ((m.sender_id = ? AND m.receiver_id = ? AND m.is_deleted_by_sender = 0)
        OR (m.sender_id = ? AND m.receiver_id = ? AND m.is_deleted_by_receiver = 0))
+      AND (m.expires_at IS NULL OR m.expires_at > CURRENT_TIMESTAMP)
     ORDER BY m.created_at ASC
   `;
 
@@ -86,14 +89,37 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
       return res.status(500).json({ error: 'Error fetching messages' });
     }
 
-    // Mark messages as read and set timestamps
+    // Delete expired messages from DB
+    db.run(
+      `DELETE FROM messages WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP`,
+      [userId, contactId, contactId, userId]
+    );
+
+    // Mark messages as read and set timestamps, then handle on_read disappearing
     db.run(
       'UPDATE messages SET is_read = 1, delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP), read_at = COALESCE(read_at, CURRENT_TIMESTAMP) WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
-      [contactId, userId]
+      [contactId, userId],
+      function() {
+        // After marking read, check "on_read" disappearing mode
+        db.get(
+          `SELECT mode FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
+          [userId, contactId, contactId, userId],
+          (dsErr, dsSetting) => {
+            if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
+              // Delete all read messages in this conversation (both directions)
+              db.run(
+                `DELETE FROM messages WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND is_read = 1`,
+                [contactId, userId, userId, contactId]
+              );
+            }
+          }
+        );
+      }
     );
 
     messages = messages.map(msg => ({
       ...msg,
+      content: decryptMsg(msg.content),
       attachments: msg.attachments ? JSON.parse(msg.attachments) : []
     }));
 
@@ -166,6 +192,27 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
     let isMessageRequest = 0;
     let messageRequestStatus = null;
 
+    // Auto-apply conversation disappearing settings if no per-message timer
+    const applyDisappearingAndSend = () => {
+      if (!expiresAt) {
+        db.get(
+          `SELECT mode, duration FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
+          [senderId, receiver_id, receiver_id, senderId],
+          (dsErr, dsSetting) => {
+            if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
+              const now = new Date();
+              now.setSeconds(now.getSeconds() + dsSetting.duration);
+              expiresAt = now.toISOString();
+            }
+            proceedWithBlockCheck();
+          }
+        );
+      } else {
+        proceedWithBlockCheck();
+      }
+    };
+
+    const proceedWithBlockCheck = () => {
     // Check if either user has blocked the other
     db.get(
       'SELECT id FROM blocked_users WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)',
@@ -181,7 +228,7 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
 
-      db.run(query, [senderId, receiver_id, messageContent, messageType, timer || null, expiresAt, originalFilename, isMessageRequest, messageRequestStatus], function(err) {
+      db.run(query, [senderId, receiver_id, encryptMsg(messageContent), messageType, timer || null, expiresAt, originalFilename, isMessageRequest, messageRequestStatus], function(err) {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Error sending message' });
@@ -275,6 +322,9 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
     });
 
   }); // end blocked check
+  }; // end proceedWithBlockCheck
+
+  applyDisappearingAndSend();
   });
 }));
 
@@ -393,6 +443,26 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
     expiresAt = now.toISOString();
   }
 
+  // Auto-apply conversation disappearing settings if no per-message timer
+  const startSendFlow = () => {
+    if (!expiresAt && receiver_id) {
+      db.get(
+        `SELECT mode, duration FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
+        [senderId, receiver_id, receiver_id, senderId],
+        (dsErr, dsSetting) => {
+          if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
+            const now = new Date();
+            now.setSeconds(now.getSeconds() + dsSetting.duration);
+            expiresAt = now.toISOString();
+          }
+          doPrivacyCheckAndSend();
+        }
+      );
+    } else {
+      doPrivacyCheckAndSend();
+    }
+  };
+
   // Check if receiver has a private account and sender is not a follower
   const insertMessage = (isMessageRequest, messageRequestStatus) => {
     const query = `
@@ -400,7 +470,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.run(query, [senderId, receiver_id, content, JSON.stringify(attachments), timer || null, expiresAt, reply_to_id || null, isMessageRequest, messageRequestStatus], function(err) {
+    db.run(query, [senderId, receiver_id, encryptMsg(content), JSON.stringify(attachments), timer || null, expiresAt, reply_to_id || null, isMessageRequest, messageRequestStatus], function(err) {
       if (err) {
         return res.status(500).json({ error: 'Error sending message' });
       }
@@ -452,6 +522,7 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
     });
   };
 
+  const doPrivacyCheckAndSend = () => {
   // Check receiver's privacy setting
   db.get('SELECT is_private FROM users WHERE id = ?', [receiver_id], (err, receiverUser) => {
     if (err || !receiverUser) {
@@ -482,6 +553,9 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
       insertMessage(0, null);
     }
   });
+  }; // end doPrivacyCheckAndSend
+
+  startSendFlow();
 }));
 
 // Edit message
@@ -557,9 +631,11 @@ router.put('/:messageId', authMiddleware, upload.single('file'), asyncHandler((r
         WHERE id = ? AND sender_id = ?
       `;
 
+      const encryptedFilePath = encryptMsg(newFilePath);
+
       db.run(
         updateQuery,
-        [newFilePath, newType, newOriginalFilename, messageId, userId],
+        [encryptedFilePath, newType, newOriginalFilename, messageId, userId],
         function(err) {
           if (err) {
             console.error('Update error:', err);
@@ -569,7 +645,7 @@ router.put('/:messageId', authMiddleware, upload.single('file'), asyncHandler((r
             return res.status(404).json({ error: 'Message not found or unauthorized' });
           }
 
-          // Emit socket event for real-time update
+          // Emit socket event for real-time update (send plaintext)
           const io = req.app.get('io');
           if (message.receiver_id) {
             io.to(`user_${message.receiver_id}`).emit('message_edited', {
@@ -612,6 +688,7 @@ router.get('/:messageId/info', authMiddleware, asyncHandler((req, res) => {
       if (!message) {
         return res.status(404).json({ error: 'Message not found' });
       }
+      message.content = decryptMsg(message.content);
       res.json({ success: true, message });
     }
   );
@@ -623,19 +700,34 @@ router.delete('/:messageId/unsend', authMiddleware, asyncHandler((req, res) => {
   const userId = req.user.userId;
   const { messageId } = req.params;
 
-  db.run(
-    'DELETE FROM messages WHERE id = ? AND sender_id = ?',
-    [messageId, userId],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: 'Error unsending message' });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: 'Message not found or unauthorized' });
-      }
-      res.json({ success: true });
+  // Get message first to know the receiver
+  db.get('SELECT receiver_id FROM messages WHERE id = ? AND sender_id = ?', [messageId, userId], (findErr, msg) => {
+    if (findErr || !msg) {
+      return res.status(404).json({ error: 'Message not found or unauthorized' });
     }
-  );
+    const receiverId = msg.receiver_id;
+
+    db.run(
+      'DELETE FROM messages WHERE id = ? AND sender_id = ?',
+      [messageId, userId],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Error unsending message' });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ error: 'Message not found or unauthorized' });
+        }
+
+        // Notify the other user in real-time
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user_${receiverId}`).emit('message:unsend', { messageId, senderId: userId });
+        }
+
+        res.json({ success: true });
+      }
+    );
+  });
 }));
 
 // Delete message (for self only)
@@ -830,7 +922,7 @@ router.get('/conversations/:contactId/starred', authMiddleware, asyncHandler((re
     if (err) {
       return res.status(500).json({ error: 'Error fetching starred messages' });
     }
-    res.json({ success: true, messages: messages || [] });
+    res.json({ success: true, messages: decryptRows(messages || []) });
   });
 }));
 
@@ -854,7 +946,7 @@ router.get('/conversations/:contactId/media', authMiddleware, asyncHandler((req,
     if (err) {
       return res.status(500).json({ error: 'Error fetching media' });
     }
-    res.json({ success: true, media: messages || [] });
+    res.json({ success: true, media: decryptRows(messages || []) });
   });
 }));
 
@@ -869,22 +961,24 @@ router.get('/conversations/:contactId/search', authMiddleware, asyncHandler((req
     return res.json({ success: true, messages: [] });
   }
 
+  // Fetch all conversation messages and filter after decryption (encrypted content can't be searched with LIKE)
   const query = `
     SELECT m.*, sender.username as sender_username
     FROM messages m
     JOIN users sender ON m.sender_id = sender.id
     WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
-      AND m.content LIKE ?
       AND m.is_deleted_by_sender = 0 AND m.is_deleted_by_receiver = 0
     ORDER BY m.created_at DESC
-    LIMIT 50
   `;
 
-  db.all(query, [userId, contactId, contactId, userId, `%${q}%`], (err, messages) => {
+  db.all(query, [userId, contactId, contactId, userId], (err, messages) => {
     if (err) {
       return res.status(500).json({ error: 'Error searching messages' });
     }
-    res.json({ success: true, messages: messages || [] });
+    const decrypted = decryptRows(messages || []);
+    const searchLower = q.toLowerCase();
+    const filtered = decrypted.filter(m => m.content && m.content.toLowerCase().includes(searchLower)).slice(0, 50);
+    res.json({ success: true, messages: filtered });
   });
 }));
 
@@ -1092,7 +1186,7 @@ router.patch('/:messageId/todo-toggle', authMiddleware, (req, res) => {
       if (msg.type !== 'todo') return res.status(400).json({ error: 'Not a todo message' });
 
       try {
-        const todo = JSON.parse(msg.content || '{}');
+        const todo = JSON.parse(decryptMsg(msg.content) || '{}');
         const items = todo.items || [];
         const idx = parseInt(itemIndex);
         if (idx < 0 || idx >= items.length) {
@@ -1102,7 +1196,7 @@ router.patch('/:messageId/todo-toggle', authMiddleware, (req, res) => {
         todo.items = items;
 
         db.run('UPDATE messages SET content = ? WHERE id = ?',
-          [JSON.stringify(todo), messageId],
+          [encryptMsg(JSON.stringify(todo)), messageId],
           function(updateErr) {
             if (updateErr) return res.status(500).json({ error: 'Failed to update' });
 

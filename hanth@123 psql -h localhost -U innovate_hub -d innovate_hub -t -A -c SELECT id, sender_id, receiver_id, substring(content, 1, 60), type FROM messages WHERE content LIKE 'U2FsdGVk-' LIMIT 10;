@@ -1,0 +1,6 @@
+ id | sender_id | receiver_id |                   content                    | type 
+----+-----------+-------------+----------------------------------------------+------
+ 17 |         1 |           2 | U2FsdGVkX1/tWpHOqyhHEOuDH5kThsd+mtUwLfVjXso= | text
+ 18 |         1 |           2 | U2FsdGVkX19FkmFHbl3E8euhOxGSpz9dc+m4mQoehoo= | text
+(2 rows)
+

@@ -443,9 +443,6 @@ async function loadGroupChat() {
       return;
     }
     
-    // Initialize E2E encryption for this group (fetch shared key)
-    await E2EManager.init(groupId);
-    
     const response = await InnovateAPI.apiRequest(`/community-groups/${groupId}/posts`);
     const messages = response.posts || [];
 
@@ -461,16 +458,6 @@ async function loadGroupChat() {
       `;
       return;
     }
-
-    // Decrypt messages before rendering
-    messages.forEach(msg => {
-      if (msg.content) {
-        msg.content = E2EManager.decrypt(msg.content, groupId);
-      }
-      if (msg.reply_to_content) {
-        msg.reply_to_content = E2EManager.decrypt(msg.reply_to_content, groupId);
-      }
-    });
 
     // Separate pinned messages from regular messages
     const pinnedMessages = messages.filter(msg => msg.pinned_at !== null);
@@ -526,14 +513,6 @@ async function loadGroupChat() {
       
       // Listen for new messages
       socket.on('group:message:receive', (message) => {
-        // Decrypt the message content before rendering
-        if (message.content) {
-          message.content = E2EManager.decrypt(message.content, groupId);
-        }
-        if (message.reply_to_content) {
-          message.reply_to_content = E2EManager.decrypt(message.reply_to_content, groupId);
-        }
-        
         const newMsg = renderChatMessage(message);
         chatContainer.insertAdjacentHTML('beforeend', newMsg);
         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -701,11 +680,8 @@ async function sendChatMessage() {
   if (!content && attachments.length === 0) return;
 
   try {
-    // Encrypt message content before sending
-    const encryptedContent = content ? E2EManager.encrypt(content, currentGroupId) : '';
-    
     const formData = new FormData();
-    formData.append('content', encryptedContent);
+    formData.append('content', content || '');
     if (attachments.length > 0) {
       formData.append('attachments', JSON.stringify(attachments));
     }

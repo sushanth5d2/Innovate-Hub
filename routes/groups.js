@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
 const upload = require('../middleware/upload');
+const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
 
 router.use(authMiddleware);
 
@@ -20,11 +21,33 @@ function ensureSchema() {
       const done = () => { if (--pending <= 0) { schemaReady = true; resolve(); } };
 
       if (isPostgres) {
-        pending = 4;
+        pending = 9;
         db.run(`ALTER TABLE group_conversations ADD COLUMN IF NOT EXISTS profile_picture TEXT DEFAULT ''`, () => done());
         db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE`, () => done());
         db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMP`, () => done());
         db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS pinned_by INTEGER`, () => done());
+        db.run(`ALTER TABLE group_messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER`, () => done());
+        // Table for "delete for me" tracking (per-user message hiding)
+        db.run(`CREATE TABLE IF NOT EXISTS deleted_group_messages (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          message_id INTEGER NOT NULL,
+          deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, message_id)
+        )`, () => done());
+        // Drop FK constraint on starred_messages so group message IDs can be starred too
+        db.run(`ALTER TABLE starred_messages DROP CONSTRAINT IF EXISTS starred_messages_message_id_fkey`, () => done());
+        // Add message_type column to starred_messages to distinguish DM vs group
+        db.run(`ALTER TABLE starred_messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'dm'`, () => done());
+        // Group disappearing messages settings
+        db.run(`CREATE TABLE IF NOT EXISTS group_disappearing_settings (
+          id SERIAL PRIMARY KEY,
+          group_id INTEGER NOT NULL UNIQUE,
+          set_by INTEGER NOT NULL,
+          mode TEXT DEFAULT 'off',
+          duration INTEGER DEFAULT 0,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`, () => done());
       } else {
         // SQLite: check columns first via PRAGMA
         pending = 2;
@@ -42,11 +65,13 @@ function ensureSchema() {
           if (!cols.includes('is_pinned')) alterPending++;
           if (!cols.includes('pinned_at')) alterPending++;
           if (!cols.includes('pinned_by')) alterPending++;
+          if (!cols.includes('reply_to_id')) alterPending++;
           if (alterPending === 0) { done(); return; }
           const alterDone = () => { if (--alterPending <= 0) done(); };
           if (!cols.includes('is_pinned')) db.run(`ALTER TABLE group_messages ADD COLUMN is_pinned BOOLEAN DEFAULT 0`, () => alterDone());
           if (!cols.includes('pinned_at')) db.run(`ALTER TABLE group_messages ADD COLUMN pinned_at DATETIME`, () => alterDone());
           if (!cols.includes('pinned_by')) db.run(`ALTER TABLE group_messages ADD COLUMN pinned_by INTEGER`, () => alterDone());
+          if (!cols.includes('reply_to_id')) db.run(`ALTER TABLE group_messages ADD COLUMN reply_to_id INTEGER`, () => alterDone());
         });
       }
     } catch (e) { schemaReady = true; resolve(); }
@@ -128,7 +153,8 @@ router.get('/', async (req, res) => {
     [userId, userId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch groups' });
-      res.json({ success: true, groups: rows });
+      const groups = (rows || []).map(g => ({ ...g, last_message: decryptMsg(g.last_message) }));
+      res.json({ success: true, groups });
     }
   );
 });
@@ -167,7 +193,8 @@ router.put('/:groupId/members/:userId/role', (req, res) => {
 });
 
 // Get group messages (membership check)
-router.get('/:groupId/messages', (req, res) => {
+router.get('/:groupId/messages', async (req, res) => {
+  await ensureSchema();
   const db = getDb();
   const userId = req.user.userId || req.user.id;
   const groupId = parseInt(req.params.groupId, 10);
@@ -182,16 +209,52 @@ router.get('/:groupId/messages', (req, res) => {
       if (!member) return res.status(403).json({ error: 'Not a member of this group' });
 
   db.all(
-    `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.attachments,
-            gm.timer, gm.expires_at, gm.is_read, gm.created_at
+    `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, u.profile_picture as sender_profile_picture,
+            gm.content, gm.type, gm.attachments, gm.timer, gm.expires_at, gm.is_read, gm.is_pinned, gm.created_at,
+            gm.reply_to_id, r.content as reply_content, ru.username as reply_username,
+            (SELECT COUNT(*) FROM starred_messages WHERE message_id = gm.id AND user_id = ? AND message_type = 'group') as user_has_starred
      FROM group_messages gm
      INNER JOIN users u ON (u.id = gm.sender_id)
-     WHERE gm.group_id = ?
+     LEFT JOIN group_messages r ON (r.id = gm.reply_to_id)
+     LEFT JOIN users ru ON (ru.id = r.sender_id)
+     LEFT JOIN deleted_group_messages dgm ON (dgm.message_id = gm.id AND dgm.user_id = ?)
+     WHERE gm.group_id = ? AND dgm.id IS NULL
+       AND (gm.expires_at IS NULL OR gm.expires_at > CURRENT_TIMESTAMP)
      ORDER BY gm.created_at ASC`,
-    [groupId],
+    [userId, userId, groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch messages' });
-      res.json({ success: true, messages: rows });
+
+      // Clean up expired group messages
+      db.run(
+        `DELETE FROM group_messages WHERE group_id = ? AND expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP`,
+        [groupId]
+      );
+
+      // Handle on_read disappearing: delete read messages from other senders
+      db.get(
+        `SELECT mode FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
+        [groupId],
+        (dsErr, dsSetting) => {
+          if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
+            // Mark all messages in this group as read by this user, then delete read messages from others
+            db.run(
+              `DELETE FROM group_messages WHERE group_id = ? AND sender_id != ? AND is_read = 1`,
+              [groupId, userId]
+            );
+          }
+        }
+      );
+
+      // Mark messages as read
+      db.run(
+        `UPDATE group_messages SET is_read = 1 WHERE group_id = ? AND sender_id != ? AND is_read = 0`,
+        [groupId, userId]
+      );
+
+      const decrypted = decryptRows(rows || []);
+      decrypted.forEach(r => { if (r.reply_content) r.reply_content = decryptMsg(r.reply_content); });
+      res.json({ success: true, messages: decrypted });
     }
   );
     });
@@ -202,7 +265,7 @@ router.post('/:groupId/messages', (req, res) => {
   const db = getDb();
   const senderId = req.user.userId || req.user.id;
   const groupId = parseInt(req.params.groupId, 10);
-  const { content = '', type = 'text', timer = null } = req.body || {};
+  const { content = '', type = 'text', timer = null, reply_to_id = null } = req.body || {};
 
   if (!content) return res.status(400).json({ error: 'Content is required' });
 
@@ -229,10 +292,13 @@ router.post('/:groupId/messages', (req, res) => {
       if (timer !== null && timer !== undefined && !isNaN(parseInt(timer))) {
         expiresAt = new Date(Date.now() + parseInt(timer) * 1000).toISOString();
       }
+
+      // Auto-apply group disappearing settings if no per-message timer
+      const proceedWithInsert = () => {
       db.run(
-        `INSERT INTO group_messages (group_id, sender_id, content, type, timer, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [groupId, senderId, content, type, timer, expiresAt],
+        `INSERT INTO group_messages (group_id, sender_id, content, type, timer, expires_at, reply_to_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [groupId, senderId, encryptMsg(content), type, timer, expiresAt, reply_to_id ? parseInt(reply_to_id) : null],
         function(err) {
           if (err) {
             console.error('Error inserting group message:', err);
@@ -244,10 +310,13 @@ router.post('/:groupId/messages', (req, res) => {
       
       // Fetch the complete message with sender info
       db.get(
-        `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.attachments,
-                gm.timer, gm.expires_at, gm.is_read, gm.created_at
+        `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, u.profile_picture as sender_profile_picture,
+                gm.content, gm.type, gm.attachments, gm.timer, gm.expires_at, gm.is_read, gm.created_at,
+                gm.reply_to_id, r.content as reply_content, ru.username as reply_username
          FROM group_messages gm
          INNER JOIN users u ON (u.id = gm.sender_id)
+         LEFT JOIN group_messages r ON (r.id = gm.reply_to_id)
+         LEFT JOIN users ru ON (ru.id = r.sender_id)
          WHERE gm.id = ?`,
         [messageId],
         (err2, message) => {
@@ -255,11 +324,51 @@ router.post('/:groupId/messages', (req, res) => {
             console.error('Error fetching sent message:', err2);
             return res.status(500).json({ error: 'Message sent but failed to retrieve' });
           }
+          if (message) {
+            message.content = decryptMsg(message.content);
+            if (message.reply_content) message.reply_content = decryptMsg(message.reply_content);
+          }
+
+          // Emit to all group members via their personal user rooms
+          const io = req.app.get('io');
+          if (io && message) {
+            db.all(
+              `SELECT user_id FROM group_members WHERE group_id = ?`,
+              [groupId],
+              (err3, members) => {
+                if (!err3 && members) {
+                  members.forEach(m => {
+                    if (m.user_id !== senderId) {
+                      io.to(`user_${m.user_id}`).emit('group:message:receive', message);
+                    }
+                  });
+                }
+              }
+            );
+          }
+
           res.json({ success: true, message: message });
         }
       );
     }
   );
+      }; // end proceedWithInsert
+
+      // Look up group disappearing settings and auto-apply timer
+      if (!expiresAt) {
+        db.get(
+          `SELECT mode, duration FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
+          [groupId],
+          (dsErr, dsSetting) => {
+            if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
+              expiresAt = new Date(Date.now() + dsSetting.duration * 1000).toISOString();
+            }
+            proceedWithInsert();
+          }
+        );
+      } else {
+        proceedWithInsert();
+      }
     }
   );
 });
@@ -290,14 +399,16 @@ router.post('/:groupId/messages/file', upload.single('file'), (req, res) => {
       if (err) return res.status(500).json({ error: 'Database error' });
       if (!member) return res.status(403).json({ error: 'You are not a member of this group' });
 
+      // Auto-apply group disappearing settings
+      const doInsert = (expiresAt) => {
       db.run(
-        `INSERT INTO group_messages (group_id, sender_id, content, type) VALUES (?, ?, ?, ?)`,
-        [groupId, senderId, filePath, fileType],
+        `INSERT INTO group_messages (group_id, sender_id, content, type, expires_at) VALUES (?, ?, ?, ?, ?)`,
+        [groupId, senderId, filePath, fileType, expiresAt],
         function(err) {
           if (err) return res.status(500).json({ error: 'Failed to send file' });
           const messageId = this.lastID;
           db.get(
-            `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username,
+            `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username, u.profile_picture as sender_profile_picture,
                     gm.content, gm.type, gm.is_read, gm.created_at
              FROM group_messages gm
              INNER JOIN users u ON (u.id = gm.sender_id)
@@ -306,9 +417,42 @@ router.post('/:groupId/messages/file', upload.single('file'), (req, res) => {
             (err2, message) => {
               if (err2) return res.status(500).json({ error: 'File sent but failed to retrieve' });
               message.original_filename = originalFilename;
+
+              // Emit to all group members via their personal user rooms
+              const io = req.app.get('io');
+              if (io && message) {
+                db.all(
+                  `SELECT user_id FROM group_members WHERE group_id = ?`,
+                  [groupId],
+                  (err3, members) => {
+                    if (!err3 && members) {
+                      members.forEach(m => {
+                        if (m.user_id !== senderId) {
+                          io.to(`user_${m.user_id}`).emit('group:message:receive', message);
+                        }
+                      });
+                    }
+                  }
+                );
+              }
+
               res.json({ success: true, message });
             }
           );
+        }
+      );
+      }; // end doInsert
+
+      // Look up disappearing settings for this group
+      db.get(
+        `SELECT mode, duration FROM group_disappearing_settings WHERE group_id = ?`,
+        [groupId],
+        (dsErr, dsSetting) => {
+          let expiresAt = null;
+          if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
+            expiresAt = new Date(Date.now() + dsSetting.duration * 1000).toISOString();
+          }
+          doInsert(expiresAt);
         }
       );
     }
@@ -406,23 +550,181 @@ router.post('/:groupId/messages/:messageId/pin', (req, res) => {
             return res.status(404).json({ error: 'Message not found' });
           }
 
-          // Toggle pin status
-          const updateQuery = `
-            UPDATE group_messages 
-            SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END,
-                pinned_at = CASE WHEN is_pinned = 0 THEN datetime('now') ELSE NULL END,
-                pinned_by = CASE WHEN is_pinned = 0 THEN ? ELSE NULL END
-            WHERE id = ?
-          `;
+          // Toggle pin status (use CURRENT_TIMESTAMP for PostgreSQL compatibility, boolean-safe checks)
+          const isPinned = message.is_pinned === true || message.is_pinned === 1;
+          const updateQuery = isPinned
+            ? `UPDATE group_messages SET is_pinned = FALSE, pinned_at = NULL, pinned_by = NULL WHERE id = ?`
+            : `UPDATE group_messages SET is_pinned = TRUE, pinned_at = CURRENT_TIMESTAMP, pinned_by = ? WHERE id = ?`;
+          const updateParams = isPinned ? [messageId] : [userId, messageId];
 
-          db.run(updateQuery, [userId, messageId], function(err) {
+          db.run(updateQuery, updateParams, function(err) {
             if (err) {
+              console.error('Pin toggle error:', err);
               return res.status(500).json({ error: 'Error updating pin status' });
             }
-            res.json({ success: true, pinned: message.is_pinned ? false : true });
+            res.json({ success: true, pinned: !isPinned });
           });
         }
       );
+    }
+  );
+});
+
+// Delete group message for self (hide from current user only, any member can do this)
+router.delete('/:groupId/messages/:messageId', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+
+  db.get(
+    `SELECT id FROM group_members WHERE group_id = ? AND user_id = ?
+     UNION SELECT id FROM community_group_members WHERE group_id = ? AND user_id = ?`,
+    [groupId, userId, groupId, userId],
+    (err, member) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!member) return res.status(403).json({ error: 'Not a member' });
+
+      // Verify message exists in this group
+      db.get(
+        `SELECT id FROM group_messages WHERE id = ? AND group_id = ?`,
+        [messageId, groupId],
+        (err2, msg) => {
+          if (err2) return res.status(500).json({ error: 'Database error' });
+          if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+          // Insert into tracking table to hide from this user (not actually deleting)
+          db.run(
+            `INSERT INTO deleted_group_messages (user_id, message_id) VALUES (?, ?) ON CONFLICT (user_id, message_id) DO NOTHING`,
+            [userId, messageId],
+            function(err3) {
+              if (err3) return res.status(500).json({ error: 'Failed to delete message' });
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Unsend group message (delete for everyone — sender only)
+router.delete('/:groupId/messages/:messageId/unsend', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+
+  db.run(
+    `DELETE FROM group_messages WHERE id = ? AND group_id = ? AND sender_id = ?`,
+    [messageId, groupId, userId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to unsend' });
+      if (this.changes === 0) return res.status(404).json({ error: 'Message not found or not yours' });
+      // Clean up any "deleted for me" tracking entries for this message
+      db.run(`DELETE FROM deleted_group_messages WHERE message_id = ?`, [messageId]);
+      // Notify other group members via socket so their UI updates in real-time
+      const io = req.app.get('io');
+      if (io) {
+        db.all(`SELECT user_id FROM group_members WHERE group_id = ?`, [groupId], (err2, members) => {
+          if (!err2 && members) {
+            members.forEach(m => {
+              if (m.user_id !== userId) {
+                io.to(`user_${m.user_id}`).emit('group:message:unsend', { messageId, groupId });
+              }
+            });
+          }
+        });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// Star/unstar group message
+router.post('/:groupId/messages/:messageId/star', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const messageId = parseInt(req.params.messageId, 10);
+  const groupId = parseInt(req.params.groupId, 10);
+
+  // Verify message exists in this group
+  db.get(
+    `SELECT id FROM group_messages WHERE id = ? AND group_id = ?`,
+    [messageId, groupId],
+    (err, msg) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!msg) return res.status(404).json({ error: 'Message not found' });
+
+      db.get(
+        `SELECT * FROM starred_messages WHERE user_id = ? AND message_id = ? AND message_type = 'group'`,
+        [userId, messageId],
+        (err2, row) => {
+          if (err2) return res.status(500).json({ error: 'Database error' });
+          if (row) {
+            db.run(`DELETE FROM starred_messages WHERE user_id = ? AND message_id = ? AND message_type = 'group'`, [userId, messageId], function(err3) {
+              if (err3) return res.status(500).json({ error: 'Failed to unstar' });
+              res.json({ success: true, starred: false });
+            });
+          } else {
+            db.run(`INSERT INTO starred_messages (user_id, message_id, message_type, starred_at) VALUES (?, ?, 'group', CURRENT_TIMESTAMP)`,
+              [userId, messageId],
+              function(err3) {
+                if (err3) {
+                  console.error('Star insert error:', err3);
+                  return res.status(500).json({ error: 'Failed to star' });
+                }
+                res.json({ success: true, starred: true });
+              }
+            );
+          }
+        }
+      );
+    }
+  );
+});
+
+// Get group message info
+router.get('/:groupId/messages/:messageId/info', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+
+  db.get(
+    `SELECT gm.id, gm.group_id, gm.sender_id, u.username as sender_username,
+            gm.content, gm.type, gm.created_at, gm.is_pinned, gm.pinned_at, gm.is_read
+     FROM group_messages gm
+     INNER JOIN users u ON (u.id = gm.sender_id)
+     WHERE gm.id = ? AND gm.group_id = ?`,
+    [messageId, groupId],
+    (err, message) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!message) return res.status(404).json({ error: 'Message not found' });
+      message.content = decryptMsg(message.content);
+      res.json({ success: true, message });
+    }
+  );
+});
+
+// Edit group message (sender only)
+router.put('/:groupId/messages/:messageId', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const messageId = parseInt(req.params.messageId, 10);
+  const { content } = req.body;
+
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Content required' });
+
+  const encrypted = encryptMsg(content.trim());
+  db.run(
+    `UPDATE group_messages SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND group_id = ? AND sender_id = ?`,
+    [encrypted, messageId, groupId, userId],
+    function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to edit' });
+      if (this.changes === 0) return res.status(404).json({ error: 'Message not found or not yours' });
+      res.json({ success: true });
     }
   );
 });
@@ -541,13 +843,15 @@ router.get('/:groupId/search', (req, res) => {
     `SELECT gm.id, gm.sender_id, u.username as sender_username, gm.content, gm.type, gm.created_at
      FROM group_messages gm
      INNER JOIN users u ON u.id = gm.sender_id
-     WHERE gm.group_id = ? AND gm.content LIKE ?
-     ORDER BY gm.created_at DESC
-     LIMIT 50`,
-    [groupId, `%${q}%`],
+     WHERE gm.group_id = ?
+     ORDER BY gm.created_at DESC`,
+    [groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Search failed' });
-      res.json({ success: true, messages: rows });
+      const decrypted = decryptRows(rows || []);
+      const searchLower = q.toLowerCase();
+      const filtered = decrypted.filter(m => m.content && m.content.toLowerCase().includes(searchLower)).slice(0, 50);
+      res.json({ success: true, messages: filtered });
     }
   );
 });
@@ -576,7 +880,7 @@ router.get('/:groupId/media', (req, res) => {
          LIMIT 50`,
         [groupId],
         (err2, linkRows) => {
-          const allMedia = [...(rows || []), ...(linkRows || [])];
+          const allMedia = [...decryptRows(rows || []), ...decryptRows(linkRows || [])];
           res.json({ success: true, media: allMedia });
         }
       );
@@ -599,7 +903,7 @@ router.get('/:groupId/starred', (req, res) => {
     [groupId],
     (err, rows) => {
       if (err) return res.status(500).json({ error: 'Failed to fetch starred messages' });
-      res.json({ success: true, messages: rows });
+      res.json({ success: true, messages: decryptRows(rows || []) });
     }
   );
 });
@@ -687,5 +991,42 @@ router.delete('/:groupId', (req, res) => {
         });
       }
     );
+  });
+});
+
+// ===== GROUP DISAPPEARING MESSAGES =====
+
+// Set disappearing messages for a group
+router.post('/:groupId/disappearing', (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId || req.user.id;
+  const groupId = parseInt(req.params.groupId, 10);
+  const { mode, duration } = req.body;
+
+  db.run(`INSERT INTO group_disappearing_settings (group_id, set_by, mode, duration, updated_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(group_id) DO UPDATE SET mode=?, duration=?, set_by=?, updated_at=CURRENT_TIMESTAMP`,
+    [groupId, userId, mode, duration || 0, mode, duration || 0, userId],
+    function(err) {
+      if (err) {
+        console.error('Error saving group disappearing settings:', err);
+        return res.status(500).json({ error: 'Error saving settings' });
+      }
+      res.json({ success: true, mode, duration });
+    }
+  );
+});
+
+// Get disappearing messages setting for a group
+router.get('/:groupId/disappearing', (req, res) => {
+  const db = getDb();
+  const groupId = parseInt(req.params.groupId, 10);
+
+  db.get('SELECT * FROM group_disappearing_settings WHERE group_id = ?', [groupId], (err, row) => {
+    if (err) {
+      console.error('Error fetching group disappearing settings:', err);
+      return res.json({ mode: 'off', duration: 0 });
+    }
+    res.json({ mode: row?.mode || 'off', duration: row?.duration || 0 });
   });
 });

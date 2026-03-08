@@ -1,0 +1,19 @@
+ column_name 
+-------------
+ id
+ group_id
+ sender_id
+ content
+ type
+ attachments
+ timer
+ expires_at
+ is_read
+ created_at
+ updated_at
+ is_pinned
+ pinned_at
+ pinned_by
+ reply_to_id
+(15 rows)
+

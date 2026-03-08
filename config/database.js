@@ -822,6 +822,17 @@ const createTables = () => {
       )
     `);
 
+    // Track per-user message deletions in groups (delete for me)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS deleted_group_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        message_id INTEGER NOT NULL,
+        deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, message_id)
+      )
+    `);
+
     // Events table
     db.run(`
       CREATE TABLE IF NOT EXISTS events (

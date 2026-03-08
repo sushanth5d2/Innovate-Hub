@@ -622,7 +622,7 @@
             </svg>
             Edit
           </button>
-          <button class="ig-message-action" onclick="unsendMessage()" id="unsendBtn" style="display: none;">
+          <button class="ig-message-action" onclick="unsendMessage()" id="unsendBtnModal" style="display: none;">
             <svg fill="currentColor" height="20" viewBox="0 0 24 24" width="20">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
             </svg>
@@ -1440,11 +1440,7 @@
         
         const isUnread = conv.unread_count > 0;
         const messageClass = isUnread ? 'ig-conversation-message unread' : 'ig-conversation-message';
-        // E2E decrypt DM conversation preview
-        const decPreview = (typeof DMEncryption !== 'undefined' && conv.contact_id && conv.last_message_type !== 'image' && conv.last_message_type !== 'video' && conv.last_message_type !== 'file' && conv.last_message_type !== 'voice' && conv.last_message_type !== 'gif' && conv.last_message_type !== 'location')
-          ? DMEncryption.decrypt(conv.last_message || '', user.id, conv.contact_id)
-          : conv.last_message;
-        const messagePreview = formatMessagePreview(decPreview, conv.last_message_type, conv.last_message_filename);
+        const messagePreview = formatMessagePreview(conv.last_message, conv.last_message_type, conv.last_message_filename);
         
         convEl.innerHTML = `
           <div title="View profile">
@@ -1573,7 +1569,7 @@
     // Load messages
     async function loadMessages(contactId) {
       try {
-        const data = await InnovateAPI.apiRequest(`/messages/${contactId}`);
+        const data = await InnovateAPI.apiRequest(`/messages/${contactId}?_t=${Date.now()}`, { cache: 'no-store' });
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.innerHTML = '';
 
@@ -1607,8 +1603,7 @@
         if (pinnedMessages.length > 0) {
           const pinnedMsg = pinnedMessages[0]; // Show most recent pinned message
           const pinnedRaw = pinnedMsg.content || 'Message';
-          const pinnedContent = (typeof DMEncryption !== 'undefined' && contactId)
-            ? DMEncryption.decrypt(pinnedRaw, user.id, contactId) : pinnedRaw;
+          const pinnedContent = pinnedRaw;
           const truncatedContent = pinnedContent.length > 50 ? pinnedContent.substring(0, 50) + '...' : pinnedContent;
           
           const pinBanner = document.createElement('div');
@@ -1686,9 +1681,7 @@
           // Message bubble
           const messageEl = document.createElement('div');
           messageEl.dataset.messageId = msg.id;
-          messageEl.dataset.messageContent = (typeof DMEncryption !== 'undefined' && contactId)
-            ? DMEncryption.decrypt(msg.content || '', user.id, contactId)
-            : (msg.content || '');
+          messageEl.dataset.messageContent = msg.content || '';
           messageEl.dataset.isSent = isSent;
           messageEl.dataset.isPinned = msg.is_pinned ? 'true' : 'false';
           messageEl.dataset.isStarred = msg.is_starred ? 'true' : 'false';
@@ -1961,7 +1954,7 @@
                   : 'border-left: 2px solid rgba(255,255,255,0.3); padding: 2px 6px; margin-bottom: 4px; border-radius: 4px; cursor: pointer;';
                 replyDiv.dataset.scrollToMessage = replyContext.id;
                 const replyName = replyContext.sender_id == user.id ? 'You' : (replyContext.sender_username || 'User');
-                const replyText = replyContext.content?.substring(0, 30) || 'Message';
+                const replyText = (replyContext.content || 'Message').substring(0, 30) || 'Message';
                 replyDiv.innerHTML = `<span style="font-size: 11px; opacity: 0.7;">${replyName}: ${replyText}</span>`;
                 replyDiv.onclick = (e) => {
                   e.stopPropagation();
@@ -1976,11 +1969,8 @@
             textWrapper.style.cssText = 'display: inline-block; width: 100%;';
             
             const textContent = document.createElement('div');
-            // E2E decrypt DM messages
             const rawMsgText = msg.content || '';
-            const msgText = (typeof DMEncryption !== 'undefined' && contactId)
-              ? DMEncryption.decrypt(rawMsgText, user.id, contactId)
-              : rawMsgText;
+            const msgText = rawMsgText;
 
             // Check if this is a Hire Me application card (new or old format)
             if (msgText.includes('[HIRE_APPLICATION]')) {
@@ -2118,10 +2108,23 @@
       }
     }
 
+    // Track previous group for socket room management
+    let _previousGroupId = null;
+
     // Open group chat
     async function openGroupChat(groupId, groupName) {
+      // Leave the previous group's socket room if switching groups
+      if (_previousGroupId && _previousGroupId !== groupId) {
+        const socket = InnovateAPI.getSocket();
+        if (socket) socket.emit('group:leave', _previousGroupId);
+      }
       currentGroupId = groupId;
+      _previousGroupId = groupId;
       currentContactId = null;
+
+      // Join this group's socket room for real-time messages
+      const socket = InnovateAPI.getSocket();
+      if (socket) socket.emit('group:join', groupId);
       
       // Reset AI chat state if switching from AI
       if (typeof aiChatActive !== 'undefined' && aiChatActive) {
@@ -2202,10 +2205,10 @@
       } catch (_) {}
     }
 
-    // Load group messages (basic text)
+    // Load group messages (styled like DMs)
     async function loadGroupMessages(groupId) {
       try {
-        const data = await InnovateAPI.apiRequest(`/groups/${groupId}/messages`);
+        const data = await InnovateAPI.apiRequest(`/groups/${groupId}/messages?_t=${Date.now()}`, { cache: 'no-store' });
         const messagesContainer = document.getElementById('chatMessages');
         messagesContainer.innerHTML = '';
 
@@ -2220,23 +2223,104 @@
           return;
         }
 
-        data.messages.forEach(msg => {
+        // Pinned message banner at top of group chat
+        const grpPinnedMessages = data.messages.filter(m => m.is_pinned === 1 || m.is_pinned === true);
+        if (grpPinnedMessages.length > 0) {
+          const pinnedMsg = grpPinnedMessages[0];
+          const pinnedContent = pinnedMsg.content || 'Message';
+          const truncated = pinnedContent.length > 50 ? pinnedContent.substring(0, 50) + '...' : pinnedContent;
+          const pinBanner = document.createElement('div');
+          pinBanner.id = 'pinned-message-banner';
+          pinBanner.style.cssText = 'position: sticky; top: 0; z-index: 10; background: linear-gradient(135deg, rgba(0, 149, 246, 0.15) 0%, rgba(138, 43, 226, 0.1) 100%); border-left: 4px solid var(--ig-blue); padding: 12px 16px; margin: 0 0 8px 0; border-radius: 0 0 8px 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);';
+          pinBanner.onclick = () => {
+            const el = document.querySelector(`[data-message-id="${pinnedMsg.id}"]`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const origBg = el.style.backgroundColor;
+              el.style.backgroundColor = 'rgba(0, 149, 246, 0.3)';
+              el.style.transition = 'background-color 0.3s';
+              setTimeout(() => { el.style.backgroundColor = origBg; setTimeout(() => { el.style.transition = ''; }, 300); }, 1500);
+            }
+          };
+          pinBanner.innerHTML = `
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 13px; color: var(--ig-blue); margin-bottom: 6px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-thumbtack" style="font-size: 14px;"></i>
+                  <span>Pinned Message</span>
+                </div>
+                <div style="font-size: 14px; color: var(--ig-primary-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9;">
+                  <strong>${pinnedMsg.sender_username || 'User'}:</strong> ${truncated}
+                </div>
+              </div>
+              <button onclick="event.stopPropagation(); unpinMessageFromBanner(${pinnedMsg.id})"
+                      style="background: rgba(0,0,0,0.05); border: none; color: var(--ig-secondary-text); cursor: pointer; font-size: 18px; line-height: 1; padding: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50; transition: all 0.2s; flex-shrink: 0;">&times;</button>
+            </div>
+          `;
+          messagesContainer.appendChild(pinBanner);
+        }
+
+        data.messages.forEach((msg, msgIndex) => {
           const isSent = msg.sender_id == user.id;
-          const senderLabel = isSent ? 'You' : (msg.sender_username || '');
-
-          const wrapperEl = document.createElement('div');
-          wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
-          const labelEl = document.createElement('div');
-          labelEl.style.cssText = `font-size: 11px; color: var(--ig-secondary-text); width: 100%; text-align: ${isSent ? 'right' : 'left'}; padding: 0 12px; margin-bottom: 4px;`;
-          labelEl.textContent = senderLabel;
-          wrapperEl.appendChild(labelEl);
-
-          const messageEl = document.createElement('div');
+          const nextMsg = data.messages[msgIndex + 1];
+          const prevMsg = data.messages[msgIndex - 1];
+          const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id;
+          const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
           const grpMsgText = msg.content || '';
           const msgType = msg.type || 'text';
-          
+
+          // Sender label (only for first message in a consecutive group from same sender)
+          if (!isSent && isFirstInGroup) {
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = 'font-size: 11px; color: var(--ig-secondary-text); padding: 0 12px 2px 36px; margin-top: 8px;';
+            labelEl.textContent = msg.sender_username || '';
+            messagesContainer.appendChild(labelEl);
+          }
+
+          // Wrapper with avatar (matching DM pattern)
+          const wrapperEl = document.createElement('div');
+          if (!isSent && isLastInGroup) {
+            wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
+            const avatarEl = document.createElement('img');
+            avatarEl.src = InnovateAPI.getUserAvatar(msg.sender_profile_picture);
+            avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+            wrapperEl.appendChild(avatarEl);
+          } else if (!isSent) {
+            wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%; padding-left: 32px;';
+          } else {
+            wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%;';
+          }
+
+          // Message bubble
+          const messageEl = document.createElement('div');
+          messageEl.dataset.messageId = msg.id;
+          messageEl.dataset.messageContent = grpMsgText;
+          messageEl.dataset.isSent = isSent;
+          messageEl.dataset.isPinned = msg.is_pinned ? 'true' : 'false';
+          messageEl.dataset.isStarred = msg.user_has_starred ? 'true' : 'false';
+          messageEl.dataset.senderId = msg.sender_id;
+
+          // Pin indicator badge
+          if (msg.is_pinned) {
+            const pinBadge = document.createElement('div');
+            pinBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ig-blue); font-weight: 600; margin-bottom: 4px; padding: 2px 8px; background: rgba(0, 149, 246, 0.15); border-radius: 12px;';
+            pinBadge.innerHTML = '<span style="font-size: 12px;">📌</span><span>Pinned</span>';
+            messageEl.appendChild(pinBadge);
+          }
+
+          // Reply context (if replying to another message)
+          if (msg.reply_to_id && msg.reply_content) {
+            const replyDiv = document.createElement('div');
+            replyDiv.style.cssText = `border-left: 2px solid ${isSent ? 'rgba(255,255,255,0.5)' : 'var(--ig-blue)'}; padding: 4px 8px; margin-bottom: 6px; border-radius: 4px; background: rgba(255,255,255,0.05); cursor: pointer;`;
+            replyDiv.dataset.scrollToMessage = msg.reply_to_id;
+            const replyText = (msg.reply_content || '').substring(0, 50);
+            const replyUser = msg.reply_username || '';
+            replyDiv.innerHTML = `<div style="font-size: 11px; font-weight: 600; color: var(--ig-blue);">${replyUser}</div><div style="font-size: 12px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${replyText}</div>`;
+            replyDiv.onclick = (e) => { e.stopPropagation(); scrollToMessage(msg.reply_to_id); };
+            messageEl.appendChild(replyDiv);
+          }
+
           if (msgType === 'image' || msgType === 'gif') {
-            // Image message
             messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
             const filename = msg.original_filename || grpMsgText.split('/').pop();
             const imgWrapper = document.createElement('div');
@@ -2253,7 +2337,6 @@
             imgWrapper.appendChild(downloadBtn);
             messageEl.appendChild(imgWrapper);
           } else if (msgType === 'video') {
-            // Video message
             messageEl.className = isSent ? 'ig-message-media ig-message-sent' : 'ig-message-media ig-message-received';
             const filename = msg.original_filename || grpMsgText.split('/').pop();
             const videoWrapper = document.createElement('div');
@@ -2270,7 +2353,6 @@
             videoWrapper.appendChild(downloadBtn);
             messageEl.appendChild(videoWrapper);
           } else if (msgType === 'file' || msgType === 'document') {
-            // File/document message
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
             const filename = msg.original_filename || grpMsgText.split('/').pop();
             const isPdf = /\.pdf$/i.test(filename);
@@ -2293,37 +2375,62 @@
             fileContainer.appendChild(downloadBtn);
             messageEl.appendChild(fileContainer);
           } else if (msgType === 'voice') {
-            // Voice message
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            messageEl.innerHTML = `
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <audio controls style="max-width: 200px;">
-                  <source src="${grpMsgText}">
-                </audio>
-              </div>
-            `;
+            const voiceDiv = document.createElement('div');
+            voiceDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+            voiceDiv.innerHTML = `<audio controls style="max-width: 200px;"><source src="${grpMsgText}"></audio>`;
+            messageEl.appendChild(voiceDiv);
           } else {
-            // Text message (default)
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
-            messageEl.innerHTML = linkifyText(grpMsgText);
-
-            // Add link preview if message contains URL
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = linkifyText(grpMsgText);
+            messageEl.appendChild(textDiv);
             const grpFirstUrl = extractFirstUrl(grpMsgText);
             if (grpFirstUrl) {
               createLinkPreview(grpFirstUrl, messageEl);
             }
           }
 
+          // Timestamp
           const timeEl = document.createElement('div');
           timeEl.className = 'ig-message-time';
           timeEl.style.cssText = 'display: flex; align-items: center; gap: 4px; justify-content: ' + (isSent ? 'flex-end' : 'flex-start') + ';';
           if (isSent) {
-            const statusIcon = '✓';
-            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px;">${statusIcon}</span>`;
+            timeEl.innerHTML = `<span style="font-size: 11px;">${formatMessageTime(msg.created_at)}</span><span style="font-size: 10px;">✓</span>`;
           } else {
             timeEl.textContent = formatMessageTime(msg.created_at);
           }
+          // Add star indicator if message is starred
+          if (msg.user_has_starred) {
+            const starEl = document.createElement('span');
+            starEl.style.cssText = 'margin-left: 4px; color: #ffd700; font-size: 10px;';
+            starEl.textContent = '⭐';
+            starEl.title = 'Starred';
+            timeEl.appendChild(starEl);
+          }
           messageEl.appendChild(timeEl);
+
+          // Context menu + long-press (same as DMs)
+          const ctxContent = grpMsgText;
+          let grpPressTimer;
+          messageEl.addEventListener('touchstart', (e) => {
+            grpPressTimer = setTimeout(() => {
+              showMessageContextMenu(e, msg.id, ctxContent, isSent, msgType);
+            }, 500);
+          });
+          messageEl.addEventListener('touchend', () => clearTimeout(grpPressTimer));
+          messageEl.addEventListener('touchmove', () => clearTimeout(grpPressTimer));
+          messageEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showMessageContextMenu(e, msg.id, ctxContent, isSent, msgType);
+          });
+          messageEl.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target.tagName !== 'IMG' && target.tagName !== 'BUTTON' && target.tagName !== 'AUDIO' &&
+                target.tagName !== 'VIDEO' && !target.closest('a') && !target.closest('button')) {
+              showMessageContextMenu(e, msg.id, ctxContent, isSent, msgType);
+            }
+          });
 
           wrapperEl.appendChild(messageEl);
           messagesContainer.appendChild(wrapperEl);
@@ -2397,11 +2504,9 @@
         if (content) {
           input.value = '';
           input.style.height = 'auto';
-          const captionEnc = (!currentGroupId && typeof DMEncryption !== 'undefined' && currentContactId)
-            ? DMEncryption.encrypt(content, user.id, currentContactId) : content;
           const textPayload = currentGroupId 
             ? { content, type: 'text' }
-            : { receiver_id: currentContactId, content: captionEnc };
+            : { receiver_id: currentContactId, content: content };
           const textEndpoint = currentGroupId 
             ? `/groups/${currentGroupId}/messages` 
             : '/messages';
@@ -2438,18 +2543,20 @@
               formData.append('fileType', input.dataset.newFileType || 'file');
             }
             
-            await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
+            const editEndpoint = currentGroupId
+              ? `/groups/${currentGroupId}/messages/${isEditing}`
+              : `/messages/${isEditing}`;
+            await InnovateAPI.apiRequest(editEndpoint, {
               method: 'PUT',
               body: formData
-              // Don't set headers - apiRequest will handle FormData automatically
             });
           } else {
-            // Text-only edit — E2E encrypt if DM
-            const editEncContent = (!currentGroupId && typeof DMEncryption !== 'undefined' && currentContactId)
-              ? DMEncryption.encrypt(content, user.id, currentContactId) : content;
-            await InnovateAPI.apiRequest(`/messages/${isEditing}`, {
+            const editEndpoint = currentGroupId
+              ? `/groups/${currentGroupId}/messages/${isEditing}`
+              : `/messages/${isEditing}`;
+            await InnovateAPI.apiRequest(editEndpoint, {
               method: 'PUT',
-              body: JSON.stringify({ content: editEncContent })
+              body: JSON.stringify({ content: content })
             });
           }
           
@@ -2477,7 +2584,11 @@
           if (voiceBtn) voiceBtn.style.display = 'inline-flex';
           if (moreBtn) moreBtn.style.display = 'inline-flex';
           
-          loadMessages(currentContactId);
+          if (currentGroupId) {
+            loadGroupMessages(currentGroupId);
+          } else {
+            loadMessages(currentContactId);
+          }
           InnovateAPI.showAlert('Message updated', 'success');
         } catch (error) {
           console.error('Edit error:', error);
@@ -2498,11 +2609,7 @@
         if (replyToMessageId) payload.reply_to_id = parseInt(replyToMessageId);
       } else {
         endpoint = '/messages';
-        // E2E encrypt DM content
-        const encContent = (typeof DMEncryption !== 'undefined' && currentContactId)
-          ? DMEncryption.encrypt(content, user.id, currentContactId)
-          : content;
-        payload = { receiver_id: currentContactId, content: encContent };
+        payload = { receiver_id: currentContactId, content: content };
         if (timer) payload.timer = parseInt(timer);
         if (replyToMessageId) payload.reply_to_id = parseInt(replyToMessageId);
       }
@@ -2621,13 +2728,8 @@
         messagesContainer.appendChild(wrapperEl);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         
-        // Emit via socket
-        if (isGroup) {
-          InnovateAPI.getSocket().emit('group:message', {
-            groupId: currentGroupId,
-            message: { content }
-          });
-        } else {
+        // Emit via socket (groups are handled server-side, only DMs need client emit)
+        if (!isGroup) {
           InnovateAPI.getSocket().emit('send_message', {
             receiver_id: currentContactId,
             content: content
@@ -3393,6 +3495,9 @@
       
       // Remove any existing listeners to prevent duplicates
       socket.off('new_message');
+      socket.off('group:message:receive');
+      socket.off('group:message:unsend');
+      socket.off('message:unsend');
       socket.off('user:online');
       socket.off('user:offline');
       socket.off('message:expired');
@@ -3579,11 +3684,7 @@
           textWrapper.style.cssText = 'display: inline-block; width: 100%;';
           
           const textContent = document.createElement('div');
-          // E2E decrypt incoming real-time DM
-          const decryptedRtContent = (typeof DMEncryption !== 'undefined' && data.sender_id)
-            ? DMEncryption.decrypt(data.content, user.id, data.sender_id)
-            : data.content;
-          textContent.innerHTML = linkifyText(decryptedRtContent);
+          textContent.innerHTML = linkifyText(data.content);
           
           textWrapper.appendChild(textContent);
           messageEl.appendChild(textWrapper);
@@ -3596,9 +3697,7 @@
         
         // Add data attributes and event listeners
         messageEl.dataset.messageId = data.id;
-        messageEl.dataset.messageContent = (typeof DMEncryption !== 'undefined' && data.sender_id)
-          ? DMEncryption.decrypt(data.content, user.id, data.sender_id)
-          : data.content;
+        messageEl.dataset.messageContent = data.content || '';
         messageEl.dataset.isSent = 'false';
         messageEl.dataset.isPinned = data.is_pinned ? 'true' : 'false';
         messageEl.dataset.isStarred = data.is_starred ? 'true' : 'false';
@@ -3646,6 +3745,160 @@
       }, reloadDelay);
     });
     
+    // Group message real-time listener
+    socket.on('group:message:receive', (message) => {
+      // If we're currently viewing this group, append the message
+      if (currentGroupId && message.group_id == currentGroupId) {
+        // Don't duplicate our own messages (already added locally on send)
+        if (message.sender_id == user.id) return;
+
+        const messagesContainer = document.getElementById('chatMessages');
+        if (!messagesContainer) return;
+
+        const grpMsgText = message.content || '';
+        const msgType = message.type || 'text';
+        const isSent = false; // Always received from others
+
+        // Check if previous message was from same sender (for avatar grouping)
+        const lastWrapper = messagesContainer.lastElementChild;
+        const lastMsgEl = lastWrapper ? lastWrapper.querySelector('[data-message-id]') : null;
+        const lastSenderId = lastMsgEl ? lastMsgEl.dataset.senderId : null;
+        const isFirstInGroup = lastSenderId !== String(message.sender_id);
+
+        // Sender label (first message from this sender in sequence)
+        if (isFirstInGroup) {
+          const labelEl = document.createElement('div');
+          labelEl.style.cssText = 'font-size: 11px; color: var(--ig-secondary-text); padding: 0 12px 2px 36px; margin-top: 8px;';
+          labelEl.textContent = message.sender_username || '';
+          messagesContainer.appendChild(labelEl);
+        }
+
+        // Wrapper with avatar
+        const wrapperEl = document.createElement('div');
+        wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
+        const avatarEl = document.createElement('img');
+        avatarEl.src = InnovateAPI.getUserAvatar(message.sender_profile_picture);
+        avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+        wrapperEl.appendChild(avatarEl);
+
+        const messageEl = document.createElement('div');
+        messageEl.dataset.messageId = message.id || '';
+        messageEl.dataset.messageContent = grpMsgText;
+        messageEl.dataset.isSent = 'false';
+        messageEl.dataset.isPinned = 'false';
+        messageEl.dataset.senderId = message.sender_id;
+
+        // Reply context for real-time received messages
+        if (message.reply_to_id && message.reply_content) {
+          const replyDiv = document.createElement('div');
+          replyDiv.style.cssText = 'border-left: 2px solid var(--ig-blue); padding: 4px 8px; margin-bottom: 6px; border-radius: 4px; background: rgba(255,255,255,0.05); cursor: pointer;';
+          replyDiv.dataset.scrollToMessage = message.reply_to_id;
+          const replyText = (message.reply_content || '').substring(0, 50);
+          const replyUser = message.reply_username || '';
+          replyDiv.innerHTML = `<div style="font-size: 11px; font-weight: 600; color: var(--ig-blue);">${replyUser}</div><div style="font-size: 12px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${replyText}</div>`;
+          replyDiv.onclick = (e) => { e.stopPropagation(); scrollToMessage(message.reply_to_id); };
+          messageEl.appendChild(replyDiv);
+        }
+
+        if (msgType === 'image' || msgType === 'gif') {
+          messageEl.className = 'ig-message-media ig-message-received';
+          const filename = message.original_filename || grpMsgText.split('/').pop();
+          const imgWrapper = document.createElement('div');
+          imgWrapper.style.cssText = 'position: relative; display: inline-block;';
+          const img = document.createElement('img');
+          img.src = grpMsgText;
+          img.style.cssText = 'max-width: 250px; max-height: 350px; border-radius: 18px; cursor: pointer; display: block;';
+          img.onclick = () => openMediaPreview(grpMsgText, msgType, filename);
+          imgWrapper.appendChild(img);
+          messageEl.appendChild(imgWrapper);
+        } else if (msgType === 'video') {
+          messageEl.className = 'ig-message-media ig-message-received';
+          const videoDiv = document.createElement('div');
+          videoDiv.innerHTML = `<video controls style="max-width: 250px; max-height: 350px; border-radius: 18px; display: block;"><source src="${grpMsgText}"></video>`;
+          messageEl.appendChild(videoDiv);
+        } else if (msgType === 'voice') {
+          messageEl.className = 'ig-message ig-message-received';
+          const voiceDiv = document.createElement('div');
+          voiceDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+          voiceDiv.innerHTML = `<audio controls style="max-width: 200px;"><source src="${grpMsgText}"></audio>`;
+          messageEl.appendChild(voiceDiv);
+        } else {
+          messageEl.className = 'ig-message ig-message-received';
+          const textDiv = document.createElement('div');
+          textDiv.innerHTML = linkifyText(grpMsgText);
+          messageEl.appendChild(textDiv);
+          const grpFirstUrl = extractFirstUrl(grpMsgText);
+          if (grpFirstUrl) createLinkPreview(grpFirstUrl, messageEl);
+        }
+
+        const timeEl = document.createElement('div');
+        timeEl.className = 'ig-message-time';
+        timeEl.textContent = formatMessageTime(message.created_at || new Date().toISOString());
+        messageEl.appendChild(timeEl);
+
+        // Context menu + long-press (same as DMs)
+        let grpRtPressTimer;
+        messageEl.addEventListener('touchstart', (e) => {
+          grpRtPressTimer = setTimeout(() => {
+            showMessageContextMenu(e, message.id, grpMsgText, isSent, msgType);
+          }, 500);
+        });
+        messageEl.addEventListener('touchend', () => clearTimeout(grpRtPressTimer));
+        messageEl.addEventListener('touchmove', () => clearTimeout(grpRtPressTimer));
+        messageEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          showMessageContextMenu(e, message.id, grpMsgText, isSent, msgType);
+        });
+        messageEl.addEventListener('click', (e) => {
+          const target = e.target;
+          if (target.tagName !== 'IMG' && target.tagName !== 'BUTTON' && target.tagName !== 'AUDIO' &&
+              target.tagName !== 'VIDEO' && !target.closest('a') && !target.closest('button')) {
+            showMessageContextMenu(e, message.id, grpMsgText, isSent, msgType);
+          }
+        });
+
+        wrapperEl.appendChild(messageEl);
+
+        // Remove empty placeholder if present
+        const placeholder = messagesContainer.querySelector(':scope > [style*="text-align: center"][style*="padding: 40px"]');
+        if (placeholder) placeholder.remove();
+
+        messagesContainer.appendChild(wrapperEl);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      // Update sidebar conversation preview for the group
+      setTimeout(() => loadConversations(), 300);
+    });
+
+    // Group message unsend real-time listener (remove message from UI when someone unsends)
+    socket.on('group:message:unsend', (data) => {
+      console.log('group:message:unsend received', data);
+      if (currentGroupId && data.groupId == currentGroupId) {
+        // Remove message from UI immediately
+        const messageEl = document.querySelector(`[data-message-id="${data.messageId}"]`);
+        if (messageEl) {
+          const wrapper = messageEl.parentElement;
+          if (wrapper) wrapper.remove();
+        }
+        // Reload from server immediately for clean state
+        loadGroupMessages(currentGroupId);
+      }
+    });
+
+    // DM unsend — other user unsent a message in real-time
+    socket.on('message:unsend', (data) => {
+      console.log('message:unsend received', data);
+      if (currentContactId && data.senderId == currentContactId) {
+        const messageEl = document.querySelector(`[data-message-id="${data.messageId}"]`);
+        if (messageEl) {
+          const wrapper = messageEl.parentElement;
+          if (wrapper) wrapper.remove();
+        }
+        loadMessages(currentContactId);
+      }
+    });
+
     // Online/Offline status listeners
     socket.on('user:online', (userId) => {
       if (userId == currentContactId) {
@@ -3684,6 +3937,7 @@
       
     // Emit user join
     socket.emit('user:join', user.id);
+
     console.log('Socket.IO listeners setup complete');
   }
     
@@ -4271,7 +4525,7 @@
       selectedMessageContent = content;
       
       const modal = document.getElementById('messageActionsModal');
-      const unsendBtn = document.getElementById('unsendBtn');
+      const unsendBtn = document.getElementById('unsendBtnModal');
       const editBtn = document.getElementById('editBtn');
       
       // Only show unsend and edit for sent messages
@@ -5278,6 +5532,15 @@
         }
       }, 10000);
       
+      // Poll active chat messages every second as fallback for socket failures
+      setInterval(() => {
+        if (currentGroupId && document.getElementById('chatWindow')?.classList.contains('active')) {
+          loadGroupMessages(currentGroupId);
+        } else if (currentContactId && document.getElementById('chatWindow')?.classList.contains('active')) {
+          loadMessages(currentContactId);
+        }
+      }, 1000);
+      
       // Load user info and conversations
       loadUserInfo()
         .then(() => {
@@ -5287,6 +5550,7 @@
         })
         .then(async () => {
           console.log('Conversations loaded:', conversations.length);
+
           if (userId) {
             // Find conversation with this user and open it
             const conv = conversations.find(c => c.contact_id == userId);
@@ -5591,8 +5855,16 @@
         const msgIds = selectedMessages && selectedMessages.size > 0 ? [...selectedMessages] : [selectedMessageId];
         let forwarded = 0;
         for (const mid of msgIds) {
+          // Get content from dataset attribute (set from server data, no DOM text pollution)
           const el = document.querySelector(`[data-message-id="${mid}"]`);
-          const msgContent = el ? el.textContent.trim() : selectedMessageContent;
+          let msgContent = el ? el.dataset.messageContent : null;
+          // Fallback to context menu content (also set from server data)
+          if (!msgContent) msgContent = selectedMessageContent;
+          // Safety: strip any trailing timestamp pattern like "10:54 AM✓" or "10:54 AM"
+          if (msgContent) {
+            msgContent = msgContent.replace(/\d{1,2}:\d{2}\s*(?:AM|PM)\s*[✓✓✔]*$/i, '').trim();
+          }
+          if (!msgContent) continue;
           await InnovateAPI.apiRequest('/messages/send', {
             method: 'POST',
             body: JSON.stringify({ receiver_id: contactId, content: msgContent, type: 'text' })
@@ -5707,7 +5979,7 @@
         
         // Reload messages to show updated pin status
         if (currentGroupId) {
-          await loadGroupChat();
+          await loadGroupMessages(currentGroupId);
         } else if (currentContactId) {
           await loadMessages(currentContactId);
         }
@@ -5734,7 +6006,7 @@
         
         // Reload messages to show updated pin status
         if (currentGroupId) {
-          await loadGroupChat();
+          await loadGroupMessages(currentGroupId);
         } else if (currentContactId) {
           await loadMessages(currentContactId);
         }
@@ -5762,7 +6034,7 @@
         
         // Reload messages to show updated pin status
         if (currentGroupId) {
-          await loadGroupChat();
+          await loadGroupMessages(currentGroupId);
         } else if (currentContactId) {
           await loadMessages(currentContactId);
         }
@@ -5773,20 +6045,19 @@
     }
 
     async function starMessage(event) {
-      console.log('Star message clicked', {selectedMessageId});
       if (event) event.stopPropagation();
       hideMessageContextMenu();
       try {
-        console.log('Calling star endpoint for message:', selectedMessageId);
-        const response = await InnovateAPI.apiRequest(`/messages/${selectedMessageId}/star`, { 
-          method: 'POST' 
-        });
-        console.log('Star response:', response);
+        const endpoint = currentGroupId
+          ? `/groups/${currentGroupId}/messages/${selectedMessageId}/star`
+          : `/messages/${selectedMessageId}/star`;
+        const response = await InnovateAPI.apiRequest(endpoint, { method: 'POST' });
         const action = response.starred ? 'starred' : 'unstarred';
         InnovateAPI.showAlert(`Message ${action}`, 'success');
         
-        // Reload messages to show updated star status
-        if (currentContactId) {
+        if (currentGroupId) {
+          await loadGroupMessages(currentGroupId);
+        } else if (currentContactId) {
           await loadMessages(currentContactId);
         }
       } catch (error) {
@@ -6073,7 +6344,10 @@
       document.body.appendChild(modal);
 
       try {
-        const response = await InnovateAPI.apiRequest(`/messages/${messageId}/info`);
+        const endpoint = currentGroupId
+          ? `/groups/${currentGroupId}/messages/${messageId}/info`
+          : `/messages/${messageId}/info`;
+        const response = await InnovateAPI.apiRequest(endpoint);
         const msg = response.message || response;
         renderMsgInfo(msg);
       } catch (err) {
@@ -6140,12 +6414,13 @@
       if (event) event.stopPropagation();
       hideMessageContextMenu();
       
-      if (!selectedMessageIsSent) {
+      // For DMs, only sender can delete for self; for groups, any member can delete for themselves
+      if (!currentGroupId && !selectedMessageIsSent) {
         InnovateAPI.showAlert('You can only delete your own messages', 'error');
         return;
       }
       
-      const confirmed = confirm('Delete this message?');
+      const confirmed = confirm('Delete this message from your chat?');
       if (!confirmed) return;
       
       try {
@@ -6155,14 +6430,21 @@
         
         await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
         
-        // Remove message from UI
+        // Remove message from UI immediately
         const messageEl = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
         if (messageEl) {
-          const wrapper = messageEl.closest('div[style*="flex-direction: column"]');
+          const wrapper = messageEl.parentElement;
           if (wrapper) wrapper.remove();
         }
         
-        InnovateAPI.showAlert('Message deleted', 'success');
+        // Reload messages from server immediately for clean state
+        if (currentGroupId) {
+          loadGroupMessages(currentGroupId);
+        } else if (currentContactId) {
+          loadMessages(currentContactId);
+        }
+        
+        InnovateAPI.showAlert('Message deleted from your chat', 'success');
       } catch (error) {
         InnovateAPI.showAlert('Failed to delete message', 'error');
       }
@@ -6183,21 +6465,23 @@
       
       try {
         const endpoint = currentGroupId
-          ? `/groups/${currentGroupId}/messages/${selectedMessageId}`
+          ? `/groups/${currentGroupId}/messages/${selectedMessageId}/unsend`
           : `/messages/${selectedMessageId}/unsend`;
         
         await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
         
+        // Remove message from UI immediately
         const messageEl = document.querySelector(`[data-message-id="${selectedMessageId}"]`);
         if (messageEl) {
-          const wrapper = messageEl.closest('div[style*="flex-direction: column"]');
+          const wrapper = messageEl.parentElement;
           if (wrapper) wrapper.remove();
         }
         
-        // Notify other user via socket
-        const io = window.socket;
-        if (io && currentContactId) {
-          io.emit('message:unsend', { messageId: selectedMessageId, contactId: currentContactId });
+        // Reload messages from server immediately for clean state
+        if (currentGroupId) {
+          loadGroupMessages(currentGroupId);
+        } else if (currentContactId) {
+          loadMessages(currentContactId);
         }
         
         InnovateAPI.showAlert('Message unsent', 'success');
@@ -6347,7 +6631,7 @@
         InnovateAPI.showAlert('No messages selected', 'info');
         return;
       }
-      if (!confirm(`Delete ${selectedMessages.size} message(s) for you?`)) return;
+      if (!confirm(`Delete ${selectedMessages.size} message(s) from your chat?`)) return;
       
       let deleted = 0;
       for (const mid of selectedMessages) {
@@ -6356,7 +6640,7 @@
           await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
           const el = document.querySelector(`[data-message-id="${mid}"]`);
           if (el) {
-            const wrapper = el.closest('div[style*="flex-direction: column"]');
+            const wrapper = el.parentElement;
             if (wrapper) wrapper.remove();
           }
           deleted++;
@@ -6364,7 +6648,13 @@
       }
       
       exitSelectMode();
-      InnovateAPI.showAlert(`${deleted} message(s) deleted`, 'success');
+      InnovateAPI.showAlert(`${deleted} message(s) deleted from your chat`, 'success');
+      // Reload from server immediately for clean state
+      if (currentGroupId) {
+        loadGroupMessages(currentGroupId);
+      } else if (currentContactId) {
+        loadMessages(currentContactId);
+      }
     }
 
     async function unsendSelectedMessages() {
@@ -6375,21 +6665,34 @@
       if (!confirm(`Delete ${selectedMessages.size} message(s) for everyone? Only your sent messages can be deleted for everyone.`)) return;
       
       let unsent = 0;
+      let failed = 0;
       for (const mid of selectedMessages) {
         try {
-          await InnovateAPI.apiRequest(`/messages/${mid}/unsend`, { method: 'DELETE' });
+          const endpoint = currentGroupId
+            ? `/groups/${currentGroupId}/messages/${mid}/unsend`
+            : `/messages/${mid}/unsend`;
+          await InnovateAPI.apiRequest(endpoint, { method: 'DELETE' });
           const el = document.querySelector(`[data-message-id="${mid}"]`);
           if (el) {
-            const wrapper = el.closest('div[style*="flex-direction: column"]');
+            const wrapper = el.parentElement;
             if (wrapper) wrapper.remove();
           }
           unsent++;
-        } catch (_) {}
+        } catch (e) {
+          failed++;
+          console.error('Unsend failed for message', mid, e);
+        }
       }
       
       exitSelectMode();
-      if (unsent > 0) InnovateAPI.showAlert(`${unsent} message(s) deleted for everyone`, 'success');
+      if (unsent > 0) InnovateAPI.showAlert(`${unsent} message(s) deleted for everyone${failed > 0 ? ` (${failed} could not be deleted - only your own messages can be unsent)` : ''}`, 'success');
       else InnovateAPI.showAlert('Could not delete any messages (only your sent messages can be deleted for everyone)', 'info');
+      // Reload from server immediately for clean state
+      if (currentGroupId) {
+        loadGroupMessages(currentGroupId);
+      } else if (currentContactId) {
+        loadMessages(currentContactId);
+      }
     }
 
     async function forwardSelectedMessages() {
@@ -8468,7 +8771,11 @@
       else if (selected === 'timer_90d') { mode = 'timer'; duration = 7776000; }
 
       try {
-        await InnovateAPI.apiRequest(`/messages/conversations/${currentContactId}/disappearing`, {
+        // Use group endpoint if in a group chat, otherwise DM endpoint
+        const endpoint = currentGroupId
+          ? `/groups/${currentGroupId}/disappearing`
+          : `/messages/conversations/${currentContactId}/disappearing`;
+        await InnovateAPI.apiRequest(endpoint, {
           method: 'POST',
           body: JSON.stringify({ mode, duration })
         });
@@ -8476,11 +8783,13 @@
         closeSubPanel('disappearingSettingsPanel');
         // Update status text
         const statusEl = document.getElementById('contactInfoDisappearingStatus');
-        if (mode === 'off') statusEl.textContent = 'Off';
-        else if (mode === 'on_read') statusEl.textContent = 'Disappear after read';
-        else if (duration === 86400) statusEl.textContent = '24 hours';
-        else if (duration === 604800) statusEl.textContent = '7 days';
-        else if (duration === 7776000) statusEl.textContent = '90 days';
+        if (statusEl) {
+          if (mode === 'off') statusEl.textContent = 'Off';
+          else if (mode === 'on_read') statusEl.textContent = 'Disappear after read';
+          else if (duration === 86400) statusEl.textContent = '24 hours';
+          else if (duration === 604800) statusEl.textContent = '7 days';
+          else if (duration === 7776000) statusEl.textContent = '90 days';
+        }
       } catch (e) {
         InnovateAPI.showAlert('Failed to save settings', 'error');
       }
@@ -9121,9 +9430,27 @@
       InnovateAPI.showAlert(isOn ? 'Notifications enabled' : 'Notifications muted', 'success');
     }
 
-    function openGroupDisappearingSettings() {
+    async function openGroupDisappearingSettings() {
       closeGroupInfo();
       openSubPanel('disappearingSettingsPanel');
+
+      // Load current group disappearing setting
+      try {
+        const data = await InnovateAPI.apiRequest(`/groups/${currentGroupId}/disappearing`);
+        let selectedValue = 'off';
+        if (data.mode === 'on_read') selectedValue = 'on_read';
+        else if (data.mode === 'timer') {
+          if (data.duration === 86400) selectedValue = 'timer_24h';
+          else if (data.duration === 604800) selectedValue = 'timer_7d';
+          else if (data.duration === 7776000) selectedValue = 'timer_90d';
+        }
+        const radio = document.querySelector(`input[name="disappearingMode"][value="${selectedValue}"]`);
+        if (radio) radio.checked = true;
+      } catch (e) {
+        // Default to off
+        const offRadio = document.querySelector('input[name="disappearingMode"][value="off"]');
+        if (offRadio) offRadio.checked = true;
+      }
     }
 
     function openGroupMediaPanel() {
