@@ -2,6 +2,37 @@
 
 This guide covers installing, configuring, and running PostgreSQL for the Innovate Hub project.
 
+
+Easy process 
+If you see this warning when running `apt-get update`:
+# 1. Fix Yarn GPG key (avoids apt warnings)
+curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo gpg --dearmor --yes -o /usr/share/keyrings/yarn-archive-keyring.gpg
+
+# 2. Install PostgreSQL & ffmpeg
+sudo apt-get update -qq && sudo apt-get install -y postgresql postgresql-contrib ffmpeg
+
+# 3. Start PostgreSQL
+sudo pg_ctlcluster 16 main start
+
+# 4. Create DB user & database
+sudo su - postgres -c "psql -c \"CREATE USER innovate_hub WITH PASSWORD 'Sushanth@123' CREATEDB;\""
+sudo su - postgres -c "psql -c \"CREATE DATABASE innovate_hub OWNER innovate_hub;\""
+
+# 5. Load schema (run 3 times for FK dependencies)
+for i in 1 2 3; do
+  PGPASSWORD='Sushanth@123' psql -h localhost -U innovate_hub -d innovate_hub -f db/postgres-schema.sql 2>&1 | grep -c "CREATE TABLE"
+done
+
+# 6. Copy env file
+cp .env.example .env
+# Then edit .env: set DB_TYPE=postgresql, PG_PASSWORD, and generate a JWT_SECRET
+
+# 7. Install deps & start
+npm install
+npm start
+
+
+
 ## Prerequisites
 
 - Ubuntu-based environment (GitHub Codespaces, WSL, or native Ubuntu)
