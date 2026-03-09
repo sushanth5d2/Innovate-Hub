@@ -1254,7 +1254,7 @@
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/unified-call-manager.js?v=20260309b"></script>
+  <script src="/js/unified-call-manager.js?v=20260310a"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -5871,7 +5871,17 @@
       };
     }
 
+    function _getGroupInfo() {
+      const name = document.getElementById('chatUsername')?.textContent || 'Group Call';
+      return { username: name, profile_picture: null };
+    }
+
     async function startVoiceCall() {
+      // DM group call
+      if (currentGroupId) {
+        callManager.startGroupCall(currentGroupId, _getGroupInfo(), true);
+        return;
+      }
       if (!currentContactId) {
         InnovateAPI.showAlert('Please select a conversation first', 'error');
         return;
@@ -5880,6 +5890,11 @@
     }
 
     async function startVideoCall() {
+      // DM group video call
+      if (currentGroupId) {
+        callManager.startGroupCall(currentGroupId, _getGroupInfo(), false);
+        return;
+      }
       if (!currentContactId) {
         InnovateAPI.showAlert('Please select a conversation first', 'error');
         return;

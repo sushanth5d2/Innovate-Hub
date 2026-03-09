@@ -53,6 +53,11 @@ class UnifiedCallManager {
 
     // Multi-device transfer data
     this._pendingTransferData = null;
+
+    // Track which screen mode is currently rendered to avoid unnecessary DOM rebuilds
+    this._renderedScreenKey = null;
+    // Retry timer for stream attachment
+    this._streamRetryTimer = null;
   }
 
   // Ensure a persistent hidden audio element exists (outside the modal)
@@ -143,6 +148,7 @@ class UnifiedCallManager {
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'waCallModal';
+      modal.style.cssText = 'position:relative;z-index:99999;';
       document.body.appendChild(modal);
     }
     return modal;
@@ -199,6 +205,16 @@ class UnifiedCallManager {
     const isGroup = this.callMode === 'group';
     const name = isGroup ? 'Group Call' : (this.currentContactInfo?.username || 'User');
     const pic = this.currentContactInfo?.profile_picture || '/img/default-avatar.png';
+
+    // Build a key that captures the current screen mode to prevent unnecessary rebuilds
+    const screenKey = `active-${isGroup}-${this.isVideoCall}-${this.isVideoSwapped}-${this.isSharingScreen}`;
+    
+    // If we already rendered this exact screen, just re-attach streams
+    if (this._renderedScreenKey === screenKey && document.getElementById('waActiveCallContainer')) {
+      this._attachStreamsToUI();
+      return;
+    }
+    this._renderedScreenKey = screenKey;
 
     // Determine which video is big vs small (tap-to-swap)
     const localIsBig = this.isVideoSwapped;
@@ -270,29 +286,52 @@ class UnifiedCallManager {
 
   // Attach local/remote streams to the current UI elements
   _attachStreamsToUI() {
+    // Cancel any pending retry
+    if (this._streamRetryTimer) {
+      clearTimeout(this._streamRetryTimer);
+      this._streamRetryTimer = null;
+    }
+
     // Always use persistent audio element for remote audio (this plays the sound)
     const audioEl = this._ensureRemoteAudio();
     if (this.remoteStream) {
-      audioEl.srcObject = this.remoteStream;
-      audioEl.play().catch(() => {});
+      if (audioEl.srcObject !== this.remoteStream) {
+        audioEl.srcObject = this.remoteStream;
+      }
+      audioEl.play().catch(e => console.warn('[Call] Audio play blocked:', e.message));
     }
 
     // Video elements are ALL muted — audio comes from persistent audio element above
     const localVid = document.getElementById('waLocalVideo');
     if (localVid && this.localStream) {
-      localVid.srcObject = this.isSharingScreen && this.screenStream ? this.screenStream : this.localStream;
+      const wantedStream = this.isSharingScreen && this.screenStream ? this.screenStream : this.localStream;
+      if (localVid.srcObject !== wantedStream) {
+        localVid.srcObject = wantedStream;
+      }
       localVid.play().catch(() => {});
     }
     const remoteVid = document.getElementById('waRemoteVideo');
     if (remoteVid && this.remoteStream) {
-      remoteVid.srcObject = this.remoteStream;
+      if (remoteVid.srcObject !== this.remoteStream) {
+        remoteVid.srcObject = this.remoteStream;
+      }
       remoteVid.play().catch(() => {});
+    }
+
+    // Retry if we have a remote stream but DOM elements aren't ready yet
+    if (this.remoteStream && this.callState === 'connected') {
+      const needsVideoRetry = this.isVideoCall && !remoteVid;
+      const needsAudioRetry = !audioEl.srcObject;
+      if (needsVideoRetry || needsAudioRetry) {
+        this._streamRetryTimer = setTimeout(() => this._attachStreamsToUI(), 300);
+      }
     }
   }
 
   // WhatsApp-style tap to swap local/remote video
   _swapVideos() {
     this.isVideoSwapped = !this.isVideoSwapped;
+    this._renderedScreenKey = null; // Force rebuild for swapped layout
     this.showActiveCallScreen();
   }
 
@@ -327,7 +366,7 @@ class UnifiedCallManager {
     }, 1000);
   }
 
-  _expandCall() { this.showActiveCallScreen(); }
+  _expandCall() { this._renderedScreenKey = null; this.showActiveCallScreen(); }
 
   _formatDuration(seconds) {
     if (!seconds || seconds < 0) return '';
@@ -570,6 +609,7 @@ class UnifiedCallManager {
       });
 
       this.callState = 'connected';
+      this._renderedScreenKey = null; // Force fresh active screen
       this.showActiveCallScreen();
       this.playConnectedTone();
 
@@ -657,6 +697,11 @@ class UnifiedCallManager {
     this.callStartTime = null;
     this._pendingOffer = null;
     this._pendingTransferData = null;
+    this._renderedScreenKey = null;
+    if (this._streamRetryTimer) {
+      clearTimeout(this._streamRetryTimer);
+      this._streamRetryTimer = null;
+    }
   }
 
   // ===================== WEBRTC (DM 1-to-1) =====================
@@ -674,20 +719,39 @@ class UnifiedCallManager {
     };
 
     this.peerConnection.ontrack = (event) => {
-      console.log('[Call] Remote track received:', event.track.kind);
+      console.log('[Call] Remote track received:', event.track.kind, 'readyState:', event.track.readyState);
+      
+      // Use the stream from the event, or build one from the track
+      const incomingStream = event.streams[0];
+      
       if (!this.remoteStream) {
-        this.remoteStream = event.streams[0] || new MediaStream();
+        this.remoteStream = incomingStream || new MediaStream();
+      } else if (incomingStream && incomingStream.id !== this.remoteStream.id) {
+        // If a different stream arrived, merge its tracks into our existing one
+        incomingStream.getTracks().forEach(t => {
+          if (!this.remoteStream.getTrackById(t.id)) {
+            this.remoteStream.addTrack(t);
+          }
+        });
       }
-      // Add new track to existing stream if not already there
-      const existingTrackIds = this.remoteStream.getTracks().map(t => t.id);
-      if (!existingTrackIds.includes(event.track.id)) {
+      
+      // Add the specific track if not already present
+      if (!this.remoteStream.getTrackById(event.track.id)) {
         this.remoteStream.addTrack(event.track);
       }
+
+      // CRITICAL: Immediately set audio on the persistent element (don't wait for UI rebuild)
+      const audioEl = this._ensureRemoteAudio();
+      if (audioEl.srcObject !== this.remoteStream) {
+        audioEl.srcObject = this.remoteStream;
+      }
+      audioEl.play().catch(e => console.warn('[Call] Audio play blocked:', e.message));
 
       // If we received a video track and we're in voice mode, upgrade to video
       if (event.track.kind === 'video' && !this.isVideoCall) {
         console.log('[Call] Upgrading to video call — remote video track received');
         this.isVideoCall = true;
+        this._renderedScreenKey = null; // Force DOM rebuild for video layout
         this.showActiveCallScreen();
         return;
       }
@@ -699,11 +763,17 @@ class UnifiedCallManager {
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
       console.log('[Call] Connection state:', state);
-      if (state === 'connected' && this.callState !== 'connected') {
-        this.callState = 'connected';
-        this.stopAllSounds();
-        this.showActiveCallScreen();
-        this.playConnectedTone();
+      if (state === 'connected') {
+        if (this.callState !== 'connected') {
+          this.callState = 'connected';
+          this.stopAllSounds();
+          this._renderedScreenKey = null; // Force rebuild on first connect
+          this.showActiveCallScreen();
+          this.playConnectedTone();
+        } else {
+          // Already connected — just re-attach streams (ontrack may have fired)
+          this._attachStreamsToUI();
+        }
       } else if (state === 'failed' || state === 'closed') {
         this.endCall('connection_lost');
       }
@@ -821,9 +891,10 @@ class UnifiedCallManager {
 
       try {
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        // Connection state change handler will show active screen when ICE completes
-        // But also show it immediately in case connection is already established
+        // Set state to connected — onconnectionstatechange will also fire
+        // but the guard (callState !== 'connected') prevents double-rebuild
         this.callState = 'connected';
+        this._renderedScreenKey = null; // Force fresh active screen
         this.showActiveCallScreen();
         this.playConnectedTone();
       } catch (err) {
@@ -1036,6 +1107,7 @@ class UnifiedCallManager {
         });
         this.isVideoCall = true;
         this.isVideoOff = false;
+        this._renderedScreenKey = null; // Force rebuild for video layout
         this.showActiveCallScreen();
         return;
       } catch (err) {
@@ -1108,6 +1180,7 @@ class UnifiedCallManager {
 
       this.isSharingScreen = true;
       if (!this.isVideoCall) this.isVideoCall = true;
+      this._renderedScreenKey = null; // Force DOM rebuild for screen share layout
       this.showActiveCallScreen();
 
       screenTrack.onended = () => this._stopScreenShare();
@@ -1138,6 +1211,7 @@ class UnifiedCallManager {
 
     this.screenStream = null;
     this.isSharingScreen = false;
+    this._renderedScreenKey = null; // Force DOM rebuild back to camera
     this.showActiveCallScreen();
 
     if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Screen sharing stopped', 'success');
@@ -1181,10 +1255,10 @@ class UnifiedCallManager {
       // Create modal OUTSIDE the call modal at highest z-index
       const addModal = document.createElement('div');
       addModal.id = 'waAddMemberModal';
-      addModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:200000;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;';
+      addModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:200001;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;';
       addModal.onclick = (e) => { if (e.target === addModal) addModal.remove(); };
       addModal.innerHTML = `
-        <div style="background:#1a1a2e;border-radius:16px 16px 0 0;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;">
+        <div style="background:#1a1a2e;border-radius:16px 16px 0 0;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;position:relative;z-index:200002;">
           <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;">
             <h3 style="margin:0;color:#fff;font-size:17px;">Add to Call</h3>
             <button onclick="document.getElementById('waAddMemberModal').remove()" style="background:none;border:none;color:#a8a8a8;font-size:24px;cursor:pointer;line-height:1;">✕</button>
