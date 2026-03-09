@@ -1,4 +1,4 @@
-const CACHE_NAME = 'innovate-v20260112';
+const CACHE_NAME = 'innovate-v20260309';
 const urlsToCache = [
   '/',
   '/home',
@@ -46,10 +46,11 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   const requestUrl = event.request.url;
   
-  // Never cache API calls, Socket.IO, or POST/PUT/DELETE requests
+  // Never cache API calls, Socket.IO, JS files, or POST/PUT/DELETE requests
   if (
     requestUrl.includes('/api/') ||
     requestUrl.includes('/socket.io/') ||
+    requestUrl.includes('/js/') ||
     event.request.method !== 'GET'
   ) {
     event.respondWith(fetch(event.request));

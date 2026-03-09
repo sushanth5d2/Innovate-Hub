@@ -207,8 +207,8 @@ class UnifiedCallManager {
     modal.innerHTML = `
       <div id="waActiveCallContainer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:100000;display:flex;flex-direction:column;">
         ${this.isVideoCall && !isGroup ? `
-          <video id="${localIsBig ? 'waLocalVideo' : 'waRemoteVideo'}" autoplay ${localIsBig ? 'muted' : ''} playsinline style="width:100%;height:100%;object-fit:cover;"></video>
-          <video id="${localIsBig ? 'waRemoteVideo' : 'waLocalVideo'}" autoplay ${localIsBig ? '' : 'muted'} playsinline onclick="callManager._swapVideos()" style="position:absolute;top:60px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;border:2px solid rgba(255,255,255,0.3);"></video>
+          <video id="${localIsBig ? 'waLocalVideo' : 'waRemoteVideo'}" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+          <video id="${localIsBig ? 'waRemoteVideo' : 'waLocalVideo'}" autoplay muted playsinline onclick="callManager._swapVideos()" style="position:absolute;top:60px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;border:2px solid rgba(255,255,255,0.3);"></video>
         ` : (!isGroup ? `
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);">
             <div style="width:100px;height:100px;border-radius:50%;overflow:hidden;margin-bottom:16px;">
@@ -270,17 +270,23 @@ class UnifiedCallManager {
 
   // Attach local/remote streams to the current UI elements
   _attachStreamsToUI() {
-    // Always use persistent audio element for remote audio
+    // Always use persistent audio element for remote audio (this plays the sound)
     const audioEl = this._ensureRemoteAudio();
-    if (this.remoteStream) audioEl.srcObject = this.remoteStream;
+    if (this.remoteStream) {
+      audioEl.srcObject = this.remoteStream;
+      audioEl.play().catch(() => {});
+    }
 
-    if (this.isVideoCall) {
-      const localVid = document.getElementById('waLocalVideo');
-      if (localVid && this.localStream) {
-        localVid.srcObject = this.isSharingScreen && this.screenStream ? this.screenStream : this.localStream;
-      }
-      const remoteVid = document.getElementById('waRemoteVideo');
-      if (remoteVid && this.remoteStream) remoteVid.srcObject = this.remoteStream;
+    // Video elements are ALL muted — audio comes from persistent audio element above
+    const localVid = document.getElementById('waLocalVideo');
+    if (localVid && this.localStream) {
+      localVid.srcObject = this.isSharingScreen && this.screenStream ? this.screenStream : this.localStream;
+      localVid.play().catch(() => {});
+    }
+    const remoteVid = document.getElementById('waRemoteVideo');
+    if (remoteVid && this.remoteStream) {
+      remoteVid.srcObject = this.remoteStream;
+      remoteVid.play().catch(() => {});
     }
   }
 
@@ -669,15 +675,25 @@ class UnifiedCallManager {
 
     this.peerConnection.ontrack = (event) => {
       console.log('[Call] Remote track received:', event.track.kind);
-      this.remoteStream = event.streams[0] || new MediaStream([event.track]);
+      if (!this.remoteStream) {
+        this.remoteStream = event.streams[0] || new MediaStream();
+      }
+      // Add new track to existing stream if not already there
+      const existingTrackIds = this.remoteStream.getTracks().map(t => t.id);
+      if (!existingTrackIds.includes(event.track.id)) {
+        this.remoteStream.addTrack(event.track);
+      }
 
-      // Immediately attach to persistent audio element (works for both voice and video)
-      const audioEl = this._ensureRemoteAudio();
-      audioEl.srcObject = this.remoteStream;
+      // If we received a video track and we're in voice mode, upgrade to video
+      if (event.track.kind === 'video' && !this.isVideoCall) {
+        console.log('[Call] Upgrading to video call — remote video track received');
+        this.isVideoCall = true;
+        this.showActiveCallScreen();
+        return;
+      }
 
-      // Attach to video element if it exists
-      const remoteVid = document.getElementById('waRemoteVideo');
-      if (remoteVid) remoteVid.srcObject = this.remoteStream;
+      // Always re-attach streams to UI (handles race condition where ontrack fires after DOM rebuild)
+      this._attachStreamsToUI();
     };
 
     this.peerConnection.onconnectionstatechange = () => {
@@ -856,15 +872,7 @@ class UnifiedCallManager {
           to: this.currentContactId,
           answer
         });
-        // Refresh the UI to show video if it was upgraded
-        if (!this.isVideoCall) {
-          const receivers = this.peerConnection.getReceivers();
-          const hasVideo = receivers.some(r => r.track && r.track.kind === 'video');
-          if (hasVideo) {
-            this.isVideoCall = true;
-            this.showActiveCallScreen();
-          }
-        }
+        // Video upgrade is now handled in ontrack when the video track arrives
       } catch (err) {
         console.error('Renegotiation answer error:', err);
       }
@@ -1140,9 +1148,29 @@ class UnifiedCallManager {
   async showAddMemberModal() {
     try {
       const token = InnovateAPI.getToken();
-      const res = await fetch('/api/messages/conversations', { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
-      const contacts = (data.conversations || data || []).filter(c => c.contact_id !== this.currentContactId);
+      const user = InnovateAPI.getCurrentUser();
+      // Fetch from both conversations and followers/following for full contact list
+      const [convRes, followRes] = await Promise.all([
+        fetch('/api/messages/conversations', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`/api/users/${user.id}/following`, { headers: { 'Authorization': `Bearer ${token}` } }).catch(() => null)
+      ]);
+      const convData = await convRes.json();
+      let contacts = (convData.conversations || convData || []).filter(c => c.contact_id !== this.currentContactId);
+      // Merge in followed users if available
+      if (followRes && followRes.ok) {
+        try {
+          const followData = await followRes.json();
+          const followList = followData.following || followData.users || followData || [];
+          const existingIds = new Set(contacts.map(c => c.contact_id));
+          followList.forEach(f => {
+            const fId = f.id || f.user_id || f.contact_id;
+            if (fId && !existingIds.has(fId) && fId !== this.currentContactId) {
+              contacts.push({ contact_id: fId, username: f.username, profile_picture: f.profile_picture });
+              existingIds.add(fId);
+            }
+          });
+        } catch (_) {}
+      }
 
       this._addMemberContacts = contacts;
 
