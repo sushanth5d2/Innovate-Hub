@@ -538,16 +538,29 @@ io.on('connection', (socket) => {
     io.to(to).emit('call:add-member-ice', { fromSocketId: socket.id, candidate });
   });
 
+  // Screen share signaling — relay to peers
+  socket.on('call:screen-share', (data) => {
+    const { to, sharing } = data || {};
+    if (!to) return;
+    io.to(`user_${to}`).emit('call:screen-share', { from: socket.id, sharing: !!sharing });
+  });
+
+  socket.on('group-call:screen-share', (data) => {
+    const { groupId, sharing } = data || {};
+    if (!groupId) return;
+    socket.to(`group_call_${groupId}`).emit('group-call:screen-share', { from: socket.id, sharing: !!sharing, groupId });
+  });
+
   // === Group Call (WebRTC mesh) ===
   // Client joins a group call room to exchange offers/answers/ICE.
   socket.on('group-call:join', (data) => {
     try {
-      const { groupId, userId, displayName, isVideo } = data || {};
+      const { groupId, userId, displayName, isVideo, profilePicture, groupPicture } = data || {};
       if (!groupId) return;
 
       const room = `group_call_${groupId}`;
       socket.join(room);
-      groupCallPresence.set(socket.id, { groupId: String(groupId), userId, displayName, isVideo });
+      groupCallPresence.set(socket.id, { groupId: String(groupId), userId, displayName, isVideo, profilePicture });
 
       // List current peers in the room (excluding this socket)
       const peers = [];
@@ -559,7 +572,8 @@ io.on('connection', (socket) => {
           peers.push({
             socketId: sid,
             userId: p?.userId,
-            displayName: p?.displayName
+            displayName: p?.displayName,
+            profilePicture: p?.profilePicture || null
           });
         }
       }
@@ -567,7 +581,7 @@ io.on('connection', (socket) => {
       socket.emit('group-call:peers', { groupId, peers });
       socket.to(room).emit('group-call:peer-joined', {
         groupId,
-        peer: { socketId: socket.id, userId, displayName }
+        peer: { socketId: socket.id, userId, displayName, profilePicture: profilePicture || null }
       });
 
       // Broadcast to all group members via the chat room
@@ -575,13 +589,28 @@ io.on('connection', (socket) => {
       
       // If this is the first person joining (starting the call), ring all group members
       if (participantCount <= 1) {
-        // Send incoming group call notification to everyone in the group chat room
-        socket.to(`group_${groupId}`).emit('group-call:ring', {
-          groupId,
-          callerId: userId,
-          callerName: displayName,
-          isVideo: !!isVideo,
-          participantCount
+        // Query group_members table to get all member user IDs and ring each one individually
+        const { getDb } = require('./config/database');
+        const db = getDb();
+        db.all('SELECT user_id FROM group_members WHERE group_id = ?', [groupId], (err, members) => {
+          if (err) {
+            console.error('Failed to query group members for ring:', err);
+            return;
+          }
+          const ringData = {
+            groupId,
+            callerId: userId,
+            callerName: displayName,
+            callerPicture: profilePicture || null,
+            groupPicture: groupPicture || null,
+            isVideo: !!isVideo,
+            participantCount
+          };
+          (members || []).forEach(m => {
+            if (String(m.user_id) !== String(userId)) {
+              io.to(`user_${m.user_id}`).emit('group-call:ring', ringData);
+            }
+          });
         });
       }
       
@@ -630,6 +659,8 @@ io.on('connection', (socket) => {
     const presence = groupCallPresence.get(socket.id);
     if (presence?.groupId) {
       const room = `group_call_${presence.groupId}`;
+      // Notify peers that this user stopped screen sharing (if they were)
+      socket.to(room).emit('group-call:screen-share', { from: socket.id, sharing: false, groupId: presence.groupId });
       socket.to(room).emit('group-call:peer-left', { groupId: presence.groupId, socketId: socket.id });
       groupCallPresence.delete(socket.id);
     }

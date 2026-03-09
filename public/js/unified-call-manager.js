@@ -58,6 +58,12 @@ class UnifiedCallManager {
     this._renderedScreenKey = null;
     // Retry timer for stream attachment
     this._streamRetryTimer = null;
+
+    // Screen share focus mode
+    this._participantsHidden = false;
+    this._remoteScreenSharePeer = null;  // socketId or 'dm' when remote is sharing
+    this._originalIsVideoCall = false;   // restore after screen share ends
+    this.peerStreams = new Map();         // socketId → MediaStream for group peers
   }
 
   // Ensure a persistent hidden audio element exists (outside the modal)
@@ -204,9 +210,10 @@ class UnifiedCallManager {
     const isGroup = this.callMode === 'group';
     const name = isGroup ? 'Group Call' : (this.currentContactInfo?.username || 'User');
     const pic = this.currentContactInfo?.profile_picture || '/img/default-avatar.png';
+    const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
 
     // Build a key that captures the current screen mode to prevent unnecessary rebuilds
-    const screenKey = `active-${isGroup}-${this.isVideoCall}-${this.isVideoSwapped}-${this.isSharingScreen}`;
+    const screenKey = `active-${isGroup}-${this.isVideoCall}-${this.isVideoSwapped}-${this.isSharingScreen}-${!!this._remoteScreenSharePeer}`;
     
     // If we already rendered this exact screen, just re-attach streams
     if (this._renderedScreenKey === screenKey && document.getElementById('waActiveCallContainer')) {
@@ -217,21 +224,66 @@ class UnifiedCallManager {
 
     // Determine which video is big vs small (tap-to-swap)
     const localIsBig = this.isVideoSwapped;
+    const participantsHiddenCSS = this._participantsHidden ? 'display:none;' : '';
+
+    let mainContentHTML = '';
+
+    if (isScreenShareMode) {
+      // ═══ SCREEN SHARE FOCUSED LAYOUT ═══
+      const sharingLabel = this.isSharingScreen ? 'You are sharing your screen' : (isGroup ? 'Screen is being shared' : `${name} is sharing screen`);
+
+      if (isGroup) {
+        // Group screen share — main screen share view + small collapsible participant bar
+        mainContentHTML = `
+          <video id="waScreenShareMain" autoplay muted playsinline style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1;"></video>
+          <div style="position:absolute;top:60px;left:12px;z-index:6;background:rgba(0,149,246,0.85);color:white;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;">
+            <svg fill="white" width="14" height="14" viewBox="0 0 24 24"><path d="M20 18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+            ${sharingLabel}
+          </div>
+          <div id="waParticipantsBar" style="position:absolute;bottom:106px;left:0;right:0;z-index:6;${participantsHiddenCSS}">
+            <div id="waGroupVideoGrid" style="display:flex;gap:4px;padding:4px 8px;overflow-x:auto;flex-wrap:nowrap;"></div>
+          </div>
+          <button id="waToggleParticipants" onclick="callManager._toggleParticipantsVisibility()" style="position:absolute;bottom:106px;right:12px;z-index:7;background:rgba(0,0,0,0.7);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px);">
+            ${this._participantsHidden ? 'Show Participants' : 'Hide Participants'}
+          </button>`;
+      } else {
+        // DM screen share — main screen share view + collapsible PiP for other person
+        mainContentHTML = `
+          <video id="waScreenShareMain" autoplay muted playsinline style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:1;"></video>
+          <div style="position:absolute;top:60px;left:12px;z-index:6;background:rgba(0,149,246,0.85);color:white;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;">
+            <svg fill="white" width="14" height="14" viewBox="0 0 24 24"><path d="M20 18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+            ${sharingLabel}
+          </div>
+          <div id="waParticipantsBar" style="position:absolute;top:100px;right:12px;z-index:6;${participantsHiddenCSS}">
+            <video id="${this.isSharingScreen ? 'waRemoteVideo' : 'waLocalVideo'}" autoplay muted playsinline style="width:120px;height:90px;border-radius:12px;object-fit:cover;box-shadow:0 2px 10px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.3);background:#1a1a2e;"></video>
+          </div>
+          <button id="waToggleParticipants" onclick="callManager._toggleParticipantsVisibility()" style="position:absolute;top:${this._participantsHidden ? '100' : '196'}px;right:12px;z-index:7;background:rgba(0,0,0,0.7);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:16px;padding:5px 12px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px);">
+            ${this._participantsHidden ? 'Show' : 'Hide'}
+          </button>`;
+      }
+    } else if (this.isVideoCall && !isGroup) {
+      // ═══ DM VIDEO CALL ═══
+      mainContentHTML = `
+        <video id="${localIsBig ? 'waLocalVideo' : 'waRemoteVideo'}" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+        <video id="${localIsBig ? 'waRemoteVideo' : 'waLocalVideo'}" autoplay muted playsinline onclick="callManager._swapVideos()" style="position:absolute;top:60px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;border:2px solid rgba(255,255,255,0.3);"></video>`;
+    } else if (!isGroup) {
+      // ═══ DM AUDIO CALL ═══
+      mainContentHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);">
+          <div style="width:100px;height:100px;border-radius:50%;overflow:hidden;margin-bottom:16px;">
+            <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+          </div>
+          <h3 style="color:white;margin:0 0 4px;">${name}</h3>
+        </div>`;
+    } else {
+      // ═══ GROUP CALL (normal video/audio grid) ═══
+      mainContentHTML = '<div id="waGroupVideoGrid" style="position:absolute;top:60px;left:0;right:0;bottom:100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px;padding:4px;overflow:auto;z-index:1;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);"></div>';
+    }
 
     modal.style.display = 'block';
     modal.innerHTML = `
       <div id="waActiveCallContainer" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:100000;display:flex;flex-direction:column;">
-        ${this.isVideoCall && !isGroup ? `
-          <video id="${localIsBig ? 'waLocalVideo' : 'waRemoteVideo'}" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
-          <video id="${localIsBig ? 'waRemoteVideo' : 'waLocalVideo'}" autoplay muted playsinline onclick="callManager._swapVideos()" style="position:absolute;top:60px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);cursor:pointer;border:2px solid rgba(255,255,255,0.3);"></video>
-        ` : (!isGroup ? `
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);">
-            <div style="width:100px;height:100px;border-radius:50%;overflow:hidden;margin-bottom:16px;">
-              <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
-            </div>
-            <h3 style="color:white;margin:0 0 4px;">${name}</h3>
-          </div>
-        ` : '')}
+        ${mainContentHTML}
         <!-- Top bar -->
         <div style="position:absolute;top:0;left:0;right:0;padding:16px;display:flex;justify-content:space-between;align-items:center;z-index:5;background:linear-gradient(to bottom,rgba(0,0,0,0.6),transparent);">
           <button onclick="callManager._minimizeCall()" style="background:none;border:none;color:white;cursor:pointer;padding:8px;">
@@ -240,8 +292,6 @@ class UnifiedCallManager {
           <span id="waCallTimer" style="color:white;font-size:14px;font-weight:600;">00:00</span>
           ${isGroup ? `<span style="color:rgba(255,255,255,0.7);font-size:12px;" id="waParticipantCount">${this.peers.size + 1} participants</span>` : '<span></span>'}
         </div>
-        <!-- Group video grid -->
-        ${isGroup ? '<div id="waGroupVideoGrid" style="position:absolute;top:60px;left:0;right:0;bottom:100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px;padding:4px;overflow:auto;z-index:1;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);"></div>' : ''}
         <!-- Controls bar -->
         <div style="position:absolute;bottom:0;left:0;right:0;padding:24px 16px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;z-index:5;background:linear-gradient(to top,rgba(0,0,0,0.8) 60%,transparent);">
           <button id="waBtnMute" onclick="callManager.toggleMute()" style="width:50px;height:50px;border-radius:50%;background:${this.isMuted ? '#ff3b30' : 'rgba(255,255,255,0.2)'};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Mute">
@@ -300,12 +350,32 @@ class UnifiedCallManager {
       audioEl.play().catch(e => console.warn('[Call] Audio play blocked:', e.message));
     }
 
+    // Screen share main view (used in screen share focused mode)
+    const screenShareMain = document.getElementById('waScreenShareMain');
+    if (screenShareMain) {
+      if (this.isSharingScreen && this.screenStream) {
+        // Local user sharing — show own screen preview
+        if (screenShareMain.srcObject !== this.screenStream) screenShareMain.srcObject = this.screenStream;
+        screenShareMain.play().catch(() => {});
+      } else if (this._remoteScreenSharePeer === 'dm' && this.remoteStream) {
+        // DM: remote is sharing — remote video has the screen content
+        if (screenShareMain.srcObject !== this.remoteStream) screenShareMain.srcObject = this.remoteStream;
+        screenShareMain.play().catch(() => {});
+      } else if (this._remoteScreenSharePeer && this._remoteScreenSharePeer !== 'dm') {
+        // Group: remote peer sharing — find their stream
+        const peerStream = this.peerStreams.get(this._remoteScreenSharePeer);
+        if (peerStream) {
+          if (screenShareMain.srcObject !== peerStream) screenShareMain.srcObject = peerStream;
+          screenShareMain.play().catch(() => {});
+        }
+      }
+    }
+
     // Video elements are ALL muted — audio comes from persistent audio element above
     const localVid = document.getElementById('waLocalVideo');
     if (localVid && this.localStream) {
-      const wantedStream = this.isSharingScreen && this.screenStream ? this.screenStream : this.localStream;
-      if (localVid.srcObject !== wantedStream) {
-        localVid.srcObject = wantedStream;
+      if (localVid.srcObject !== this.localStream) {
+        localVid.srcObject = this.localStream;
       }
       localVid.play().catch(() => {});
     }
@@ -319,7 +389,7 @@ class UnifiedCallManager {
 
     // Retry if we have a remote stream but DOM elements aren't ready yet
     if (this.remoteStream && this.callState === 'connected') {
-      const needsVideoRetry = this.isVideoCall && !remoteVid;
+      const needsVideoRetry = this.isVideoCall && !remoteVid && !screenShareMain;
       const needsAudioRetry = !audioEl.srcObject;
       if (needsVideoRetry || needsAudioRetry) {
         this._streamRetryTimer = setTimeout(() => this._attachStreamsToUI(), 300);
@@ -367,6 +437,14 @@ class UnifiedCallManager {
 
   _expandCall() { this._renderedScreenKey = null; this.showActiveCallScreen(); }
 
+  _toggleParticipantsVisibility() {
+    this._participantsHidden = !this._participantsHidden;
+    const bar = document.getElementById('waParticipantsBar');
+    const btn = document.getElementById('waToggleParticipants');
+    if (bar) bar.style.display = this._participantsHidden ? 'none' : '';
+    if (btn) btn.textContent = this._participantsHidden ? (this.callMode === 'group' ? 'Show Participants' : 'Show') : (this.callMode === 'group' ? 'Hide Participants' : 'Hide');
+  }
+
   _formatDuration(seconds) {
     if (!seconds || seconds < 0) return '';
     const m = Math.floor(seconds / 60);
@@ -404,43 +482,87 @@ class UnifiedCallManager {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // Local user
+    const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
+    const tileCSS = isScreenShareMode
+      ? 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;width:100px;height:75px;flex-shrink:0;'
+      : 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
+
+    // Local user tile
     const localContainer = document.createElement('div');
-    localContainer.style.cssText = 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
-    const localVid = document.createElement('video');
-    localVid.autoplay = true;
-    localVid.muted = true;
-    localVid.playsInline = true;
-    localVid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-    if (this.localStream) localVid.srcObject = this.localStream;
-    localContainer.appendChild(localVid);
+    localContainer.style.cssText = tileCSS;
+
+    const hasLocalVideo = this.isVideoCall && this.localStream && this.localStream.getVideoTracks().length > 0;
+    if (hasLocalVideo) {
+      const localVid = document.createElement('video');
+      localVid.autoplay = true;
+      localVid.muted = true;
+      localVid.playsInline = true;
+      localVid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      localVid.srcObject = this.localStream;
+      localContainer.appendChild(localVid);
+    } else {
+      // Audio-only — show user's own profile picture
+      const user = typeof InnovateAPI !== 'undefined' ? InnovateAPI.getCurrentUser() : null;
+      const userPic = user?.profile_picture;
+      const avatarDiv = document.createElement('div');
+      avatarDiv.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2);';
+      if (userPic) {
+        avatarDiv.innerHTML = `<img src="${userPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<svg fill=\\'white\\' width=\\'32\\' height=\\'32\\' viewBox=\\'0 0 24 24\\'><path d=\\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\\'/></svg>'" />`;
+      } else {
+        avatarDiv.innerHTML = '<svg fill="white" width="32" height="32" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+      }
+      localContainer.appendChild(avatarDiv);
+    }
+
     const localLabel = document.createElement('div');
     localLabel.style.cssText = 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;';
     localLabel.textContent = 'You';
     localContainer.appendChild(localLabel);
     grid.appendChild(localContainer);
+
+    // Also re-render any existing peers
+    this.peerStreams.forEach((stream, socketId) => {
+      const presence = this.participants.get(socketId);
+      this._addGroupPeerVideoToGrid(grid, socketId, presence?.username || 'Participant', stream, tileCSS);
+    });
   }
 
-  _addGroupPeerVideo(socketId, displayName, stream) {
-    const grid = document.getElementById('waGroupVideoGrid');
+  _addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS) {
     if (!grid) return;
-
     let container = document.getElementById(`waGroupPeer-${socketId}`);
     if (!container) {
       container = document.createElement('div');
       container.id = `waGroupPeer-${socketId}`;
-      container.style.cssText = 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
+      container.style.cssText = tileCSS;
       grid.appendChild(container);
     }
     container.innerHTML = '';
-    const vid = document.createElement('video');
-    vid.autoplay = true;
-    vid.playsInline = true;
-    vid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-    vid.srcObject = stream;
-    container.appendChild(vid);
 
-    // Also play the audio from this peer
+    const presence = this.participants.get(socketId);
+    const peerPic = presence?.profile_picture;
+    const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+    if (hasVideo) {
+      const vid = document.createElement('video');
+      vid.autoplay = true;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+      vid.srcObject = stream;
+      container.appendChild(vid);
+    } else {
+      // Audio-only participant — show their profile picture or fallback initial
+      const avatarDiv = document.createElement('div');
+      avatarDiv.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f093fb,#f5576c);';
+      if (peerPic) {
+        avatarDiv.innerHTML = `<img src="${peerPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'color:white;font-size:24px;font-weight:700;\\'>${(displayName || 'P').charAt(0).toUpperCase()}</span>'" />`;
+      } else {
+        const initial = (displayName || 'P').charAt(0).toUpperCase();
+        avatarDiv.innerHTML = `<span style="color:white;font-size:24px;font-weight:700;">${initial}</span>`;
+      }
+      container.appendChild(avatarDiv);
+    }
+
+    // Play audio from this peer
     const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.srcObject = stream;
@@ -451,12 +573,37 @@ class UnifiedCallManager {
     label.style.cssText = 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;';
     label.textContent = displayName || 'Participant';
     container.appendChild(label);
+  }
+
+  _addGroupPeerVideo(socketId, displayName, stream, profilePicture) {
+    // Store stream for re-renders and screen share
+    this.peerStreams.set(socketId, stream);
+    // Merge profile_picture into participants (may already exist from _createGroupPeerConnection)
+    const existing = this.participants.get(socketId) || {};
+    this.participants.set(socketId, { ...existing, username: displayName, profile_picture: profilePicture || existing.profile_picture || null });
+
+    // If this peer is screen sharing, re-attach updated stream to waScreenShareMain
+    if (this._remoteScreenSharePeer === socketId) {
+      this._attachStreamsToUI();
+    }
+
+    const grid = document.getElementById('waGroupVideoGrid');
+    if (!grid) return;
+
+    const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
+    const tileCSS = isScreenShareMode
+      ? 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;width:100px;height:75px;flex-shrink:0;'
+      : 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
+
+    this._addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS);
 
     const countEl = document.getElementById('waParticipantCount');
     if (countEl) countEl.textContent = `${this.peers.size + 1} participants`;
   }
 
   _removeGroupPeerVideo(socketId) {
+    this.peerStreams.delete(socketId);
+    this.participants.delete(socketId);
     const el = document.getElementById(`waGroupPeer-${socketId}`);
     if (el) el.remove();
     const countEl = document.getElementById('waParticipantCount');
@@ -546,7 +693,9 @@ class UnifiedCallManager {
         groupId,
         userId: user.id,
         displayName: user.username || user.fullname || 'User',
-        isVideo: this.isVideoCall
+        isVideo: this.isVideoCall,
+        profilePicture: user.profile_picture || null,
+        groupPicture: this.currentContactInfo?.profile_picture || null
       });
 
       this._logCallStart('group', groupId, this.isVideoCall);
@@ -570,7 +719,9 @@ class UnifiedCallManager {
       if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
       this.callState = 'idle';
     }
-    await this.startGroupCall(groupId, groupInfo || { username: 'Group Call' }, false);
+    // Respect current isVideoCall flag (set by group-call:ring), default to audio-only
+    const isAudioOnly = this.isVideoCall === true ? false : true;
+    await this.startGroupCall(groupId, groupInfo || { username: 'Group Call' }, isAudioOnly);
   }
 
   async acceptCall() {
@@ -665,6 +816,15 @@ class UnifiedCallManager {
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
 
+    // Notify peers that screen sharing stopped before ending
+    if (this.isSharingScreen) {
+      if (this.callMode === 'group' && this.currentGroupId) {
+        this.socket.emit('group-call:screen-share', { groupId: this.currentGroupId, sharing: false });
+      } else if (this.callMode === 'dm' && this.currentContactId) {
+        this.socket.emit('call:screen-share', { to: this.currentContactId, sharing: false });
+      }
+    }
+
     const status = reason || (this.callState === 'connected' ? 'completed' : (this.callState === 'ringing' && this.callDirection === 'outgoing' ? 'cancelled' : 'ended'));
 
     if (this.callMode === 'dm') {
@@ -727,6 +887,10 @@ class UnifiedCallManager {
     this._pendingTransferData = null;
     this._pendingGroupCallData = null;
     this._renderedScreenKey = null;
+    this._participantsHidden = false;
+    this._remoteScreenSharePeer = null;
+    this._originalIsVideoCall = false;
+    this.peerStreams.clear();
     if (this._streamRetryTimer) {
       clearTimeout(this._streamRetryTimer);
       this._streamRetryTimer = null;
@@ -777,10 +941,13 @@ class UnifiedCallManager {
       audioEl.play().catch(e => console.warn('[Call] Audio play blocked:', e.message));
 
       // If we received a video track and we're in voice mode, upgrade to video
-      if (event.track.kind === 'video' && !this.isVideoCall) {
-        console.log('[Call] Upgrading to video call — remote video track received');
-        this.isVideoCall = true;
-        this._renderedScreenKey = null; // Force DOM rebuild for video layout
+      // But if remote is screen sharing, don't rebuild to normal video — the screen share layout handles it
+      if (event.track.kind === 'video') {
+        if (!this.isVideoCall) {
+          console.log('[Call] Upgrading to video call — remote video track received');
+          this.isVideoCall = true;
+        }
+        this._renderedScreenKey = null;
         this.showActiveCallScreen();
         return;
       }
@@ -826,19 +993,29 @@ class UnifiedCallManager {
 
   // ===================== WEBRTC (GROUP MESH) =====================
 
-  _createGroupPeerConnection(socketId, userId, displayName, initiator) {
+  _createGroupPeerConnection(socketId, userId, displayName, initiator, profilePicture) {
     const pc = new RTCPeerConnection(this.iceConfig);
 
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => pc.addTrack(track, this.localStream));
     }
 
-    // Save display name for re-renders
-    this.participants.set(socketId, { displayName: displayName || 'Participant', userId });
+    // Save display name and profile picture for re-renders
+    this.participants.set(socketId, { username: displayName || 'Participant', userId, profile_picture: profilePicture || null });
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0] || new MediaStream([event.track]);
-      this._addGroupPeerVideo(socketId, displayName, stream);
+      // Merge new track into existing stream to preserve live srcObject references
+      let stream;
+      const existingStream = this.peerStreams.get(socketId);
+      if (existingStream) {
+        if (!existingStream.getTrackById(event.track.id)) {
+          existingStream.addTrack(event.track);
+        }
+        stream = existingStream;
+      } else {
+        stream = event.streams[0] || new MediaStream([event.track]);
+      }
+      this._addGroupPeerVideo(socketId, displayName, stream, profilePicture);
     };
 
     pc.onicecandidate = (event) => {
@@ -848,6 +1025,23 @@ class UnifiedCallManager {
           to: socketId,
           payload: { candidate: event.candidate }
         });
+      }
+    };
+
+    // Renegotiation for mid-call changes (screen share, add video)
+    pc.onnegotiationneeded = async () => {
+      if (pc.connectionState !== 'connected') return;
+      if (pc.signalingState !== 'stable') return;
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        this.socket.emit('group-call:signal', {
+          groupId: this.currentGroupId,
+          to: socketId,
+          payload: pc.localDescription
+        });
+      } catch (err) {
+        console.error('[GroupCall] Renegotiation error:', err);
       }
     };
 
@@ -884,7 +1078,16 @@ class UnifiedCallManager {
     const pc = this.peers.get(socketId);
     if (pc) { pc.close(); this.peers.delete(socketId); }
     this.participants.delete(socketId);
+    this.peerStreams.delete(socketId);
     this._removeGroupPeerVideo(socketId);
+
+    // If this peer was sharing screen, exit screen share mode
+    if (this._remoteScreenSharePeer === socketId) {
+      this._remoteScreenSharePeer = null;
+      this._participantsHidden = false;
+      this._renderedScreenKey = null;
+      if (this.callState === 'connected') this.showActiveCallScreen();
+    }
   }
 
   // ===================== SOCKET LISTENERS =====================
@@ -1085,13 +1288,13 @@ class UnifiedCallManager {
     socket.on('group-call:peers', (data) => {
       if (!data.peers) return;
       data.peers.forEach(peer => {
-        this._createGroupPeerConnection(peer.socketId, peer.userId, peer.displayName, true);
+        this._createGroupPeerConnection(peer.socketId, peer.userId, peer.displayName, true, peer.profilePicture);
       });
     });
 
     socket.on('group-call:peer-joined', (data) => {
       if (!data.peer) return;
-      this._createGroupPeerConnection(data.peer.socketId, data.peer.userId, data.peer.displayName, false);
+      this._createGroupPeerConnection(data.peer.socketId, data.peer.userId, data.peer.displayName, false, data.peer.profilePicture);
     });
 
     socket.on('group-call:signal', async (data) => {
@@ -1139,12 +1342,12 @@ class UnifiedCallManager {
       this.callState = 'ringing';
       this.isVideoCall = !!data.isVideo;
       this.currentGroupId = data.groupId;
-      this.currentContactInfo = { username: data.callerName || 'Group Call', profile_picture: null };
+      this.currentContactInfo = { username: data.callerName || 'Group Call', profile_picture: data.groupPicture || data.callerPicture || null };
       this._pendingGroupCallData = data;
       
       this.showIncomingCallScreen({
         username: `${data.callerName || 'Someone'} • Group Call`,
-        profile_picture: null
+        profile_picture: data.groupPicture || data.callerPicture || null
       });
       this.playIncomingRingtone();
       
@@ -1160,6 +1363,21 @@ class UnifiedCallManager {
 
     socket.on('group-call:ended', () => {
       this.hideOngoingCallBanner();
+    });
+
+    // Screen share signaling — remote user started/stopped sharing
+    socket.on('call:screen-share', (data) => {
+      this._remoteScreenSharePeer = data.sharing ? 'dm' : null;
+      this._participantsHidden = false;
+      this._renderedScreenKey = null;
+      if (this.callState === 'connected') this.showActiveCallScreen();
+    });
+
+    socket.on('group-call:screen-share', (data) => {
+      this._remoteScreenSharePeer = data.sharing ? data.from : null;
+      this._participantsHidden = false;
+      this._renderedScreenKey = null;
+      if (this.callState === 'connected') this.showActiveCallScreen();
     });
   }
 
@@ -1258,7 +1476,7 @@ class UnifiedCallManager {
         if (sender) {
           await sender.replaceTrack(screenTrack);
         } else {
-          this.peerConnection.addTrack(screenTrack, this.screenStream);
+          this.peerConnection.addTrack(screenTrack, this.localStream);
         }
       }
 
@@ -1267,14 +1485,23 @@ class UnifiedCallManager {
         if (sender) {
           sender.replaceTrack(screenTrack);
         } else {
-          pc.addTrack(screenTrack, this.screenStream);
+          pc.addTrack(screenTrack, this.localStream);
         }
       });
 
       this.isSharingScreen = true;
+      this._originalIsVideoCall = this.isVideoCall;
       if (!this.isVideoCall) this.isVideoCall = true;
-      this._renderedScreenKey = null; // Force DOM rebuild for screen share layout
+      this._participantsHidden = false;
+      this._renderedScreenKey = null;
       this.showActiveCallScreen();
+
+      // Signal to peers that screen sharing started
+      if (this.callMode === 'group' && this.currentGroupId) {
+        this.socket.emit('group-call:screen-share', { groupId: this.currentGroupId, sharing: true });
+      } else if (this.callMode === 'dm' && this.currentContactId) {
+        this.socket.emit('call:screen-share', { to: this.currentContactId, sharing: true });
+      }
 
       screenTrack.onended = () => this._stopScreenShare();
 
@@ -1288,24 +1515,39 @@ class UnifiedCallManager {
     if (!this.screenStream) return;
 
     this.screenStream.getVideoTracks().forEach(t => t.stop());
+    // Also stop any audio tracks from screen share
+    this.screenStream.getAudioTracks().forEach(t => t.stop());
 
     const cameraTrack = this.localStream?.getVideoTracks()[0];
 
-    if (this.peerConnection && cameraTrack) {
+    if (this.peerConnection) {
       const sender = this.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) sender.replaceTrack(cameraTrack);
+      if (sender) {
+        if (cameraTrack) { sender.replaceTrack(cameraTrack); }
+        else { this.peerConnection.removeTrack(sender); }
+      }
     }
     this.peers.forEach((pc) => {
-      if (cameraTrack) {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) sender.replaceTrack(cameraTrack);
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) {
+        if (cameraTrack) { sender.replaceTrack(cameraTrack); }
+        else { pc.removeTrack(sender); }
       }
     });
 
     this.screenStream = null;
     this.isSharingScreen = false;
-    this._renderedScreenKey = null; // Force DOM rebuild back to camera
+    this.isVideoCall = this._originalIsVideoCall;
+    this._participantsHidden = false;
+    this._renderedScreenKey = null;
     this.showActiveCallScreen();
+
+    // Signal to peers that screen sharing stopped
+    if (this.callMode === 'group' && this.currentGroupId) {
+      this.socket.emit('group-call:screen-share', { groupId: this.currentGroupId, sharing: false });
+    } else if (this.callMode === 'dm' && this.currentContactId) {
+      this.socket.emit('call:screen-share', { to: this.currentContactId, sharing: false });
+    }
 
     if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Screen sharing stopped', 'success');
   }
@@ -1584,3 +1826,34 @@ const DMEncryption = {
 const callManager = new UnifiedCallManager();
 window.callManager = callManager;
 window.DMEncryption = DMEncryption;
+
+// Auto-init: detect socket and connect call manager on any page
+(function _autoInitCallManager() {
+  if (callManager._autoInitDone) return;
+  function tryInit() {
+    if (callManager._autoInitDone) return;
+    if (typeof InnovateAPI === 'undefined' || typeof InnovateAPI.getSocket !== 'function') return;
+    const socket = InnovateAPI.getSocket();
+    if (!socket) return;
+    callManager._autoInitDone = true;
+    // Ensure waCallModal div exists
+    if (!document.getElementById('waCallModal')) {
+      const div = document.createElement('div');
+      div.id = 'waCallModal';
+      div.style.display = 'none';
+      document.body.appendChild(div);
+    }
+    // Only setup if not already done (messages.html calls setupSocketListeners manually)
+    if (!callManager.socket) {
+      callManager.setupSocketListeners(socket);
+    }
+  }
+  // Try immediately, then retry a few times for pages where socket connects later
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { tryInit(); setTimeout(tryInit, 1000); setTimeout(tryInit, 3000); });
+  } else {
+    tryInit();
+    setTimeout(tryInit, 1000);
+    setTimeout(tryInit, 3000);
+  }
+})();

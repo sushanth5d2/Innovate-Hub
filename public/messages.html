@@ -1254,7 +1254,7 @@
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/unified-call-manager.js?v=20260310b"></script>
+  <script src="/js/unified-call-manager.js?v=20260310f"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -5938,7 +5938,9 @@
 
     function _getGroupInfo() {
       const name = document.getElementById('chatUsername')?.textContent || 'Group Call';
-      return { username: name, profile_picture: null };
+      const avatarEl = document.getElementById('chatAvatar');
+      const pic = (avatarEl && avatarEl.src && !avatarEl.src.includes('default-avatar')) ? avatarEl.src : null;
+      return { username: name, profile_picture: pic };
     }
 
     async function startVoiceCall() {

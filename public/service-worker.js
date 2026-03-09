@@ -1,4 +1,4 @@
-const CACHE_NAME = 'innovate-v20260310b';
+const CACHE_NAME = 'innovate-v20260310g';
 const urlsToCache = [
   '/',
   '/home',
@@ -46,42 +46,36 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   const requestUrl = event.request.url;
   
-  // Never cache API calls, Socket.IO, JS files, or POST/PUT/DELETE requests
+  // Never cache API calls, Socket.IO, or non-GET requests
   if (
+    event.request.method !== 'GET' ||
     requestUrl.includes('/api/') ||
-    requestUrl.includes('/socket.io/') ||
-    requestUrl.includes('/js/') ||
-    event.request.method !== 'GET'
+    requestUrl.includes('/socket.io/')
   ) {
     event.respondWith(fetch(event.request));
     return;
   }
 
+  // JS files — always fetch fresh, bypass browser HTTP cache
+  if (requestUrl.includes('/js/')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
+  // HTML and other assets — network-first with cache fallback
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        return fetch(event.request).then(
-          response => {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        );
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request);
       })
   );
 });
@@ -98,7 +92,7 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
