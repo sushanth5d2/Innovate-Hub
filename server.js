@@ -149,6 +149,7 @@ app.use('/api/groups', require('./routes/groups'));
 app.use('/api/ai-chat', require('./routes/ai-chat'));
 app.use('/api/portfolio', require('./routes/portfolio'));
 app.use('/api/shared', require('./routes/shared-tasks-notes'));
+app.use('/api/calls', require('./routes/calls'));
 app.use('/api', require('./routes/community-groups'));
 
 // Link preview endpoint (SSRF-protected)
@@ -494,6 +495,25 @@ io.on('connection', (socket) => {
     io.to(`user_${to}`).emit('call:ended');
   });
 
+  // Renegotiation (mid-call track changes: screen share, add video to voice call)
+  socket.on('call:renegotiate', (data) => {
+    const { to, offer } = data;
+    io.to(`user_${to}`).emit('call:renegotiate', { offer });
+  });
+
+  socket.on('call:renegotiate-answer', (data) => {
+    const { to, answer } = data;
+    io.to(`user_${to}`).emit('call:renegotiate-answer', { answer });
+  });
+
+  // Multi-device: call answered on one device → dismiss on others
+  socket.on('call:answered-on-device', (data) => {
+    const { userId } = data;
+    // Emit to all sockets of this user EXCEPT the current one
+    const room = `user_${userId}`;
+    socket.to(room).emit('call:answered-elsewhere');
+  });
+
   // Add member to active call signaling
   socket.on('call:add-member-offer', (data) => {
     const { to, offer, userId, username, profile_picture } = data;
@@ -547,6 +567,10 @@ io.on('connection', (socket) => {
         groupId,
         peer: { socketId: socket.id, userId, displayName }
       });
+
+      // Broadcast to the group chat room so non-participants see an ongoing call banner
+      const participantCount = roomSockets ? roomSockets.size : 1;
+      io.to(`group_${groupId}`).emit('group-call:started', { groupId, participantCount });
     } catch (e) {
       console.error('group-call:join error', e);
     }
@@ -570,6 +594,15 @@ io.on('connection', (socket) => {
       socket.leave(room);
       groupCallPresence.delete(socket.id);
       socket.to(room).emit('group-call:peer-left', { groupId, socketId: socket.id });
+
+      // If room is now empty, broadcast that the call ended
+      const roomSockets = io.sockets.adapter.rooms.get(room);
+      if (!roomSockets || roomSockets.size === 0) {
+        io.to(`group_${groupId}`).emit('group-call:ended', { groupId });
+      } else {
+        // Update participant count
+        io.to(`group_${groupId}`).emit('group-call:started', { groupId, participantCount: roomSockets.size });
+      }
     } catch (e) {
       console.error('group-call:leave error', e);
     }

@@ -4,7 +4,7 @@
  */
 
 // Global instances
-let groupCallManager = null;
+let groupCallManager = null; // Legacy alias — now uses unified callManager
 let todoBoard = null;
 let notesEditor = null;
 let socket = null;
@@ -110,8 +110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Socket.IO
   socket = InnovateAPI.getSocket();
   
-  // Initialize managers
-  groupCallManager = new GroupCallManager(currentGroupId, socket);
+  // Initialize managers — use unified callManager from unified-call-manager.js
+  if (window.callManager) {
+    window.callManager.setupSocketListeners(socket);
+    groupCallManager = window.callManager;
+  }
   todoBoard = new TodoBoard(currentGroupId);
   notesEditor = new NotesEditor(currentGroupId, socket);
 
@@ -292,13 +295,13 @@ function setupEventListeners() {
 
   if (videoCallBtn) {
     videoCallBtn.addEventListener('click', () => {
-      groupCallManager.startCall(false); // video call
+      if (window.callManager) window.callManager.startGroupCall(currentGroupId, { username: document.getElementById('group-name')?.textContent || 'Group' }, false);
     });
   }
 
   if (audioCallBtn) {
     audioCallBtn.addEventListener('click', () => {
-      groupCallManager.startCall(true); // audio-only call
+      if (window.callManager) window.callManager.startGroupCall(currentGroupId, { username: document.getElementById('group-name')?.textContent || 'Group' }, true);
     });
   }
 
@@ -309,19 +312,19 @@ function setupEventListeners() {
   const endCall = document.getElementById('end-call');
 
   if (toggleMic) {
-    toggleMic.addEventListener('click', () => groupCallManager.toggleMic());
+    toggleMic.addEventListener('click', () => { if (window.callManager) window.callManager.toggleMute(); });
   }
 
   if (toggleCamera) {
-    toggleCamera.addEventListener('click', () => groupCallManager.toggleCamera());
+    toggleCamera.addEventListener('click', () => { if (window.callManager) window.callManager.toggleVideo(); });
   }
 
   if (shareScreen) {
-    shareScreen.addEventListener('click', () => groupCallManager.shareScreen());
+    shareScreen.addEventListener('click', () => { if (window.callManager) window.callManager.toggleScreenShare(); });
   }
 
   if (endCall) {
-    endCall.addEventListener('click', () => groupCallManager.endCall());
+    endCall.addEventListener('click', () => { if (window.callManager) window.callManager.endCall(); });
   }
 
   // To-Do create button

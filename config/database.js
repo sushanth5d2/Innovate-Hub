@@ -2184,6 +2184,40 @@ const migrateDatabase = () => {
       }
     });
 
+    // Call history table
+    db.run(`CREATE TABLE IF NOT EXISTS call_history (
+      id SERIAL PRIMARY KEY,
+      caller_id INTEGER NOT NULL,
+      call_type TEXT NOT NULL DEFAULT 'dm',
+      target_id INTEGER NOT NULL,
+      is_video BOOLEAN DEFAULT 0,
+      status TEXT DEFAULT 'initiated',
+      started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      answered_at TIMESTAMPTZ,
+      ended_at TIMESTAMPTZ,
+      duration INTEGER DEFAULT 0,
+      FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: call_history table - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Call participants table (for group calls)
+    db.run(`CREATE TABLE IF NOT EXISTS call_participants (
+      id SERIAL PRIMARY KEY,
+      call_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      left_at TIMESTAMPTZ,
+      FOREIGN KEY (call_id) REFERENCES call_history(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: call_participants table - ', err ? err.message : 'ok');
+      }
+    });
+
   });
 };
 

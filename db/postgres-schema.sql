@@ -965,3 +965,29 @@ CREATE TABLE IF NOT EXISTS users (
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       , date_of_birth DATE, fullname TEXT, is_private BOOLEAN DEFAULT FALSE);
 
+-- Table: call_history
+CREATE TABLE IF NOT EXISTS call_history (
+        id BIGSERIAL PRIMARY KEY,
+        caller_id INTEGER NOT NULL,
+        call_type TEXT NOT NULL DEFAULT 'dm',
+        target_id INTEGER NOT NULL,
+        is_video BOOLEAN DEFAULT FALSE,
+        status TEXT DEFAULT 'initiated',
+        started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        answered_at TIMESTAMPTZ,
+        ended_at TIMESTAMPTZ,
+        duration INTEGER DEFAULT 0,
+        FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+-- Table: call_participants
+CREATE TABLE IF NOT EXISTS call_participants (
+        id BIGSERIAL PRIMARY KEY,
+        call_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        left_at TIMESTAMPTZ,
+        FOREIGN KEY (call_id) REFERENCES call_history(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+

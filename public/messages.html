@@ -1254,7 +1254,7 @@
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/call-manager.js"></script>
+  <script src="/js/unified-call-manager.js?v=20250629"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -1327,6 +1327,13 @@
       }
     }
 
+    function _fmtCallDur(seconds) {
+      if (!seconds || seconds <= 0) return '';
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`;
+    }
+
     // Format message preview based on type
     function formatMessagePreview(message, type, filename) {
       if (!message) return 'Start a conversation';
@@ -1356,6 +1363,18 @@
             return `✓ ${todo.title || 'Todo list'}`;
           } catch {
             return '✓ Todo list';
+          }
+        case 'call':
+          try {
+            const cd = JSON.parse(message);
+            const callIcon = cd.is_video ? '📹' : '📞';
+            if (cd.status === 'completed') return `${callIcon} Call • ${cd.duration ? _fmtCallDur(cd.duration) : ''}`;
+            if (cd.status === 'missed') return `${callIcon} Missed call`;
+            if (cd.status === 'declined') return `${callIcon} Declined call`;
+            if (cd.status === 'no_answer') return `${callIcon} No answer`;
+            return `${callIcon} Call`;
+          } catch {
+            return '📞 Call';
           }
         default:
           // Show clean preview for special messages
@@ -1922,6 +1941,31 @@
               messageEl.innerHTML = html;
             } catch (_) {
               messageEl.textContent = msg.content || '';
+            }
+          } else if (msg.type === 'call') {
+            // System message — call details shown centered like WhatsApp
+            messageEl.className = 'ig-message-system';
+            messageEl.style.cssText = 'text-align:center;margin:8px auto;max-width:280px;';
+            try {
+              const cd = JSON.parse(msg.content || '{}');
+              const callIcon = cd.is_video ? '📹' : '📞';
+              const isCaller = cd.caller_id == user.id;
+              let statusText = '';
+              if (cd.status === 'completed') statusText = `Call ended • ${_fmtCallDur(cd.duration)}`;
+              else if (cd.status === 'missed') statusText = isCaller ? 'No answer' : 'Missed call';
+              else if (cd.status === 'declined') statusText = 'Call declined';
+              else if (cd.status === 'no_answer') statusText = 'No answer';
+              else if (cd.status === 'cancelled') statusText = 'Call cancelled';
+              else statusText = 'Call';
+              const isMissed = cd.status === 'missed' || cd.status === 'no_answer' || cd.status === 'declined';
+              messageEl.innerHTML = `
+                <div style="display:inline-flex;align-items:center;gap:8px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:${isMissed ? '#ff3b30' : 'var(--ig-secondary-text)'};">
+                  <span style="font-size:16px;">${callIcon}</span>
+                  <span>${statusText}</span>
+                  <span style="font-size:11px;opacity:0.7;">${new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+                </div>`;
+            } catch (_) {
+              messageEl.innerHTML = '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--ig-secondary-text);">📞 Call</div>';
             }
           } else if (msg.type === 'file' || msg.type === 'video' || msg.type === 'document') {
             const fileName = msg.original_filename || (msg.content || '').split('/').pop();
@@ -4080,6 +4124,13 @@
           const wrapper = messageEl.parentElement;
           if (wrapper) wrapper.remove();
         }
+        loadMessages(currentContactId);
+      }
+    });
+
+    // Call system message — refresh chat to show call details in conversation
+    socket.on('call:system-message', (data) => {
+      if (currentContactId) {
         loadMessages(currentContactId);
       }
     });
