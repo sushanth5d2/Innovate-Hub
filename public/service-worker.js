@@ -1,4 +1,4 @@
-const CACHE_NAME = 'innovate-v20260310a';
+const CACHE_NAME = 'innovate-v20260310b';
 const urlsToCache = [
   '/',
   '/home',

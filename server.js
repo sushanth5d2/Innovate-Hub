@@ -461,14 +461,16 @@ io.on('connection', (socket) => {
 
   // WebRTC Call Signaling
   socket.on('call:initiate', (data) => {
-    const { to, from, offer, isVideo, caller } = data;
-    console.log(`Call initiated from ${from} to ${to}, video: ${isVideo}`);
+    const { to, from, offer, isVideo, caller, isGroupAdd, groupId } = data;
+    console.log(`Call initiated from ${from} to ${to}, video: ${isVideo}, groupAdd: ${!!isGroupAdd}`);
     console.log(`Emitting to room: user_${to}`);
     io.to(`user_${to}`).emit('call:incoming', {
       from,
       offer,
       isVideo,
-      caller
+      caller,
+      isGroupAdd: !!isGroupAdd,
+      groupId: groupId || null
     });
   });
 
@@ -540,12 +542,12 @@ io.on('connection', (socket) => {
   // Client joins a group call room to exchange offers/answers/ICE.
   socket.on('group-call:join', (data) => {
     try {
-      const { groupId, userId, displayName } = data || {};
+      const { groupId, userId, displayName, isVideo } = data || {};
       if (!groupId) return;
 
       const room = `group_call_${groupId}`;
       socket.join(room);
-      groupCallPresence.set(socket.id, { groupId: String(groupId), userId, displayName });
+      groupCallPresence.set(socket.id, { groupId: String(groupId), userId, displayName, isVideo });
 
       // List current peers in the room (excluding this socket)
       const peers = [];
@@ -568,8 +570,22 @@ io.on('connection', (socket) => {
         peer: { socketId: socket.id, userId, displayName }
       });
 
-      // Broadcast to the group chat room so non-participants see an ongoing call banner
+      // Broadcast to all group members via the chat room
       const participantCount = roomSockets ? roomSockets.size : 1;
+      
+      // If this is the first person joining (starting the call), ring all group members
+      if (participantCount <= 1) {
+        // Send incoming group call notification to everyone in the group chat room
+        socket.to(`group_${groupId}`).emit('group-call:ring', {
+          groupId,
+          callerId: userId,
+          callerName: displayName,
+          isVideo: !!isVideo,
+          participantCount
+        });
+      }
+      
+      // Also broadcast the started event for banners
       io.to(`group_${groupId}`).emit('group-call:started', { groupId, participantCount });
     } catch (e) {
       console.error('group-call:join error', e);

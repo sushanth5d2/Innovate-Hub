@@ -148,7 +148,6 @@ class UnifiedCallManager {
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'waCallModal';
-      modal.style.cssText = 'position:relative;z-index:99999;';
       document.body.appendChild(modal);
     }
     return modal;
@@ -381,8 +380,8 @@ class UnifiedCallManager {
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'waOngoingCallBanner';
-      banner.style.cssText = 'background:#34c759;color:white;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:500;cursor:pointer;';
-      const chatHeader = document.querySelector('.wa-chat-header');
+      banner.style.cssText = 'background:#34c759;color:white;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:500;cursor:pointer;position:fixed;top:60px;left:0;right:0;z-index:9999;';
+      const chatHeader = document.querySelector('.ig-chat-header') || document.querySelector('.wa-chat-header');
       if (chatHeader) chatHeader.after(banner);
       else document.body.prepend(banner);
     }
@@ -524,7 +523,7 @@ class UnifiedCallManager {
   }
 
   async startGroupCall(groupId, groupInfo, isAudioOnly) {
-    if (this.callState !== 'idle') {
+    if (this.callState !== 'idle' && this.callState !== 'connecting') {
       if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Already in a call', 'error');
       return;
     }
@@ -546,7 +545,8 @@ class UnifiedCallManager {
       this.socket.emit('group-call:join', {
         groupId,
         userId: user.id,
-        displayName: user.username || user.fullname || 'User'
+        displayName: user.username || user.fullname || 'User',
+        isVideo: this.isVideoCall
       });
 
       this._logCallStart('group', groupId, this.isVideoCall);
@@ -562,16 +562,34 @@ class UnifiedCallManager {
     }
   }
 
-  async joinGroupCall(groupId) {
-    await this.startGroupCall(groupId, { username: 'Group Call' }, false);
+  async joinGroupCall(groupId, groupInfo) {
+    this.hideOngoingCallBanner();
+    // Reset state if we were in ringing from group-call:ring
+    if (this.callState === 'ringing') {
+      this.stopAllSounds();
+      if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+      this.callState = 'idle';
+    }
+    await this.startGroupCall(groupId, groupInfo || { username: 'Group Call' }, false);
   }
 
   async acceptCall() {
     if (this.callState !== 'ringing' || this.callDirection !== 'incoming') return;
 
     this.stopAllSounds();
+    if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
     this.callState = 'connecting';
 
+    // Group call acceptance — join the mesh
+    if (this.callMode === 'group' && this._pendingGroupCallData) {
+      const groupId = this._pendingGroupCallData.groupId;
+      this._pendingGroupCallData = null;
+      this.hideOngoingCallBanner();
+      await this.startGroupCall(groupId, this.currentContactInfo, !this.isVideoCall);
+      return;
+    }
+
+    // DM call acceptance
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -624,6 +642,16 @@ class UnifiedCallManager {
     if (this.callState !== 'ringing' || this.callDirection !== 'incoming') return;
 
     this.stopAllSounds();
+    if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+    
+    if (this.callMode === 'group') {
+      // Just dismiss the incoming group call screen — don't signal rejection
+      this.showCallEndedScreen('Call declined');
+      this.playCallEndTone();
+      this.cleanup();
+      return;
+    }
+    
     this.socket.emit('call:reject', { to: this.currentContactId });
     this.showCallEndedScreen('Call declined');
     this.playCallEndTone();
@@ -697,6 +725,7 @@ class UnifiedCallManager {
     this.callStartTime = null;
     this._pendingOffer = null;
     this._pendingTransferData = null;
+    this._pendingGroupCallData = null;
     this._renderedScreenKey = null;
     if (this._streamRetryTimer) {
       clearTimeout(this._streamRetryTimer);
@@ -870,6 +899,34 @@ class UnifiedCallManager {
         return;
       }
 
+      // If this is a group add invitation (no WebRTC offer, just an invite to join group call)
+      if (data.isGroupAdd && data.groupId) {
+        this.callMode = 'group';
+        this.callDirection = 'incoming';
+        this.callState = 'ringing';
+        this.isVideoCall = data.isVideo;
+        this.currentGroupId = data.groupId;
+        this.currentContactInfo = { username: data.caller?.username || 'Group Call', profile_picture: data.caller?.profile_picture };
+        this._pendingGroupCallData = { groupId: data.groupId, isVideo: data.isVideo };
+
+        this.showIncomingCallScreen({
+          username: `${data.caller?.username || 'Someone'} invites you to a call`,
+          profile_picture: data.caller?.profile_picture
+        });
+        this.playIncomingRingtone();
+
+        this.ringTimeout = setTimeout(() => {
+          if (this.callState === 'ringing') {
+            this.stopAllSounds();
+            this.showCallEndedScreen('Missed call');
+            this.cleanup();
+          }
+        }, 45000);
+        return;
+      }
+
+      // If this is a DM add-to-call with an offer, treat it as a normal incoming call
+      // but mark it as an add (they'll join an existing DM peer for audio/video)
       this.callMode = 'dm';
       this.callDirection = 'incoming';
       this.callState = 'ringing';
@@ -880,6 +937,14 @@ class UnifiedCallManager {
 
       this.showIncomingCallScreen(data.caller);
       this.playIncomingRingtone();
+
+      this.ringTimeout = setTimeout(() => {
+        if (this.callState === 'ringing') {
+          this.stopAllSounds();
+          this.showCallEndedScreen('Missed call');
+          this.cleanup();
+        }
+      }, 45000);
     });
 
     // DM: call answered by remote
@@ -1063,6 +1128,34 @@ class UnifiedCallManager {
       if (this.callState === 'idle' && data.groupId) {
         this.showOngoingCallBanner(data.groupId, data.participantCount || 1);
       }
+    });
+
+    // Group call ring — someone started a group call, show incoming call screen
+    socket.on('group-call:ring', (data) => {
+      if (this.callState !== 'idle') return;
+      
+      this.callMode = 'group';
+      this.callDirection = 'incoming';
+      this.callState = 'ringing';
+      this.isVideoCall = !!data.isVideo;
+      this.currentGroupId = data.groupId;
+      this.currentContactInfo = { username: data.callerName || 'Group Call', profile_picture: null };
+      this._pendingGroupCallData = data;
+      
+      this.showIncomingCallScreen({
+        username: `${data.callerName || 'Someone'} • Group Call`,
+        profile_picture: null
+      });
+      this.playIncomingRingtone();
+      
+      // Auto-dismiss after 45 seconds
+      this.ringTimeout = setTimeout(() => {
+        if (this.callState === 'ringing' && this.callMode === 'group') {
+          this.stopAllSounds();
+          this.showCallEndedScreen('Missed group call');
+          this.cleanup();
+        }
+      }, 45000);
     });
 
     socket.on('group-call:ended', () => {
@@ -1252,13 +1345,13 @@ class UnifiedCallManager {
       const existing = document.getElementById('waAddMemberModal');
       if (existing) existing.remove();
 
-      // Create modal OUTSIDE the call modal at highest z-index
+      // Create modal inside the call modal so it shares the same stacking context
       const addModal = document.createElement('div');
       addModal.id = 'waAddMemberModal';
-      addModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:200001;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;';
+      addModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:100001;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end;justify-content:center;';
       addModal.onclick = (e) => { if (e.target === addModal) addModal.remove(); };
       addModal.innerHTML = `
-        <div style="background:#1a1a2e;border-radius:16px 16px 0 0;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;position:relative;z-index:200002;">
+        <div style="background:#1a1a2e;border-radius:16px 16px 0 0;width:100%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;position:relative;z-index:100002;">
           <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;">
             <h3 style="margin:0;color:#fff;font-size:17px;">Add to Call</h3>
             <button onclick="document.getElementById('waAddMemberModal').remove()" style="background:none;border:none;color:#a8a8a8;font-size:24px;cursor:pointer;line-height:1;">✕</button>
@@ -1273,7 +1366,9 @@ class UnifiedCallManager {
             ${this._renderContactList(contacts)}
           </div>
         </div>`;
-      document.body.appendChild(addModal);
+      // Append inside the call modal overlay for proper stacking
+      const callModal = this._getModal();
+      callModal.appendChild(addModal);
 
       // Wire up search with proper event listener
       const searchInput = document.getElementById('waAddMemberSearch');
@@ -1322,6 +1417,23 @@ class UnifiedCallManager {
     const user = InnovateAPI.getCurrentUser();
 
     try {
+      // For group calls, invite the member to join the existing group call
+      if (this.callMode === 'group' && this.currentGroupId) {
+        // Emit a ring to the specific user for the group call
+        this.socket.emit('call:initiate', {
+          to: contactId,
+          from: user.id,
+          offer: null,
+          isVideo: this.isVideoCall,
+          caller: { username: user.username, profile_picture: user.profile_picture },
+          isGroupAdd: true,
+          groupId: this.currentGroupId
+        });
+        if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert(`Calling ${username}...`, 'info');
+        return;
+      }
+
+      // For DM calls, create a separate peer connection to the new member
       const pc = new RTCPeerConnection(this.iceConfig);
 
       if (this.localStream) {
@@ -1329,11 +1441,22 @@ class UnifiedCallManager {
       }
 
       pc.ontrack = (event) => {
+        const stream = event.streams[0] || new MediaStream([event.track]);
+        // Play audio from added member
         const audio = document.createElement('audio');
         audio.autoplay = true;
-        audio.srcObject = event.streams[0];
+        audio.srcObject = stream;
         audio.id = `waAddedMemberAudio-${contactId}`;
         document.body.appendChild(audio);
+        
+        // If video track, show it
+        if (event.track.kind === 'video') {
+          const remoteVid = document.getElementById('waRemoteVideo');
+          if (remoteVid) {
+            remoteVid.srcObject = stream;
+            remoteVid.play().catch(() => {});
+          }
+        }
       };
 
       pc.onicecandidate = (event) => {

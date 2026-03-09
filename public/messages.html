@@ -1254,7 +1254,7 @@
   <script src="/js/app.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/unified-call-manager.js?v=20260310a"></script>
+  <script src="/js/unified-call-manager.js?v=20260310b"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -2541,6 +2541,31 @@
             voiceDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
             voiceDiv.innerHTML = `<audio controls style="max-width: 200px;"><source src="${grpMsgText}"></audio>`;
             messageEl.appendChild(voiceDiv);
+          } else if (msgType === 'call') {
+            // System call message — centered like WhatsApp
+            messageEl.className = 'ig-message-system';
+            messageEl.style.cssText = 'text-align:center;margin:8px auto;max-width:280px;';
+            try {
+              const cd = JSON.parse(grpMsgText || '{}');
+              const callIcon = cd.is_video ? '📹' : '📞';
+              const isCaller = cd.caller_id == user.id;
+              let statusText = '';
+              if (cd.status === 'completed') statusText = `Call ended • ${_fmtCallDur(cd.duration)}`;
+              else if (cd.status === 'missed') statusText = isCaller ? 'No answer' : 'Missed call';
+              else if (cd.status === 'declined') statusText = 'Call declined';
+              else if (cd.status === 'no_answer') statusText = 'No answer';
+              else if (cd.status === 'cancelled') statusText = 'Call cancelled';
+              else statusText = 'Call';
+              const isMissed = cd.status === 'missed' || cd.status === 'no_answer' || cd.status === 'declined';
+              messageEl.innerHTML = `
+                <div style="display:inline-flex;align-items:center;gap:8px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:${isMissed ? '#ff3b30' : 'var(--ig-secondary-text)'};">
+                  <span style="font-size:16px;">${callIcon}</span>
+                  <span>${statusText}</span>
+                  <span style="font-size:11px;opacity:0.7;">${formatMessageTime(msg.created_at)}</span>
+                </div>`;
+            } catch (_) {
+              messageEl.innerHTML = '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--ig-secondary-text);">📞 Call</div>';
+            }
           } else {
             messageEl.className = isSent ? 'ig-message ig-message-sent' : 'ig-message ig-message-received';
             const textDiv = document.createElement('div');
@@ -4046,6 +4071,31 @@
           voiceDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
           voiceDiv.innerHTML = `<audio controls style="max-width: 200px;"><source src="${grpMsgText}"></audio>`;
           messageEl.appendChild(voiceDiv);
+        } else if (msgType === 'call') {
+          // System call message — render centered
+          messageEl.className = 'ig-message-system';
+          messageEl.style.cssText = 'text-align:center;margin:8px auto;max-width:280px;';
+          try {
+            const cd = JSON.parse(grpMsgText || '{}');
+            const callIcon = cd.is_video ? '📹' : '📞';
+            const isCaller = cd.caller_id == user.id;
+            let statusText = '';
+            if (cd.status === 'completed') statusText = `Call ended • ${_fmtCallDur(cd.duration)}`;
+            else if (cd.status === 'missed') statusText = isCaller ? 'No answer' : 'Missed call';
+            else if (cd.status === 'declined') statusText = 'Call declined';
+            else if (cd.status === 'no_answer') statusText = 'No answer';
+            else if (cd.status === 'cancelled') statusText = 'Call cancelled';
+            else statusText = 'Call';
+            const isMissed = cd.status === 'missed' || cd.status === 'no_answer' || cd.status === 'declined';
+            messageEl.innerHTML = `
+              <div style="display:inline-flex;align-items:center;gap:8px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:${isMissed ? '#ff3b30' : 'var(--ig-secondary-text)'};">
+                <span style="font-size:16px;">${callIcon}</span>
+                <span>${statusText}</span>
+                <span style="font-size:11px;opacity:0.7;">${formatMessageTime(message.created_at || new Date().toISOString())}</span>
+              </div>`;
+          } catch (_) {
+            messageEl.innerHTML = '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--ig-secondary-background);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--ig-secondary-text);">📞 Call</div>';
+          }
         } else {
           messageEl.className = 'ig-message ig-message-received';
           const textDiv = document.createElement('div');
@@ -4132,6 +4182,21 @@
     socket.on('call:system-message', (data) => {
       if (currentContactId) {
         loadMessages(currentContactId);
+      } else if (currentGroupId) {
+        loadGroupMessages(currentGroupId);
+      }
+    });
+
+    // Group call started — show incoming group call banner/notification
+    socket.on('group-call:started', (data) => {
+      if (data && data.groupId && callManager.callState === 'idle') {
+        callManager.showOngoingCallBanner(data.groupId, data.participantCount || 1);
+      }
+    });
+
+    socket.on('group-call:ended', (data) => {
+      if (callManager && typeof callManager.hideOngoingCallBanner === 'function') {
+        callManager.hideOngoingCallBanner();
       }
     });
 
