@@ -23,9 +23,11 @@ function getGeminiClient() {
 // ===================== Local AI Auto-Detection =====================
 // Automatically detect local AI services — no env config needed
 
-// Ollama (localhost:11434)
+// Ollama (supports multiple instances via OLLAMA_BASE_URLS)
 let ollamaAutoDetected = false;
 let ollamaAvailableModels = [];
+// Maps model name -> base URL for multi-instance routing
+let ollamaModelUrlMap = {};
 
 // LM Studio (localhost:1234) - OpenAI-compatible
 let lmStudioDetected = false;
@@ -46,21 +48,56 @@ let koboldModels = [];
 // Pollinations AI (remote, free, no key needed)
 let pollinationsAvailable = true; // Assume available initially
 
+/**
+ * Parse all Ollama URLs from env. Supports:
+ *   OLLAMA_BASE_URLS=url1,url2,url3  (multiple instances)
+ *   OLLAMA_BASE_URL=url              (single instance, backwards compat)
+ */
+function getOllamaUrls() {
+  if (process.env.OLLAMA_BASE_URLS) {
+    return process.env.OLLAMA_BASE_URLS.split(',').map(u => u.trim()).filter(Boolean);
+  }
+  return [process.env.OLLAMA_BASE_URL || 'http://localhost:11434'];
+}
+
+/** Get the Ollama base URL that hosts a given model */
+function getOllamaUrlForModel(modelName) {
+  return ollamaModelUrlMap[modelName] || getOllamaUrls()[0];
+}
+
 async function detectOllama() {
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-  try {
-    const response = await axios.get(`${baseUrl}/api/tags`, { timeout: 3000 });
-    const models = response.data?.models || [];
-    if (models.length > 0) {
-      ollamaAutoDetected = true;
-      ollamaAvailableModels = models.map(m => m.name);
-      console.log(`[Ollama] Auto-detected with ${models.length} models: ${ollamaAvailableModels.join(', ')}`);
-      // Dynamically register any Ollama models not already in AI_MODELS
-      registerDynamicOllamaModels(ollamaAvailableModels);
+  const urls = getOllamaUrls();
+  let allModels = [];
+  ollamaModelUrlMap = {};
+
+  for (const baseUrl of urls) {
+    try {
+      const response = await axios.get(`${baseUrl}/api/tags`, { timeout: 5000 });
+      const models = response.data?.models || [];
+      if (models.length > 0) {
+        const names = models.map(m => m.name);
+        console.log(`[Ollama] ${baseUrl} → ${names.length} models: ${names.join(', ')}`);
+        for (const name of names) {
+          if (!ollamaModelUrlMap[name]) {
+            ollamaModelUrlMap[name] = baseUrl;
+          }
+        }
+        allModels.push(...names);
+      } else {
+        console.log(`[Ollama] ${baseUrl} → connected but no models`);
+      }
+    } catch {
+      console.log(`[Ollama] ${baseUrl} → unreachable`);
     }
-  } catch {
-    ollamaAutoDetected = false;
-    ollamaAvailableModels = [];
+  }
+
+  // Deduplicate model names
+  ollamaAvailableModels = [...new Set(allModels)];
+  ollamaAutoDetected = ollamaAvailableModels.length > 0;
+
+  if (ollamaAutoDetected) {
+    console.log(`[Ollama] Total: ${ollamaAvailableModels.length} unique models across ${urls.length} instance(s)`);
+    registerDynamicOllamaModels(ollamaAvailableModels);
   }
 }
 
@@ -1184,7 +1221,7 @@ const PROVIDER_CONFIGS = {
     })
   },
   ollama: {
-    baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    baseUrl: null, // Dynamic: uses getOllamaUrlForModel() for multi-instance routing
     headers: () => ({
       'Content-Type': 'application/json'
     })
@@ -2068,8 +2105,8 @@ async function callCohereWithPrompt(modelId, apiKey, messages, temperature, maxT
 }
 
 async function callOllamaWithPrompt(modelId, messages, temperature, maxTokens, systemPrompt) {
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   const modelName = modelId.replace('ollama/', '');
+  const baseUrl = getOllamaUrlForModel(modelName);
   const payload = {
     model: modelName,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
@@ -2382,9 +2419,9 @@ async function callHuggingFace(modelId, apiKey, messages, temperature, maxTokens
 }
 
 async function callOllama(modelId, messages, temperature, maxTokens) {
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
   // Extract model name: 'ollama/llama3.2' -> 'llama3.2'
   const modelName = modelId.replace('ollama/', '');
+  const baseUrl = getOllamaUrlForModel(modelName);
   
   const payload = {
     model: modelName,
