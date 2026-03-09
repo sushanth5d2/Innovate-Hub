@@ -736,6 +736,9 @@ class UnifiedCallManager {
       const groupId = this._pendingGroupCallData.groupId;
       this._pendingGroupCallData = null;
       this.hideOngoingCallBanner();
+      // Notify other devices of this user that call was answered here
+      const user = InnovateAPI.getCurrentUser();
+      this.socket.emit('call:answered-on-device', { userId: user.id, callFrom: groupId });
       await this.startGroupCall(groupId, this.currentContactInfo, !this.isVideoCall);
       return;
     }
@@ -1235,6 +1238,15 @@ class UnifiedCallManager {
       }
     });
 
+    // Multi-device: group call was answered on another device
+    socket.on('group-call:answered-elsewhere', () => {
+      if (this.callState === 'ringing' && this.callDirection === 'incoming' && this.callMode === 'group') {
+        this.stopAllSounds();
+        this.showCallEndedScreen('Answered on another device');
+        this.cleanup();
+      }
+    });
+
     // DM: add member signaling
     socket.on('call:add-member-offer', async (data) => {
       try {
@@ -1465,10 +1477,11 @@ class UnifiedCallManager {
     try {
       this.screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: 'always' },
-        audio: false
+        audio: true
       });
 
       const screenTrack = this.screenStream.getVideoTracks()[0];
+      const screenAudioTrack = this.screenStream.getAudioTracks()[0];
 
       // Replace or add video track in peer connection(s)
       if (this.peerConnection) {
@@ -1478,6 +1491,10 @@ class UnifiedCallManager {
         } else {
           this.peerConnection.addTrack(screenTrack, this.localStream);
         }
+        // Add screen audio as a separate track (does NOT replace mic audio)
+        if (screenAudioTrack) {
+          this.peerConnection.addTrack(screenAudioTrack, this.screenStream);
+        }
       }
 
       this.peers.forEach((pc) => {
@@ -1486,6 +1503,9 @@ class UnifiedCallManager {
           sender.replaceTrack(screenTrack);
         } else {
           pc.addTrack(screenTrack, this.localStream);
+        }
+        if (screenAudioTrack) {
+          pc.addTrack(screenAudioTrack, this.screenStream);
         }
       });
 
@@ -1514,27 +1534,40 @@ class UnifiedCallManager {
   _stopScreenShare() {
     if (!this.screenStream) return;
 
-    this.screenStream.getVideoTracks().forEach(t => t.stop());
-    // Also stop any audio tracks from screen share
-    this.screenStream.getAudioTracks().forEach(t => t.stop());
+    // Save references to screen audio tracks BEFORE stopping them
+    const screenAudioTracks = this.screenStream.getAudioTracks().slice();
 
     const cameraTrack = this.localStream?.getVideoTracks()[0];
 
+    // Remove screen audio senders and restore video senders BEFORE stopping tracks
     if (this.peerConnection) {
-      const sender = this.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        if (cameraTrack) { sender.replaceTrack(cameraTrack); }
-        else { this.peerConnection.removeTrack(sender); }
+      const videoSender = this.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+      if (videoSender) {
+        if (cameraTrack) { videoSender.replaceTrack(cameraTrack); }
+        else { this.peerConnection.removeTrack(videoSender); }
       }
+      // Remove screen audio sender (keep mic audio sender)
+      this.peerConnection.getSenders().forEach(s => {
+        if (s.track && screenAudioTracks.includes(s.track)) {
+          this.peerConnection.removeTrack(s);
+        }
+      });
     }
     this.peers.forEach((pc) => {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        if (cameraTrack) { sender.replaceTrack(cameraTrack); }
-        else { pc.removeTrack(sender); }
+      const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (videoSender) {
+        if (cameraTrack) { videoSender.replaceTrack(cameraTrack); }
+        else { pc.removeTrack(videoSender); }
       }
+      pc.getSenders().forEach(s => {
+        if (s.track && screenAudioTracks.includes(s.track)) {
+          pc.removeTrack(s);
+        }
+      });
     });
 
+    // Now stop and clean up screen stream
+    this.screenStream.getTracks().forEach(t => t.stop());
     this.screenStream = null;
     this.isSharingScreen = false;
     this.isVideoCall = this._originalIsVideoCall;
