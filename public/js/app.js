@@ -299,6 +299,35 @@
     return canvas.toDataURL();
   }
 
+  function initNavProfilePic() {
+    const user = getCurrentUser();
+    // Find profile nav item by ID or by SVG aria-label
+    let profileLink = document.getElementById('profileNavLink');
+    if (!profileLink) {
+      const nav = document.querySelector('.ig-bottom-nav');
+      if (nav) {
+        const items = nav.querySelectorAll('.ig-bottom-nav-item');
+        for (const item of items) {
+          const label = item.querySelector('.ig-bottom-nav-label');
+          if (label && label.textContent.trim() === 'Profile') {
+            profileLink = item;
+            break;
+          }
+        }
+      }
+    }
+    if (!profileLink) return;
+    const svg = profileLink.querySelector('svg');
+    if (!svg) return;
+    const pic = user && user.profile_picture ? user.profile_picture : '/images/default-avatar.svg';
+    const img = document.createElement('img');
+    img.src = pic;
+    img.alt = 'Profile';
+    img.className = 'ig-nav-profile-pic';
+    img.onerror = function() { this.src = '/images/default-avatar.svg'; };
+    svg.replaceWith(img);
+  }
+
   function initializePage() {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
@@ -307,6 +336,9 @@
         logout();
       });
     }
+
+    // Load profile picture into bottom nav Profile item
+    initNavProfilePic();
 
     const currentPage = window.location.pathname;
     document.querySelectorAll('.navbar-menu a').forEach((link) => {
@@ -412,6 +444,14 @@
     debounce,
     getUserAvatar,
     createAvatarWithInitials,
-    initializePage
+    initializePage,
+    initNavProfilePic
   };
+
+  // Auto-init: load profile pic into bottom nav on every page
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNavProfilePic);
+  } else {
+    initNavProfilePic();
+  }
 })();

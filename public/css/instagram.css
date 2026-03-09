@@ -299,12 +299,12 @@ body {
   justify-content: center;
   align-items: center;
   height: 100%;
-  gap: 4px;
+  gap: 2px;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 8px 0;
+  padding: 6px 0;
   border-radius: 16px;
   position: relative;
 }
@@ -320,8 +320,8 @@ body {
 }
 
 .ig-bottom-nav-item svg {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   stroke: currentColor;
   fill: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
@@ -334,6 +334,23 @@ body {
 
 .ig-bottom-nav-item.active svg {
   stroke-width: 2.5px;
+}
+
+/* Profile picture in nav */
+.ig-nav-profile-pic {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid transparent;
+}
+
+.ig-bottom-nav-item.active .ig-nav-profile-pic {
+  border-color: #fff;
+}
+
+:root[data-theme="light"] .ig-bottom-nav-item.active .ig-nav-profile-pic {
+  border-color: var(--ig-blue);
 }
 
 /* Light theme nav items */
@@ -355,9 +372,10 @@ body {
 }
 
 .ig-bottom-nav-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: -0.2px;
+  white-space: nowrap;
 }
 
 /* Light theme override for bottom nav */
@@ -374,27 +392,6 @@ body {
 /* Adjust body padding for messages page */
 .ig-messages-page {
   padding-bottom: 0 !important;
-}
-
-/* Responsive adjustments for small screens */
-@media (max-width: 480px) {
-  .ig-bottom-nav {
-    width: 95%;
-    max-width: 360px;
-    bottom: 12px;
-    height: 56px;
-    border-radius: 32px;
-    padding: 0 12px;
-  }
-  
-  .ig-bottom-nav-item svg {
-    width: 24px;
-    height: 24px;
-  }
-  
-  .ig-bottom-nav-label {
-    font-size: 9px;
-  }
 }
 
 /* === MAIN CONTENT === */
@@ -1516,18 +1513,44 @@ body {
     border-right: none;
   }
   
-  /* Responsive circular bottom nav */
+  /* Responsive scrollable bottom nav for mobile */
   .ig-bottom-nav {
-    width: 92%;
-    max-width: 380px;
-    bottom: 16px;
-    height: 60px;
-    border-radius: 35px;
+    width: 94%;
+    max-width: none;
+    bottom: 10px;
+    height: 56px;
+    border-radius: 28px;
+    padding: 0 6px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  
+  .ig-bottom-nav::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .ig-bottom-nav-item {
+    flex: 0 0 auto;
+    min-width: 56px;
+    padding: 6px 8px;
   }
   
   .ig-bottom-nav-item svg {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
+  }
+  
+  .ig-bottom-nav-label {
+    font-size: 9px;
+  }
+  
+  .ig-nav-profile-pic {
+    width: 22px;
+    height: 22px;
   }
   
   /* Mobile Messages Styling */
