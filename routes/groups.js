@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
 const upload = require('../middleware/upload');
 const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
+const disappearing = require('../services/disappearing-messages');
 
 router.use(authMiddleware);
 
@@ -346,16 +347,11 @@ router.post('/:groupId/messages', (req, res) => {
 
       // Look up group disappearing settings and auto-apply timer
       if (!expiresAt) {
-        db.get(
-          `SELECT mode, duration FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
-          [groupId],
-          (dsErr, dsSetting) => {
-            if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
-              expiresAt = new Date(Date.now() + dsSetting.duration * 1000).toISOString();
-            }
-            proceedWithInsert();
-          }
-        );
+        disappearing.getGroupSetting(groupId, (dsErr, dsSetting) => {
+          const expiry = disappearing.computeTimerExpiry(dsSetting);
+          if (expiry) expiresAt = expiry;
+          proceedWithInsert();
+        });
       } else {
         proceedWithInsert();
       }
@@ -434,17 +430,10 @@ router.post('/:groupId/messages/file', upload.single('file'), (req, res) => {
       }; // end doInsert
 
       // Look up disappearing settings for this group
-      db.get(
-        `SELECT mode, duration FROM group_disappearing_settings WHERE group_id = ?`,
-        [groupId],
-        (dsErr, dsSetting) => {
-          let expiresAt = null;
-          if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
-            expiresAt = new Date(Date.now() + dsSetting.duration * 1000).toISOString();
-          }
-          doInsert(expiresAt);
-        }
-      );
+      disappearing.getGroupSetting(groupId, (dsErr, dsSetting) => {
+        const expiresAt = disappearing.computeTimerExpiry(dsSetting);
+        doInsert(expiresAt);
+      });
     }
   );
 });
@@ -998,65 +987,39 @@ router.delete('/:groupId', (req, res) => {
 
 // Set disappearing messages for a group
 router.post('/:groupId/disappearing', (req, res) => {
-  const db = getDb();
   const userId = req.user.userId || req.user.id;
   const groupId = parseInt(req.params.groupId, 10);
   const { mode, duration } = req.body;
 
-  db.run(`INSERT INTO group_disappearing_settings (group_id, set_by, mode, duration, updated_at)
-          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(group_id) DO UPDATE SET mode=?, duration=?, set_by=?, updated_at=CURRENT_TIMESTAMP`,
-    [groupId, userId, mode, duration || 0, mode, duration || 0, userId],
-    function(err) {
-      if (err) {
-        console.error('Error saving group disappearing settings:', err);
-        return res.status(500).json({ error: 'Error saving settings' });
-      }
-      res.json({ success: true, mode, duration });
+  disappearing.saveGroupSetting(groupId, userId, mode, duration, (err) => {
+    if (err) {
+      console.error('Error saving group disappearing settings:', err);
+      return res.status(500).json({ error: 'Error saving settings' });
     }
-  );
+    res.json({ success: true, mode, duration });
+  });
 });
 
 // Get disappearing messages setting for a group
 router.get('/:groupId/disappearing', (req, res) => {
-  const db = getDb();
   const groupId = parseInt(req.params.groupId, 10);
 
-  db.get('SELECT * FROM group_disappearing_settings WHERE group_id = ?', [groupId], (err, row) => {
+  disappearing.getGroupSetting(groupId, (err, setting) => {
     if (err) {
       console.error('Error fetching group disappearing settings:', err);
       return res.json({ mode: 'off', duration: 0 });
     }
-    res.json({ mode: row?.mode || 'off', duration: row?.duration || 0 });
+    res.json({ mode: setting.mode, duration: setting.duration });
   });
 });
 
 // Leave group chat - handle disappear-on-exit mode
 router.post('/:groupId/leave-chat', (req, res) => {
-  const db = getDb();
   const userId = req.user.userId || req.user.id;
   const groupId = parseInt(req.params.groupId, 10);
 
-  db.get(
-    `SELECT mode FROM group_disappearing_settings WHERE group_id = ? ORDER BY updated_at DESC LIMIT 1`,
-    [groupId],
-    (dsErr, dsSetting) => {
-      if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
-        // Soft-delete: insert into deleted_group_messages for this user only
-        db.run(
-          `INSERT INTO deleted_group_messages (user_id, message_id, deleted_at)
-           SELECT ?, id, CURRENT_TIMESTAMP FROM group_messages 
-           WHERE group_id = ? AND sender_id != ? AND is_read = 1
-           AND id NOT IN (SELECT message_id FROM deleted_group_messages WHERE user_id = ?)`,
-          [userId, groupId, userId, userId],
-          function(err) {
-            if (err) console.error('Error soft-deleting disappearing group messages:', err);
-            res.json({ success: true, deleted: this.changes || 0 });
-          }
-        );
-      } else {
-        res.json({ success: true, deleted: 0 });
-      }
-    }
-  );
+  disappearing.handleGroupLeave(userId, groupId, (err, deleted) => {
+    if (err) console.error('Error in group leave:', err);
+    res.json({ success: true, deleted: deleted || 0 });
+  });
 });

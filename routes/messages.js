@@ -5,6 +5,7 @@ const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
 const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
+const disappearing = require('../services/disappearing-messages');
 
 // Get conversations list
 router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
@@ -198,18 +199,11 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
     // Auto-apply conversation disappearing settings if no per-message timer
     const applyDisappearingAndSend = () => {
       if (!expiresAt) {
-        db.get(
-          `SELECT mode, duration FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
-          [senderId, receiver_id, receiver_id, senderId],
-          (dsErr, dsSetting) => {
-            if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
-              const now = new Date();
-              now.setSeconds(now.getSeconds() + dsSetting.duration);
-              expiresAt = now.toISOString();
-            }
-            proceedWithBlockCheck();
-          }
-        );
+        disappearing.getDMSetting(senderId, receiver_id, (dsErr, dsSetting) => {
+          const expiry = disappearing.computeTimerExpiry(dsSetting);
+          if (expiry) expiresAt = expiry;
+          proceedWithBlockCheck();
+        });
       } else {
         proceedWithBlockCheck();
       }
@@ -453,18 +447,11 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
   // Auto-apply conversation disappearing settings if no per-message timer
   const startSendFlow = () => {
     if (!expiresAt && receiver_id) {
-      db.get(
-        `SELECT mode, duration FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
-        [senderId, receiver_id, receiver_id, senderId],
-        (dsErr, dsSetting) => {
-          if (!dsErr && dsSetting && dsSetting.mode === 'timer' && dsSetting.duration > 0) {
-            const now = new Date();
-            now.setSeconds(now.getSeconds() + dsSetting.duration);
-            expiresAt = now.toISOString();
-          }
-          doPrivacyCheckAndSend();
-        }
-      );
+      disappearing.getDMSetting(senderId, receiver_id, (dsErr, dsSetting) => {
+        const expiry = disappearing.computeTimerExpiry(dsSetting);
+        if (expiry) expiresAt = expiry;
+        doPrivacyCheckAndSend();
+      });
     } else {
       doPrivacyCheckAndSend();
     }
@@ -1055,107 +1042,37 @@ router.delete('/conversations/:contactId/delete-all', authMiddleware, asyncHandl
 
 // Set disappearing messages for a conversation
 router.post('/conversations/:contactId/disappearing', authMiddleware, asyncHandler((req, res) => {
-  const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
-  const { mode, duration } = req.body; // mode: 'off' | 'timer' | 'on_read', duration: seconds (for timer mode)
+  const { mode, duration } = req.body;
+  const io = req.app.get('io');
 
-  // Store in a simple key-value style using a dedicated table or in-memory
-  // For now, we'll use a simple approach with a disappearing_settings table
-  db.run(`CREATE TABLE IF NOT EXISTS disappearing_settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    contact_id INTEGER NOT NULL,
-    mode TEXT DEFAULT 'off',
-    duration INTEGER DEFAULT 0,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, contact_id)
-  )`, (err) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
-
-    db.run(`INSERT INTO disappearing_settings (user_id, contact_id, mode, duration, updated_at) 
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=CURRENT_TIMESTAMP`,
-      [userId, contactId, mode, duration || 0, mode, duration || 0],
-      function(err) {
-        if (err) return res.status(500).json({ error: 'Error saving settings' });
-        // Also save the same setting for the other user so it's shared
-        db.run(`INSERT INTO disappearing_settings (user_id, contact_id, mode, duration, updated_at) 
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(user_id, contact_id) DO UPDATE SET mode=?, duration=?, updated_at=CURRENT_TIMESTAMP`,
-          [contactId, userId, mode, duration || 0, mode, duration || 0],
-          function(err2) {
-            if (err2) console.error('Error syncing disappearing setting for other user:', err2);
-            // Notify the other user via socket so their UI updates
-            const io = req.app.get('io');
-            if (io) {
-              io.to(`user-${contactId}`).emit('disappearing:updated', { contactId: userId, mode, duration: duration || 0 });
-            }
-            res.json({ success: true, mode, duration });
-          }
-        );
-      }
-    );
+  disappearing.saveDMSetting(userId, contactId, mode, duration, io, (err) => {
+    if (err) return res.status(500).json({ error: 'Error saving settings' });
+    res.json({ success: true, mode, duration });
   });
 }));
 
 // Get disappearing messages setting
 router.get('/conversations/:contactId/disappearing', authMiddleware, asyncHandler((req, res) => {
-  const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
 
-  db.run(`CREATE TABLE IF NOT EXISTS disappearing_settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    contact_id INTEGER NOT NULL,
-    mode TEXT DEFAULT 'off',
-    duration INTEGER DEFAULT 0,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, contact_id)
-  )`, () => {
-    db.get('SELECT * FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1', [userId, contactId, contactId, userId], (err, row) => {
-      if (err) return res.status(500).json({ error: 'Error fetching settings' });
-      res.json({ success: true, mode: row ? row.mode : 'off', duration: row ? row.duration : 0 });
-    });
+  disappearing.getDMSetting(userId, contactId, (err, setting) => {
+    if (err) return res.status(500).json({ error: 'Error fetching settings' });
+    res.json({ success: true, mode: setting.mode, duration: setting.duration });
   });
 }));
 
-// Leave chat - handle disappear-on-exit mode (delete read messages when user exits the chat)
+// Leave chat - handle disappear-on-exit mode
 router.post('/conversations/:contactId/leave', authMiddleware, asyncHandler((req, res) => {
-  const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
 
-  db.get(
-    `SELECT mode FROM disappearing_settings WHERE (user_id = ? AND contact_id = ?) OR (user_id = ? AND contact_id = ?) ORDER BY updated_at DESC LIMIT 1`,
-    [userId, contactId, contactId, userId],
-    (dsErr, dsSetting) => {
-      if (!dsErr && dsSetting && dsSetting.mode === 'on_read') {
-        // Soft-delete: mark messages as deleted for the exiting user only
-        // Messages sent BY this user: mark is_deleted_by_sender
-        db.run(
-          `UPDATE messages SET is_deleted_by_sender = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 1`,
-          [userId, contactId],
-          function(err1) {
-            if (err1) console.error('Error soft-deleting sent messages:', err1);
-            const sentDeleted = this.changes || 0;
-            // Messages received BY this user: mark is_deleted_by_receiver
-            db.run(
-              `UPDATE messages SET is_deleted_by_receiver = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 1`,
-              [contactId, userId],
-              function(err2) {
-                if (err2) console.error('Error soft-deleting received messages:', err2);
-                res.json({ success: true, deleted: sentDeleted + (this.changes || 0) });
-              }
-            );
-          }
-        );
-      } else {
-        res.json({ success: true, deleted: 0 });
-      }
-    }
-  );
+  disappearing.handleDMLeave(userId, contactId, (err, deleted) => {
+    if (err) console.error('Error in DM leave:', err);
+    res.json({ success: true, deleted: deleted || 0 });
+  });
 }));
 
 // Toggle chat notifications mute
