@@ -8,6 +8,13 @@
   --exp-soft-2: rgba(255, 255, 255, 0.08);
 }
 
+:root[data-theme="light"] {
+  --exp-card-bg: rgba(0, 0, 0, 0.03);
+  --exp-card-border: rgba(0, 0, 0, 0.1);
+  --exp-soft: rgba(0, 0, 0, 0.04);
+  --exp-soft-2: rgba(0, 0, 0, 0.06);
+}
+
 .exp-page {
   max-width: 1180px;
   margin: 0 auto;
@@ -25,6 +32,28 @@
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-bottom: 1px solid var(--ig-border);
+}
+
+:root[data-theme="light"] .exp-topbar {
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid #dbdbdb;
+}
+
+:root[data-theme="light"] .exp-pill,
+:root[data-theme="light"] .exp-search,
+:root[data-theme="light"] .exp-icon-btn {
+  border-color: var(--exp-card-border);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .exp-tab {
+  border-color: var(--exp-card-border);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="light"] .exp-tab.active {
+  background: rgba(0,149,246,0.1);
+  border-color: rgba(0,149,246,0.5);
 }
 
 .exp-topbar-inner {
