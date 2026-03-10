@@ -150,6 +150,7 @@ app.use('/api/ai-chat', require('./routes/ai-chat'));
 app.use('/api/portfolio', require('./routes/portfolio'));
 app.use('/api/shared', require('./routes/shared-tasks-notes'));
 app.use('/api/calls', require('./routes/calls'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api', require('./routes/community-groups'));
 
 // Link preview endpoint (SSRF-protected)
@@ -736,6 +737,14 @@ app.get('/social-service', (req, res) => {
 
 app.get('/todos', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'todos.html'));
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/admin-login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
 app.get('/group.html', (req, res) => {

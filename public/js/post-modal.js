@@ -364,6 +364,26 @@ const PostModal = (function () {
               '<p class="cb-hint" style="margin-top:0;">Even though your account is private, this specific post will be visible to everyone. You can change this later by editing the post.</p>' +
             '</div>' +
 
+            '<!-- Admin Post Controls (visible only for admins) -->' +
+            '<div class="cb-builder" id="' + p + 'pmAdminPostSection" style="margin-top:12px;display:none;">' +
+              '<div class="cb-builder-header" style="margin-bottom:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a29bfe" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span style="color:#a29bfe;font-weight:700;">Sponsored / Promoted Post</span></div>' +
+              '<label class="cp-toggle-row" style="padding:0;margin-bottom:10px;">' +
+                '<div class="cp-toggle-info"><span style="font-weight:600;font-size:14px;">Mark as Admin Post</span></div>' +
+                '<div class="cp-switch"><input type="checkbox" id="' + p + 'pmIsAdminPost" onchange="PostModal.toggleAdminPostFields()"><span class="cp-switch-slider"></span></div>' +
+              '</label>' +
+              '<div id="' + p + 'pmAdminPostFields" style="display:none;">' +
+                '<label class="cb-field-label">Display Frequency</label>' +
+                '<select id="' + p + 'pmAdminFrequency" class="cp-input" style="margin-bottom:10px;padding:8px 12px;">' +
+                  '<option value="once">Once</option>' +
+                  '<option value="daily" selected>Daily</option>' +
+                  '<option value="weekly">Weekly</option>' +
+                '</select>' +
+                '<label class="cb-field-label">Show After Every N Posts</label>' +
+                '<input type="number" id="' + p + 'pmAdminFeedPosition" class="cp-input" min="1" max="50" value="3" placeholder="e.g. 3 = after every 3 posts" style="margin-bottom:6px;">' +
+                '<p class="cb-hint">This post will appear after every N posts in users\' feeds.</p>' +
+              '</div>' +
+            '</div>' +
+
           '</div>' +
 
         '</div>' + // cp-body
@@ -420,6 +440,7 @@ const PostModal = (function () {
     switchTab('post');
     loadTrendingHashtags();
     checkPrivateAccountForPostPublic();
+    checkAdminForAdminPost();
 
     el('postModalOverlay').style.display = 'flex';
     setTimeout(function () { var t = el('pmCaption'); if (t) t.focus(); }, 300);
@@ -524,6 +545,17 @@ const PostModal = (function () {
       var publicPostCheckbox = el('pmPublicPost');
       if (publicPostCheckbox) publicPostCheckbox.checked = !!post.is_public_post;
       checkPrivateAccountForPostPublic();
+      checkAdminForAdminPost();
+
+      // Pre-fill admin post fields if editing an admin post
+      if (post.is_admin_post) {
+        var adminCb = el('pmIsAdminPost');
+        if (adminCb) { adminCb.checked = true; toggleAdminPostFields(); }
+        var adminFreq = el('pmAdminFrequency');
+        if (adminFreq && post.admin_frequency) adminFreq.value = post.admin_frequency;
+        var adminPos = el('pmAdminFeedPosition');
+        if (adminPos && post.admin_feed_position) adminPos.value = post.admin_feed_position;
+      }
 
       // Load trending hashtags
       loadTrendingHashtags();
@@ -631,6 +663,16 @@ const PostModal = (function () {
     if (cdmToggle) cdmToggle.checked = false;
     var cdmFields = el('pmCommentDMFields');
     if (cdmFields) cdmFields.style.display = 'none';
+
+    // Admin post reset
+    var adminCb = el('pmIsAdminPost');
+    if (adminCb) adminCb.checked = false;
+    var adminFields = el('pmAdminPostFields');
+    if (adminFields) adminFields.style.display = 'none';
+    var adminFreq = el('pmAdminFrequency');
+    if (adminFreq) adminFreq.value = 'daily';
+    var adminPos = el('pmAdminFeedPosition');
+    if (adminPos) adminPos.value = '3';
 
     // Hashtags
     var hashSug = el('pmHashtagSuggestions');
@@ -1055,6 +1097,26 @@ const PostModal = (function () {
       });
     } else {
       section.style.display = 'none';
+    }
+  }
+
+  // ========== ADMIN POST CONTROLS ==========
+  function checkAdminForAdminPost() {
+    var section = el('pmAdminPostSection');
+    if (!section) return;
+    var user = _getUser ? _getUser() : null;
+    if (user && user.is_admin && localStorage.getItem('admin_token')) {
+      section.style.display = '';
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  function toggleAdminPostFields() {
+    var cb = el('pmIsAdminPost');
+    var fields = el('pmAdminPostFields');
+    if (cb && fields) {
+      fields.style.display = cb.checked ? 'block' : 'none';
     }
   }
 
@@ -1562,6 +1624,16 @@ const PostModal = (function () {
       formData.append('is_public_post', '1');
     }
 
+    // Admin post controls
+    var adminPostCheck = el('pmIsAdminPost');
+    if (adminPostCheck && adminPostCheck.checked) {
+      formData.append('is_admin_post', '1');
+      var freq = el('pmAdminFrequency');
+      if (freq) formData.append('admin_frequency', freq.value);
+      var pos = el('pmAdminFeedPosition');
+      if (pos) formData.append('admin_feed_position', pos.value || '3');
+    }
+
     try {
       await InnovateAPI.apiRequest('/posts', { method: 'POST', body: formData, headers: {} });
       InnovateAPI.showAlert(scheduleTime ? 'Post scheduled successfully!' : 'Post shared!', 'success');
@@ -1664,6 +1736,16 @@ const PostModal = (function () {
       // Post Public toggle for private accounts
       var publicPostCheck = el('pmPublicPost');
       if (publicPostCheck) formData.append('is_public_post', publicPostCheck.checked ? '1' : '0');
+
+      // Admin post controls
+      var adminPostCheck2 = el('pmIsAdminPost');
+      if (adminPostCheck2 && adminPostCheck2.checked) {
+        formData.append('is_admin_post', '1');
+        var freq2 = el('pmAdminFrequency');
+        if (freq2) formData.append('admin_frequency', freq2.value);
+        var pos2 = el('pmAdminFeedPosition');
+        if (pos2) formData.append('admin_feed_position', pos2.value || '3');
+      }
 
       await InnovateAPI.apiRequest('/posts', { method: 'POST', body: formData, headers: {} });
       InnovateAPI.showAlert(scheduleTime ? 'Creator Series scheduled!' : 'Creator Series shared!', 'success');
@@ -1789,6 +1871,18 @@ const PostModal = (function () {
     var publicPostCheck = el('pmPublicPost');
     if (publicPostCheck) formData.append('is_public_post', publicPostCheck.checked ? '1' : '0');
 
+    // Admin post controls
+    var adminPostCheck = el('pmIsAdminPost');
+    if (adminPostCheck) {
+      formData.append('is_admin_post', adminPostCheck.checked ? '1' : '0');
+      if (adminPostCheck.checked) {
+        var freq = el('pmAdminFrequency');
+        if (freq) formData.append('admin_frequency', freq.value);
+        var pos = el('pmAdminFeedPosition');
+        if (pos) formData.append('admin_feed_position', pos.value || '3');
+      }
+    }
+
     try {
       await InnovateAPI.apiRequest('/posts/' + editPostId, { method: 'PUT', body: formData, headers: {} });
       close();
@@ -1827,6 +1921,7 @@ const PostModal = (function () {
     addCBField: addCBField,
     addCBCustomField: addCBCustomField,
     addCDMItem: addCDMItem,
+    toggleAdminPostFields: toggleAdminPostFields,
     onCaptionInput: onCaptionInput,
     insertHashtag: insertHashtag,
     insertMention: insertMention,

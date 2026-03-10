@@ -2132,10 +2132,12 @@
       if (userId === user.id) {
         document.getElementById('postMenuModal').style.display = 'flex';
       } else {
-        // Show report/unfollow options for other users' posts
-        const action = confirm('Report this post?');
-        if (action) {
-          InnovateAPI.showAlert('Post reported', 'success');
+        // Use the proper report flow from post-interactions.js
+        if (typeof openPostActionsMenu === 'function') {
+          openPostActionsMenu(postId, userId);
+        } else if (typeof pfHandleReport === 'function') {
+          window.currentPostIdForActions = postId;
+          pfHandleReport();
         }
       }
     }

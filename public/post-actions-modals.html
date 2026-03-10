@@ -311,8 +311,8 @@ function handleInstantMeeting() {
 
 function handleReport() {
   closePostActionsModal();
-  if (confirm('Report this post for violating community guidelines?')) {
-    alert('Thank you for your report. We will review this post.');
+  if (typeof pfHandleReport === 'function') {
+    pfHandleReport();
   }
 }
 

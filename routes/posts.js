@@ -148,6 +148,7 @@ router.get('/', authMiddleware, (req, res) => {
     LEFT JOIN blocked_users b2 ON (b2.blocker_id = p.user_id AND b2.blocked_id = ?)
     WHERE p.is_archived = 0
       AND p.is_story = 0
+      AND (p.is_admin_post IS NOT TRUE)
       AND (p.scheduled_at IS NULL OR p.scheduled_at <= CURRENT_TIMESTAMP)
       AND b1.id IS NULL
       AND b2.id IS NULL
@@ -168,17 +169,52 @@ router.get('/', authMiddleware, (req, res) => {
     LIMIT 50
   `;
 
+  // Also fetch active admin posts separately
+  const adminPostQuery = `
+    SELECT p.*, u.username, u.profile_picture,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count,
+           (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) as comments_count,
+           (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id AND user_id = ?) as user_has_liked,
+           (SELECT COUNT(*) FROM saved_posts WHERE post_id = p.id AND user_id = ?) as is_saved
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.is_admin_post IS TRUE
+      AND p.is_archived IS NOT TRUE
+      AND (
+        p.admin_frequency = 'daily'
+        OR p.admin_frequency = 'weekly'
+        OR p.admin_frequency = 'once'
+      )
+    ORDER BY p.created_at DESC
+  `;
+
   db.all(query, [userId, userId, userId, userId, userId, userId], (err, posts) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Error fetching posts' });
     }
 
-    if (!posts || posts.length === 0) {
-      return res.json({ success: true, posts: [] });
-    }
+    if (!posts) posts = [];
 
-    const postIds = posts.map(p => p.id);
+    // Fetch admin posts
+    db.all(adminPostQuery, [userId, userId], (err2, adminPosts) => {
+      if (err2) adminPosts = [];
+      if (!adminPosts) adminPosts = [];
+
+      // Merge: insert admin posts at their specified feed positions
+      const mergedPosts = [...posts];
+      adminPosts.forEach(ap => {
+        const pos = Math.min(ap.admin_feed_position || 3, mergedPosts.length);
+        // Mark it so frontend knows it's an admin/promoted post
+        ap._is_admin_post = true;
+        mergedPosts.splice(pos, 0, ap);
+      });
+
+      if (mergedPosts.length === 0) {
+        return res.json({ success: true, posts: [] });
+      }
+
+    const postIds = mergedPosts.map(p => p.id);
     const placeholders = postIds.map(() => '?').join(',');
 
     // Batch query 1: All polls for these posts
@@ -229,7 +265,7 @@ router.get('/', authMiddleware, (req, res) => {
                   });
 
                   // Assemble all posts
-                  const processedPosts = posts.map(post => {
+                  const processedPosts = mergedPosts.map(post => {
                     const poll = pollMap[post.id] || null;
                     let pollData = null;
                     if (poll) {
@@ -251,6 +287,7 @@ router.get('/', authMiddleware, (req, res) => {
                       comment_to_dm: post.comment_to_dm ? JSON.parse(post.comment_to_dm) : null,
                       user_has_liked: post.user_has_liked > 0,
                       is_saved: post.is_saved > 0,
+                      is_admin_post: !!post.is_admin_post,
                       poll: pollData,
                       recent_comments: (commentMap[post.id] || []).reverse(),
                       recent_liker: likerMap[post.id] || null
@@ -265,6 +302,7 @@ router.get('/', authMiddleware, (req, res) => {
         }
       );
     });
+    }); // end adminPostQuery callback
   });
 });
 
@@ -379,7 +417,10 @@ router.post('/', authMiddleware, (req, res, next) => {
     comment_to_dm,
     existing_images,
     existing_video,
-    is_public_post
+    is_public_post,
+    is_admin_post,
+    admin_frequency,
+    admin_feed_position
   } = req.body;
 
   let images = [];
@@ -431,8 +472,8 @@ router.post('/', authMiddleware, (req, res, next) => {
   }
 
   const query = `
-    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_creator_series, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm, is_public_post)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO posts (user_id, content, images, files, video_url, is_story, is_creator_series, scheduled_at, expires_at, hashtags, enable_contact, enable_interested, custom_button, comment_to_dm, is_public_post, is_admin_post, admin_frequency, admin_feed_position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -452,7 +493,10 @@ router.post('/', authMiddleware, (req, res, next) => {
       enable_interested === '1' || enable_interested === true ? 1 : 0,
       custom_button || null,
       comment_to_dm || null,
-      is_public_post === '1' || is_public_post === true ? 1 : 0
+      is_public_post === '1' || is_public_post === true ? 1 : 0,
+      is_admin_post === '1' || is_admin_post === true ? 1 : 0,
+      admin_frequency || null,
+      admin_feed_position ? parseInt(admin_feed_position) : null
     ],
     function(err) {
       if (err) {
@@ -1304,7 +1348,7 @@ router.put('/:postId', authMiddleware, upload.fields([
   const db = getDb();
   const userId = req.user.userId;
   const { postId } = req.params;
-  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button, comment_to_dm, is_public_post } = req.body;
+  const { content, poll_question, poll_options, poll_expiry, scheduled_at, enable_contact, enable_interested, hashtags, custom_button, comment_to_dm, is_public_post, is_admin_post, admin_frequency, admin_feed_position } = req.body;
 
   db.get('SELECT * FROM posts WHERE id = ? AND user_id = ?', [postId, userId], (err, post) => {
     if (err || !post) {
@@ -1385,6 +1429,20 @@ router.put('/:postId', authMiddleware, upload.fields([
     if (is_public_post !== undefined) {
       updateFields.push('is_public_post = ?');
       updateValues.push(is_public_post === '1' || is_public_post === true ? 1 : 0);
+    }
+
+    // Admin post fields
+    if (is_admin_post !== undefined) {
+      updateFields.push('is_admin_post = ?');
+      updateValues.push(is_admin_post === '1' || is_admin_post === true ? 1 : 0);
+    }
+    if (admin_frequency !== undefined) {
+      updateFields.push('admin_frequency = ?');
+      updateValues.push(admin_frequency || null);
+    }
+    if (admin_feed_position !== undefined) {
+      updateFields.push('admin_feed_position = ?');
+      updateValues.push(admin_feed_position ? parseInt(admin_feed_position) : null);
     }
     
     updateValues.push(postId);
@@ -1685,6 +1743,36 @@ router.delete('/:postId', authMiddleware, (req, res) => {
       res.json({ success: true });
     }
   );
+});
+
+// Report a post
+router.post('/:postId/report', authMiddleware, (req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { postId } = req.params;
+  const { reason, details } = req.body;
+
+  const validReasons = ['spam', 'nudity', 'harassment', 'misinformation', 'violence', 'hate_speech', 'other'];
+  if (!reason || !validReasons.includes(reason)) {
+    return res.status(400).json({ error: 'Valid reason required: ' + validReasons.join(', ') });
+  }
+
+  // Check post exists
+  db.get('SELECT id, user_id FROM posts WHERE id = ?', [postId], (err, post) => {
+    if (err || !post) return res.status(404).json({ error: 'Post not found' });
+    if (post.user_id === userId) return res.status(400).json({ error: 'Cannot report your own post' });
+
+    // Check for duplicate report
+    db.get('SELECT id FROM post_reports WHERE reporter_id = ? AND post_id = ?', [userId, postId], (err2, existing) => {
+      if (existing) return res.status(400).json({ error: 'You already reported this post' });
+
+      db.run('INSERT INTO post_reports (reporter_id, post_id, reason, details) VALUES (?, ?, ?, ?)',
+        [userId, postId, reason, details || ''], function(err3) {
+          if (err3) return res.status(500).json({ error: 'Failed to submit report' });
+          res.json({ success: true, message: 'Report submitted. An admin will review it.' });
+        });
+    });
+  });
 });
 
 // ========== Comment-to-DM Helper Functions ==========

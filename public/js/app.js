@@ -299,7 +299,27 @@
     return canvas.toDataURL();
   }
 
-  function initNavProfilePic() {
+  function initAdminPanelLink() {
+  try {
+    const user = getCurrentUser();
+    if (!user || !user.is_admin) return;
+    const adminToken = localStorage.getItem('admin_token');
+    if (!adminToken) return;
+    const navIcons = document.querySelector('.ig-nav-icons');
+    if (!navIcons) return;
+    // Don't add twice
+    if (document.getElementById('adminPanelLink')) return;
+    const link = document.createElement('a');
+    link.id = 'adminPanelLink';
+    link.href = '/admin';
+    link.title = 'Admin Panel';
+    link.style.cssText = 'display:flex;align-items:center;gap:4px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:16px;text-decoration:none;margin-right:4px;';
+    link.innerHTML = '<i class="fas fa-shield-alt" style="font-size:12px;"></i> Admin';
+    navIcons.insertBefore(link, navIcons.firstChild);
+  } catch(e) {}
+}
+
+function initNavProfilePic() {
     const user = getCurrentUser();
     // Find profile nav item by ID or by SVG aria-label
     let profileLink = document.getElementById('profileNavLink');
@@ -339,6 +359,7 @@
 
     // Load profile picture into bottom nav Profile item
     initNavProfilePic();
+    initAdminPanelLink();
 
     const currentPage = window.location.pathname;
     document.querySelectorAll('.navbar-menu a').forEach((link) => {

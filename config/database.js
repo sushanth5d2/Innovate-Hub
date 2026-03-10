@@ -157,7 +157,8 @@ function createPgWrapper(pool) {
       'is_deleted','is_deleted_by_sender','is_deleted_by_receiver','is_edited',
       'is_message_request','notification_sent','is_muted','is_hidden','is_verified',
       'is_blocked','show_on_map','proximity_notifications','is_locked','is_sent',
-      'enable_contact','enable_interested','is_creator_series'
+      'enable_contact','enable_interested','is_creator_series',
+      'is_admin_post','is_banned','is_deactivated'
     ]),
 
     // Convert 0/1 integer parameters to true/false when they target boolean columns
@@ -2234,6 +2235,77 @@ const migrateDatabase = () => {
     db.run(`ALTER TABLE users ADD COLUMN deactivated_at TIMESTAMPTZ`, (err) => {
       if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
         console.log('Note: deactivated_at column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // ===== ADMIN & MODERATION SYSTEM =====
+    db.run(`ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: is_admin column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE users ADD COLUMN is_banned BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: is_banned column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE users ADD COLUMN banned_until TIMESTAMPTZ`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: banned_until column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE users ADD COLUMN ban_reason TEXT`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: ban_reason column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE posts ADD COLUMN is_admin_post BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: is_admin_post column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE posts ADD COLUMN admin_frequency TEXT DEFAULT 'once'`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: admin_frequency column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE posts ADD COLUMN admin_feed_position INTEGER DEFAULT 3`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: admin_feed_position column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Post reports table
+    db.run(`CREATE TABLE IF NOT EXISTS post_reports (
+      id SERIAL PRIMARY KEY,
+      reporter_id INTEGER NOT NULL,
+      post_id INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      details TEXT,
+      status TEXT DEFAULT 'pending',
+      reviewed_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: post_reports table - ', err ? err.message : 'ok');
+      }
+    });
+
+    // Admin actions audit log
+    db.run(`CREATE TABLE IF NOT EXISTS admin_actions (
+      id SERIAL PRIMARY KEY,
+      admin_id INTEGER NOT NULL,
+      action_type TEXT NOT NULL,
+      target_user_id INTEGER,
+      target_post_id INTEGER,
+      details TEXT,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: admin_actions table - ', err ? err.message : 'ok');
       }
     });
 

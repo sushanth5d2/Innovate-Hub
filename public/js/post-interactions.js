@@ -1049,9 +1049,58 @@ const PostInteractions = (function () {
    */
   function handleReport() {
     closePostActionsModal();
-    if (confirm('Report this post for violating community guidelines?')) {
-      InnovateAPI.showAlert('Thank you for your report. We will review this post.', 'success');
-    }
+    var postId = currentPostIdForActions;
+    if (!postId) return;
+
+    // Build a report reason picker
+    var reasons = [
+      { value: 'spam', label: 'Spam' },
+      { value: 'nudity', label: 'Nudity or sexual content' },
+      { value: 'harassment', label: 'Harassment or bullying' },
+      { value: 'misinformation', label: 'Misinformation' },
+      { value: 'violence', label: 'Violence' },
+      { value: 'hate_speech', label: 'Hate speech' },
+      { value: 'other', label: 'Other' }
+    ];
+
+    var overlay = document.createElement('div');
+    overlay.id = 'reportPostOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:200000;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = '<div style="background:var(--ig-primary-background,#fff);border-radius:16px;padding:24px;max-width:380px;width:90%;">' +
+      '<h3 style="margin:0 0 16px;font-size:18px;color:var(--ig-primary-text,#262626);">Report Post</h3>' +
+      '<p style="color:var(--ig-secondary-text,#8e8e8e);font-size:13px;margin-bottom:16px;">Why are you reporting this post?</p>' +
+      '<div id="reportPostReasons" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">' +
+      reasons.map(function(r) {
+        return '<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--ig-secondary-background,#fafafa);border-radius:10px;cursor:pointer;">' +
+          '<input type="radio" name="reportPostReason" value="' + r.value + '" style="accent-color:#ed4956;"> ' + r.label + '</label>';
+      }).join('') +
+      '</div>' +
+      '<textarea id="reportPostDetails" placeholder="Additional details (optional)..." rows="3" style="width:100%;padding:12px;border:1px solid var(--ig-border,#dbdbdb);border-radius:10px;background:var(--ig-secondary-background,#fafafa);color:var(--ig-primary-text,#262626);resize:none;margin-bottom:16px;box-sizing:border-box;"></textarea>' +
+      '<div style="display:flex;gap:12px;">' +
+        '<button id="reportPostCancel" style="flex:1;padding:12px;background:var(--ig-secondary-background,#fafafa);border:1px solid var(--ig-border,#dbdbdb);border-radius:10px;color:var(--ig-primary-text,#262626);cursor:pointer;font-weight:600;">Cancel</button>' +
+        '<button id="reportPostSubmit" style="flex:1;padding:12px;background:#ed4956;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;">Report</button>' +
+      '</div></div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#reportPostCancel').onclick = function() { overlay.remove(); };
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('#reportPostSubmit').onclick = function() {
+      var checked = overlay.querySelector('input[name="reportPostReason"]:checked');
+      if (!checked) { InnovateAPI.showAlert('Please select a reason', 'error'); return; }
+      var details = overlay.querySelector('#reportPostDetails').value;
+
+      InnovateAPI.apiRequest('/posts/' + postId + '/report', {
+        method: 'POST',
+        body: JSON.stringify({ reason: checked.value, details: details })
+      }).then(function(res) {
+        overlay.remove();
+        InnovateAPI.showAlert(res.message || 'Report submitted', 'success');
+      }).catch(function(err) {
+        InnovateAPI.showAlert(err.message || 'Failed to submit report', 'error');
+      });
+    };
   }
 
   // ======================== Edit Post Modal ========================
