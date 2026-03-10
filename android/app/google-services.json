@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "783065425486",
+    "project_id": "innovatehub-eafcf",
+    "storage_bucket": "innovatehub-eafcf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:783065425486:android:55dd85758c52435fbe451f",
+        "android_client_info": {
+          "package_name": "com.innovatehub.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5NNSkxqmCYzd4dKJqk83nw4iAQCcFmvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

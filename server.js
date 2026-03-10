@@ -15,6 +15,7 @@ const { initRedis } = require('./config/cache');
 const logger = require('./config/logger');
 const authMiddleware = require('./middleware/auth');
 const { responseTimeLogger } = require('./middleware/performance');
+const pushService = require('./services/push-service');
 
 const app = express();
 const server = http.createServer(app);
@@ -408,6 +409,14 @@ io.on('connection', (socket) => {
     
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('message:receive', message);
+    } else {
+      // User is offline — send push notification
+      pushService.sendMessagePush(
+        receiverId,
+        message.sender_username || message.username || 'Someone',
+        message.content || 'Sent you a message',
+        message.sender_id || socket.userId
+      );
     }
   });
 
@@ -457,6 +466,14 @@ io.on('connection', (socket) => {
     
     if (userSocketId) {
       io.to(userSocketId).emit('notification:receive', notification);
+    } else {
+      // User is offline — send push notification
+      pushService.sendNotificationPush(
+        userId,
+        notification.title || 'Innovate Hub',
+        notification.content || notification.body || 'You have a new notification',
+        { type: notification.type || 'general' }
+      );
     }
   });
 
@@ -473,6 +490,16 @@ io.on('connection', (socket) => {
       isGroupAdd: !!isGroupAdd,
       groupId: groupId || null
     });
+
+    // Also send high-priority push notification for incoming call (works on lock screen)
+    pushService.sendCallPush(
+      to,
+      caller?.username || caller?.displayName || 'Someone',
+      from,
+      isVideo,
+      !!isGroupAdd,
+      groupId || null
+    );
   });
 
   socket.on('call:answer', (data) => {
@@ -613,6 +640,15 @@ io.on('connection', (socket) => {
             (members || []).forEach(m => {
               if (String(m.user_id) !== String(userId)) {
                 io.to(`user_${m.user_id}`).emit('group-call:ring', ringData);
+                // Send push notification for group call (works on lock screen)
+                pushService.sendCallPush(
+                  m.user_id,
+                  displayName || 'Someone',
+                  userId,
+                  !!isVideo,
+                  true,
+                  groupId
+                );
               }
             });
           });

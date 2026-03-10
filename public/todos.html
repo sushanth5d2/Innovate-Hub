@@ -281,6 +281,17 @@
       color: var(--ig-secondary-text);
       font-size: 14px;
     }
+
+    @media (max-width: 600px) {
+      .todo-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 12px;
+      }
+      .stat-value {
+        font-size: 20px;
+      }
+    }
   </style>
 </head>
 <body>

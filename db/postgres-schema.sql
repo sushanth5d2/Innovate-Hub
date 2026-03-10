@@ -991,3 +991,16 @@ CREATE TABLE IF NOT EXISTS call_participants (
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
+-- Table: device_tokens
+CREATE TABLE IF NOT EXISTS device_tokens (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        device_token TEXT NOT NULL,
+        device_type TEXT DEFAULT 'android',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, device_token)
+      );
+

@@ -26,6 +26,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@capacitor/local-notifications": "^8.0.2",
+    "@capacitor/push-notifications": "^8.0.2",
     "@google/genai": "^1.42.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
@@ -37,6 +39,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
+    "firebase-admin": "^13.7.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
@@ -48,7 +51,8 @@
     "redis": "^4.6.11",
     "sharp": "^0.33.1",
     "socket.io": "^4.6.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",

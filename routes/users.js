@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
+const pushService = require('../services/push-service');
 
 // Change password
 router.put('/password', authMiddleware, asyncHandler((req, res) => {
@@ -520,6 +521,7 @@ router.post('/:userId/follow', authMiddleware, asyncHandler((req, res) => {
                     username: senderInfo ? senderInfo.username : '',
                     profile_picture: senderInfo ? senderInfo.profile_picture : ''
                   });
+                  pushService.sendNotificationPush(followingId, senderInfo ? senderInfo.username : 'Someone', 'requested to follow you', { type: 'follow_request' });
                 });
               }
 
@@ -568,6 +570,7 @@ router.post('/:userId/follow', authMiddleware, asyncHandler((req, res) => {
                 };
                 io.to(`user_${followingId}`).emit('notification:receive', followNotif);
                 io.to(`user-${followingId}`).emit('notification:received', followNotif);
+                pushService.sendNotificationPush(followingId, senderInfo ? senderInfo.username : 'Someone', 'started following you', { type: 'follow' });
               });
             }
 

@@ -7,6 +7,7 @@ const { validateInput } = require('../middleware/validateInput');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const pushService = require('../services/push-service');
 
 // Lightweight multer for chunk uploads — no logging, writes to temp
 const chunkUpload = multer({
@@ -760,6 +761,7 @@ router.post('/:postId/like', authMiddleware, (req, res) => {
                   username: sender ? sender.username : '',
                   profile_picture: sender ? sender.profile_picture : ''
                 });
+                pushService.sendNotificationPush(post.user_id, sender ? sender.username : 'Someone', 'liked your post', { type: 'like', postId });
               });
             }
           }

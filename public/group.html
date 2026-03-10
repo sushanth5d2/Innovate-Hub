@@ -26,10 +26,10 @@
   </div>
 
   <!-- Main Content -->
-  <div style="margin-top: 70px; max-width: 1400px; margin-left: auto; margin-right: auto; display: flex; gap: 24px; padding: 0 20px;">
+  <div class="group-main-layout" style="margin-top: 70px; max-width: 1400px; margin-left: auto; margin-right: auto; display: flex; gap: 24px; padding: 0 20px;">
     
     <!-- Center Content (Group Feed) -->
-    <div style="flex: 1; max-width: 630px;">
+    <div class="group-center-content" style="flex: 1; max-width: 630px;">
     <!-- Group Header -->
     <div style="background: var(--ig-primary-background); border: 1px solid var(--ig-border); border-radius: 8px; padding: 24px; margin-bottom: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -955,6 +955,18 @@
 
     /* Mobile optimizations */
     @media (max-width: 768px) {
+      /* Main layout */
+      .group-main-layout {
+        flex-direction: column !important;
+        padding: 0 12px !important;
+        gap: 16px !important;
+      }
+      
+      .group-center-content {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
       /* Show mobile info button */
       #mobile-group-info-btn {
         display: block !important;
@@ -1033,6 +1045,17 @@
       /* Feed content bottom margin */
       #feed-content > div:first-child {
         margin-bottom: 100px !important;
+      }
+
+      /* Grid fixes for mobile */
+      #todo-board {
+        grid-template-columns: 1fr !important;
+      }
+      #images-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+      }
+      #videos-grid {
+        grid-template-columns: 1fr !important;
       }
     }
     

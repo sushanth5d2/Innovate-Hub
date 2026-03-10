@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
+const { registerDeviceToken, unregisterDeviceToken } = require('../services/push-service');
 
 // Get all notifications
 router.get('/', authMiddleware, (req, res) => {
@@ -127,6 +128,44 @@ router.post('/cleanup/duplicates', authMiddleware, (req, res) => {
     }
     res.json({ success: true, deleted: this.changes });
   });
+});
+
+// ===== DEVICE TOKEN MANAGEMENT (Push Notifications) =====
+
+// Register device token for push notifications
+router.post('/device-token', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { token, deviceType } = req.body;
+
+    if (!token || typeof token !== 'string' || token.length < 10) {
+      return res.status(400).json({ error: 'Valid device token required' });
+    }
+
+    await registerDeviceToken(userId, token, deviceType || 'android');
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error registering device token:', err);
+    res.status(500).json({ error: 'Failed to register device token' });
+  }
+});
+
+// Unregister device token (on logout)
+router.delete('/device-token', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Device token required' });
+    }
+
+    await unregisterDeviceToken(userId, token);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error unregistering device token:', err);
+    res.status(500).json({ error: 'Failed to unregister device token' });
+  }
 });
 
 module.exports = router;

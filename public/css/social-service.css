@@ -370,6 +370,43 @@
   display: flex;
   flex-direction: column;
   background: var(--ig-primary-background);
+  overflow-y: auto;
+}
+
+.ss-detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+.ss-detail-title {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--ig-primary-text);
+  flex: 1;
+}
+
+.ss-detail-meta {
+  margin-top: 12px;
+}
+
+.ss-detail-description {
+  margin-top: 16px;
+  color: var(--ig-secondary-text);
+  line-height: 1.6;
+}
+
+.ss-detail-location {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  border: 1px solid var(--ig-border);
+}
+
+.ss-detail-share-link {
+  margin-top: 16px;
 }
 
 .ss-detail-header {
@@ -421,16 +458,29 @@
   .ss-detail-container {
     flex-direction: column;
     height: 95vh;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
   }
   
   .ss-detail-images {
     width: 100%;
-    height: 50%;
+    height: 45%;
+    min-height: 200px;
   }
   
   .ss-detail-info {
     width: 100%;
-    height: 50%;
+    height: 55%;
+  }
+
+  .ss-detail-title {
+    font-size: 20px;
+  }
+
+  .ss-detail-close {
+    top: 10px;
+    right: 10px;
   }
 }
 

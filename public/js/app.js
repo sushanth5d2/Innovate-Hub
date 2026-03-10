@@ -211,6 +211,11 @@
   }
 
   function logout() {
+    // Unregister push notification token before logout
+    if (window.InnovatePush && window.InnovatePush.unregister) {
+      try { window.InnovatePush.unregister(); } catch(e) { /* ignore */ }
+    }
+
     try {
       if (socket && socket.connected) {
         socket.disconnect();

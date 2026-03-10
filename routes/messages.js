@@ -6,6 +6,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
 const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
 const disappearing = require('../services/disappearing-messages');
+const pushService = require('../services/push-service');
 
 // Get conversations list
 router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
@@ -285,6 +286,9 @@ router.post('/send', authMiddleware, asyncHandler((req, res, next) => {
         };
         io.to(`user_${receiver_id}`).emit('notification:receive', msgNotif);
 
+        // Send push notification for offline users
+        pushService.sendMessagePush(receiver_id, sender.username, messageContent || 'sent you a message', senderId);
+
         res.json({ success: true, message: messageData });
       }
     );
@@ -511,6 +515,8 @@ router.post('/', authMiddleware, upload.array('attachments', 5), asyncHandler((r
           receiver_id: receiver_id,
           created_at: new Date().toISOString()
         });
+        // Send push notification for offline users
+        pushService.sendMessagePush(receiver_id, senderInfo ? senderInfo.username : 'Someone', content || 'sent you a message', senderId);
       });
 
       res.json({

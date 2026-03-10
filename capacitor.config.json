@@ -32,6 +32,11 @@
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_launcher",
+      "iconColor": "#833AB4",
+      "sound": "default"
     }
   }
 }

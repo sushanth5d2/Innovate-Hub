@@ -372,9 +372,9 @@
 
   <!-- Donation Detail Modal -->
   <div id="donation-detail-modal" class="ig-modal-overlay" style="display: none;">
-    <div style="max-width: 1080px; width: 95%; max-height: 90vh; margin: auto; display: flex; background: var(--ig-secondary-background); border-radius: 12px; overflow: hidden;">
+    <div class="ss-detail-container">
       <!-- Image Section -->
-      <div style="flex: 0 0 60%; position: relative; background: #000;">
+      <div class="ss-detail-images">
         <button onclick="closeDonationDetail()" class="ss-detail-close">
           <i class="fas fa-times"></i>
         </button>
@@ -384,27 +384,27 @@
       </div>
       
       <!-- Details Section -->
-      <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
-        <div style="padding: 24px;">
+      <div class="ss-detail-info">
+        <div class="ss-detail-body">
           <!-- User Info -->
           <div class="ss-detail-user" id="detail-user-info" onclick="event.stopPropagation();">
             <!-- User info will be loaded here -->
           </div>
           
           <!-- Title and Status -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px;">
-            <h2 id="detail-title" style="font-size: 24px; font-weight: 900; color: var(--ig-primary-text); flex: 1;"></h2>
+          <div class="ss-detail-title-row">
+            <h2 id="detail-title" class="ss-detail-title"></h2>
             <div id="detail-status-badge"></div>
           </div>
           
           <!-- Meta Info -->
-          <div id="detail-meta" class="ss-card-meta" style="margin-top: 12px;"></div>
+          <div id="detail-meta" class="ss-card-meta ss-detail-meta"></div>
           
           <!-- Description -->
-          <div id="detail-description" style="margin-top: 16px; color: var(--ig-secondary-text); line-height: 1.6;"></div>
+          <div id="detail-description" class="ss-detail-description"></div>
           
           <!-- Location -->
-          <div id="detail-location" style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--ig-border);">
+          <div id="detail-location" class="ss-detail-location">
             <!-- Location will be loaded here -->
           </div>
           
@@ -415,11 +415,11 @@
           <div id="detail-completion-photos"></div>
           
           <!-- Share Location Link -->
-          <div id="detail-share-link" style="margin-top: 16px;"></div>
+          <div id="detail-share-link" class="ss-detail-share-link"></div>
         </div>
         
         <!-- Action Buttons -->
-        <div id="detail-actions" style="padding: 20px; border-top: 1px solid var(--ig-border); margin-top: auto;">
+        <div id="detail-actions" class="ss-detail-footer">
           <!-- Buttons will be loaded here -->
         </div>
       </div>

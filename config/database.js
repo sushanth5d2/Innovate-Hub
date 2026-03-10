@@ -2331,6 +2331,23 @@ const migrateDatabase = () => {
       }
     });
 
+    // ===== PUSH NOTIFICATION DEVICE TOKENS =====
+    db.run(`CREATE TABLE IF NOT EXISTS device_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      device_token TEXT NOT NULL,
+      device_type TEXT DEFAULT 'android',
+      is_active BOOLEAN DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, device_token)
+    )`, (err) => {
+      if (err && !err.message.includes('already exists')) {
+        console.log('Note: device_tokens table - ', err ? err.message : 'ok');
+      }
+    });
+
   });
 };
 
