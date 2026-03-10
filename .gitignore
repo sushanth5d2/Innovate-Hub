@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.production
 .env.local
+config/firebase-service-account.json
 *.db
 uploads/*
 !uploads/.gitkeep
