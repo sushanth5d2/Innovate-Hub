@@ -176,7 +176,7 @@
             <div class="exp-card-body">
               <div class="exp-card-title">${e.title || 'Untitled event'}</div>
               <div class="exp-card-meta">
-                <span>${place || 'Location TBA'}</span>
+                <span>${(e.is_online === true || e.is_online === 1 || e.is_online === '1') ? '🌐 Online Event' : (place || 'Location TBA')}</span>
                 <span>•</span>
                 <span>${interested}+ interested</span>
                 ${badge ? `<span>•</span>${badge}` : ''}
@@ -371,9 +371,25 @@
     const placeText = [ev.location, ev.city].filter(Boolean).join(' · ');
     const interested = Number(ev.interested_count ?? ev.attendee_count ?? 0);
 
+    const isOnline = ev.is_online === true || ev.is_online === 1 || ev.is_online === '1' || ev.is_online === 'true';
+
     if (img) img.src = ev.cover_image || placeholderImage(ev.title);
     if (title) title.textContent = ev.title || 'Untitled event';
-    if (place) place.textContent = placeText || 'Location TBA';
+    if (place) place.textContent = isOnline ? '🌐 Online Event' : (placeText || 'Location TBA');
+
+    // Show/hide online join button - only if user has a ticket or is the organizer
+    const onlineJoinBtn = document.getElementById('btnJoinOnline');
+    if (onlineJoinBtn) {
+      const hasTicket = Number(ev.user_has_ticket) > 0;
+      const isOrganizer = currentUser?.id && Number(ev.creator_id) === Number(currentUser.id);
+      if (isOnline && ev.online_url && (hasTicket || isOrganizer)) {
+        onlineJoinBtn.href = ev.online_url;
+        onlineJoinBtn.style.display = '';
+      } else {
+        onlineJoinBtn.style.display = 'none';
+      }
+    }
+
     if (price) {
       if (priceText === 'Free') {
         price.innerHTML = '<span style=\"color: #00d4aa; display: flex; align-items: center; gap: 4px;\"><span>\ud83c\udf89</span> Free</span>';
@@ -1236,10 +1252,15 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Checkout failed');
 
+      const isOnlineEvent = ev.is_online === true || ev.is_online === 1 || ev.is_online === '1';
+      const joinHtml = (isOnlineEvent && ev.online_url) 
+        ? `<a href="${ev.online_url}" target="_blank" rel="noopener noreferrer" style="display:inline-block; margin-top:8px; padding:8px 16px; background:linear-gradient(135deg,#00d4aa,#0095f6); color:#fff; border-radius:8px; text-decoration:none; font-weight:700; font-size:13px;">🌐 Join Online Event</a>` 
+        : '';
+
       if (data.tickets?.length) {
-        result.innerHTML = `<div style="color: var(--ig-primary-text); font-weight: 800;">Pass issued.</div><div class="exp-hint">Open Passes tab to view QR.</div>`;
+        result.innerHTML = `<div style="color: var(--ig-primary-text); font-weight: 800;">Pass issued.</div><div class="exp-hint">Open Passes tab to view QR.</div>${joinHtml}`;
       } else {
-        result.innerHTML = `<div style="color: var(--ig-primary-text); font-weight: 800;">Order created.</div><div class="exp-hint">Organizer will DM you after confirming payment.</div>`;
+        result.innerHTML = `<div style="color: var(--ig-primary-text); font-weight: 800;">Order created.</div><div class="exp-hint">Organizer will DM you after confirming payment.</div>${joinHtml}`;
       }
       
       // Refresh event data to update Interested count and Popularity
@@ -2111,6 +2132,14 @@ let html5QrCode = null;
     document.getElementById('ceNote').value = '';
     document.getElementById('ceDesc').value = '';
     
+    // Reset online event fields
+    const ceIsOnline = document.getElementById('ceIsOnline');
+    if (ceIsOnline) {
+      ceIsOnline.checked = false;
+      document.getElementById('ceOnlineUrl').value = '';
+      if (typeof toggleOnlineFields === 'function') toggleOnlineFields('ce');
+    }
+    
     // Reset pass types form
     state.createEventPassTypes = [];
     document.getElementById('cePassName').value = '';
@@ -2135,6 +2164,8 @@ let html5QrCode = null;
     const important_note = document.getElementById('ceNote').value.trim();
     const is_public = document.getElementById('cePublic').checked;
     const max_persons = document.getElementById('ceMaxPersons').value;
+    const is_online = document.getElementById('ceIsOnline') ? document.getElementById('ceIsOnline').checked : false;
+    const online_url = document.getElementById('ceOnlineUrl') ? document.getElementById('ceOnlineUrl').value.trim() : '';
 
     if (!title || !event_date) {
       showAlert && showAlert('Title and date required', 'error');
@@ -2154,6 +2185,8 @@ let html5QrCode = null;
       formData.append('is_public', is_public ? '1' : '0');
       formData.append('notes', '');
       formData.append('max_persons', max_persons || '');
+      formData.append('is_online', is_online ? '1' : '0');
+      if (online_url) formData.append('online_url', online_url);
 
       // Handle cover image (file or URL)
       if (cover_file) {
@@ -2232,6 +2265,15 @@ let html5QrCode = null;
     document.getElementById('eeNote').value = event.important_note || '';
     document.getElementById('eeDesc').value = event.description || '';
     document.getElementById('eePublic').checked = event.is_public !== 0;
+    
+    // Populate online event fields
+    const eeIsOnline = document.getElementById('eeIsOnline');
+    const eeOnlineUrl = document.getElementById('eeOnlineUrl');
+    if (eeIsOnline) {
+      eeIsOnline.checked = !!event.is_online;
+      if (eeOnlineUrl) eeOnlineUrl.value = event.online_url || '';
+      if (typeof toggleOnlineFields === 'function') toggleOnlineFields('ee');
+    }
     
     // Handle datetime-local format
     if (event.event_date) {
@@ -2609,6 +2651,8 @@ let html5QrCode = null;
     const important_note = document.getElementById('eeNote').value.trim();
     const is_public = document.getElementById('eePublic').checked;
     const max_persons = document.getElementById('eeMaxPersons').value;
+    const is_online = document.getElementById('eeIsOnline') ? document.getElementById('eeIsOnline').checked : false;
+    const online_url = document.getElementById('eeOnlineUrl') ? document.getElementById('eeOnlineUrl').value.trim() : '';
 
     if (!title || !event_date) {
       showAlert && showAlert('Title and date required', 'error');
@@ -2628,6 +2672,8 @@ let html5QrCode = null;
       formData.append('is_public', is_public ? '1' : '0');
       formData.append('notes', '');
       formData.append('max_persons', max_persons || '');
+      formData.append('is_online', is_online ? '1' : '0');
+      if (online_url) formData.append('online_url', online_url);
 
       // Handle cover image (file or URL)
       if (cover_file) {

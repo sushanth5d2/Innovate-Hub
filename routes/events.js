@@ -680,7 +680,8 @@ router.get('/', authMiddleware, (req, res) => {
           (SELECT COUNT(*) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as ticket_type_count,
           (SELECT MIN(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as min_price_cents,
           (SELECT MAX(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as max_price_cents,
-          (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency
+          (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency,
+          (SELECT COUNT(*) FROM event_tickets WHERE event_id = e.id AND owner_id = ? AND status = 'issued') as user_has_ticket
     FROM events e
     JOIN users u ON e.creator_id = u.id
     LEFT JOIN event_attendees ea ON e.id = ea.event_id AND ea.user_id = ?
@@ -688,7 +689,7 @@ router.get('/', authMiddleware, (req, res) => {
     ORDER BY e.event_date ASC
   `;
 
-  db.all(query, [userId, userId, userId], (err, events) => {
+  db.all(query, [userId, userId, userId, userId], (err, events) => {
     if (err) {
       return res.status(500).json({ error: 'Error fetching events' });
     }
@@ -742,7 +743,7 @@ router.get('/discover', authMiddleware, (req, res) => {
   const userId = req.user.userId;
   const { city, category, q } = req.query || {};
 
-  const params = [userId];
+  const params = [userId, userId];
   let where = `WHERE e.is_public = 1 AND datetime(e.event_date) >= datetime('now')`;
 
   if (city && String(city).trim()) {
@@ -769,7 +770,8 @@ router.get('/discover', authMiddleware, (req, res) => {
            (SELECT COUNT(*) FROM event_attendees WHERE event_id = e.id AND status = 'accepted') as interested_count,
            (SELECT MIN(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as min_price_cents,
            (SELECT MAX(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as max_price_cents,
-           (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency
+           (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency,
+           (SELECT COUNT(*) FROM event_tickets WHERE event_id = e.id AND owner_id = ? AND status = 'issued') as user_has_ticket
     FROM events e
     JOIN users u ON e.creator_id = u.id
     LEFT JOIN event_attendees ea ON e.id = ea.event_id AND ea.user_id = ?
@@ -849,7 +851,9 @@ router.post('/', authMiddleware, upload.single('cover_photo'), (req, res) => {
     fare_single,
     fare_couple,
     fare_group,
-    fare_options
+    fare_options,
+    is_online,
+    online_url
   } = req.body;
 
   // Use uploaded file path if available, otherwise use cover_image URL
@@ -860,9 +864,10 @@ router.post('/', authMiddleware, upload.single('cover_photo'), (req, res) => {
       creator_id, title, description, event_date,
       is_public, city, category,
       location, cover_image, organizer_name, important_note,
-      notes, max_persons, pricing_type, fare_single, fare_couple, fare_group, fare_options
+      notes, max_persons, pricing_type, fare_single, fare_couple, fare_group, fare_options,
+      is_online, online_url
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.run(
@@ -885,7 +890,9 @@ router.post('/', authMiddleware, upload.single('cover_photo'), (req, res) => {
       fare_single || null,
       fare_couple || null,
       fare_group || null,
-      fare_options || null
+      fare_options || null,
+      (is_online === '1' || is_online === 'true' || is_online === true) ? 1 : 0,
+      online_url || null
     ],
     function(err) {
     if (err) {
@@ -1770,14 +1777,15 @@ router.get('/:eventId', authMiddleware, (req, res) => {
            (SELECT COUNT(*) FROM event_attendees WHERE event_id = e.id) as total_invited,
            (SELECT MIN(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as min_price_cents,
            (SELECT MAX(price_cents) FROM event_ticket_types WHERE event_id = e.id AND is_active = 1) as max_price_cents,
-           (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency
+           (SELECT currency FROM event_ticket_types WHERE event_id = e.id AND is_active = 1 ORDER BY price_cents ASC, id ASC LIMIT 1) as ticket_currency,
+           (SELECT COUNT(*) FROM event_tickets WHERE event_id = e.id AND owner_id = ? AND status = 'issued') as user_has_ticket
     FROM events e
     JOIN users u ON e.creator_id = u.id
     LEFT JOIN event_attendees ea ON e.id = ea.event_id AND ea.user_id = ?
     WHERE e.id = ?
   `;
 
-  db.get(query, [userId, eventId], (err, event) => {
+  db.get(query, [userId, userId, eventId], (err, event) => {
     if (err || !event) {
       return res.status(404).json({ error: 'Event not found' });
     }
@@ -1827,7 +1835,9 @@ router.put('/:eventId', authMiddleware, upload.single('cover_photo'), (req, res)
     fare_single,
     fare_couple,
     fare_group,
-    fare_options
+    fare_options,
+    is_online,
+    online_url
   } = req.body;
 
   // Use uploaded file path if available, otherwise use cover_image URL or keep existing
@@ -1852,6 +1862,8 @@ router.put('/:eventId', authMiddleware, upload.single('cover_photo'), (req, res)
          fare_couple = ?,
          fare_group = ?,
          fare_options = ?,
+         is_online = COALESCE(?, is_online),
+         online_url = ?,
          updated_at = CURRENT_TIMESTAMP
      WHERE id = ? AND creator_id = ?`,
     [
@@ -1872,6 +1884,8 @@ router.put('/:eventId', authMiddleware, upload.single('cover_photo'), (req, res)
       fare_couple || null,
       fare_group || null,
       fare_options || null,
+      (is_online === undefined || is_online === null) ? null : ((is_online === '1' || is_online === 'true' || is_online === true) ? 1 : 0),
+      (is_online === '0' || is_online === 'false' || is_online === false) ? null : (online_url || null),
       eventId,
       userId
     ],

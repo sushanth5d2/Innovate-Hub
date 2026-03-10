@@ -301,7 +301,12 @@ function createPgWrapper(pool) {
     // db.prepare(sql) - SQLite prepared statements compatibility
     // Returns an object with .run(params, cb) and .finalize(cb)
     prepare(sql) {
-      const pgSql = wrapper._convertQuery(sql);
+      let pgSql = wrapper._convertQuery(sql);
+      // For INSERT, add RETURNING id to get lastID
+      const isInsert = /^\s*INSERT\s/i.test(pgSql);
+      if (isInsert && !/RETURNING/i.test(pgSql)) {
+        pgSql = pgSql.replace(/;?\s*$/, ' RETURNING id');
+      }
       return {
         run(...args) {
           let params = [];
@@ -309,9 +314,13 @@ function createPgWrapper(pool) {
           if (args.length >= 1 && typeof args[args.length - 1] === 'function') {
             callback = args.pop();
           }
-          params = args;
+          // Handle both .run([p1,p2], cb) and .run(p1, p2, cb) styles
+          if (args.length === 1 && Array.isArray(args[0])) {
+            params = args[0];
+          } else {
+            params = args;
+          }
           const converted = wrapper._convertBoolParams(pgSql, params);
-          // Re-index placeholders for each call (pgSql already has $1, $2, etc.)
           pool.query(pgSql, converted)
             .then(result => {
               if (callback) {
@@ -323,6 +332,7 @@ function createPgWrapper(pool) {
               }
             })
             .catch(err => {
+              console.error('[PG prepare.run] Error:', err.message, '\nSQL:', pgSql.substring(0, 200));
               if (callback) callback(err);
             });
         },
@@ -1692,6 +1702,18 @@ const migrateDatabase = () => {
     db.run(`ALTER TABLE events ADD COLUMN fare_options TEXT`, (err) => {
       if (err && !err.message.includes('duplicate column name')) {
         console.error('Error adding fare_options column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN is_online BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+        console.error('Error adding is_online column to events:', err);
+      }
+    });
+
+    db.run(`ALTER TABLE events ADD COLUMN online_url TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+        console.error('Error adding online_url column to events:', err);
       }
     });
 

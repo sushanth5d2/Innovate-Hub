@@ -172,6 +172,7 @@
 
             <div style="overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px;">
               <div class="exp-cta" style="display: flex; gap: 12px; min-width: max-content; padding-bottom: 4px;">
+                <a class="exp-btn" id="btnJoinOnline" href="#" target="_blank" rel="noopener noreferrer" style="display:none; min-width: 140px; text-decoration:none; background: linear-gradient(135deg,#00d4aa,#0095f6); color:#fff; text-align:center;">🌐 Join Online</a>
                 <button class="exp-btn primary" id="btnSelectTickets" type="button" style="min-width: 140px;">Select Tickets</button>
                 <button class="exp-btn" id="btnEditEvent" type="button" style="display:none; min-width: 140px;">Edit Event</button>
                 <button class="exp-btn" id="btnDeleteEvent" type="button" style="display:none; min-width: 120px; background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);">Delete</button>
@@ -364,6 +365,24 @@
               <div class="exp-field"><label>Date & time</label><input id="eeDate" type="datetime-local" required /></div>
               <div class="exp-field"><label>City</label><input id="eeCity" placeholder="e.g., Hyderabad, Khammam" /></div>
               <div class="exp-field"><label>Category</label><input id="eeCategory" placeholder="e.g., Concert, Party, Trip" /></div>
+            </div>
+
+            <!-- Online Event Toggle -->
+            <div style="margin-top: 12px; padding: 14px; background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.2); border-radius: 12px;">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                <input id="eeIsOnline" type="checkbox" style="width: 18px; height: 18px; accent-color: #a855f7;" onchange="toggleOnlineFields('ee')" />
+                <span style="display: flex; align-items: center; gap: 6px;">🌐 This is an Online Event</span>
+              </label>
+              <div id="eeOnlineFields" style="display: none; margin-top: 12px;">
+                <div class="exp-field" style="margin-bottom: 0;">
+                  <label>Event URL / Meeting Link</label>
+                  <input id="eeOnlineUrl" placeholder="https://zoom.us/j/... or https://meet.google.com/..." style="font-size: 14px;" />
+                  <small style="color: var(--ig-secondary-text); display: block; margin-top: 4px;">Zoom, Google Meet, Teams, YouTube Live, or any link where attendees can join</small>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="eeLocation" placeholder="Venue name, area" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;">
                 <label>Upload Cover Photo (optional)</label>
@@ -473,6 +492,24 @@
               <div class="exp-field"><label>Date & time</label><input id="ceDate" type="datetime-local" required /></div>
               <div class="exp-field"><label>City</label><input id="ceCity" placeholder="e.g., Hyderabad, Khammam" /></div>
               <div class="exp-field"><label>Category</label><input id="ceCategory" placeholder="e.g., Concert, Party, Trip" /></div>
+            </div>
+
+            <!-- Online Event Toggle -->
+            <div style="margin-top: 12px; padding: 14px; background: rgba(0,149,246,0.05); border: 1px solid rgba(0,149,246,0.2); border-radius: 12px;">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600;">
+                <input id="ceIsOnline" type="checkbox" style="width: 18px; height: 18px; accent-color: #0095f6;" onchange="toggleOnlineFields('ce')" />
+                <span style="display: flex; align-items: center; gap: 6px;">🌐 This is an Online Event</span>
+              </label>
+              <div id="ceOnlineFields" style="display: none; margin-top: 12px;">
+                <div class="exp-field" style="margin-bottom: 0;">
+                  <label>Event URL / Meeting Link</label>
+                  <input id="ceOnlineUrl" placeholder="https://zoom.us/j/... or https://meet.google.com/..." style="font-size: 14px;" />
+                  <small style="color: var(--ig-secondary-text); display: block; margin-top: 4px;">Zoom, Google Meet, Teams, YouTube Live, or any link where attendees can join</small>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
               <div class="exp-field" style="grid-column: 1 / -1;"><label>Venue / Location</label><input id="ceLocation" placeholder="Venue name, area" /></div>
               <div class="exp-field" style="grid-column: 1 / -1;">
                 <label>Upload Cover Photo (optional)</label>
@@ -720,6 +757,21 @@
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
       <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
       <script src="/js/events-experiences.js"></script>
+      <script>
+        // Toggle online event fields visibility
+        function toggleOnlineFields(prefix) {
+          var checkbox = document.getElementById(prefix + 'IsOnline');
+          var fields = document.getElementById(prefix + 'OnlineFields');
+          var locationField = document.getElementById(prefix + 'Location');
+          if (checkbox.checked) {
+            fields.style.display = 'block';
+            if (locationField && !locationField.value) locationField.placeholder = 'Optional for online events';
+          } else {
+            fields.style.display = 'none';
+            if (locationField) locationField.placeholder = 'Venue name, area';
+          }
+        }
+      </script>
       <script src="/js/notification-banner.js"></script>
       <script src="/js/unified-call-manager.js?v=20260310j"></script>
       
