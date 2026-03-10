@@ -963,7 +963,7 @@ CREATE TABLE IF NOT EXISTS users (
         last_seen TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      , date_of_birth DATE, fullname TEXT, is_private BOOLEAN DEFAULT FALSE);
+      , date_of_birth DATE, fullname TEXT, is_private BOOLEAN DEFAULT TRUE, break_until TIMESTAMPTZ, is_deactivated BOOLEAN DEFAULT FALSE, deactivated_at TIMESTAMPTZ);
 
 -- Table: call_history
 CREATE TABLE IF NOT EXISTS call_history (

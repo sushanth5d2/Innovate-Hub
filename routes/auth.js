@@ -134,6 +134,11 @@ router.post('/login', [
         return res.status(400).json({ error: 'Invalid credentials' });
       }
 
+      // If account was deactivated, reactivate on login
+      if (user.is_deactivated) {
+        db.run('UPDATE users SET is_deactivated = 0, deactivated_at = NULL WHERE id = ?', [user.id]);
+      }
+
       // Update online status
       db.run('UPDATE users SET is_online = 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
 

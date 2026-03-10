@@ -2117,8 +2117,8 @@ const migrateDatabase = () => {
 
     // ===== PRIVATE ACCOUNT FEATURE =====
 
-    // Add is_private column to users
-    db.run(`ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT 0`, (err) => {
+    // Add is_private column to users (default: private)
+    db.run(`ALTER TABLE users ADD COLUMN is_private BOOLEAN DEFAULT 1`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         console.log('Note: is_private column migration - ', err ? err.message : 'ok');
       }
@@ -2215,6 +2215,25 @@ const migrateDatabase = () => {
     )`, (err) => {
       if (err && !err.message.includes('already exists')) {
         console.log('Note: call_participants table - ', err ? err.message : 'ok');
+      }
+    });
+
+    // ===== TAKE A BREAK FEATURE =====
+    db.run(`ALTER TABLE users ADD COLUMN break_until TIMESTAMPTZ`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: break_until column migration - ', err ? err.message : 'ok');
+      }
+    });
+
+    // ===== DEACTIVATE ACCOUNT FEATURE =====
+    db.run(`ALTER TABLE users ADD COLUMN is_deactivated BOOLEAN DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: is_deactivated column migration - ', err ? err.message : 'ok');
+      }
+    });
+    db.run(`ALTER TABLE users ADD COLUMN deactivated_at TIMESTAMPTZ`, (err) => {
+      if (err && !err.message.includes('already exists') && !err.message.includes('duplicate column')) {
+        console.log('Note: deactivated_at column migration - ', err ? err.message : 'ok');
       }
     });
 

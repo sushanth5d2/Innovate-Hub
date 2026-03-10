@@ -1,9 +1,112 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
+
+// Change password
+router.put('/password', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { old_password, new_password } = req.body;
+
+  if (!old_password || !new_password) {
+    return res.status(400).json({ error: 'Both old and new passwords are required' });
+  }
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+
+  db.get('SELECT password FROM users WHERE id = ?', [userId], async (err, user) => {
+    if (err) return res.status(500).json({ error: 'Server error' });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(old_password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(new_password, salt);
+
+    db.run('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedPassword, userId], function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to update password' });
+        res.json({ success: true, message: 'Password changed successfully' });
+      });
+  });
+}));
+
+// Take a Break - set break_until timestamp
+router.put('/take-a-break', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { duration_minutes } = req.body;
+
+  if (!duration_minutes || duration_minutes < 1 || duration_minutes > 1440) {
+    return res.status(400).json({ error: 'Duration must be between 1 and 1440 minutes' });
+  }
+
+  const breakUntil = new Date(Date.now() + duration_minutes * 60 * 1000).toISOString();
+
+  db.run('UPDATE users SET break_until = ? WHERE id = ?', [breakUntil, userId], function(err) {
+    if (err) return res.status(500).json({ error: 'Failed to set break' });
+    res.json({ success: true, break_until: breakUntil });
+  });
+}));
+
+// Cancel take a break
+router.delete('/take-a-break', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.run('UPDATE users SET break_until = NULL WHERE id = ?', [userId], function(err) {
+    if (err) return res.status(500).json({ error: 'Failed to cancel break' });
+    res.json({ success: true });
+  });
+}));
+
+// Get break status
+router.get('/take-a-break/status', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+
+  db.get('SELECT break_until FROM users WHERE id = ?', [userId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Server error' });
+    const breakUntil = row && row.break_until ? new Date(row.break_until) : null;
+    const isOnBreak = breakUntil && breakUntil > new Date();
+    res.json({ success: true, is_on_break: !!isOnBreak, break_until: isOnBreak ? row.break_until : null });
+  });
+}));
+
+// Deactivate account
+router.put('/deactivate', authMiddleware, asyncHandler((req, res) => {
+  const db = getDb();
+  const userId = req.user.userId;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required to deactivate account' });
+  }
+
+  db.get('SELECT password FROM users WHERE id = ?', [userId], async (err, user) => {
+    if (err) return res.status(500).json({ error: 'Server error' });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Incorrect password' });
+    }
+
+    db.run('UPDATE users SET is_deactivated = 1, deactivated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [userId], function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to deactivate account' });
+        res.json({ success: true, message: 'Account deactivated. Log back in anytime to reactivate.' });
+      });
+  });
+}));
 
 // Get user profile
 router.get('/:userId', authMiddleware, asyncHandler((req, res) => {
@@ -894,5 +997,7 @@ router.get('/:userId/following-detailed', authMiddleware, asyncHandler((req, res
     res.json({ success: true, following: following || [] });
   });
 }));
+
+// Reactivate account (called during login, handled in auth.js)
 
 module.exports = router;

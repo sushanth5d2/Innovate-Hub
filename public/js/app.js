@@ -421,6 +421,66 @@
     }
   }
 
+  // ===== TAKE A BREAK CHECK =====
+  function checkBreakStatus() {
+    // Skip on login/register pages
+    if (window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/') return;
+    const token = getToken();
+    if (!token) return;
+
+    // Quick local check first
+    const localBreak = localStorage.getItem('break_until');
+    if (localBreak && new Date(localBreak) > new Date()) {
+      showBreakScreenGlobal(localBreak);
+      return;
+    } else if (localBreak) {
+      localStorage.removeItem('break_until');
+    }
+
+    // Server check
+    fetch(API_URL + '/users/take-a-break/status', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.is_on_break && data.break_until) {
+        localStorage.setItem('break_until', data.break_until);
+        showBreakScreenGlobal(data.break_until);
+      }
+    }).catch(function() {});
+  }
+
+  function showBreakScreenGlobal(breakUntilStr) {
+    if (document.getElementById('break-screen-global')) return;
+    const screen = document.createElement('div');
+    screen.id = 'break-screen-global';
+    screen.style.cssText = 'position:fixed;inset:0;background:#0a0a0a;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+    screen.innerHTML = '<div style="text-align:center;max-width:340px;padding:20px;">'
+      + '<div style="font-size:64px;margin-bottom:16px;">☕</div>'
+      + '<h2 style="margin:0 0 8px;font-size:24px;font-weight:700;">You\'re on a break</h2>'
+      + '<p style="margin:0 0 24px;color:#86868b;font-size:14px;">Take some time away. The app will unlock when the timer ends.</p>'
+      + '<div id="break-countdown-global" style="font-size:48px;font-weight:800;background:linear-gradient(135deg,#fdcb6e,#e17055);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:24px;font-variant-numeric:tabular-nums;"></div>'
+      + '<p style="margin:0;color:#86868b;font-size:12px;">You chose this. Stay strong! 💪</p>'
+      + '</div>';
+    document.body.appendChild(screen);
+
+    var countdown = screen.querySelector('#break-countdown-global');
+    function update() {
+      var now = new Date();
+      var end = new Date(breakUntilStr);
+      var diff = end - now;
+      if (diff <= 0) {
+        screen.remove();
+        localStorage.removeItem('break_until');
+        return;
+      }
+      var h = Math.floor(diff / 3600000);
+      var m = Math.floor((diff % 3600000) / 60000);
+      var s = Math.floor((diff % 60000) / 1000);
+      countdown.textContent = (h > 0 ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+      setTimeout(update, 500);
+    }
+    update();
+  }
+
   window.InnovateAPI = {
     __version: '2026-01-12',
     API_URL,
@@ -445,13 +505,19 @@
     getUserAvatar,
     createAvatarWithInitials,
     initializePage,
-    initNavProfilePic
+    initNavProfilePic,
+    checkBreakStatus,
+    showBreakScreenGlobal
   };
 
   // Auto-init: load profile pic into bottom nav on every page
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initNavProfilePic);
+    document.addEventListener('DOMContentLoaded', function() {
+      initNavProfilePic();
+      checkBreakStatus();
+    });
   } else {
     initNavProfilePic();
+    checkBreakStatus();
   }
 })();
