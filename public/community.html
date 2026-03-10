@@ -6500,90 +6500,55 @@
       `;
     }
 
+    function _getGroupCallInfo() {
+      const group = state.groups.find(g => g.id == state.currentGroupId);
+      return {
+        username: group ? group.name : 'Group Call',
+        profile_picture: group ? group.profile_picture : null
+      };
+    }
+
     async function startVoiceCall() {
-      try {
-        state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        renderCallInterface(false);
-        // Implement WebRTC signaling
-      } catch (error) {
-        console.error('Error starting voice call:', error);
+      if (!state.currentGroupId) {
+        InnovateAPI.showAlert('Please select a group first', 'error');
+        return;
       }
+      if (!window.callManager) {
+        InnovateAPI.showAlert('Call system not ready', 'error');
+        return;
+      }
+      window.callManager.startGroupCall(state.currentGroupId, _getGroupCallInfo(), true);
     }
 
     async function startVideoCall() {
-      try {
-        state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        renderCallInterface(true);
-        // Implement WebRTC signaling
-      } catch (error) {
-        console.error('Error starting video call:', error);
+      if (!state.currentGroupId) {
+        InnovateAPI.showAlert('Please select a group first', 'error');
+        return;
       }
+      if (!window.callManager) {
+        InnovateAPI.showAlert('Call system not ready', 'error');
+        return;
+      }
+      window.callManager.startGroupCall(state.currentGroupId, _getGroupCallInfo(), false);
     }
 
     async function startScreenShare() {
-      try {
-        state.localStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        renderCallInterface(true);
-        // Implement WebRTC signaling
-      } catch (error) {
-        console.error('Error starting screen share:', error);
+      if (!state.currentGroupId) {
+        InnovateAPI.showAlert('Please select a group first', 'error');
+        return;
       }
-    }
-
-    function renderCallInterface(hasVideo) {
-      const content = document.getElementById('centerContent');
-      content.innerHTML = `
-        <div class="call-view">
-          <div class="video-grid" id="videoGrid">
-            <div class="video-tile">
-              <video id="localVideo" autoplay muted ${hasVideo ? '' : 'style="display:none"'}></video>
-              <div class="video-name">You</div>
-            </div>
-          </div>
-          <div class="call-controls">
-            <button class="call-btn mute" onclick="toggleMute()">
-              <i class="fas fa-microphone"></i>
-            </button>
-            <button class="call-btn video" onclick="toggleVideo()" ${hasVideo ? '' : 'style="display:none"'}>
-              <i class="fas fa-video"></i>
-            </button>
-            <button class="call-btn screen" onclick="toggleScreenShare()">
-              <i class="fas fa-desktop"></i>
-            </button>
-            <button class="call-btn end" onclick="endCall()">
-              <i class="fas fa-phone-slash"></i>
-            </button>
-          </div>
-        </div>
-      `;
-
-      if (hasVideo) {
-        document.getElementById('localVideo').srcObject = state.localStream;
+      if (!window.callManager) {
+        InnovateAPI.showAlert('Call system not ready', 'error');
+        return;
       }
-    }
-
-    function toggleMute() {
-      if (state.localStream) {
-        const audioTrack = state.localStream.getAudioTracks()[0];
-        audioTrack.enabled = !audioTrack.enabled;
-        event.target.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
-      }
-    }
-
-    function toggleVideo() {
-      if (state.localStream) {
-        const videoTrack = state.localStream.getVideoTracks()[0];
-        videoTrack.enabled = !videoTrack.enabled;
-        event.target.innerHTML = videoTrack.enabled ? '<i class="fas fa-video"></i>' : '<i class="fas fa-video-slash"></i>';
-      }
-    }
-
-    function endCall() {
-      if (state.localStream) {
-        state.localStream.getTracks().forEach(track => track.stop());
-        state.localStream = null;
-      }
-      loadCallsView(state.currentGroupId);
+      // Start an audio-only group call first, then immediately toggle screen share
+      await window.callManager.startGroupCall(state.currentGroupId, _getGroupCallInfo(), true);
+      // Small delay to let the call connect before toggling screen share
+      setTimeout(() => {
+        if (window.callManager.callState === 'connected') {
+          window.callManager.toggleScreenShare();
+        }
+      }, 500);
     }
 
     // ==================== FOLDERS VIEW ====================

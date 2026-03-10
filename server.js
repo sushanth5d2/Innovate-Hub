@@ -593,24 +593,28 @@ io.on('connection', (socket) => {
         // Query group_members table to get all member user IDs and ring each one individually
         const { getDb } = require('./config/database');
         const db = getDb();
-        db.all('SELECT user_id FROM group_members WHERE group_id = ?', [groupId], (err, members) => {
-          if (err) {
-            console.error('Failed to query group members for ring:', err);
-            return;
-          }
-          const ringData = {
-            groupId,
-            callerId: userId,
-            callerName: displayName,
-            callerPicture: profilePicture || null,
-            groupPicture: groupPicture || null,
-            isVideo: !!isVideo,
-            participantCount
-          };
-          (members || []).forEach(m => {
-            if (String(m.user_id) !== String(userId)) {
-              io.to(`user_${m.user_id}`).emit('group-call:ring', ringData);
+        // Also fetch group name for the ring notification
+        db.get('SELECT name, profile_picture FROM community_groups WHERE id = ?', [groupId], (nameErr, groupRow) => {
+          db.all('SELECT user_id FROM group_members WHERE group_id = ?', [groupId], (err, members) => {
+            if (err) {
+              console.error('Failed to query group members for ring:', err);
+              return;
             }
+            const ringData = {
+              groupId,
+              callerId: userId,
+              callerName: displayName,
+              callerPicture: profilePicture || null,
+              groupPicture: groupPicture || (groupRow ? groupRow.profile_picture : null),
+              groupName: groupRow ? groupRow.name : null,
+              isVideo: !!isVideo,
+              participantCount
+            };
+            (members || []).forEach(m => {
+              if (String(m.user_id) !== String(userId)) {
+                io.to(`user_${m.user_id}`).emit('group-call:ring', ringData);
+              }
+            });
           });
         });
       }

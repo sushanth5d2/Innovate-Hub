@@ -208,7 +208,7 @@ class UnifiedCallManager {
   showActiveCallScreen() {
     const modal = this._getModal();
     const isGroup = this.callMode === 'group';
-    const name = isGroup ? 'Group Call' : (this.currentContactInfo?.username || 'User');
+    const name = isGroup ? (this.currentContactInfo?.username || 'Group Call') : (this.currentContactInfo?.username || 'User');
     const pic = this.currentContactInfo?.profile_picture || '/img/default-avatar.png';
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
 
@@ -1354,11 +1354,12 @@ class UnifiedCallManager {
       this.callState = 'ringing';
       this.isVideoCall = !!data.isVideo;
       this.currentGroupId = data.groupId;
-      this.currentContactInfo = { username: data.callerName || 'Group Call', profile_picture: data.groupPicture || data.callerPicture || null };
+      const groupLabel = data.groupName || 'Group Call';
+      this.currentContactInfo = { username: groupLabel, profile_picture: data.groupPicture || data.callerPicture || null };
       this._pendingGroupCallData = data;
       
       this.showIncomingCallScreen({
-        username: `${data.callerName || 'Someone'} • Group Call`,
+        username: `${data.callerName || 'Someone'} • ${groupLabel}`,
         profile_picture: data.groupPicture || data.callerPicture || null
       });
       this.playIncomingRingtone();
