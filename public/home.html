@@ -1689,8 +1689,8 @@
       
       <div class="story-viewer-header">
         <div class="story-viewer-user">
-          <img id="storyViewerAvatar" src="" alt="" class="story-viewer-avatar">
-          <span id="storyViewerUsername"></span>
+          <img id="storyViewerAvatar" src="" alt="" class="story-viewer-avatar" style="cursor:pointer;" onclick="event.stopPropagation(); navigateToStoryUserProfile()">
+          <span id="storyViewerUsername" style="cursor:pointer;" onclick="event.stopPropagation(); navigateToStoryUserProfile()"></span>
           <span id="storyViewerTime" class="story-viewer-time"></span>
         </div>
         <button class="story-viewer-close" onclick="event.stopPropagation(); closeStoryViewer()">×</button>
@@ -3204,6 +3204,15 @@
     }
 
     // Story functions
+    function navigateToStoryUserProfile() {
+      const story = currentStories[currentStoryIndex];
+      if (story && story.username) {
+        window.location.href = `/profile/${story.username}`;
+      } else if (story && story.user_id) {
+        window.location.href = `/profile/${story.user_id}`;
+      }
+    }
+
     function openCreateStoryModal() {
       document.getElementById('createStoryModal').style.display = 'flex';
       updateStoryCharCount();

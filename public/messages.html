@@ -1773,7 +1773,8 @@
             wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
             const avatarEl = document.createElement('img');
             avatarEl.src = InnovateAPI.getUserAvatar(currentPartnerAvatar);
-            avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+            avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; cursor: pointer;';
+            avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${currentContactId}`; };
             wrapperEl.appendChild(avatarEl);
           } else if (!isSent) {
             // No avatar but add left margin to align with avatar messages
@@ -2447,7 +2448,8 @@
             wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
             const avatarEl = document.createElement('img');
             avatarEl.src = InnovateAPI.getUserAvatar(msg.sender_profile_picture);
-            avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+            avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; cursor: pointer;';
+            avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${msg.sender_id}`; };
             wrapperEl.appendChild(avatarEl);
           } else if (!isSent) {
             wrapperEl.style.cssText = 'display: flex; flex-direction: column; width: 100%; padding-left: 32px;';
@@ -3973,7 +3975,8 @@
         const wrapperEl = document.createElement('div');
         wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
         const avatarEl = document.createElement('img');
-        avatarEl.src = InnovateAPI.getUserAvatar(currentPartnerAvatar);
+        avatarEl.src = InnovateAPI.getUserAvatar(currentPartnerAvatar); cursor: pointer;';
+        avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${currentContactId}`; }
         avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
         wrapperEl.appendChild(avatarEl);
         wrapperEl.appendChild(messageEl);
@@ -4030,7 +4033,8 @@
         wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
         const avatarEl = document.createElement('img');
         avatarEl.src = InnovateAPI.getUserAvatar(message.sender_profile_picture);
-        avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+        avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; cursor: pointer;';
+        avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${message.sender_id}`; };
         wrapperEl.appendChild(avatarEl);
 
         const messageEl = document.createElement('div');
@@ -6198,12 +6202,12 @@
         return;
       }
       container.innerHTML = contacts.map(c => {
-        const pic = c.profile_picture || '/img/default-avatar.png';
+        const pic = c.profile_picture || '/images/default-avatar.svg';
         const lastMsg = c.last_message ? (c.last_message.length > 35 ? c.last_message.substring(0, 35) + '...' : c.last_message) : '';
         const safeUsername = (c.username || '').replace(/'/g, "\\'");
         return `
           <div onclick="doForwardTo(${c.contact_id}, '${safeUsername}')" style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
-            <img src="${pic}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.src='/img/default-avatar.png'" />
+            <img src="${pic}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.src='/images/default-avatar.svg'" />
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 15px; font-weight: 500; color: var(--ig-primary-text, #fff);">${c.username}</div>
               <div style="font-size: 13px; color: var(--ig-secondary-text, #a8a8a8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${lastMsg}</div>

@@ -178,7 +178,7 @@ class CallManager {
     if (typeof InnovateAPI !== 'undefined' && InnovateAPI.getUserAvatar) {
       return InnovateAPI.getUserAvatar(pic);
     }
-    return pic || '/img/default-avatar.png';
+    return pic || '/images/default-avatar.svg';
   }
 
   showOutgoingCallScreen(name, avatar, isVideo) {
@@ -197,7 +197,7 @@ class CallManager {
             End-to-end encrypted
           </div>
           <div class="wa-call-avatar-ring">
-            <img src="${avatarUrl}" class="wa-call-avatar" onerror="this.src='/img/default-avatar.png'" />
+            <img src="${avatarUrl}" class="wa-call-avatar" onerror="this.src='/images/default-avatar.svg'" />
           </div>
           <h2 class="wa-call-name">${this._esc(name)}</h2>
           <p class="wa-call-status" id="waCallStatus">Calling...</p>
@@ -253,7 +253,7 @@ class CallManager {
             End-to-end encrypted
           </div>
           <div class="wa-call-avatar-ring wa-ring-pulse">
-            <img src="${avatarUrl}" class="wa-call-avatar" onerror="this.src='/img/default-avatar.png'" />
+            <img src="${avatarUrl}" class="wa-call-avatar" onerror="this.src='/images/default-avatar.svg'" />
           </div>
           <h2 class="wa-call-name">${this._esc(name)}</h2>
           <p class="wa-call-status">${typeLabel}</p>
@@ -305,7 +305,7 @@ class CallManager {
         </div>
 
         <div class="wa-call-center-info ${isVideo ? 'wa-center-hidden' : ''}" id="waCallCenterInfo">
-          <img src="${avatarUrl}" class="wa-call-avatar-active" onerror="this.src='/img/default-avatar.png'" />
+          <img src="${avatarUrl}" class="wa-call-avatar-active" onerror="this.src='/images/default-avatar.svg'" />
           <h2 class="wa-call-name" style="margin-top:12px;">${this._esc(name)}</h2>
           <p class="wa-call-timer" id="waCallTimer">00:00</p>
           <div id="waParticipantsArea" style="margin-top:8px;">${participantsHtml}</div>
@@ -391,7 +391,7 @@ class CallManager {
       <div class="wa-call-overlay wa-ended">
         <div class="wa-call-bg"></div>
         <div class="wa-call-content">
-          <img src="${avatarUrl}" class="wa-call-avatar-active" onerror="this.src='/img/default-avatar.png'" style="width:80px;height:80px;" />
+          <img src="${avatarUrl}" class="wa-call-avatar-active" onerror="this.src='/images/default-avatar.svg'" style="width:80px;height:80px;" />
           <h2 class="wa-call-name" style="margin-top:16px;">${this._esc(name)}</h2>
           <p class="wa-call-status" style="color:#ef4444;">Call ended</p>
           ${duration ? `<p class="wa-call-status" style="font-size:13px; opacity:0.7;">${duration}</p>` : ''}
@@ -440,7 +440,7 @@ class CallManager {
     let html = '<div class="wa-participants">';
     this.participants.forEach((info, id) => {
       html += `<div class="wa-participant-chip">
-        <img src="${this._avatarUrl(info.profile_picture)}" class="wa-participant-avatar" onerror="this.src='/img/default-avatar.png'" />
+        <img src="${this._avatarUrl(info.profile_picture)}" class="wa-participant-avatar" onerror="this.src='/images/default-avatar.svg'" />
         <span>${this._esc(info.username)}</span>
       </div>`;
     });
@@ -530,7 +530,7 @@ class CallManager {
     }
     mini.innerHTML = `
       <div class="wa-mini-avatar">
-        <img src="${this._avatarUrl(this.currentCallInfo?.profile_picture)}" onerror="this.src='/img/default-avatar.png'" />
+        <img src="${this._avatarUrl(this.currentCallInfo?.profile_picture)}" onerror="this.src='/images/default-avatar.svg'" />
       </div>
       <div class="wa-mini-info">
         <span class="wa-mini-name">${this._esc(this.currentCallInfo?.username || 'Call')}</span>
@@ -1054,7 +1054,7 @@ class CallManager {
           <div id="waAddMemberList" style="flex:1;overflow-y:auto;padding:4px 0;">
             ${contacts.map(c => `
               <div onclick="callManager.addMemberToCall(${c.contact_id}, '${(c.username || '').replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
-                <img src="${c.profile_picture || '/img/default-avatar.png'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+                <img src="${c.profile_picture || '/images/default-avatar.svg'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
                 <div style="flex:1;min-width:0;">
                   <div style="font-size:15px;font-weight:500;color:var(--ig-primary-text, #fff);">${c.username || ''}</div>
                 </div>
@@ -1084,7 +1084,7 @@ class CallManager {
     }
     list.innerHTML = filtered.map(c => `
       <div onclick="callManager.addMemberToCall(${c.contact_id}, '${(c.username || '').replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
-        <img src="${c.profile_picture || '/img/default-avatar.png'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+        <img src="${c.profile_picture || '/images/default-avatar.svg'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
         <div style="flex:1;"><div style="font-size:15px;font-weight:500;color:var(--ig-primary-text, #fff);">${c.username || ''}</div></div>
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="20" height="20" style="color:var(--ig-secondary-text);"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>

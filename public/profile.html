@@ -1824,6 +1824,12 @@
       border: 1px solid var(--pf-border);
     }
 
+    .pf-follow-back-btn.requested {
+      background: var(--ig-secondary-background);
+      color: var(--ig-primary-text);
+      border: 1px solid var(--ig-border);
+    }
+
     .pf-remove-btn {
       background: none;
       border: none;
@@ -2773,6 +2779,11 @@
         isPrivateAccount = !!user.is_private;
         hasRequestedFollow = !!user.has_requested_follow;
         isBlockedUser = !isOwnPortfolio && user.is_blocked > 0;
+
+        // Update browser URL to use username for cleaner sharing
+        if (user.username && window.location.pathname !== `/profile/${user.username}`) {
+          window.history.replaceState(null, '', `/profile/${user.username}`);
+        }
 
         // Parse JSON fields
         const skills = Array.isArray(user.skills) ? user.skills : (user.skills ? JSON.parse(user.skills) : []);
@@ -3764,17 +3775,36 @@
     }
 
     async function toggleFollowInList(userId, btn) {
-      const isFollowing = btn.classList.contains('following');
+      const isCurrentlyFollowing = btn.classList.contains('following');
+      const isRequested = btn.classList.contains('requested');
       try {
-        const method = isFollowing ? 'DELETE' : 'POST';
+        const method = (isCurrentlyFollowing || isRequested) ? 'DELETE' : 'POST';
         const res = await fetch(`/api/users/${userId}/follow`, {
           method,
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         if (!res.ok) throw new Error('Failed');
-        btn.classList.toggle('following');
-        btn.textContent = btn.classList.contains('following') ? 'Following' : 'Follow Back';
-        showToast(btn.classList.contains('following') ? 'Following!' : 'Unfollowed');
+        const data = await res.json();
+
+        btn.classList.remove('following', 'requested');
+        if (method === 'POST' && data.status === 'requested') {
+          btn.classList.add('requested');
+          btn.textContent = 'Requested';
+          btn.style.background = 'var(--ig-secondary-background)';
+          btn.style.color = 'var(--ig-primary-text)';
+          showToast('Follow request sent');
+        } else if (method === 'POST') {
+          btn.classList.add('following');
+          btn.textContent = 'Following';
+          btn.style.background = '';
+          btn.style.color = '';
+          showToast('Following!');
+        } else {
+          btn.textContent = 'Follow Back';
+          btn.style.background = '';
+          btn.style.color = '';
+          showToast(isCurrentlyFollowing ? 'Unfollowed' : 'Request cancelled');
+        }
       } catch (err) {
         showToast('Failed to update');
       }
@@ -4377,7 +4407,8 @@
     }
 
     function sharePortfolio() {
-      const url = window.location.href;
+      const username = portfolioUserData ? portfolioUserData.username : null;
+      const url = username ? `${window.location.origin}/profile/${username}` : window.location.href;
       if (navigator.share) {
         navigator.share({ title: 'Profile', url });
       } else {

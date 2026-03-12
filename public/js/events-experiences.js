@@ -823,11 +823,11 @@
           allMatches.forEach(match => {
             const distance = match.distance_meters ? `${match.distance_meters}m away` : 'Nearby';
             const timeAgo = match.matched_at ? formatTimeAgo(match.matched_at) : '';
-            const profilePic = match.profile_picture || '/images/default-avatar.png';
+            const profilePic = match.profile_picture || '/images/default-avatar.svg';
             
             html += `
               <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--ig-background); border: 1px solid var(--ig-border); border-radius: 8px; margin-bottom: 8px;">
-                <img src="${profilePic}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(0,212,170,0.5);" onerror="this.src='/images/default-avatar.png'" />
+                <img src="${profilePic}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(0,212,170,0.5);" onerror="this.src='/images/default-avatar.svg'" />
                 <div style="flex: 1; min-width: 0;">
                   <div style="font-weight: 700; font-size: 14px;">@${match.username}</div>
                   <div style="font-size: 12px; color: var(--ig-secondary-text);">
@@ -1412,7 +1412,7 @@
             : `<div style="display: flex; align-items: center; gap: 8px; color: #00d4aa; font-size: 13px; font-weight: 700; padding: 8px 16px; background: rgba(0,212,170,0.1); border-radius: 12px; border: 1.5px solid rgba(0,212,170,0.2);"><span style="font-size: 16px;">🎫</span> Ticket Issued</div>`;
 
           // Profile picture with fallback to initial avatar
-          const hasProfilePic = o.buyer_picture && o.buyer_picture !== '/default-avatar.png';
+          const hasProfilePic = o.buyer_picture && o.buyer_picture !== '/default-avatar.svg';
           const firstLetter = o.buyer_username?.charAt(0)?.toUpperCase() || 'U';
           const profileUrl = `/profile.html?username=${encodeURIComponent(o.buyer_username)}`;
           

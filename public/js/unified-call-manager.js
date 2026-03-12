@@ -162,13 +162,13 @@ class UnifiedCallManager {
   showOutgoingCallScreen(contactInfo) {
     const modal = this._getModal();
     const name = contactInfo?.username || 'User';
-    const pic = contactInfo?.profile_picture || '/img/default-avatar.png';
+    const pic = contactInfo?.profile_picture || '/images/default-avatar.svg';
     const label = this.callMode === 'group' ? 'Group Call' : (this.isVideoCall ? 'Video Call' : 'Voice Call');
     modal.style.display = 'block';
     modal.innerHTML = `
       <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
         <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;margin-bottom:24px;box-shadow:0 0 30px rgba(0,149,246,0.3);">
-          <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+          <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
         </div>
         <h2 style="margin:0 0 8px;font-size:24px;">${name}</h2>
         <p style="margin:0;color:rgba(255,255,255,0.6);font-size:14px;">${label} • Calling...</p>
@@ -183,13 +183,13 @@ class UnifiedCallManager {
   showIncomingCallScreen(callerInfo) {
     const modal = this._getModal();
     const name = callerInfo?.username || 'Unknown';
-    const pic = callerInfo?.profile_picture || '/img/default-avatar.png';
+    const pic = callerInfo?.profile_picture || '/images/default-avatar.svg';
     const label = this.callMode === 'group' ? 'Group Call' : (this.isVideoCall ? 'Video Call' : 'Voice Call');
     modal.style.display = 'block';
     modal.innerHTML = `
       <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
         <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;margin-bottom:24px;box-shadow:0 0 30px rgba(0,149,246,0.3);animation:pulse-ring 1.5s ease-in-out infinite;">
-          <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+          <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
         </div>
         <h2 style="margin:0 0 8px;font-size:24px;">${name}</h2>
         <p style="margin:0;color:rgba(255,255,255,0.6);font-size:14px;">Incoming ${label}</p>
@@ -209,7 +209,7 @@ class UnifiedCallManager {
     const modal = this._getModal();
     const isGroup = this.callMode === 'group';
     const name = isGroup ? (this.currentContactInfo?.username || 'Group Call') : (this.currentContactInfo?.username || 'User');
-    const pic = this.currentContactInfo?.profile_picture || '/img/default-avatar.png';
+    const pic = this.currentContactInfo?.profile_picture || '/images/default-avatar.svg';
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
 
     // Build a key that captures the current screen mode to prevent unnecessary rebuilds
@@ -271,7 +271,7 @@ class UnifiedCallManager {
       mainContentHTML = `
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);">
           <div style="width:100px;height:100px;border-radius:50%;overflow:hidden;margin-bottom:16px;">
-            <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+            <img src="${pic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
           </div>
           <h3 style="color:white;margin:0 0 4px;">${name}</h3>
         </div>`;
@@ -1668,7 +1668,7 @@ class UnifiedCallManager {
       const safeUsername = (c.username || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       return `
       <div onclick="callManager.addMemberToCall(${c.contact_id}, '${safeUsername}')" style="display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
-        <img src="${c.profile_picture || '/img/default-avatar.png'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/img/default-avatar.png'" />
+        <img src="${c.profile_picture || '/images/default-avatar.svg'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.src='/images/default-avatar.svg'" />
         <div style="flex:1;"><div style="font-size:15px;font-weight:500;color:#fff;">${c.username || ''}</div></div>
         <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,149,246,0.2);display:flex;align-items:center;justify-content:center;">
           <svg fill="none" viewBox="0 0 24 24" stroke="#0095f6" stroke-width="2" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke-linecap="round" stroke-linejoin="round"/></svg>
