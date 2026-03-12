@@ -3043,21 +3043,20 @@
 
     // ===== AVATAR CLICK & PHOTO CHANGE =====
     function handleAvatarClick() {
-      if (isOwnPortfolio) {
-        changePhoto();
-      } else {
-        // Preview photo for other users
-        const src = document.getElementById('pf-avatar').src;
-        if (!src || src.includes('default') || src.startsWith('data:image/svg')) return;
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-        modal.innerHTML = `
-          <button onclick="this.parentElement.remove()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;color:white;width:44px;height:44px;border-radius:50%;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
-          <img src="${src}" style="max-width:90vw;max-height:85vh;object-fit:contain;border-radius:12px;">
-        `;
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-        document.body.appendChild(modal);
+      const src = document.getElementById('pf-avatar').src;
+      if (!src || src.includes('default') || src.startsWith('data:image/svg')) {
+        if (isOwnPortfolio) changePhoto();
+        return;
       }
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+      modal.innerHTML = `
+        <button onclick="this.parentElement.remove()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;color:white;width:44px;height:44px;border-radius:50%;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;">&times;</button>
+        <img src="${src}" style="max-width:90vw;max-height:85vh;object-fit:contain;border-radius:12px;">
+        ${isOwnPortfolio ? '<button onclick="this.parentElement.remove();changePhoto();" style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#6c63ff,#a855f7);border:none;color:white;padding:12px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class=\\"fas fa-camera\\"></i> Change Photo</button>' : ''}
+      `;
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      document.body.appendChild(modal);
     }
 
     let cropper = null;

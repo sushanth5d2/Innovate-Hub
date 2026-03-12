@@ -662,3 +662,36 @@
     height: 200px !important;
   }
 }
+
+/* Create Event modal mobile fixes */
+@media (max-width: 520px) {
+  #createEventModal > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+  }
+
+  #createEventModalContent {
+    padding: 14px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stack 2-column grids to single column on mobile */
+  #createEventModalContent > div[style*="grid-template-columns: 1fr 1fr"],
+  #createEventModalContent div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ig-modal-overlay {
+    padding: 0 !important;
+  }
+
+  .ig-modal {
+    min-width: unset !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+  }
+}

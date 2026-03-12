@@ -383,7 +383,12 @@ const initDatabase = () => {
     // Wrap the pool with SQLite-compatible API
     db = createPgWrapper(pool);
     console.log('Connected to PostgreSQL database');
-    createTablesPostgres();
+    createTablesPostgres().then(() => {
+      migrateDatabase();
+    }).catch(err => {
+      console.error('Schema init error, running migrations anyway:', err.message);
+      migrateDatabase();
+    });
   }
   
   return db;

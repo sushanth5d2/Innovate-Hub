@@ -520,7 +520,7 @@ CREATE TABLE IF NOT EXISTS events (
         important_note TEXT,
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, max_persons INTEGER, pricing_type TEXT DEFAULT 'free', fare_single INTEGER, fare_couple INTEGER, fare_group INTEGER, fare_options TEXT,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, max_persons INTEGER, pricing_type TEXT DEFAULT 'free', fare_single INTEGER, fare_couple INTEGER, fare_group INTEGER, fare_options TEXT, is_online BOOLEAN DEFAULT FALSE, online_url TEXT,
         FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
@@ -565,7 +565,7 @@ CREATE TABLE IF NOT EXISTS group_conversations (
         id BIGSERIAL PRIMARY KEY,
         creator_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, profile_picture TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, profile_picture TEXT DEFAULT '', description TEXT DEFAULT '',
         FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
@@ -617,7 +617,7 @@ CREATE TABLE IF NOT EXISTS group_messages (
         expires_at TIMESTAMPTZ,
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, is_pinned BOOLEAN DEFAULT FALSE, pinned_at TIMESTAMPTZ, pinned_by INTEGER, reply_to_id INTEGER,
         FOREIGN KEY (group_id) REFERENCES group_conversations(id) ON DELETE CASCADE,
         FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
       );
@@ -808,7 +808,7 @@ CREATE TABLE IF NOT EXISTS posts (
         likes_count INTEGER DEFAULT 0,
         comments_count INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, hashtags TEXT, enable_contact BOOLEAN DEFAULT FALSE, enable_interested BOOLEAN DEFAULT FALSE, custom_button TEXT, comment_to_dm TEXT, is_creator_series BOOLEAN DEFAULT FALSE, is_public_post BOOLEAN DEFAULT FALSE,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, hashtags TEXT, enable_contact BOOLEAN DEFAULT FALSE, enable_interested BOOLEAN DEFAULT FALSE, custom_button TEXT, comment_to_dm TEXT, is_creator_series BOOLEAN DEFAULT FALSE, is_public_post BOOLEAN DEFAULT FALSE, is_admin_post BOOLEAN DEFAULT FALSE, admin_frequency TEXT DEFAULT 'once', admin_feed_position INTEGER DEFAULT 3,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
@@ -880,7 +880,7 @@ CREATE TABLE IF NOT EXISTS starred_messages (
         id BIGSERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         message_id INTEGER NOT NULL,
-        starred_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        starred_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, message_type TEXT DEFAULT 'dm',
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
         UNIQUE(user_id, message_id)
@@ -963,7 +963,7 @@ CREATE TABLE IF NOT EXISTS users (
         last_seen TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-      , date_of_birth DATE, fullname TEXT, is_private BOOLEAN DEFAULT TRUE, break_until TIMESTAMPTZ, is_deactivated BOOLEAN DEFAULT FALSE, deactivated_at TIMESTAMPTZ);
+      , date_of_birth DATE, fullname TEXT, is_private BOOLEAN DEFAULT TRUE, break_until TIMESTAMPTZ, is_deactivated BOOLEAN DEFAULT FALSE, deactivated_at TIMESTAMPTZ, is_admin BOOLEAN DEFAULT FALSE, is_banned BOOLEAN DEFAULT FALSE, banned_until TIMESTAMPTZ, ban_reason TEXT);
 
 -- Table: call_history
 CREATE TABLE IF NOT EXISTS call_history (
@@ -991,6 +991,17 @@ CREATE TABLE IF NOT EXISTS call_participants (
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
+-- Table: user_conversations
+CREATE TABLE IF NOT EXISTS user_conversations (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        contact_id INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (contact_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, contact_id)
+      );
+
 -- Table: device_tokens
 CREATE TABLE IF NOT EXISTS device_tokens (
         id BIGSERIAL PRIMARY KEY,
@@ -1002,5 +1013,89 @@ CREATE TABLE IF NOT EXISTS device_tokens (
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(user_id, device_token)
+      );
+
+-- Table: post_reports
+CREATE TABLE IF NOT EXISTS post_reports (
+        id BIGSERIAL PRIMARY KEY,
+        reporter_id INTEGER NOT NULL,
+        post_id INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        details TEXT,
+        status TEXT DEFAULT 'pending',
+        reviewed_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+      );
+
+-- Table: admin_actions
+CREATE TABLE IF NOT EXISTS admin_actions (
+        id BIGSERIAL PRIMARY KEY,
+        admin_id INTEGER NOT NULL,
+        action_type TEXT NOT NULL,
+        target_user_id INTEGER,
+        target_post_id INTEGER,
+        details TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+-- Table: deleted_group_messages
+CREATE TABLE IF NOT EXISTS deleted_group_messages (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        message_id INTEGER NOT NULL,
+        deleted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, message_id)
+      );
+
+-- Table: group_disappearing_settings
+CREATE TABLE IF NOT EXISTS group_disappearing_settings (
+        id BIGSERIAL PRIMARY KEY,
+        group_id INTEGER NOT NULL UNIQUE,
+        set_by INTEGER NOT NULL,
+        mode TEXT DEFAULT 'off',
+        duration INTEGER DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+-- Table: disappearing_settings
+CREATE TABLE IF NOT EXISTS disappearing_settings (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        contact_id INTEGER NOT NULL,
+        mode TEXT DEFAULT 'off',
+        duration INTEGER DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, contact_id)
+      );
+
+-- Table: chat_mute_settings
+CREATE TABLE IF NOT EXISTS chat_mute_settings (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        contact_id INTEGER NOT NULL,
+        muted BOOLEAN DEFAULT FALSE,
+        UNIQUE(user_id, contact_id)
+      );
+
+-- Table: user_reports
+CREATE TABLE IF NOT EXISTS user_reports (
+        id BIGSERIAL PRIMARY KEY,
+        reporter_id INTEGER NOT NULL,
+        reported_user_id INTEGER NOT NULL,
+        reason TEXT,
+        details TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+-- Table: muted_users
+CREATE TABLE IF NOT EXISTS muted_users (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        muted_id INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, muted_id)
       );
 
