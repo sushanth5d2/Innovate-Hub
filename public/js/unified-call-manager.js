@@ -697,10 +697,24 @@ class UnifiedCallManager {
     this.playRingback();
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not available. Ensure you are on HTTPS.');
+      }
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: isVideo ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
+
+      if (!this.localStream) {
+        throw new Error('Failed to get media stream');
+      }
+
+      // Check if call was cancelled while waiting for getUserMedia
+      if (this.callState !== 'ringing') {
+        this.localStream.getTracks().forEach(t => t.stop());
+        this.localStream = null;
+        return;
+      }
 
       // Prime audio element during user gesture so play() works later (iOS autoplay policy)
       const primeAudio = this._ensureRemoteAudio();
@@ -756,10 +770,17 @@ class UnifiedCallManager {
     this.currentContactInfo = groupInfo || { username: 'Group Call' };
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not available. Ensure you are on HTTPS.');
+      }
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: this.isVideoCall ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
       });
+
+      if (!this.localStream) {
+        throw new Error('Failed to get media stream');
+      }
 
       const user = InnovateAPI.getCurrentUser();
       this.socket.emit('group-call:join', {
@@ -818,10 +839,17 @@ class UnifiedCallManager {
 
     // DM call acceptance
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Media devices not available. Ensure you are on HTTPS.');
+      }
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: this.isVideoCall ? { facingMode: 'user' } : false
       });
+
+      if (!this.localStream) {
+        throw new Error('Failed to get media stream');
+      }
 
       this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
