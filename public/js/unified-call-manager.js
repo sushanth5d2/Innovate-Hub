@@ -700,18 +700,35 @@ class UnifiedCallManager {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Media devices not available. Ensure you are on HTTPS.');
       }
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: isVideo ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
-      });
 
-      if (!this.localStream) {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: isVideo ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
+        });
+      } catch (mediaErr) {
+        console.error('getUserMedia failed:', mediaErr);
+        // Fallback: try audio-only if video was requested
+        if (isVideo) {
+          console.log('Retrying with audio only...');
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          this.isVideoCall = false;
+          this.isVideoOff = true;
+        } else {
+          throw mediaErr;
+        }
+      }
+
+      if (!stream) {
         throw new Error('Failed to get media stream');
       }
 
+      this.localStream = stream;
+
       // Check if call was cancelled while waiting for getUserMedia
       if (this.callState !== 'ringing') {
-        this.localStream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach(t => t.stop());
         this.localStream = null;
         return;
       }
@@ -721,10 +738,16 @@ class UnifiedCallManager {
       primeAudio.srcObject = new MediaStream();
       await primeAudio.play().catch(() => {});
 
+      // Guard: if cleanup happened during audio prime
+      if (!this.localStream) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
       this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
 
-      this.localStream.getTracks().forEach(track => {
+      stream.getTracks().forEach(track => {
         this.peerConnection.addTrack(track, this.localStream);
       });
 
@@ -736,7 +759,7 @@ class UnifiedCallManager {
         to: contactId,
         from: user.id,
         offer,
-        isVideo,
+        isVideo: this.isVideoCall,
         caller: { username: user.username, profile_picture: user.profile_picture }
       });
 
@@ -773,14 +796,29 @@ class UnifiedCallManager {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Media devices not available. Ensure you are on HTTPS.');
       }
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: this.isVideoCall ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
-      });
 
-      if (!this.localStream) {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: this.isVideoCall ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
+        });
+      } catch (mediaErr) {
+        console.error('getUserMedia failed:', mediaErr);
+        if (this.isVideoCall) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          this.isVideoCall = false;
+          this.isVideoOff = true;
+        } else {
+          throw mediaErr;
+        }
+      }
+
+      if (!stream) {
         throw new Error('Failed to get media stream');
       }
+
+      this.localStream = stream;
 
       const user = InnovateAPI.getCurrentUser();
       this.socket.emit('group-call:join', {
@@ -842,20 +880,35 @@ class UnifiedCallManager {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Media devices not available. Ensure you are on HTTPS.');
       }
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: this.isVideoCall ? { facingMode: 'user' } : false
-      });
 
-      if (!this.localStream) {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: this.isVideoCall ? { facingMode: 'user' } : false
+        });
+      } catch (mediaErr) {
+        console.error('getUserMedia failed:', mediaErr);
+        if (this.isVideoCall) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          this.isVideoCall = false;
+          this.isVideoOff = true;
+        } else {
+          throw mediaErr;
+        }
+      }
+
+      if (!stream) {
         throw new Error('Failed to get media stream');
       }
+
+      this.localStream = stream;
 
       this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
 
-      this.localStream.getTracks().forEach(track => {
-        this.peerConnection.addTrack(track, this.localStream);
+      stream.getTracks().forEach(track => {
+        this.peerConnection.addTrack(track, stream);
       });
 
       // Prime audio element during user gesture so play() works later (iOS autoplay policy)
@@ -1219,6 +1272,23 @@ class UnifiedCallManager {
 
   setupSocketListeners(socket) {
     this.socket = socket;
+
+    // Remove existing call listeners to prevent duplicates
+    socket.off('call:incoming');
+    socket.off('call:answered');
+    socket.off('call:ice-candidate');
+    socket.off('call:rejected');
+    socket.off('call:ended');
+    socket.off('call:renegotiate');
+    socket.off('call:renegotiate-answer');
+    socket.off('call:answered-on-device');
+    socket.off('group-call:peers');
+    socket.off('group-call:peer-joined');
+    socket.off('group-call:signal');
+    socket.off('group-call:peer-left');
+    socket.off('group-call:ring');
+    socket.off('group-call:ended');
+    socket.off('group-call:screen-share');
 
     // DM: incoming call
     socket.on('call:incoming', (data) => {
