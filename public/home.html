@@ -1418,6 +1418,20 @@
               <button class="story-color-btn" data-bg="#ffffff" onclick="setStoryBg(this)" style="background: #ffffff; border: 1px solid var(--ig-border);"></button>
             </div>
           </div>
+
+          <!-- Share to Public Toggle -->
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--ig-border); margin-top: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" fill="var(--ig-secondary-text)" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+              <span style="font-size: 13px; color: var(--ig-primary-text);">Share to Public</span>
+            </div>
+            <label style="position: relative; width: 44px; height: 24px; cursor: pointer;">
+              <input type="checkbox" id="storyPublicToggle" style="opacity: 0; width: 0; height: 0;">
+              <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--ig-border); border-radius: 12px; transition: 0.3s;" onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.background = this.previousElementSibling.checked ? '#0095f6' : 'var(--ig-border)'; this.querySelector('span').style.transform = this.previousElementSibling.checked ? 'translateX(20px)' : 'translateX(0)'">
+                <span style="position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: 0.3s;"></span>
+              </span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -1693,7 +1707,21 @@
           <span id="storyViewerUsername" style="cursor:pointer;" onclick="event.stopPropagation(); navigateToStoryUserProfile()"></span>
           <span id="storyViewerTime" class="story-viewer-time"></span>
         </div>
-        <button class="story-viewer-close" onclick="event.stopPropagation(); closeStoryViewer()">×</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="storyActionsBtn" class="story-viewer-close" style="display:none; font-size:20px; letter-spacing:2px;" onclick="event.stopPropagation(); toggleStoryActions()">⋯</button>
+          <button class="story-viewer-close" onclick="event.stopPropagation(); closeStoryViewer()">×</button>
+        </div>
+      </div>
+      <!-- Story Actions Menu (own stories only) -->
+      <div id="storyActionsMenu" style="display:none; position:absolute; top:60px; right:16px; z-index:20; background:var(--ig-elevated-background, #262626); border-radius:12px; box-shadow:0 4px 24px rgba(0,0,0,0.4); overflow:hidden; min-width:180px;">
+        <button onclick="event.stopPropagation(); editCurrentStory()" style="display:flex; align-items:center; gap:10px; width:100%; padding:14px 16px; border:none; background:none; color:var(--ig-primary-text, white); cursor:pointer; font-size:14px; text-align:left;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='none'">
+          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          Edit Story
+        </button>
+        <button onclick="event.stopPropagation(); deleteCurrentStory()" style="display:flex; align-items:center; gap:10px; width:100%; padding:14px 16px; border:none; background:none; color:#ff3b30; cursor:pointer; font-size:14px; text-align:left;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='none'">
+          <svg width="18" height="18" fill="#ff3b30" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          Delete Story
+        </button>
       </div>
       
       <div class="story-viewer-content">
@@ -3302,6 +3330,12 @@
       formData.append('content', content);
       formData.append('is_story', 'true');
       
+      // Share to public toggle
+      const isPublic = document.getElementById('storyPublicToggle')?.checked;
+      if (isPublic) {
+        formData.append('is_public_post', '1');
+      }
+      
       if (media) {
         if (media.type.startsWith('video/')) {
           formData.append('video', media);
@@ -3422,6 +3456,16 @@
       username.textContent = story.username;
       time.textContent = InnovateAPI.formatDate(story.created_at);
       
+      // Show actions button only for own stories
+      const actionsBtn = document.getElementById('storyActionsBtn');
+      const actionsMenu = document.getElementById('storyActionsMenu');
+      if (story.user_id === user.id) {
+        actionsBtn.style.display = 'block';
+      } else {
+        actionsBtn.style.display = 'none';
+      }
+      actionsMenu.style.display = 'none';
+      
       // Set content
       text.textContent = story.content || '';
       
@@ -3515,6 +3559,43 @@
       currentStoryIndex = 0;
       
       modal.style.display = 'none';
+    }
+
+    function toggleStoryActions() {
+      const menu = document.getElementById('storyActionsMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function deleteCurrentStory() {
+      const story = currentStories[currentStoryIndex];
+      if (!story) return;
+      if (!confirm('Delete this story?')) return;
+      try {
+        await InnovateAPI.apiRequest(`/posts/${story.id}`, { method: 'DELETE' });
+        closeStoryViewer();
+        loadStories();
+      } catch (err) {
+        alert('Failed to delete story');
+      }
+    }
+
+    async function editCurrentStory() {
+      const story = currentStories[currentStoryIndex];
+      if (!story) return;
+      const newContent = prompt('Edit story text:', story.content || '');
+      if (newContent === null) return;
+      try {
+        await InnovateAPI.apiRequest(`/posts/${story.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: newContent })
+        });
+        story.content = newContent;
+        document.getElementById('storyViewerText').textContent = newContent;
+        document.getElementById('storyActionsMenu').style.display = 'none';
+      } catch (err) {
+        alert('Failed to edit story');
+      }
     }
 
     // Keyboard navigation for stories

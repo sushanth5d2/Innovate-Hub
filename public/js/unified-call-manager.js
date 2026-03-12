@@ -296,8 +296,8 @@ class UnifiedCallManager {
           <h3 style="color:white;margin:0 0 4px;">${name}</h3>
         </div>`;
     } else {
-      // ═══ GROUP CALL (normal video/audio grid) ═══
-      mainContentHTML = '<div id="waGroupVideoGrid" style="position:absolute;top:60px;left:0;right:0;bottom:100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px;padding:4px;overflow:auto;z-index:1;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);"></div>';
+      // ═══ GROUP CALL (WhatsApp-style adaptive layout) ═══
+      mainContentHTML = `<div id="waGroupVideoGrid" style="position:absolute;top:60px;left:0;right:0;bottom:100px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px;padding:16px;overflow:auto;z-index:1;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);"></div>`;
     }
 
     modal.style.display = 'block';
@@ -503,16 +503,35 @@ class UnifiedCallManager {
     grid.innerHTML = '';
 
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
+    const totalParticipants = this.peerStreams.size + 1; // +1 for self
+
+    // WhatsApp-style adaptive sizing: larger DPs for fewer participants
+    let dpSize, fontSize;
+    if (isScreenShareMode) {
+      dpSize = 60; fontSize = 20;
+    } else if (totalParticipants <= 2) {
+      dpSize = 120; fontSize = 36;
+    } else if (totalParticipants <= 4) {
+      dpSize = 100; fontSize = 30;
+    } else if (totalParticipants <= 6) {
+      dpSize = 80; fontSize = 24;
+    } else {
+      dpSize = 64; fontSize = 20;
+    }
+
     const tileCSS = isScreenShareMode
       ? 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;width:100px;height:75px;flex-shrink:0;'
-      : 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
+      : `position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:${dpSize + 40}px;flex-shrink:0;`;
 
     // Local user tile
     const localContainer = document.createElement('div');
     localContainer.style.cssText = tileCSS;
 
     const hasLocalVideo = this.isVideoCall && this.localStream && this.localStream.getVideoTracks().length > 0;
-    if (hasLocalVideo) {
+    if (hasLocalVideo && !isScreenShareMode) {
+      localContainer.style.cssText = isScreenShareMode
+        ? 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;width:100px;height:75px;flex-shrink:0;'
+        : `position:relative;background:#1a1a2e;border-radius:12px;overflow:hidden;width:${dpSize + 40}px;height:${dpSize + 60}px;flex-shrink:0;`;
       const localVid = document.createElement('video');
       localVid.autoplay = true;
       localVid.muted = true;
@@ -521,21 +540,23 @@ class UnifiedCallManager {
       localVid.srcObject = this.localStream;
       localContainer.appendChild(localVid);
     } else {
-      // Audio-only — show user's own profile picture
+      // Audio-only — circular profile picture (WhatsApp style)
       const user = typeof InnovateAPI !== 'undefined' ? InnovateAPI.getCurrentUser() : null;
       const userPic = user?.profile_picture;
       const avatarDiv = document.createElement('div');
-      avatarDiv.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2);';
+      avatarDiv.style.cssText = `width:${dpSize}px;height:${dpSize}px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2);border:3px solid rgba(255,255,255,0.3);box-shadow:0 4px 15px rgba(0,0,0,0.3);`;
       if (userPic) {
-        avatarDiv.innerHTML = `<img src="${userPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<svg fill=\\'white\\' width=\\'32\\' height=\\'32\\' viewBox=\\'0 0 24 24\\'><path d=\\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\\'/></svg>'" />`;
+        avatarDiv.innerHTML = `<img src="${userPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<svg fill=\\'white\\' width=\\'${fontSize}\\' height=\\'${fontSize}\\' viewBox=\\'0 0 24 24\\'><path d=\\'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\\'/></svg>'" />`;
       } else {
-        avatarDiv.innerHTML = '<svg fill="white" width="32" height="32" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+        avatarDiv.innerHTML = `<svg fill="white" width="${fontSize}" height="${fontSize}" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
       }
       localContainer.appendChild(avatarDiv);
     }
 
     const localLabel = document.createElement('div');
-    localLabel.style.cssText = 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;';
+    localLabel.style.cssText = isScreenShareMode
+      ? 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;'
+      : 'color:rgba(255,255,255,0.9);font-size:12px;margin-top:8px;text-align:center;font-weight:500;';
     localLabel.textContent = 'You';
     localContainer.appendChild(localLabel);
     grid.appendChild(localContainer);
@@ -543,12 +564,16 @@ class UnifiedCallManager {
     // Also re-render any existing peers
     this.peerStreams.forEach((stream, socketId) => {
       const presence = this.participants.get(socketId);
-      this._addGroupPeerVideoToGrid(grid, socketId, presence?.username || 'Participant', stream, tileCSS);
+      this._addGroupPeerVideoToGrid(grid, socketId, presence?.username || 'Participant', stream, tileCSS, dpSize, fontSize);
     });
   }
 
-  _addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS) {
+  _addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS, dpSize, fontSize) {
     if (!grid) return;
+    dpSize = dpSize || 80;
+    fontSize = fontSize || 24;
+    const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
+
     let container = document.getElementById(`waGroupPeer-${socketId}`);
     if (!container) {
       container = document.createElement('div');
@@ -562,6 +587,9 @@ class UnifiedCallManager {
     const peerPic = presence?.profile_picture;
     const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
     if (hasVideo) {
+      if (!isScreenShareMode) {
+        container.style.cssText = `position:relative;background:#1a1a2e;border-radius:12px;overflow:hidden;width:${dpSize + 40}px;height:${dpSize + 60}px;flex-shrink:0;`;
+      }
       const vid = document.createElement('video');
       vid.autoplay = true;
       vid.muted = true;
@@ -570,14 +598,14 @@ class UnifiedCallManager {
       vid.srcObject = stream;
       container.appendChild(vid);
     } else {
-      // Audio-only participant — show their profile picture or fallback initial
+      // Audio-only participant — circular profile picture (WhatsApp style)
       const avatarDiv = document.createElement('div');
-      avatarDiv.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f093fb,#f5576c);';
+      avatarDiv.style.cssText = `width:${dpSize}px;height:${dpSize}px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f093fb,#f5576c);border:3px solid rgba(255,255,255,0.3);box-shadow:0 4px 15px rgba(0,0,0,0.3);`;
       if (peerPic) {
-        avatarDiv.innerHTML = `<img src="${peerPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'color:white;font-size:24px;font-weight:700;\\'>${(displayName || 'P').charAt(0).toUpperCase()}</span>'" />`;
+        avatarDiv.innerHTML = `<img src="${peerPic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'color:white;font-size:${fontSize}px;font-weight:700;\\'>${(displayName || 'P').charAt(0).toUpperCase()}</span>'" />`;
       } else {
         const initial = (displayName || 'P').charAt(0).toUpperCase();
-        avatarDiv.innerHTML = `<span style="color:white;font-size:24px;font-weight:700;">${initial}</span>`;
+        avatarDiv.innerHTML = `<span style="color:white;font-size:${fontSize}px;font-weight:700;">${initial}</span>`;
       }
       container.appendChild(avatarDiv);
     }
@@ -597,7 +625,9 @@ class UnifiedCallManager {
     peerAudio.play().catch(() => {});
 
     const label = document.createElement('div');
-    label.style.cssText = 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;';
+    label.style.cssText = isScreenShareMode
+      ? 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;'
+      : 'color:rgba(255,255,255,0.9);font-size:12px;margin-top:8px;text-align:center;font-weight:500;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     label.textContent = displayName || 'Participant';
     container.appendChild(label);
   }
@@ -618,11 +648,19 @@ class UnifiedCallManager {
     if (!grid) return;
 
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
+    const totalParticipants = this.peerStreams.size + 1;
+    let dpSize, fontSize;
+    if (isScreenShareMode) { dpSize = 60; fontSize = 20; }
+    else if (totalParticipants <= 2) { dpSize = 120; fontSize = 36; }
+    else if (totalParticipants <= 4) { dpSize = 100; fontSize = 30; }
+    else if (totalParticipants <= 6) { dpSize = 80; fontSize = 24; }
+    else { dpSize = 64; fontSize = 20; }
+
     const tileCSS = isScreenShareMode
       ? 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;width:100px;height:75px;flex-shrink:0;'
-      : 'position:relative;background:#1a1a2e;border-radius:8px;overflow:hidden;min-height:120px;';
+      : `position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:${dpSize + 40}px;flex-shrink:0;`;
 
-    this._addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS);
+    this._addGroupPeerVideoToGrid(grid, socketId, displayName, stream, tileCSS, dpSize, fontSize);
 
     const countEl = document.getElementById('waParticipantCount');
     if (countEl) countEl.textContent = `${this.peers.size + 1} participants`;

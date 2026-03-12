@@ -314,7 +314,7 @@ router.get('/stories', authMiddleware, (req, res) => {
   const userId = req.user.userId;
 
   const query = `
-    SELECT p.*, u.username, u.profile_picture,
+    SELECT p.*, u.username, u.profile_picture, u.is_private,
       EXISTS(SELECT 1 FROM story_views sv WHERE sv.story_id = p.id AND sv.user_id = ?) as viewed_by_current_user
     FROM posts p
     JOIN users u ON p.user_id = u.id
@@ -324,10 +324,16 @@ router.get('/stories', authMiddleware, (req, res) => {
       AND p.expires_at > CURRENT_TIMESTAMP
       AND b1.id IS NULL
       AND b2.id IS NULL
+      AND (
+        p.user_id = ?
+        OR u.is_private = 0
+        OR p.is_public_post = 1
+        OR EXISTS (SELECT 1 FROM followers WHERE follower_id = ? AND following_id = p.user_id)
+      )
     ORDER BY p.created_at DESC
   `;
 
-  db.all(query, [userId, userId, userId], (err, stories) => {
+  db.all(query, [userId, userId, userId, userId, userId], (err, stories) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Error fetching stories' });
