@@ -385,6 +385,20 @@ const initDatabase = () => {
     console.log('Connected to PostgreSQL database');
     createTablesPostgres().then(() => {
       migrateDatabase();
+      // Ensure user_conversations table exists with correct schema (direct pool query)
+      pool.query(`
+        CREATE TABLE IF NOT EXISTS user_conversations (
+          id BIGSERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          contact_id INTEGER NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, contact_id)
+        )
+      `).then(() => {
+        console.log('user_conversations table verified');
+      }).catch(e => {
+        console.error('user_conversations init error:', e.message);
+      });
     }).catch(err => {
       console.error('Schema init error, running migrations anyway:', err.message);
       migrateDatabase();

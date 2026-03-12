@@ -13,43 +13,34 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
 
-  // Get conversations from both messages and user_conversations table
-  // user_conversations persists even when messages are cleared
+  // Get conversations from messages table
   const query = `
-    WITH msg_contacts AS (
+    WITH all_contacts AS (
       SELECT DISTINCT
         CASE
           WHEN sender_id = ? THEN receiver_id
           ELSE sender_id
-        END as _cid
+        END as cid
       FROM messages
       WHERE (sender_id = ? OR receiver_id = ?)
         AND (is_deleted_by_sender = 0 OR sender_id != ?)
         AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
         AND (is_message_request = 0 OR message_request_status = 'accepted')
     ),
-    uc_contacts AS (
-      SELECT DISTINCT contact_id as _cid FROM user_conversations WHERE user_id = ?
-    ),
-    all_contacts AS (
-      SELECT _cid as contact_id FROM msg_contacts
-      UNION
-      SELECT _cid as contact_id FROM uc_contacts
-    ),
     contact_last_msg AS (
       SELECT
-        ac.contact_id,
+        ac.cid,
         MAX(m.id) as last_message_id
       FROM all_contacts ac
       LEFT JOIN messages m ON (
-        ((m.sender_id = ? AND m.receiver_id = ac.contact_id) OR (m.sender_id = ac.contact_id AND m.receiver_id = ?))
+        ((m.sender_id = ? AND m.receiver_id = ac.cid) OR (m.sender_id = ac.cid AND m.receiver_id = ?))
         AND (m.is_deleted_by_sender = 0 OR m.sender_id != ?)
         AND (m.is_deleted_by_receiver = 0 OR m.receiver_id != ?)
       )
-      GROUP BY ac.contact_id
+      GROUP BY ac.cid
     )
     SELECT
-      cm.contact_id,
+      cm.cid as contact_id,
       u.username,
       u.profile_picture,
       u.is_online,
@@ -61,18 +52,18 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
       m.original_filename as last_message_filename,
       m.created_at as last_message_time,
       (SELECT COUNT(*) FROM messages
-       WHERE sender_id = cm.contact_id
+       WHERE sender_id = cm.cid
        AND receiver_id = ?
        AND is_read = 0) as unread_count
     FROM contact_last_msg cm
-    JOIN users u ON u.id = cm.contact_id
+    JOIN users u ON u.id = cm.cid
     LEFT JOIN messages m ON m.id = cm.last_message_id
-    LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = cm.contact_id)
-    LEFT JOIN blocked_users b2 ON (b2.blocker_id = cm.contact_id AND b2.blocked_id = ?)
+    LEFT JOIN blocked_users b1 ON (b1.blocker_id = ? AND b1.blocked_id = cm.cid)
+    LEFT JOIN blocked_users b2 ON (b2.blocker_id = cm.cid AND b2.blocked_id = ?)
     ORDER BY COALESCE(m.created_at, '1970-01-01') DESC
   `;
 
-  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId], (err, rows) => {
+  db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId, userId], (err, rows) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Error fetching conversations' });
