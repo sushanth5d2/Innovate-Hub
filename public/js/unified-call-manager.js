@@ -1007,6 +1007,7 @@ class UnifiedCallManager {
   cleanup() {
     if (this.callTimerInterval) { clearInterval(this.callTimerInterval); this.callTimerInterval = null; }
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+    if (this._lastPeerLeftTimer) { clearTimeout(this._lastPeerLeftTimer); this._lastPeerLeftTimer = null; }
     this.stopAllSounds();
 
     if (this.localStream) {
@@ -1265,6 +1266,17 @@ class UnifiedCallManager {
       this._participantsHidden = false;
       this._renderedScreenKey = null;
       if (this.callState === 'connected') this.showActiveCallScreen();
+    }
+
+    // Auto-end call if everyone else left and we're the only one remaining
+    if (this.peers.size === 0 && this.callState === 'connected' && this.callMode === 'group') {
+      if (this._lastPeerLeftTimer) clearTimeout(this._lastPeerLeftTimer);
+      this._lastPeerLeftTimer = setTimeout(() => {
+        this._lastPeerLeftTimer = null;
+        if (this.peers.size === 0 && this.callState === 'connected' && this.callMode === 'group') {
+          this.endCall();
+        }
+      }, 5000);
     }
   }
 
@@ -1589,8 +1601,17 @@ class UnifiedCallManager {
       }, 45000);
     });
 
-    socket.on('group-call:ended', () => {
+    socket.on('group-call:ended', (data) => {
       this.hideOngoingCallBanner();
+      // Also dismiss incoming ring screen if we're ringing for this group call
+      const gid = data && data.groupId;
+      if (this.callState === 'ringing' && this.callMode === 'group' &&
+          (!gid || String(this.currentGroupId) === String(gid))) {
+        this.stopAllSounds();
+        if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+        this.showCallEndedScreen('Call cancelled');
+        this.cleanup();
+      }
     });
 
     // Screen share signaling — remote user started/stopped sharing

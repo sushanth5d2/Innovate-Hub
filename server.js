@@ -685,6 +685,16 @@ io.on('connection', (socket) => {
       const roomSockets = io.sockets.adapter.rooms.get(room);
       if (!roomSockets || roomSockets.size === 0) {
         io.to(`group_${groupId}`).emit('group-call:ended', { groupId });
+        // Also notify all group members directly so ringing members (not in the chat room) dismiss
+        const { getDb } = require('./config/database');
+        const db = getDb();
+        db.all('SELECT user_id FROM group_members WHERE group_id = ?', [groupId], (err, members) => {
+          if (!err && members) {
+            members.forEach(m => {
+              io.to(`user_${m.user_id}`).emit('group-call:ended', { groupId });
+            });
+          }
+        });
       } else {
         // Update participant count
         io.to(`group_${groupId}`).emit('group-call:started', { groupId, participantCount: roomSockets.size });

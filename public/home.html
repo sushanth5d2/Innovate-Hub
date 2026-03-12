@@ -997,9 +997,12 @@
     .story-create-modal {
       width: 500px;
       max-width: 95vw;
+      max-height: 90vh;
       background: var(--ig-primary-background);
       border-radius: 16px;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
       animation: slideUp 0.3s ease;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
@@ -1037,7 +1040,7 @@
     }
     .story-create-share:hover { opacity: 0.85; }
     .story-create-share:active { transform: scale(0.97); }
-    .story-create-body { padding: 16px; }
+    .story-create-body { padding: 16px; overflow-y: auto; flex: 1; }
     .story-create-preview {
       width: 100%;
       aspect-ratio: 9/16;
@@ -1905,7 +1908,7 @@
   <script src="/js/post-modal.js"></script>
   <script src="/js/post-renderer.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/unified-call-manager.js?v=20260312b"></script>
+  <script src="/js/unified-call-manager.js?v=20260602a"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();

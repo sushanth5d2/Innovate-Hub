@@ -204,7 +204,7 @@
   }
 
   function getSocket() {
-    if (!socket || !socket.connected) {
+    if (!socket) {
       socket = initSocket();
     }
     return socket;
