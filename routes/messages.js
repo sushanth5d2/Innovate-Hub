@@ -28,7 +28,7 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
         AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
         AND (is_message_request = 0 OR message_request_status = 'accepted')
       UNION
-      SELECT contact_id FROM user_conversations WHERE user_id = ?
+      SELECT uc.contact_id FROM user_conversations uc WHERE uc.user_id = ?
     ),
     contact_last_msg AS (
       SELECT 
