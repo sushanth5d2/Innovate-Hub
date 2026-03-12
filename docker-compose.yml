@@ -27,9 +27,12 @@ services:
       - REDIS_ENABLED=true
       - REDIS_URL=redis://redis:6379
       - PYTHON_ML_SERVICE_URL=http://ml-service:5000
+      - FIREBASE_SERVICE_ACCOUNT_PATH=/run/secrets/firebase-sa
     volumes:
       - uploads_data:/app/uploads
       - app_logs:/app/logs
+    secrets:
+      - firebase-sa
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,3 +147,7 @@ volumes:
 networks:
   innovate-net:
     driver: bridge
+
+secrets:
+  firebase-sa:
+    file: ./config/firebase-service-account.json

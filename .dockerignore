@@ -1,8 +1,7 @@
 node_modules
 npm-debug.log
 .env
-.env.production
-.env.local
+.env.*
 *.db
 database/*.db
 uploads/*
@@ -13,3 +12,12 @@ logs/*
 android/
 native-modules/
 .DS_Store
+.vscode/
+.github/
+docs/
+scripts/
+config/firebase-service-account.json
+*.apk
+*-old.html
+*-broken.html
+*-backup*.html
