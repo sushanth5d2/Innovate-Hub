@@ -17,18 +17,20 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
   // user_conversations persists even when messages are cleared
   const query = `
     WITH all_contacts AS (
-      SELECT DISTINCT
-        CASE 
-          WHEN sender_id = ? THEN receiver_id
-          ELSE sender_id
-        END as contact_id
-      FROM messages
-      WHERE (sender_id = ? OR receiver_id = ?)
-        AND (is_deleted_by_sender = 0 OR sender_id != ?)
-        AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
-        AND (is_message_request = 0 OR message_request_status = 'accepted')
-      UNION
-      SELECT uc.contact_id FROM user_conversations uc WHERE uc.user_id = ?
+      SELECT DISTINCT contact_id FROM (
+        SELECT
+          CASE 
+            WHEN sender_id = ? THEN receiver_id
+            ELSE sender_id
+          END as contact_id
+        FROM messages
+        WHERE (sender_id = ? OR receiver_id = ?)
+          AND (is_deleted_by_sender = 0 OR sender_id != ?)
+          AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
+          AND (is_message_request = 0 OR message_request_status = 'accepted')
+        UNION
+        SELECT contact_id FROM user_conversations WHERE user_id = ?
+      ) _contacts
     ),
     contact_last_msg AS (
       SELECT 
