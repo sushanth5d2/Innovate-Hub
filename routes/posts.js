@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { getDb } = require('../config/database');
+require('../middleware/validateIdParams').attachTo(router);
 const { validateInput } = require('../middleware/validateInput');
 const fs = require('fs');
 const path = require('path');

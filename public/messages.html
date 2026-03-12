@@ -1263,6 +1263,7 @@
 
     const user = InnovateAPI.getCurrentUser();
     let currentContactId = null;
+    function isDMContact() { return currentContactId && currentContactId !== 'ai-assistant'; }
     // Expose to window for notification banner suppression
     Object.defineProperty(window, 'currentContactId', {
       get: () => currentContactId,
@@ -5868,7 +5869,7 @@
                 updateScrollDownButton();
               }
             }
-          } else if (currentContactId) {
+          } else if (isDMContact()) {
             const checkData = await InnovateAPI.apiRequest(`/messages/${currentContactId}?_t=${Date.now()}`, { cache: 'no-store' });
             const newCount = checkData.messages?.length || 0;
             if (newCount !== lastMessageCount) {

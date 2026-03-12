@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminMiddleware = require('../middleware/adminAuth');
 const { getDb } = require('../config/database');
+require('../middleware/validateIdParams').attachTo(router);
 const upload = require('../middleware/upload');
 
 // Dashboard stats

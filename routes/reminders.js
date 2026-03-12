@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { getDb } = require('../config/database');
+require('../middleware/validateIdParams').attachTo(router);
 
 // ==================== GET ALL REMINDERS (aggregated) ====================
 

@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
+require('../middleware/validateIdParams').attachTo(router);
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {

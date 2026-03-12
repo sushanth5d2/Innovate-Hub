@@ -4,6 +4,7 @@ const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getDb } = require('../config/database');
+require('../middleware/validateIdParams').attachTo(router);
 const { encrypt: encryptMsg, decrypt: decryptMsg, decryptRows } = require('../services/message-encryption');
 const disappearing = require('../services/disappearing-messages');
 const pushService = require('../services/push-service');
@@ -82,10 +83,6 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
   const db = getDb();
   const userId = req.user.userId;
   const { contactId } = req.params;
-
-  if (!/^\d+$/.test(contactId)) {
-    return res.status(400).json({ error: 'Invalid contact ID' });
-  }
 
   const query = `
     SELECT m.*, 
