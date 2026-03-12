@@ -16,24 +16,28 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
   // Get conversations from both messages and user_conversations table
   // user_conversations persists even when messages are cleared
   const query = `
-    WITH all_contacts AS (
-      SELECT DISTINCT contact_id FROM (
-        SELECT
-          CASE 
-            WHEN sender_id = ? THEN receiver_id
-            ELSE sender_id
-          END as contact_id
-        FROM messages
-        WHERE (sender_id = ? OR receiver_id = ?)
-          AND (is_deleted_by_sender = 0 OR sender_id != ?)
-          AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
-          AND (is_message_request = 0 OR message_request_status = 'accepted')
-        UNION
-        SELECT contact_id FROM user_conversations WHERE user_id = ?
-      ) _contacts
+    WITH msg_contacts AS (
+      SELECT DISTINCT
+        CASE
+          WHEN sender_id = ? THEN receiver_id
+          ELSE sender_id
+        END as _cid
+      FROM messages
+      WHERE (sender_id = ? OR receiver_id = ?)
+        AND (is_deleted_by_sender = 0 OR sender_id != ?)
+        AND (is_deleted_by_receiver = 0 OR receiver_id != ?)
+        AND (is_message_request = 0 OR message_request_status = 'accepted')
+    ),
+    uc_contacts AS (
+      SELECT DISTINCT contact_id as _cid FROM user_conversations WHERE user_id = ?
+    ),
+    all_contacts AS (
+      SELECT _cid as contact_id FROM msg_contacts
+      UNION
+      SELECT _cid as contact_id FROM uc_contacts
     ),
     contact_last_msg AS (
-      SELECT 
+      SELECT
         ac.contact_id,
         MAX(m.id) as last_message_id
       FROM all_contacts ac
@@ -44,7 +48,7 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
       )
       GROUP BY ac.contact_id
     )
-    SELECT 
+    SELECT
       cm.contact_id,
       u.username,
       u.profile_picture,
@@ -56,9 +60,9 @@ router.get('/conversations', authMiddleware, asyncHandler((req, res) => {
       m.type as last_message_type,
       m.original_filename as last_message_filename,
       m.created_at as last_message_time,
-      (SELECT COUNT(*) FROM messages 
-       WHERE sender_id = cm.contact_id 
-       AND receiver_id = ? 
+      (SELECT COUNT(*) FROM messages
+       WHERE sender_id = cm.contact_id
+       AND receiver_id = ?
        AND is_read = 0) as unread_count
     FROM contact_last_msg cm
     JOIN users u ON u.id = cm.contact_id
