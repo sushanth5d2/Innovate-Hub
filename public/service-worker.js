@@ -1,4 +1,4 @@
-const CACHE_NAME = 'innovate-v20260310j';
+const CACHE_NAME = 'innovate-v20260313a';
 const urlsToCache = [
   '/',
   '/home',
@@ -47,11 +47,14 @@ self.addEventListener('fetch', event => {
   const requestUrl = event.request.url;
   
   // Never cache API calls, Socket.IO, or non-GET requests
+  // For Socket.IO: don't intercept at all — let browser handle natively
+  // (intercepting causes "Failed to fetch" when GitHub Codespace redirects polling requests)
   if (
     event.request.method !== 'GET' ||
     requestUrl.includes('/api/') ||
     requestUrl.includes('/socket.io/')
   ) {
+    if (requestUrl.includes('/socket.io/')) return;  // Let browser handle Socket.IO natively
     event.respondWith(fetch(event.request));
     return;
   }

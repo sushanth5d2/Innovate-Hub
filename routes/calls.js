@@ -88,7 +88,7 @@ router.post('/log-end', authMiddleware, async (req, res) => {
     if (!call) return res.status(404).json({ error: 'Call not found' });
 
     const finalStatus = status || 'completed';
-    await callService.endCall(parseInt(callId), finalStatus);
+    await callService.endCall(parseInt(callId), finalStatus, parseInt(duration) || 0);
 
     // Build call data for system message
     const callMsg = {

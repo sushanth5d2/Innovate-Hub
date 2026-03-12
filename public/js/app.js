@@ -186,6 +186,7 @@
     }
 
     socket = window.io(window.location.origin, {
+      transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

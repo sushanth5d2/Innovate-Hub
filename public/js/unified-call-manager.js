@@ -424,6 +424,33 @@ class UnifiedCallManager {
     this.showActiveCallScreen();
   }
 
+
+  // Tap local PiP in 2-person group video call to swap peer/local
+  _swapLocalPeerGroup() {
+    this.isVideoSwapped = !this.isVideoSwapped;
+    const grid = document.getElementById('waGroupVideoGrid');
+    if (!grid) return;
+    grid.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;overflow:hidden;background:#000;';
+    grid.innerHTML = '';
+    if (this.isVideoSwapped) {
+      // Local video fills screen, peer is PiP
+      const localVid = document.createElement('video');
+      localVid.autoplay = true; localVid.muted = true; localVid.playsInline = true;
+      localVid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;';
+      if (this.localStream) { localVid.srcObject = this.localStream; localVid.play().catch(() => {}); }
+      grid.appendChild(localVid);
+      const peerPip = document.createElement('video');
+      peerPip.autoplay = true; peerPip.playsInline = true;
+      peerPip.style.cssText = 'position:absolute;top:70px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.3);cursor:pointer;';
+      peerPip.onclick = () => this._swapLocalPeerGroup();
+      this.peerStreams.forEach((s) => { if (peerPip.srcObject !== s) peerPip.srcObject = s; peerPip.play().catch(() => {}); });
+      grid.appendChild(peerPip);
+    } else {
+      // Back to default: peer fills screen, local is PiP
+      this._renderGroupGrid();
+    }
+  }
+
   showCallEndedScreen(reason) {
     const modal = this._getModal();
     const name = this.currentContactInfo?.username || 'User';
@@ -505,12 +532,64 @@ class UnifiedCallManager {
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
     const totalParticipants = this.peerStreams.size + 1; // +1 for self
 
+    // ── 2-person video call: full-screen PiP layout (peer big, self small corner) ──
+    if (this.isVideoCall && totalParticipants <= 2 && !isScreenShareMode) {
+      grid.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;overflow:hidden;background:#000;';
+
+      if (this.peerStreams.size > 0) {
+        // Peer fills the full screen
+        const peerVid = document.createElement('video');
+        peerVid.autoplay = true;
+        peerVid.playsInline = true;
+        peerVid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;';
+        this.peerStreams.forEach((stream, socketId) => {
+          if (peerVid.srcObject !== stream) peerVid.srcObject = stream;
+          peerVid.play().catch(() => {});
+          let peerAudio = document.getElementById(`waGroupPeerAudio-${socketId}`);
+          if (!peerAudio) {
+            peerAudio = document.createElement('audio');
+            peerAudio.id = `waGroupPeerAudio-${socketId}`;
+            peerAudio.autoplay = true;
+            peerAudio.style.display = 'none';
+            document.body.appendChild(peerAudio);
+          }
+          if (peerAudio.srcObject !== stream) peerAudio.srcObject = stream;
+          peerAudio.play().catch(() => {});
+        });
+        grid.appendChild(peerVid);
+      } else {
+        // Waiting for peer — show placeholder
+        grid.style.cssText += 'display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);';
+        const peerName = this.currentContactInfo?.username || 'User';
+        const peerPic = this.currentContactInfo?.profile_picture;
+        const placeholderEl = document.createElement('div');
+        placeholderEl.style.cssText = 'text-align:center;color:white;';
+        placeholderEl.innerHTML = peerPic
+          ? `<img src="${peerPic}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:16px;" onerror="this.style.display='none'"/><div style="font-size:18px;font-weight:600;">${peerName}</div>`
+          : `<div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:40px;font-weight:700;color:white;">${peerName.charAt(0).toUpperCase()}</div><div style="font-size:18px;font-weight:600;">${peerName}</div>`;
+        grid.appendChild(placeholderEl);
+      }
+
+      // Local video — small PiP in top-right corner (muted)
+      const localVid = document.createElement('video');
+      localVid.id = 'waLocalVideo';
+      localVid.autoplay = true;
+      localVid.muted = true;
+      localVid.playsInline = true;
+      localVid.style.cssText = 'position:absolute;top:70px;right:12px;width:120px;height:170px;border-radius:12px;object-fit:cover;z-index:4;box-shadow:0 2px 10px rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.3);cursor:pointer;';
+      localVid.onclick = () => this._swapLocalPeerGroup();
+      if (this.localStream) { localVid.srcObject = this.localStream; localVid.play().catch(() => {}); }
+      grid.appendChild(localVid);
+      return;
+    }
+
+    // ── 3+ participants or audio-only: tile grid ──
+    grid.style.cssText = 'position:absolute;top:60px;left:0;right:0;bottom:100px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px;padding:16px;overflow:auto;z-index:1;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);';
+
     // WhatsApp-style adaptive sizing: larger DPs for fewer participants
     let dpSize, fontSize;
     if (isScreenShareMode) {
       dpSize = 60; fontSize = 20;
-    } else if (totalParticipants <= 2) {
-      dpSize = 120; fontSize = 36;
     } else if (totalParticipants <= 4) {
       dpSize = 100; fontSize = 30;
     } else if (totalParticipants <= 6) {
@@ -649,9 +728,17 @@ class UnifiedCallManager {
 
     const isScreenShareMode = this.isSharingScreen || !!this._remoteScreenSharePeer;
     const totalParticipants = this.peerStreams.size + 1;
+
+    // For 2-person video: re-render in PiP layout when the first peer arrives
+    if (this.isVideoCall && totalParticipants <= 2 && !isScreenShareMode) {
+      this._renderGroupGrid();
+      const countEl = document.getElementById('waParticipantCount');
+      if (countEl) countEl.textContent = `${this.peers.size + 1} participants`;
+      return;
+    }
+
     let dpSize, fontSize;
     if (isScreenShareMode) { dpSize = 60; fontSize = 20; }
-    else if (totalParticipants <= 2) { dpSize = 120; fontSize = 36; }
     else if (totalParticipants <= 4) { dpSize = 100; fontSize = 30; }
     else if (totalParticipants <= 6) { dpSize = 80; fontSize = 24; }
     else { dpSize = 64; fontSize = 20; }
@@ -2046,7 +2133,6 @@ class UnifiedCallManager {
     } catch (_) {}
   }
 }
-
 // ========== E2E ENCRYPTION FOR DMs ==========
 
 const DMEncryption = {

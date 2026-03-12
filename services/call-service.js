@@ -49,26 +49,14 @@ function answerCall(callId) {
  * @param {number} callId
  * @param {string} status - 'completed', 'missed', 'declined', 'no_answer'
  */
-function endCall(callId, status = 'completed') {
+function endCall(callId, status = 'completed', duration = 0) {
   const db = getDb();
   return new Promise((resolve, reject) => {
-    // First update the status and ended_at
+    // Update status, ended_at, and duration in one query using client-reported duration
     db.run(
-      `UPDATE call_history SET status = ?, ended_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [status, callId],
-      (err) => {
-        if (err) return reject(err);
-        // Then calculate duration from the updated row
-        db.run(
-          `UPDATE call_history SET duration = CASE
-             WHEN answered_at IS NOT NULL
-             THEN CAST(EXTRACT(EPOCH FROM (ended_at - answered_at)) AS INTEGER)
-             ELSE 0
-           END WHERE id = ?`,
-          [callId],
-          (err2) => (err2 ? reject(err2) : resolve())
-        );
-      }
+      `UPDATE call_history SET status = ?, ended_at = CURRENT_TIMESTAMP, duration = ? WHERE id = ?`,
+      [status, duration, callId],
+      (err) => (err ? reject(err) : resolve())
     );
   });
 }
