@@ -18,7 +18,10 @@ class UnifiedCallManager {
     this.iceConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'turn:a.relay.metered.ca:80', username: 'e8dd65d92f3c1ed1ee8b438c', credential: 'vK+RjR1t5yGpNjrA' },
+        { urls: 'turn:a.relay.metered.ca:443', username: 'e8dd65d92f3c1ed1ee8b438c', credential: 'vK+RjR1t5yGpNjrA' },
+        { urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: 'e8dd65d92f3c1ed1ee8b438c', credential: 'vK+RjR1t5yGpNjrA' }
       ]
     };
 
@@ -47,6 +50,9 @@ class UnifiedCallManager {
 
     // Persistent audio element for remote audio (survives UI rebuilds)
     this._remoteAudioEl = null;
+
+    // ICE candidate buffer — holds candidates that arrive before peerConnection or remoteDescription is ready
+    this._pendingIceCandidates = [];
 
     // Add member contacts cache
     this._addMemberContacts = [];
@@ -83,6 +89,20 @@ class UnifiedCallManager {
       this._remoteAudioEl.srcObject = null;
       this._remoteAudioEl.remove();
       this._remoteAudioEl = null;
+    }
+  }
+
+  // Flush any ICE candidates that were buffered before peerConnection/remoteDescription was ready
+  async _applyBufferedIceCandidates() {
+    while (this._pendingIceCandidates.length > 0) {
+      const candidate = this._pendingIceCandidates.shift();
+      try {
+        if (this.peerConnection) {
+          await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (err) {
+        console.error('Buffered ICE candidate error:', err);
+      }
     }
   }
 
@@ -562,12 +582,19 @@ class UnifiedCallManager {
       container.appendChild(avatarDiv);
     }
 
-    // Play audio from this peer
-    const audio = document.createElement('audio');
-    audio.autoplay = true;
-    audio.srcObject = stream;
-    audio.style.display = 'none';
-    container.appendChild(audio);
+    // Play audio from this peer — use persistent element outside the grid to survive re-renders
+    let peerAudio = document.getElementById(`waGroupPeerAudio-${socketId}`);
+    if (!peerAudio) {
+      peerAudio = document.createElement('audio');
+      peerAudio.id = `waGroupPeerAudio-${socketId}`;
+      peerAudio.autoplay = true;
+      peerAudio.style.display = 'none';
+      document.body.appendChild(peerAudio);
+    }
+    if (peerAudio.srcObject !== stream) {
+      peerAudio.srcObject = stream;
+    }
+    peerAudio.play().catch(() => {});
 
     const label = document.createElement('div');
     label.style.cssText = 'position:absolute;bottom:4px;left:8px;color:white;font-size:11px;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;';
@@ -606,6 +633,9 @@ class UnifiedCallManager {
     this.participants.delete(socketId);
     const el = document.getElementById(`waGroupPeer-${socketId}`);
     if (el) el.remove();
+    // Clean up persistent peer audio element
+    const peerAudio = document.getElementById(`waGroupPeerAudio-${socketId}`);
+    if (peerAudio) { peerAudio.srcObject = null; peerAudio.remove(); }
     const countEl = document.getElementById('waParticipantCount');
     if (countEl) countEl.textContent = `${this.peers.size + 1} participants`;
   }
@@ -633,6 +663,11 @@ class UnifiedCallManager {
         audio: true,
         video: isVideo ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
       });
+
+      // Prime audio element during user gesture so play() works later (iOS autoplay policy)
+      const primeAudio = this._ensureRemoteAudio();
+      primeAudio.srcObject = new MediaStream();
+      await primeAudio.play().catch(() => {});
 
       this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
@@ -757,7 +792,13 @@ class UnifiedCallManager {
         this.peerConnection.addTrack(track, this.localStream);
       });
 
+      // Prime audio element during user gesture so play() works later (iOS autoplay policy)
+      const primeAudio = this._ensureRemoteAudio();
+      primeAudio.srcObject = new MediaStream();
+      await primeAudio.play().catch(() => {});
+
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(this._pendingOffer));
+      await this._applyBufferedIceCandidates();
 
       const answer = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answer);
@@ -867,9 +908,12 @@ class UnifiedCallManager {
 
     // Destroy persistent audio
     this._destroyRemoteAudio();
+    // Remove autoplay banner if present
+    const autoplayBanner = document.getElementById('waAutoplayBanner');
+    if (autoplayBanner) autoplayBanner.remove();
 
-    // Remove any added member audios
-    document.querySelectorAll('[id^="waAddedMemberAudio-"]').forEach(el => el.remove());
+    // Remove any added member audios and persistent peer audio elements
+    document.querySelectorAll('[id^="waAddedMemberAudio-"], [id^="waGroupPeerAudio-"]').forEach(el => { el.srcObject = null; el.remove(); });
 
     this.remoteStream = null;
     this.callState = 'idle';
@@ -889,6 +933,7 @@ class UnifiedCallManager {
     this._pendingOffer = null;
     this._pendingTransferData = null;
     this._pendingGroupCallData = null;
+    this._pendingIceCandidates = [];
     this._renderedScreenKey = null;
     this._participantsHidden = false;
     this._remoteScreenSharePeer = null;
@@ -941,7 +986,18 @@ class UnifiedCallManager {
       if (audioEl.srcObject !== this.remoteStream) {
         audioEl.srcObject = this.remoteStream;
       }
-      audioEl.play().catch(e => console.warn('[Call] Audio play blocked:', e.message));
+      audioEl.play().catch(e => {
+        console.warn('[Call] Audio play blocked:', e.message);
+        // Show tap-to-unmute banner as fallback
+        if (!document.getElementById('waAutoplayBanner')) {
+          const banner = document.createElement('div');
+          banner.id = 'waAutoplayBanner';
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff9500;color:white;text-align:center;padding:12px;z-index:200000;cursor:pointer;font-weight:600;font-size:14px;';
+          banner.textContent = '\uD83D\uDD07 Tap here to enable call audio';
+          banner.onclick = () => { audioEl.play().catch(() => {}); banner.remove(); };
+          document.body.appendChild(banner);
+        }
+      });
 
       // If we received a video track and we're in voice mode, upgrade to video
       // But if remote is screen sharing, don't rebuild to normal video — the screen share layout handles it
@@ -1162,6 +1218,7 @@ class UnifiedCallManager {
 
       try {
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        await this._applyBufferedIceCandidates();
         // Set state to connected — onconnectionstatechange will also fire
         // but the guard (callState !== 'connected') prevents double-rebuild
         this.callState = 'connected';
@@ -1174,11 +1231,13 @@ class UnifiedCallManager {
       }
     });
 
-    // DM: ICE candidate
+    // DM: ICE candidate — buffer if peerConnection or remoteDescription not ready yet
     socket.on('call:ice-candidate', async (data) => {
       try {
-        if (this.peerConnection && data.candidate) {
+        if (this.peerConnection && this.peerConnection.remoteDescription && data.candidate) {
           await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } else if (data.candidate) {
+          this._pendingIceCandidates.push(data.candidate);
         }
       } catch (err) {
         console.error('ICE candidate error:', err);
@@ -1317,9 +1376,22 @@ class UnifiedCallManager {
         }
         const payload = data.payload;
         if (payload.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          // Buffer ICE candidates if remoteDescription not yet set
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          } else {
+            if (!pc._bufferedCandidates) pc._bufferedCandidates = [];
+            pc._bufferedCandidates.push(payload.candidate);
+          }
         } else if (payload.type === 'offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(payload));
+          // Flush buffered ICE candidates
+          if (pc._bufferedCandidates) {
+            for (const c of pc._bufferedCandidates) {
+              await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+            }
+            pc._bufferedCandidates = [];
+          }
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socket.emit('group-call:signal', {
@@ -1329,6 +1401,13 @@ class UnifiedCallManager {
           });
         } else if (payload.type === 'answer') {
           await pc.setRemoteDescription(new RTCSessionDescription(payload));
+          // Flush buffered ICE candidates
+          if (pc._bufferedCandidates) {
+            for (const c of pc._bufferedCandidates) {
+              await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+            }
+            pc._bufferedCandidates = [];
+          }
         }
       } catch (err) {
         console.error('group-call:signal error:', err);

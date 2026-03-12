@@ -3975,9 +3975,9 @@
         const wrapperEl = document.createElement('div');
         wrapperEl.style.cssText = 'display: flex; align-items: flex-end; gap: 8px; width: 100%;';
         const avatarEl = document.createElement('img');
-        avatarEl.src = InnovateAPI.getUserAvatar(currentPartnerAvatar); cursor: pointer;';
-        avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${currentContactId}`; }
-        avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px;';
+        avatarEl.src = InnovateAPI.getUserAvatar(currentPartnerAvatar);
+        avatarEl.style.cssText = 'width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-bottom: 2px; cursor: pointer;';
+        avatarEl.onclick = (e) => { e.stopPropagation(); window.location.href = `/profile/${currentContactId}`; };
         wrapperEl.appendChild(avatarEl);
         wrapperEl.appendChild(messageEl);
         
