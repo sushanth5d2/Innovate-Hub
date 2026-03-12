@@ -83,6 +83,10 @@ router.get('/:contactId', authMiddleware, asyncHandler((req, res) => {
   const userId = req.user.userId;
   const { contactId } = req.params;
 
+  if (!/^\d+$/.test(contactId)) {
+    return res.status(400).json({ error: 'Invalid contact ID' });
+  }
+
   const query = `
     SELECT m.*, 
            sender.username as sender_username,

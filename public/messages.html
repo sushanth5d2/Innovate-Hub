@@ -1657,6 +1657,7 @@
 
     // Load messages
     async function loadMessages(contactId) {
+      if (contactId === 'ai-assistant') return; // AI chat has its own flow
       try {
         const data = await InnovateAPI.apiRequest(`/messages/${contactId}?_t=${Date.now()}`, { cache: 'no-store' });
         const messagesContainer = document.getElementById('chatMessages');
