@@ -111,7 +111,9 @@ router.post('/log-end', authMiddleware, async (req, res) => {
     if (io) {
       if (call.call_type === 'dm') {
         io.to(`user_${call.target_id}`).emit('call:system-message', callMsg);
+        io.to(`user-${call.target_id}`).emit('call:system-message', callMsg);
         io.to(`user_${call.caller_id}`).emit('call:system-message', callMsg);
+        io.to(`user-${call.caller_id}`).emit('call:system-message', callMsg);
       } else {
         io.to(`group_${call.target_id}`).emit('call:system-message', callMsg);
       }

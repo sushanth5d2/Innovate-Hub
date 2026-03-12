@@ -171,6 +171,17 @@
   // Socket.IO
   let socket = null;
 
+  function joinSocketAsCurrentUser() {
+    if (!socket || !socket.connected) {
+      return;
+    }
+
+    const user = getCurrentUser();
+    if (user?.id) {
+      socket.emit('user:join', user.id);
+    }
+  }
+
   function initSocket() {
     if (!isAuthenticated()) {
       return null;
@@ -193,13 +204,17 @@
       reconnectionAttempts: Infinity
     });
 
-    const user = getCurrentUser();
-
     socket.on('connect', () => {
-      if (user?.id) {
-        socket.emit('user:join', user.id);
-      }
+      joinSocketAsCurrentUser();
     });
+
+    socket.on('reconnect', () => {
+      joinSocketAsCurrentUser();
+    });
+
+    if (socket.connected) {
+      joinSocketAsCurrentUser();
+    }
 
     return socket;
   }

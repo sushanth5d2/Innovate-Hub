@@ -358,6 +358,33 @@ setInterval(() => {
 // Socket.IO connection handling
 const connectedUsers = new Map();
 
+function normalizeUserId(userId) {
+  if (userId === null || userId === undefined) return null;
+  return String(userId);
+}
+
+function emitToUser(userId, eventName, payload, excludedSocketId = null) {
+  const normalizedUserId = normalizeUserId(userId);
+  if (!normalizedUserId) return;
+
+  const socketId = connectedUsers.get(normalizedUserId);
+  if (socketId && socketId !== excludedSocketId) {
+    io.to(socketId).emit(eventName, payload);
+    return;
+  }
+
+  const underscoreRoom = `user_${normalizedUserId}`;
+  const hyphenRoom = `user-${normalizedUserId}`;
+  if (excludedSocketId) {
+    io.to(underscoreRoom).except(excludedSocketId).emit(eventName, payload);
+    io.to(hyphenRoom).except(excludedSocketId).emit(eventName, payload);
+    return;
+  }
+
+  io.to(underscoreRoom).emit(eventName, payload);
+  io.to(hyphenRoom).emit(eventName, payload);
+}
+
 // Group call participation (WebRTC signaling)
 // Map socket.id -> { groupId, userId, displayName }
 const groupCallPresence = new Map();
@@ -367,18 +394,19 @@ io.on('connection', (socket) => {
 
   // User joins with their userId
   socket.on('user:join', (userId) => {
-    if (!userId) return;
-    connectedUsers.set(userId, socket.id);
-    socket.userId = userId;
+    const normalizedUserId = normalizeUserId(userId);
+    if (!normalizedUserId) return;
+    connectedUsers.set(normalizedUserId, socket.id);
+    socket.userId = normalizedUserId;
     
     // Join user-specific rooms for receiving messages/notifications
     // Some routes use user_${id} (underscore) and some use user-${id} (hyphen)
-    socket.join(`user_${userId}`);
-    socket.join(`user-${userId}`);
-    console.log(`User ${userId} joined rooms user_${userId} & user-${userId}, socket: ${socket.id}`);
+    socket.join(`user_${normalizedUserId}`);
+    socket.join(`user-${normalizedUserId}`);
+    console.log(`User ${normalizedUserId} joined rooms user_${normalizedUserId} & user-${normalizedUserId}, socket: ${socket.id}`);
     
     // Broadcast online status
-    io.emit('user:online', userId);
+    io.emit('user:online', normalizedUserId);
   });
 
   // Join community room
@@ -405,7 +433,7 @@ io.on('connection', (socket) => {
   // Send message
   socket.on('message:send', (data) => {
     const { receiverId, message } = data;
-    const receiverSocketId = connectedUsers.get(receiverId);
+    const receiverSocketId = connectedUsers.get(normalizeUserId(receiverId));
     
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('message:receive', message);
@@ -429,7 +457,7 @@ io.on('connection', (socket) => {
   // Typing indicator
   socket.on('typing:start', (data) => {
     const { receiverId } = data;
-    const receiverSocketId = connectedUsers.get(receiverId);
+    const receiverSocketId = connectedUsers.get(normalizeUserId(receiverId));
     
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('typing:start', { userId: socket.userId });
@@ -452,7 +480,7 @@ io.on('connection', (socket) => {
 
   socket.on('typing:stop', (data) => {
     const { receiverId } = data;
-    const receiverSocketId = connectedUsers.get(receiverId);
+    const receiverSocketId = connectedUsers.get(normalizeUserId(receiverId));
     
     if (receiverSocketId) {
       io.to(receiverSocketId).emit('typing:stop', { userId: socket.userId });
@@ -462,7 +490,7 @@ io.on('connection', (socket) => {
   // Send notification
   socket.on('notification:send', (data) => {
     const { userId, notification } = data;
-    const userSocketId = connectedUsers.get(userId);
+    const userSocketId = connectedUsers.get(normalizeUserId(userId));
     
     if (userSocketId) {
       io.to(userSocketId).emit('notification:receive', notification);
@@ -479,14 +507,14 @@ io.on('connection', (socket) => {
 
   // WebRTC Call Signaling
   socket.on('call:initiate', (data) => {
-    const { to, from, offer, isVideo, caller, isGroupAdd, groupId } = data;
+    const { to, from, offer, isVideo, caller, isGroupAdd, groupId, callId } = data;
     console.log(`Call initiated from ${from} to ${to}, video: ${isVideo}, groupAdd: ${!!isGroupAdd}`);
-    console.log(`Emitting to room: user_${to}`);
-    io.to(`user_${to}`).emit('call:incoming', {
+    emitToUser(to, 'call:incoming', {
       from,
       offer,
       isVideo,
       caller,
+      callId: callId || null,
       isGroupAdd: !!isGroupAdd,
       groupId: groupId || null
     });
@@ -504,44 +532,42 @@ io.on('connection', (socket) => {
 
   socket.on('call:answer', (data) => {
     const { to, answer } = data;
-    console.log(`Call answered, sending to user_${to}`);
-    io.to(`user_${to}`).emit('call:answered', { answer });
+    console.log(`Call answered, sending to user ${to}`);
+    emitToUser(to, 'call:answered', { answer });
   });
 
   socket.on('call:ice-candidate', (data) => {
     const { to, candidate } = data;
-    io.to(`user_${to}`).emit('call:ice-candidate', { candidate });
+    emitToUser(to, 'call:ice-candidate', { candidate });
   });
 
   socket.on('call:reject', (data) => {
     const { to } = data;
-    console.log(`Call rejected, notifying user_${to}`);
-    io.to(`user_${to}`).emit('call:rejected');
+    console.log(`Call rejected, notifying user ${to}`);
+    emitToUser(to, 'call:rejected');
   });
 
   socket.on('call:end', (data) => {
     const { to } = data;
-    console.log(`Call ended, notifying user_${to}`);
-    io.to(`user_${to}`).emit('call:ended');
+    console.log(`Call ended, notifying user ${to}`);
+    emitToUser(to, 'call:ended');
   });
 
   // Renegotiation (mid-call track changes: screen share, add video to voice call)
   socket.on('call:renegotiate', (data) => {
     const { to, offer } = data;
-    io.to(`user_${to}`).emit('call:renegotiate', { offer });
+    emitToUser(to, 'call:renegotiate', { offer });
   });
 
   socket.on('call:renegotiate-answer', (data) => {
     const { to, answer } = data;
-    io.to(`user_${to}`).emit('call:renegotiate-answer', { answer });
+    emitToUser(to, 'call:renegotiate-answer', { answer });
   });
 
   // Multi-device: call answered on one device → dismiss on others
   socket.on('call:answered-on-device', (data) => {
     const { userId } = data;
-    // Emit to all sockets of this user EXCEPT the current one
-    const room = `user_${userId}`;
-    socket.to(room).emit('call:answered-elsewhere');
+    emitToUser(userId, 'call:answered-elsewhere', undefined, socket.id);
   });
 
   // Add member to active call signaling

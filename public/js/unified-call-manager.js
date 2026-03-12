@@ -841,16 +841,16 @@ class UnifiedCallManager {
       const offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
 
+      const callId = await this._logCallStart('dm', contactId, this.isVideoCall);
       const user = InnovateAPI.getCurrentUser();
       this.socket.emit('call:initiate', {
         to: contactId,
         from: user.id,
         offer,
         isVideo: this.isVideoCall,
+        callId,
         caller: { username: user.username, profile_picture: user.profile_picture }
       });
-
-      this._logCallStart('dm', contactId, isVideo);
 
       // 45s ring timeout
       this.ringTimeout = setTimeout(() => {
@@ -1428,6 +1428,7 @@ class UnifiedCallManager {
       this.callDirection = 'incoming';
       this.callState = 'ringing';
       this.isVideoCall = data.isVideo;
+      this.currentCallId = data.callId || null;
       this.currentContactId = data.from;
       this.currentContactInfo = data.caller;
       this._pendingOffer = data.offer;
@@ -2102,8 +2103,10 @@ class UnifiedCallManager {
       });
       const data = await res.json();
       if (data.callId) this.currentCallId = data.callId;
+      return data.callId || null;
     } catch (err) {
       console.error('Failed to log call start:', err);
+      return null;
     }
   }
 
