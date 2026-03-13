@@ -1947,6 +1947,12 @@ class UnifiedCallManager {
     socket.on('call:renegotiate', async (data) => {
       try {
         if (!this.peerConnection) return;
+        if (this.peerConnection.signalingState !== 'stable') {
+          console.log('[CallTrace] call:renegotiate ignored in non-stable state', {
+            signalingState: this.peerConnection.signalingState
+          });
+          return;
+        }
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await this.peerConnection.createAnswer();
         await this.peerConnection.setLocalDescription(answer);
@@ -1956,16 +1962,28 @@ class UnifiedCallManager {
         });
         // Video upgrade is now handled in ontrack when the video track arrives
       } catch (err) {
-        console.error('Renegotiation answer error:', err);
+        const benignStateError = String(err?.message || '').includes('Called in wrong state');
+        if (!benignStateError) {
+          console.error('Renegotiation answer error:', err);
+        }
       }
     });
 
     socket.on('call:renegotiate-answer', async (data) => {
       try {
         if (!this.peerConnection) return;
+        if (this.peerConnection.signalingState !== 'have-local-offer') {
+          console.log('[CallTrace] call:renegotiate-answer ignored', {
+            signalingState: this.peerConnection.signalingState
+          });
+          return;
+        }
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
       } catch (err) {
-        console.error('Renegotiation answer set error:', err);
+        const benignStateError = String(err?.message || '').includes('Called in wrong state');
+        if (!benignStateError) {
+          console.error('Renegotiation answer set error:', err);
+        }
       }
     });
 
