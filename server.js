@@ -363,16 +363,36 @@ function normalizeUserId(userId) {
   return String(userId);
 }
 
+function getSocketAssociatedUserId(socket) {
+  return normalizeUserId(
+    socket?.userId ||
+    socket?.handshake?.auth?.userId ||
+    socket?.handshake?.query?.userId
+  );
+}
+
 function emitToUser(userId, eventName, payload, excludedSocketId = null) {
   const normalizedUserId = normalizeUserId(userId);
   if (!normalizedUserId) return;
 
   const socketId = connectedUsers.get(normalizedUserId);
-  if (socketId && socketId !== excludedSocketId) {
-    io.to(socketId).emit(eventName, payload);
-    return;
+  const hasActiveSocket = socketId ? io.sockets.sockets.has(socketId) : false;
+
+  if (socketId && !hasActiveSocket) {
+    // Cleanup stale mapping so room-based delivery can still work.
+    connectedUsers.delete(normalizedUserId);
   }
 
+  // Emit directly to all sockets associated with this user first.
+  // This avoids relying solely on room-join timing from the client.
+  for (const [sid, s] of io.sockets.sockets) {
+    if (excludedSocketId && sid === excludedSocketId) continue;
+    if (getSocketAssociatedUserId(s) === normalizedUserId) {
+      io.to(sid).emit(eventName, payload);
+    }
+  }
+
+  // Also emit via rooms as compatibility for older tabs.
   const underscoreRoom = `user_${normalizedUserId}`;
   const hyphenRoom = `user-${normalizedUserId}`;
   if (excludedSocketId) {
@@ -385,6 +405,19 @@ function emitToUser(userId, eventName, payload, excludedSocketId = null) {
   io.to(hyphenRoom).emit(eventName, payload);
 }
 
+function registerSocketUser(socket, userId) {
+  const normalizedUserId = normalizeUserId(userId);
+  if (!normalizedUserId) return false;
+
+  connectedUsers.set(normalizedUserId, socket.id);
+  socket.userId = normalizedUserId;
+
+  // Join both room naming variants used across the codebase.
+  socket.join(`user_${normalizedUserId}`);
+  socket.join(`user-${normalizedUserId}`);
+  return true;
+}
+
 // Group call participation (WebRTC signaling)
 // Map socket.id -> { groupId, userId, displayName }
 const groupCallPresence = new Map();
@@ -392,17 +425,21 @@ const groupCallPresence = new Map();
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
+  // Prefer eager registration from handshake auth so realtime events work
+  // even before explicit user:join emit runs on the client.
+  const handshakeUserId = normalizeUserId(socket.handshake?.auth?.userId || socket.handshake?.query?.userId);
+  if (handshakeUserId && registerSocketUser(socket, handshakeUserId)) {
+    console.log(`User ${handshakeUserId} auto-joined from handshake, socket: ${socket.id}`);
+    io.emit('user:online', handshakeUserId);
+  } else {
+    console.log(`Socket ${socket.id} connected without handshake userId`);
+  }
+
   // User joins with their userId
   socket.on('user:join', (userId) => {
     const normalizedUserId = normalizeUserId(userId);
     if (!normalizedUserId) return;
-    connectedUsers.set(normalizedUserId, socket.id);
-    socket.userId = normalizedUserId;
-    
-    // Join user-specific rooms for receiving messages/notifications
-    // Some routes use user_${id} (underscore) and some use user-${id} (hyphen)
-    socket.join(`user_${normalizedUserId}`);
-    socket.join(`user-${normalizedUserId}`);
+    registerSocketUser(socket, normalizedUserId);
     console.log(`User ${normalizedUserId} joined rooms user_${normalizedUserId} & user-${normalizedUserId}, socket: ${socket.id}`);
     
     // Broadcast online status
@@ -542,15 +579,27 @@ io.on('connection', (socket) => {
   });
 
   socket.on('call:reject', (data) => {
-    const { to } = data;
+    const { to, reason } = data || {};
+    // Ignore implicit/legacy auto-rejects from background/stale tabs.
+    // Only explicit user declines should be forwarded to caller.
+    if (reason !== 'declined') {
+      console.log(`Ignoring non-manual call reject from ${socket.userId || 'unknown'} to ${to}`);
+      return;
+    }
     console.log(`Call rejected, notifying user ${to}`);
-    emitToUser(to, 'call:rejected');
+    emitToUser(to, 'call:rejected', {
+      from: socket.userId || null,
+      reason: 'declined'
+    });
   });
 
   socket.on('call:end', (data) => {
-    const { to } = data;
+    const { to, reason } = data || {};
     console.log(`Call ended, notifying user ${to}`);
-    emitToUser(to, 'call:ended');
+    emitToUser(to, 'call:ended', {
+      from: socket.userId || null,
+      reason: reason || 'ended'
+    });
   });
 
   // Renegotiation (mid-call track changes: screen share, add video to voice call)
@@ -573,7 +622,7 @@ io.on('connection', (socket) => {
   // Add member to active call signaling
   socket.on('call:add-member-offer', (data) => {
     const { to, offer, userId, username, profile_picture } = data;
-    io.to(`user_${to}`).emit('call:add-member-offer', {
+    emitToUser(to, 'call:add-member-offer', {
       fromSocketId: socket.id,
       offer,
       userId,
@@ -596,7 +645,7 @@ io.on('connection', (socket) => {
   socket.on('call:screen-share', (data) => {
     const { to, sharing } = data || {};
     if (!to) return;
-    io.to(`user_${to}`).emit('call:screen-share', { from: socket.id, sharing: !!sharing });
+    emitToUser(to, 'call:screen-share', { from: socket.id, sharing: !!sharing });
   });
 
   socket.on('group-call:screen-share', (data) => {
@@ -665,7 +714,7 @@ io.on('connection', (socket) => {
             };
             (members || []).forEach(m => {
               if (String(m.user_id) !== String(userId)) {
-                io.to(`user_${m.user_id}`).emit('group-call:ring', ringData);
+                emitToUser(m.user_id, 'group-call:ring', ringData);
                 // Send push notification for group call (works on lock screen)
                 pushService.sendCallPush(
                   m.user_id,
@@ -717,7 +766,7 @@ io.on('connection', (socket) => {
         db.all('SELECT user_id FROM group_members WHERE group_id = ?', [groupId], (err, members) => {
           if (!err && members) {
             members.forEach(m => {
-              io.to(`user_${m.user_id}`).emit('group-call:ended', { groupId });
+              emitToUser(m.user_id, 'group-call:ended', { groupId });
             });
           }
         });
@@ -743,7 +792,10 @@ io.on('connection', (socket) => {
     }
 
     if (socket.userId) {
-      connectedUsers.delete(socket.userId);
+      // Only delete mapping if this disconnected socket is still the active one.
+      if (connectedUsers.get(socket.userId) === socket.id) {
+        connectedUsers.delete(socket.userId);
+      }
       io.emit('user:offline', socket.userId);
     }
     console.log('User disconnected:', socket.id);

@@ -1255,7 +1255,7 @@
   <script src="/js/push-notifications.js"></script>
   <script src="/js/instagram-theme.js"></script>
   <script src="/js/notification-banner.js"></script>
-  <script src="/js/unified-call-manager.js?v=20260313a"></script>
+  <script src="/js/unified-call-manager.js?v=20260313e"></script>
   <script>
     InnovateAPI.requireAuth();
     InnovateAPI.initializePage();
@@ -4252,6 +4252,20 @@
 
     // WebRTC call event listeners - delegated to CallManager
     callManager.setupSocketListeners(socket);
+
+    // Self-heal call signaling handlers on reconnects.
+    socket.off('connect', window.__messagesCallReconnectHandler);
+    socket.off('reconnect', window.__messagesCallReconnectHandler);
+    window.__messagesCallReconnectHandler = () => {
+      try {
+        callManager.setupSocketListeners(socket);
+        socket.emit('user:join', user.id);
+      } catch (e) {
+        console.error('Failed to rebind call listeners on reconnect:', e);
+      }
+    };
+    socket.on('connect', window.__messagesCallReconnectHandler);
+    socket.on('reconnect', window.__messagesCallReconnectHandler);
       
     // Emit user join
     socket.emit('user:join', user.id);

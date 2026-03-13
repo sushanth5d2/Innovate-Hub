@@ -70,6 +70,28 @@ class UnifiedCallManager {
     this._remoteScreenSharePeer = null;  // socketId or 'dm' when remote is sharing
     this._originalIsVideoCall = false;   // restore after screen share ends
     this.peerStreams = new Map();         // socketId → MediaStream for group peers
+
+    // Socket lifecycle handlers (for clean rebind)
+    this._onSocketConnect = null;
+    this._onSocketReconnect = null;
+  }
+
+  _ensureSignalingReady() {
+    if (!this.socket) return false;
+
+    // Try to restore connection quickly for production reconnect scenarios.
+    if (!this.socket.connected && typeof this.socket.connect === 'function') {
+      try { this.socket.connect(); } catch (_) {}
+    }
+
+    const user = (typeof InnovateAPI !== 'undefined' && typeof InnovateAPI.getCurrentUser === 'function')
+      ? InnovateAPI.getCurrentUser()
+      : null;
+    if (user?.id) {
+      this.socket.emit('user:join', user.id);
+    }
+
+    return true;
   }
 
   // Ensure a persistent hidden audio element exists (outside the modal)
@@ -780,6 +802,12 @@ class UnifiedCallManager {
     this.currentContactId = contactId;
     this.currentContactInfo = contactInfo;
 
+    if (!this._ensureSignalingReady()) {
+      this.callState = 'idle';
+      if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Call service unavailable. Please refresh.', 'error');
+      return;
+    }
+
     this.showOutgoingCallScreen(contactInfo);
     this.playRingback();
 
@@ -878,6 +906,12 @@ class UnifiedCallManager {
     this.callState = 'connecting';
     this.currentGroupId = groupId;
     this.currentContactInfo = groupInfo || { username: 'Group Call' };
+
+    if (!this._ensureSignalingReady()) {
+      this.callState = 'idle';
+      if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Call service unavailable. Please refresh.', 'error');
+      return;
+    }
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1042,6 +1076,8 @@ class UnifiedCallManager {
   rejectCall() {
     if (this.callState !== 'ringing' || this.callDirection !== 'incoming') return;
 
+    this._ensureSignalingReady();
+
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
     
@@ -1053,7 +1089,7 @@ class UnifiedCallManager {
       return;
     }
     
-    this.socket.emit('call:reject', { to: this.currentContactId });
+    this.socket.emit('call:reject', { to: this.currentContactId, reason: 'declined' });
     this.showCallEndedScreen('Call declined');
     this.playCallEndTone();
     this._logCallEnd('declined');
@@ -1062,6 +1098,8 @@ class UnifiedCallManager {
 
   endCall(reason) {
     if (this.callState === 'idle') return;
+
+    this._ensureSignalingReady();
 
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
@@ -1078,7 +1116,7 @@ class UnifiedCallManager {
     const status = reason || (this.callState === 'connected' ? 'completed' : (this.callState === 'ringing' && this.callDirection === 'outgoing' ? 'cancelled' : 'ended'));
 
     if (this.callMode === 'dm') {
-      this.socket.emit('call:end', { to: this.currentContactId });
+      this.socket.emit('call:end', { to: this.currentContactId, reason: status });
     } else if (this.callMode === 'group') {
       this.socket.emit('group-call:leave', { groupId: this.currentGroupId });
       this.peers.forEach((pc) => pc.close());
@@ -1372,6 +1410,15 @@ class UnifiedCallManager {
   setupSocketListeners(socket) {
     this.socket = socket;
 
+    // Keep the current user in signaling rooms across reconnects.
+    if (this._onSocketConnect) socket.off('connect', this._onSocketConnect);
+    if (this._onSocketReconnect) socket.off('reconnect', this._onSocketReconnect);
+    this._onSocketConnect = () => this._ensureSignalingReady();
+    this._onSocketReconnect = () => this._ensureSignalingReady();
+    socket.on('connect', this._onSocketConnect);
+    socket.on('reconnect', this._onSocketReconnect);
+    this._ensureSignalingReady();
+
     // Remove existing call listeners to prevent duplicates
     socket.off('call:incoming');
     socket.off('call:answered');
@@ -1391,25 +1438,56 @@ class UnifiedCallManager {
 
     // DM: incoming call
     socket.on('call:incoming', (data) => {
-      if (this.callState !== 'idle') {
-        socket.emit('call:reject', { to: data.from });
-        return;
-      }
+      try {
+        // If actively connected in another call, ignore here.
+        // Do not auto-reject from client side because hidden/stale tabs can
+        // incorrectly cancel calls for the whole user.
+        if (this.callState === 'connected') {
+          return;
+        }
 
-      // If this is a group add invitation (no WebRTC offer, just an invite to join group call)
-      if (data.isGroupAdd && data.groupId) {
-        this.callMode = 'group';
+        // Recover from stale non-idle states so incoming call can still ring.
+        if (this.callState !== 'idle') {
+          this.cleanup();
+        }
+
+        // If this is a group add invitation (no WebRTC offer, just an invite to join group call)
+        if (data.isGroupAdd && data.groupId) {
+          this.callMode = 'group';
+          this.callDirection = 'incoming';
+          this.callState = 'ringing';
+          this.isVideoCall = data.isVideo;
+          this.currentGroupId = data.groupId;
+          this.currentContactInfo = { username: data.caller?.username || 'Group Call', profile_picture: data.caller?.profile_picture };
+          this._pendingGroupCallData = { groupId: data.groupId, isVideo: data.isVideo };
+
+          this.showIncomingCallScreen({
+            username: `${data.caller?.username || 'Someone'} invites you to a call`,
+            profile_picture: data.caller?.profile_picture
+          });
+          this.playIncomingRingtone();
+
+          this.ringTimeout = setTimeout(() => {
+            if (this.callState === 'ringing') {
+              this.stopAllSounds();
+              this.showCallEndedScreen('Missed call');
+              this.cleanup();
+            }
+          }, 45000);
+          return;
+        }
+
+        // If this is a DM add-to-call with an offer, treat it as a normal incoming call.
+        this.callMode = 'dm';
         this.callDirection = 'incoming';
         this.callState = 'ringing';
         this.isVideoCall = data.isVideo;
-        this.currentGroupId = data.groupId;
-        this.currentContactInfo = { username: data.caller?.username || 'Group Call', profile_picture: data.caller?.profile_picture };
-        this._pendingGroupCallData = { groupId: data.groupId, isVideo: data.isVideo };
+        this.currentCallId = data.callId || null;
+        this.currentContactId = data.from;
+        this.currentContactInfo = data.caller;
+        this._pendingOffer = data.offer;
 
-        this.showIncomingCallScreen({
-          username: `${data.caller?.username || 'Someone'} invites you to a call`,
-          profile_picture: data.caller?.profile_picture
-        });
+        this.showIncomingCallScreen(data.caller);
         this.playIncomingRingtone();
 
         this.ringTimeout = setTimeout(() => {
@@ -1419,30 +1497,10 @@ class UnifiedCallManager {
             this.cleanup();
           }
         }, 45000);
-        return;
+      } catch (err) {
+        console.error('call:incoming handler error:', err);
+        if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Incoming call error', 'error');
       }
-
-      // If this is a DM add-to-call with an offer, treat it as a normal incoming call
-      // but mark it as an add (they'll join an existing DM peer for audio/video)
-      this.callMode = 'dm';
-      this.callDirection = 'incoming';
-      this.callState = 'ringing';
-      this.isVideoCall = data.isVideo;
-      this.currentCallId = data.callId || null;
-      this.currentContactId = data.from;
-      this.currentContactInfo = data.caller;
-      this._pendingOffer = data.offer;
-
-      this.showIncomingCallScreen(data.caller);
-      this.playIncomingRingtone();
-
-      this.ringTimeout = setTimeout(() => {
-        if (this.callState === 'ringing') {
-          this.stopAllSounds();
-          this.showCallEndedScreen('Missed call');
-          this.cleanup();
-        }
-      }, 45000);
     });
 
     // DM: call answered by remote
@@ -1481,18 +1539,23 @@ class UnifiedCallManager {
     });
 
     // DM: call rejected
-    socket.on('call:rejected', () => {
+    socket.on('call:rejected', (data) => {
       this.stopAllSounds();
-      this.showCallEndedScreen('Call declined');
+      const reason = data?.reason === 'declined' ? 'Call declined' : 'Call declined';
+      this.showCallEndedScreen(reason);
       this.playCallEndTone();
       this._logCallEnd('declined');
       this.cleanup();
     });
 
     // DM: call ended by remote
-    socket.on('call:ended', () => {
+    socket.on('call:ended', (data) => {
       this.stopAllSounds();
-      this.showCallEndedScreen('Call ended');
+      const reason = data?.reason;
+      const endedText = reason === 'cancelled' ? 'Call cancelled' :
+        reason === 'no_answer' ? 'No answer' :
+        reason === 'connection_lost' ? 'Connection lost' : 'Call ended';
+      this.showCallEndedScreen(endedText);
       this.playCallEndTone();
       this._logCallEnd(this.callState === 'connected' ? 'completed' : 'missed');
       this.cleanup();
@@ -2101,6 +2164,11 @@ class UnifiedCallManager {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ callType, targetId, isVideo })
       });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error('Failed to log call start: HTTP', res.status, errText);
+        return null;
+      }
       const data = await res.json();
       if (data.callId) this.currentCallId = data.callId;
       return data.callId || null;
@@ -2111,8 +2179,19 @@ class UnifiedCallManager {
   }
 
   async _logCallEnd(status) {
-    if (!this.currentCallId) return;
     try {
+      // Fallback: if call start logging failed, create a call record now so
+      // log-end can still create the system message in DM/group chat.
+      if (!this.currentCallId) {
+        const callType = this.callMode === 'group' ? 'group' : 'dm';
+        const targetId = callType === 'group' ? this.currentGroupId : this.currentContactId;
+        if (targetId) {
+          await this._logCallStart(callType, targetId, this.isVideoCall);
+        }
+      }
+
+      if (!this.currentCallId) return;
+
       const token = InnovateAPI.getToken();
       const duration = this.callStartTime ? Math.floor((Date.now() - this.callStartTime) / 1000) : 0;
       await fetch('/api/calls/log-end', {

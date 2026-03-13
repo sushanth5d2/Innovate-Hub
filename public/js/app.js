@@ -201,7 +201,10 @@
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity
+      reconnectionAttempts: Infinity,
+      auth: {
+        userId: getCurrentUser()?.id || null
+      }
     });
 
     socket.on('connect', () => {
