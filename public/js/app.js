@@ -171,6 +171,20 @@
   // Socket.IO
   let socket = null;
 
+  function tryConnectSocket() {
+    if (!socket || socket.connected || typeof socket.connect !== 'function') {
+      return;
+    }
+
+    // Avoid spamming connect() while Socket.IO manager is already opening.
+    const readyState = socket.io?.readyState || socket.io?._readyState;
+    if (readyState === 'opening' || readyState === 'open') {
+      return;
+    }
+
+    try { socket.connect(); } catch (_) {}
+  }
+
   function joinSocketAsCurrentUser() {
     if (!socket || !socket.connected) {
       return;
@@ -178,6 +192,7 @@
 
     const user = getCurrentUser();
     if (user?.id) {
+      console.log('[SocketTrace] user:join emit', { userId: user.id, socketId: socket.id, connected: socket.connected, transport: socket.io?.engine?.transport?.name });
       socket.emit('user:join', user.id);
     }
   }
@@ -187,7 +202,10 @@
       return null;
     }
 
-    if (socket && socket.connected) {
+    // Reuse the same socket instance; recreating while it is connecting causes
+    // polling 400/session mismatch errors and breaks realtime signaling.
+    if (socket) {
+      tryConnectSocket();
       return socket;
     }
 
@@ -197,7 +215,6 @@
     }
 
     socket = window.io(window.location.origin, {
-      transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -208,11 +225,17 @@
     });
 
     socket.on('connect', () => {
+      console.log('[SocketTrace] connect', { socketId: socket.id, transport: socket.io?.engine?.transport?.name });
       joinSocketAsCurrentUser();
     });
 
     socket.on('reconnect', () => {
+      console.log('[SocketTrace] reconnect', { socketId: socket.id, transport: socket.io?.engine?.transport?.name });
       joinSocketAsCurrentUser();
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[SocketTrace] connect_error', err?.message || err);
     });
 
     if (socket.connected) {
@@ -225,6 +248,8 @@
   function getSocket() {
     if (!socket) {
       socket = initSocket();
+    } else {
+      tryConnectSocket();
     }
     return socket;
   }

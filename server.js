@@ -154,6 +154,193 @@ app.use('/api/calls', require('./routes/calls'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api', require('./routes/community-groups'));
 
+// Prevent duplicate incoming rings when the same initiate signal arrives via
+// both Socket.IO and HTTP fallback.
+const recentCallInitiates = new Map();
+const recentCallAnswers = new Map();
+
+function buildCallInitiateKey({ signalId, from, to, offer }) {
+  if (signalId) return `signal:${signalId}`;
+  const sdpSig = offer?.sdp ? String(offer.sdp).slice(0, 64) : 'no-sdp';
+  return `pair:${from}->${to}:${sdpSig}`;
+}
+
+function isDuplicateCallInitiate(payload) {
+  const key = buildCallInitiateKey(payload);
+  if (!key) return false;
+
+  const now = Date.now();
+  const prev = recentCallInitiates.get(key);
+  if (prev && now - prev < 10000) {
+    return true;
+  }
+
+  recentCallInitiates.set(key, now);
+  if (recentCallInitiates.size > 5000) {
+    for (const [k, t] of recentCallInitiates) {
+      if (now - t > 60000) recentCallInitiates.delete(k);
+    }
+  }
+  return false;
+}
+
+function dispatchCallInitiate({ to, from, offer, isVideo, caller, isGroupAdd, groupId, callId, signalId }, source) {
+  if (!to || !from || !offer) {
+    return { ok: false, error: 'Invalid call initiate payload' };
+  }
+
+  const duplicate = isDuplicateCallInitiate({ to, from, offer, signalId });
+  if (duplicate) {
+    console.log('[CallTrace] call:initiate duplicate ignored', {
+      source,
+      from,
+      to,
+      signalId: signalId || null
+    });
+    return { ok: true, duplicate: true };
+  }
+
+  emitToUser(to, 'call:incoming', {
+    from,
+    offer,
+    isVideo,
+    caller,
+    callId: callId || null,
+    isGroupAdd: !!isGroupAdd,
+    groupId: groupId || null,
+    signalId: signalId || null
+  });
+
+  // Also send high-priority push notification for incoming call (works on lock screen)
+  pushService.sendCallPush(
+    to,
+    caller?.username || caller?.displayName || 'Someone',
+    from,
+    isVideo,
+    !!isGroupAdd,
+    groupId || null
+  );
+
+  return { ok: true, duplicate: false };
+}
+
+function dispatchCallAnswer({ to, from, answer, signalId }, source) {
+  if (!to || !answer) {
+    return { ok: false, error: 'Invalid call answer payload' };
+  }
+
+  if (signalId) {
+    recentCallAnswers.set(String(signalId), {
+      to: String(to),
+      from: from ? String(from) : null,
+      answer,
+      at: Date.now()
+    });
+    if (recentCallAnswers.size > 5000) {
+      const now = Date.now();
+      for (const [k, v] of recentCallAnswers) {
+        if (!v?.at || now - v.at > 120000) recentCallAnswers.delete(k);
+      }
+    }
+  }
+
+  emitToUser(to, 'call:answered', {
+    answer,
+    from: from || null,
+    signalId: signalId || null
+  });
+
+  console.log('[CallTrace] call:answer dispatched', {
+    source,
+    from: from || null,
+    to,
+    signalId: signalId || null
+  });
+
+  return { ok: true };
+}
+
+app.post('/api/calls/signal-initiate', authMiddleware, (req, res) => {
+  try {
+    const { to, offer, isVideo, caller, isGroupAdd, groupId, callId, signalId } = req.body || {};
+    const from = String(req.user?.userId || req.user?.id || '');
+
+    const payload = {
+      to,
+      from,
+      offer,
+      isVideo,
+      caller: caller || { username: req.user?.username || req.user?.fullname || 'User' },
+      isGroupAdd,
+      groupId,
+      callId,
+      signalId
+    };
+
+    console.log('[CallTrace] call:initiate via http', {
+      from,
+      to,
+      isVideo: !!isVideo,
+      isGroupAdd: !!isGroupAdd,
+      groupId: groupId || null,
+      callId: callId || null,
+      signalId: signalId || null
+    });
+
+    const result = dispatchCallInitiate(payload, 'http');
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error || 'Failed to signal call' });
+    }
+
+    return res.json({ ok: true, duplicate: !!result.duplicate });
+  } catch (err) {
+    console.error('HTTP call initiate fallback failed:', err);
+    return res.status(500).json({ error: 'Failed to signal call' });
+  }
+});
+
+app.post('/api/calls/signal-answer', authMiddleware, (req, res) => {
+  try {
+    const { to, answer, signalId } = req.body || {};
+    const from = String(req.user?.userId || req.user?.id || '');
+
+    const result = dispatchCallAnswer({ to, from, answer, signalId }, 'http');
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error || 'Failed to signal answer' });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('HTTP call answer fallback failed:', err);
+    return res.status(500).json({ error: 'Failed to signal answer' });
+  }
+});
+
+app.get('/api/calls/signal-answer-status/:signalId', authMiddleware, (req, res) => {
+  try {
+    const signalId = String(req.params?.signalId || '');
+    const requesterId = String(req.user?.userId || req.user?.id || '');
+    if (!signalId) {
+      return res.status(400).json({ error: 'Missing signalId' });
+    }
+
+    const entry = recentCallAnswers.get(signalId);
+    if (!entry) {
+      return res.json({ ok: true, answered: false });
+    }
+
+    // Only the intended receiver of the answer (original caller) can read it.
+    if (String(entry.to) !== requesterId) {
+      return res.json({ ok: true, answered: false });
+    }
+
+    return res.json({ ok: true, answered: true, answer: entry.answer });
+  } catch (err) {
+    console.error('call answer status lookup failed:', err);
+    return res.status(500).json({ error: 'Failed to get answer status' });
+  }
+});
+
 // Link preview endpoint (SSRF-protected)
 app.get('/api/link-preview', authMiddleware, async (req, res) => {
   const url = req.query.url;
@@ -383,18 +570,30 @@ function emitToUser(userId, eventName, payload, excludedSocketId = null) {
     connectedUsers.delete(normalizedUserId);
   }
 
+  const directTargets = [];
   // Emit directly to all sockets associated with this user first.
   // This avoids relying solely on room-join timing from the client.
   for (const [sid, s] of io.sockets.sockets) {
     if (excludedSocketId && sid === excludedSocketId) continue;
     if (getSocketAssociatedUserId(s) === normalizedUserId) {
       io.to(sid).emit(eventName, payload);
+      directTargets.push(sid);
     }
   }
 
   // Also emit via rooms as compatibility for older tabs.
   const underscoreRoom = `user_${normalizedUserId}`;
   const hyphenRoom = `user-${normalizedUserId}`;
+  console.log('[CallTrace] emitToUser', {
+    eventName,
+    userId: normalizedUserId,
+    excludedSocketId: excludedSocketId || null,
+    mappedSocketId: socketId || null,
+    hasActiveSocket,
+    directTargets,
+    underscoreRoomSize: io.sockets.adapter.rooms.get(underscoreRoom)?.size || 0,
+    hyphenRoomSize: io.sockets.adapter.rooms.get(hyphenRoom)?.size || 0
+  });
   if (excludedSocketId) {
     io.to(underscoreRoom).except(excludedSocketId).emit(eventName, payload);
     io.to(hyphenRoom).except(excludedSocketId).emit(eventName, payload);
@@ -543,39 +742,53 @@ io.on('connection', (socket) => {
   });
 
   // WebRTC Call Signaling
-  socket.on('call:initiate', (data) => {
-    const { to, from, offer, isVideo, caller, isGroupAdd, groupId, callId } = data;
-    console.log(`Call initiated from ${from} to ${to}, video: ${isVideo}, groupAdd: ${!!isGroupAdd}`);
-    emitToUser(to, 'call:incoming', {
+    socket.on('call:initiate', (data, ack) => {
+      const { to, from, offer, isVideo, caller, isGroupAdd, groupId, callId, signalId } = data;
+    console.log('[CallTrace] call:initiate', {
       from,
-      offer,
-      isVideo,
-      caller,
-      callId: callId || null,
-      isGroupAdd: !!isGroupAdd,
-      groupId: groupId || null
-    });
-
-    // Also send high-priority push notification for incoming call (works on lock screen)
-    pushService.sendCallPush(
       to,
-      caller?.username || caller?.displayName || 'Someone',
-      from,
-      isVideo,
-      !!isGroupAdd,
-      groupId || null
-    );
+      isVideo: !!isVideo,
+      isGroupAdd: !!isGroupAdd,
+      groupId: groupId || null,
+      callId: callId || null,
+        signalId: signalId || null,
+      socketId: socket.id,
+      socketUserId: socket.userId || null
+    });
+      const result = dispatchCallInitiate({ to, from, offer, isVideo, caller, isGroupAdd, groupId, callId, signalId }, 'socket');
+
+    if (typeof ack === 'function') {
+        ack({ ok: !!result.ok, duplicate: !!result.duplicate, error: result.error || null });
+      }
   });
 
   socket.on('call:answer', (data) => {
-    const { to, answer } = data;
-    console.log(`Call answered, sending to user ${to}`);
-    emitToUser(to, 'call:answered', { answer });
+    const { to, answer, from, signalId } = data || {};
+    const senderId = String(from || socket.userId || '');
+    const result = dispatchCallAnswer({ to, from: senderId, answer, signalId }, 'socket');
+    if (!result.ok) {
+      console.log(`Invalid call answer payload from user ${senderId} to ${to}`);
+    }
   });
 
   socket.on('call:ice-candidate', (data) => {
-    const { to, candidate } = data;
-    emitToUser(to, 'call:ice-candidate', { candidate });
+    const { to, candidate, answer, signalId } = data || {};
+
+    // Reliability fallback: callee may piggyback answer on ICE packet.
+    if (to && answer) {
+      dispatchCallAnswer({
+        to,
+        from: String(socket.userId || ''),
+        answer,
+        signalId: signalId || null
+      }, 'socket-ice-fallback');
+    }
+
+    emitToUser(to, 'call:ice-candidate', {
+      candidate,
+      answer: answer || null,
+      signalId: signalId || null
+    });
   });
 
   socket.on('call:reject', (data) => {

@@ -74,14 +74,23 @@ class UnifiedCallManager {
     // Socket lifecycle handlers (for clean rebind)
     this._onSocketConnect = null;
     this._onSocketReconnect = null;
-  }
+      this._pendingLocalRenegotiation = false;
+      this._acceptInProgress = false;
+      this._currentIncomingSignalId = null;
+      this._currentOutgoingSignalId = null;
+      this._outgoingAnswerPollTimer = null;
+      this._pendingCleanup = false;
+    }
 
   _ensureSignalingReady() {
     if (!this.socket) return false;
 
     // Try to restore connection quickly for production reconnect scenarios.
     if (!this.socket.connected && typeof this.socket.connect === 'function') {
-      try { this.socket.connect(); } catch (_) {}
+      const readyState = this.socket.io?.readyState || this.socket.io?._readyState;
+      if (readyState !== 'opening' && readyState !== 'open') {
+        try { this.socket.connect(); } catch (_) {}
+      }
     }
 
     const user = (typeof InnovateAPI !== 'undefined' && typeof InnovateAPI.getCurrentUser === 'function')
@@ -93,6 +102,127 @@ class UnifiedCallManager {
 
     return true;
   }
+
+  async _waitForSocketConnected(timeoutMs = 5000) {
+    if (!this.socket) return false;
+    if (this.socket.connected) return true;
+
+    this._ensureSignalingReady();
+
+    return await new Promise((resolve) => {
+      let settled = false;
+      const onConnect = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(true);
+      };
+      const onError = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(false);
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.socket.off('connect', onConnect);
+        this.socket.off('connect_error', onError);
+      };
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(!!this.socket?.connected);
+      }, timeoutMs);
+
+      this.socket.on('connect', onConnect);
+      this.socket.on('connect_error', onError);
+    });
+  }
+
+    async _emitDmRenegotiation(reason = 'manual') {
+      if (!this.peerConnection || !this.currentContactId || !this.socket) return false;
+      if (this.callState !== 'connected') return false;
+      if (this.peerConnection.signalingState !== 'stable') return false;
+
+      try {
+        const offer = await this.peerConnection.createOffer();
+        await this.peerConnection.setLocalDescription(offer);
+        this.socket.emit('call:renegotiate', {
+          to: this.currentContactId,
+          offer: this.peerConnection.localDescription
+        });
+        this._pendingLocalRenegotiation = false;
+        console.log('[CallTrace] call:renegotiate sent', { reason, to: this.currentContactId });
+        return true;
+      } catch (err) {
+        console.error('[CallTrace] call:renegotiate failed', err);
+        return false;
+      }
+    }
+
+    async _acquireLocalMediaForOutgoingCall(isVideoRequested) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn('[CallTrace] mediaDevices unavailable for outgoing call');
+        return;
+      }
+
+      let stream;
+      try {
+        console.log('[CallTrace] getUserMedia begin', { isVideoRequested: !!isVideoRequested });
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: isVideoRequested ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
+        });
+      } catch (mediaErr) {
+        console.error('getUserMedia failed:', mediaErr);
+        if (isVideoRequested) {
+          try {
+            console.log('[CallTrace] retry getUserMedia audio-only');
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.isVideoCall = false;
+            this.isVideoOff = true;
+          } catch (audioErr) {
+            console.error('audio-only getUserMedia failed:', audioErr);
+            return;
+          }
+        } else {
+          return;
+        }
+      }
+
+      if (!stream) return;
+
+      if (this.callState !== 'ringing' && this.callState !== 'connected') {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      this.localStream = stream;
+
+      const primeAudio = this._ensureRemoteAudio();
+      primeAudio.srcObject = new MediaStream();
+      await primeAudio.play().catch(() => {});
+
+      if (!this.peerConnection) return;
+
+      stream.getTracks().forEach(track => {
+        const existingSender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === track.kind);
+        if (existingSender) {
+          existingSender.replaceTrack(track).catch(() => {});
+        } else {
+          this.peerConnection.addTrack(track, this.localStream);
+        }
+      });
+
+      this._attachStreamsToUI();
+
+      if (this.callState === 'connected') {
+        await this._emitDmRenegotiation('local-media-ready');
+      } else {
+        this._pendingLocalRenegotiation = true;
+      }
+    }
 
   // Ensure a persistent hidden audio element exists (outside the modal)
   _ensureRemoteAudio() {
@@ -112,6 +242,83 @@ class UnifiedCallManager {
       this._remoteAudioEl.remove();
       this._remoteAudioEl = null;
     }
+  }
+
+  async _handleOutgoingAnswered(data, source = 'socket') {
+    if (this.callDirection !== 'outgoing') return false;
+    if (this.callState !== 'ringing' && this.callState !== 'connecting') return false;
+    if (!data?.answer || !this.peerConnection) return false;
+
+    this.stopAllSounds();
+    if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+
+    try {
+      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      await this._applyBufferedIceCandidates();
+      this.callState = 'connected';
+      this._renderedScreenKey = null;
+      this.showActiveCallScreen();
+      this.playConnectedTone();
+      console.log('[CallTrace] outgoing call answered', { source, signalId: data?.signalId || null });
+      return true;
+    } catch (err) {
+      console.error('Error handling answer:', err, { source });
+      this.endCall();
+      return false;
+    }
+  }
+
+  _startOutgoingAnswerPolling(signalId) {
+    if (!signalId) return;
+    if (this._outgoingAnswerPollTimer) {
+      clearInterval(this._outgoingAnswerPollTimer);
+      this._outgoingAnswerPollTimer = null;
+    }
+
+    this._outgoingAnswerPollTimer = setInterval(async () => {
+      if (this.callDirection !== 'outgoing' || this.callState !== 'ringing') {
+        clearInterval(this._outgoingAnswerPollTimer);
+        this._outgoingAnswerPollTimer = null;
+        return;
+      }
+
+      try {
+        const status = await this._apiGet(`/api/calls/signal-answer-status/${encodeURIComponent(signalId)}`);
+        if (status?.answered && status?.answer) {
+          const handled = await this._handleOutgoingAnswered({ answer: status.answer, signalId }, 'http-poll');
+          if (handled && this._outgoingAnswerPollTimer) {
+            clearInterval(this._outgoingAnswerPollTimer);
+            this._outgoingAnswerPollTimer = null;
+          }
+        }
+      } catch (_) {}
+    }, 1000);
+  }
+
+  _forceStopAllLocalMediaTracks() {
+    const stopped = new Set();
+    const stopTrack = (track) => {
+      if (!track || stopped.has(track)) return;
+      try { track.stop(); } catch (_) {}
+      stopped.add(track);
+    };
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(stopTrack);
+    }
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(stopTrack);
+    }
+    if (this.peerConnection) {
+      try {
+        this.peerConnection.getSenders().forEach(sender => stopTrack(sender.track));
+      } catch (_) {}
+    }
+    this.peers.forEach((pc) => {
+      try {
+        pc.getSenders().forEach(sender => stopTrack(sender.track));
+      } catch (_) {}
+    });
   }
 
   // Flush any ICE candidates that were buffered before peerConnection/remoteDescription was ready
@@ -808,76 +1015,76 @@ class UnifiedCallManager {
       return;
     }
 
+    console.log('[CallTrace] startCall', {
+      contactId,
+      isVideo: !!isVideo,
+      socketConnected: !!this.socket?.connected,
+      socketId: this.socket?.id || null,
+      callState: this.callState
+    });
+
     this.showOutgoingCallScreen(contactInfo);
     this.playRingback();
 
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Media devices not available. Ensure you are on HTTPS.');
-      }
-
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: isVideo ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } : false
-        });
-      } catch (mediaErr) {
-        console.error('getUserMedia failed:', mediaErr);
-        // Fallback: try audio-only if video was requested
-        if (isVideo) {
-          console.log('Retrying with audio only...');
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          this.isVideoCall = false;
-          this.isVideoOff = true;
-        } else {
-          throw mediaErr;
-        }
-      }
-
-      if (!stream) {
-        throw new Error('Failed to get media stream');
-      }
-
-      this.localStream = stream;
-
-      // Check if call was cancelled while waiting for getUserMedia
-      if (this.callState !== 'ringing') {
-        stream.getTracks().forEach(t => t.stop());
-        this.localStream = null;
-        return;
-      }
-
-      // Prime audio element during user gesture so play() works later (iOS autoplay policy)
-      const primeAudio = this._ensureRemoteAudio();
-      primeAudio.srcObject = new MediaStream();
-      await primeAudio.play().catch(() => {});
-
-      // Guard: if cleanup happened during audio prime
-      if (!this.localStream) {
-        stream.getTracks().forEach(t => t.stop());
-        return;
-      }
-
       this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
 
-      stream.getTracks().forEach(track => {
-        this.peerConnection.addTrack(track, this.localStream);
-      });
+      // Build an offer immediately so incoming ring does not wait on camera/mic permission.
+      this.peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+      if (isVideo) {
+        this.peerConnection.addTransceiver('video', { direction: 'recvonly' });
+      }
 
       const offer = await this.peerConnection.createOffer();
       await this.peerConnection.setLocalDescription(offer);
 
-      const callId = await this._logCallStart('dm', contactId, this.isVideoCall);
       const user = InnovateAPI.getCurrentUser();
-      this.socket.emit('call:initiate', {
+
+      // Do not block signaling on call-history logging. PostgreSQL/write-path
+      // issues should never prevent the receiver from getting the incoming call.
+      let callId = null;
+      this._logCallStart('dm', contactId, this.isVideoCall)
+        .then((loggedCallId) => {
+          if (loggedCallId) {
+            this.currentCallId = loggedCallId;
+          }
+        })
+        .catch((err) => {
+          console.error('[CallTrace] async log-start failed:', err);
+        });
+
+      const signalId = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      this._currentOutgoingSignalId = signalId;
+
+      const initiatePayload = {
         to: contactId,
         from: user.id,
         offer,
         isVideo: this.isVideoCall,
         callId,
+        signalId,
         caller: { username: user.username, profile_picture: user.profile_picture }
+      };
+
+      let initiateAcked = false;
+      this.socket.emit('call:initiate', initiatePayload, (ack) => {
+        if (ack?.ok) initiateAcked = true;
+      });
+
+      // Poll fallback for answered state in case call:answered socket event is missed.
+      this._startOutgoingAnswerPolling(signalId);
+
+      // Safety net: if socket ACK is missing, send the same signal via HTTP.
+      setTimeout(() => {
+        if (this.callState !== 'ringing' || initiateAcked) return;
+        console.warn('[CallTrace] call:initiate ack missing, using HTTP fallback');
+        this._apiPost('/api/calls/signal-initiate', initiatePayload);
+      }, 1200);
+
+      // Acquire local media in parallel so signaling is not blocked by permission/device delays.
+      this._acquireLocalMediaForOutgoingCall(isVideo).catch((err) => {
+        console.error('[CallTrace] local media attach failed:', err);
       });
 
       // 45s ring timeout
@@ -980,9 +1187,17 @@ class UnifiedCallManager {
   async acceptCall() {
     if (this.callState !== 'ringing' || this.callDirection !== 'incoming') return;
 
+    if (this._acceptInProgress) return;
+    this._acceptInProgress = true;
+
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
     this.callState = 'connecting';
+
+    // Switch UI immediately so incoming Accept/Decline buttons don't remain visible
+    // while media/signaling async steps complete.
+    this._renderedScreenKey = null;
+    this.showActiveCallScreen();
 
     // Group call acceptance — join the mesh
     if (this.callMode === 'group' && this._pendingGroupCallData) {
@@ -998,6 +1213,11 @@ class UnifiedCallManager {
 
     // DM call acceptance
     try {
+      const pendingOffer = this._pendingOffer;
+      if (!pendingOffer) {
+        throw new Error('Missing incoming offer for call acceptance');
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Media devices not available. Ensure you are on HTTPS.');
       }
@@ -1025,56 +1245,94 @@ class UnifiedCallManager {
 
       this.localStream = stream;
 
-      this.peerConnection = new RTCPeerConnection(this.iceConfig);
+      // ── CRITICAL PATH: WebRTC signaling first, before any further awaits ──
+      // primeAudio.play() is NOT awaited here as it causes the AudioContext
+      // policy error, blocks the event loop, and drops the socket.emit below.
+      const primeAudio = this._ensureRemoteAudio();
+      primeAudio.srcObject = new MediaStream();
+      primeAudio.play().catch(() => {}); // fire-and-forget
+
+      const pc = this.peerConnection = new RTCPeerConnection(this.iceConfig);
       this._setupDMPeerConnection();
 
       stream.getTracks().forEach(track => {
-        this.peerConnection.addTrack(track, stream);
+        pc.addTrack(track, stream);
       });
 
-      // Prime audio element during user gesture so play() works later (iOS autoplay policy)
-      const primeAudio = this._ensureRemoteAudio();
-      primeAudio.srcObject = new MediaStream();
-      await primeAudio.play().catch(() => {});
-
-      await this.peerConnection.setRemoteDescription(new RTCSessionDescription(this._pendingOffer));
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer));
       await this._applyBufferedIceCandidates();
 
-      const answer = await this.peerConnection.createAnswer();
-      await this.peerConnection.setLocalDescription(answer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
 
+      // Capture the socket reference right before emitting — protects against
+      // in-flight reconnects that update this.socket before the emit.
+      const signalingSocket = this.socket;
       const user = InnovateAPI.getCurrentUser();
-      this.socket.emit('call:answer', {
-        to: this.currentContactId,
+      const contactId = this.currentContactId;
+      const answerPayload = {
+        to: contactId,
         answer,
-        from: user.id
-      });
+        from: user.id,
+        signalId: this._currentIncomingSignalId || null
+      };
 
-      // Notify server call was answered
+      // Emit answer immediately on current socket (no await before this point
+      // other than pure WebRTC ops that cannot be avoided).
+      if (signalingSocket && signalingSocket.connected) {
+        signalingSocket.emit('call:answer', answerPayload);
+        console.log('[CallTrace] call:answer emitted via socket', { to: contactId, signalId: answerPayload.signalId });
+      } else {
+        console.warn('[CallTrace] socket not connected at answer emit, using HTTP only');
+      }
+
+      // HTTP fallback — always send so server caches for caller polling.
+      this._apiPost('/api/calls/signal-answer', answerPayload);
+
+      // Retry socket emit once after 600ms in case socket reconnected.
+      setTimeout(() => {
+        if (this.callDirection !== 'incoming' || !this.currentContactId) return;
+        const s = this.socket;
+        if (s && s.connected) {
+          s.emit('call:answer', answerPayload);
+          console.log('[CallTrace] call:answer retry emitted', { to: contactId });
+        }
+      }, 600);
+
+      // Notify server call was answered (DB logging, non-critical)
       if (this.currentCallId) {
         this._apiPost('/api/calls/answer', { callId: this.currentCallId });
       }
 
       // Notify other devices of this user that call was answered here
-      this.socket.emit('call:answered-on-device', {
-        userId: user.id,
-        callFrom: this.currentContactId
-      });
+      const s2 = this.socket;
+      if (s2 && s2.connected) {
+        s2.emit('call:answered-on-device', { userId: user.id, callFrom: contactId });
+      }
 
-      this.callState = 'connected';
-      this._renderedScreenKey = null; // Force fresh active screen
+      // Callee side shows connecting screen — will flip to connected when
+      // onconnectionstatechange fires or caller's ICE flow completes.
+      this.callState = 'connecting';
+      this._renderedScreenKey = null;
       this.showActiveCallScreen();
-      this.playConnectedTone();
 
     } catch (err) {
       console.error('acceptCall error:', err);
+      // Reset first so cleanup is not deferred.
+      this._acceptInProgress = false;
       this.cleanup();
-      if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Could not access camera/mic', 'error');
+      if (typeof InnovateAPI !== 'undefined') InnovateAPI.showAlert('Could not connect call - please retry', 'error');
+    } finally {
+      this._acceptInProgress = false;
+      if (this._pendingCleanup) {
+        this._pendingCleanup = false;
+        this.cleanup();
+      }
     }
   }
 
   rejectCall() {
-    if (this.callState !== 'ringing' || this.callDirection !== 'incoming') return;
+    if ((this.callState !== 'ringing' && this.callState !== 'connecting') || this.callDirection !== 'incoming') return;
 
     this._ensureSignalingReady();
 
@@ -1089,7 +1347,9 @@ class UnifiedCallManager {
       return;
     }
     
-    this.socket.emit('call:reject', { to: this.currentContactId, reason: 'declined' });
+    if (this.currentContactId && this.socket) {
+      this.socket.emit('call:reject', { to: this.currentContactId, reason: 'declined' });
+    }
     this.showCallEndedScreen('Call declined');
     this.playCallEndTone();
     this._logCallEnd('declined');
@@ -1100,6 +1360,9 @@ class UnifiedCallManager {
     if (this.callState === 'idle') return;
 
     this._ensureSignalingReady();
+
+    // Ensure device indicators (mic/cam) are released immediately.
+    this._forceStopAllLocalMediaTracks();
 
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
@@ -1130,19 +1393,22 @@ class UnifiedCallManager {
   }
 
   cleanup() {
+    // If acceptCall is mid-flight, defer cleanup so we don't null the peerConnection under it.
+    if (this._acceptInProgress) {
+      this._pendingCleanup = true;
+      return;
+    }
+    this._pendingCleanup = false;
+
     if (this.callTimerInterval) { clearInterval(this.callTimerInterval); this.callTimerInterval = null; }
+    if (this._outgoingAnswerPollTimer) { clearInterval(this._outgoingAnswerPollTimer); this._outgoingAnswerPollTimer = null; }
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
     if (this._lastPeerLeftTimer) { clearTimeout(this._lastPeerLeftTimer); this._lastPeerLeftTimer = null; }
     this.stopAllSounds();
 
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(t => t.stop());
-      this.localStream = null;
-    }
-    if (this.screenStream) {
-      this.screenStream.getTracks().forEach(t => t.stop());
-      this.screenStream = null;
-    }
+    this._forceStopAllLocalMediaTracks();
+    this.localStream = null;
+    this.screenStream = null;
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
@@ -1170,12 +1436,16 @@ class UnifiedCallManager {
     this.isSpeakerOn = false;
     this.isSharingScreen = false;
     this.isVideoSwapped = false;
+    this._pendingLocalRenegotiation = false;
     this.currentCallId = null;
     this.currentContactId = null;
     this.currentGroupId = null;
     this.currentContactInfo = null;
     this.callStartTime = null;
     this._pendingOffer = null;
+    this._acceptInProgress = false;
+    this._currentIncomingSignalId = null;
+    this._currentOutgoingSignalId = null;
     this._pendingTransferData = null;
     this._pendingGroupCallData = null;
     this._pendingIceCandidates = [];
@@ -1197,10 +1467,24 @@ class UnifiedCallManager {
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        this.socket.emit('call:ice-candidate', {
+        const candidatePayload = {
           to: this.currentContactId,
           candidate: event.candidate
-        });
+        };
+
+        // Reliability fallback: when this side accepted an incoming DM call,
+        // piggyback the answer on ICE packets so caller can recover if a
+        // standalone call:answer signal was dropped.
+        if (
+          this.callMode === 'dm' &&
+          this.callDirection === 'incoming' &&
+          this.peerConnection?.localDescription?.type === 'answer'
+        ) {
+          candidatePayload.answer = this.peerConnection.localDescription;
+          candidatePayload.signalId = this._currentIncomingSignalId || null;
+        }
+
+        this.socket.emit('call:ice-candidate', candidatePayload);
       }
     };
 
@@ -1409,6 +1693,10 @@ class UnifiedCallManager {
 
   setupSocketListeners(socket) {
     this.socket = socket;
+    console.log('[CallTrace] setupSocketListeners', {
+      socketId: socket?.id || null,
+      connected: !!socket?.connected
+    });
 
     // Keep the current user in signaling rooms across reconnects.
     if (this._onSocketConnect) socket.off('connect', this._onSocketConnect);
@@ -1439,15 +1727,45 @@ class UnifiedCallManager {
     // DM: incoming call
     socket.on('call:incoming', (data) => {
       try {
+        console.log('[CallTrace] call:incoming received', {
+          from: data?.from || null,
+          isVideo: !!data?.isVideo,
+          isGroupAdd: !!data?.isGroupAdd,
+          groupId: data?.groupId || null,
+          socketId: socket?.id || null,
+          callStateBefore: this.callState
+        });
+
         // If actively connected in another call, ignore here.
         // Do not auto-reject from client side because hidden/stale tabs can
         // incorrectly cancel calls for the whole user.
         if (this.callState === 'connected') {
+          console.log('[CallTrace] call:incoming ignored because already connected');
           return;
+        }
+
+        const isSameIncomingSource =
+          this.callDirection === 'incoming' &&
+          (this.callState === 'ringing' || this.callState === 'connecting') &&
+          String(this.currentContactId || '') === String(data?.from || '');
+
+        if (isSameIncomingSource) {
+          if (data?.signalId && data.signalId === this._currentIncomingSignalId) {
+            console.log('[CallTrace] call:incoming duplicate ignored by signalId', { signalId: data.signalId });
+            return;
+          }
+          if (this._acceptInProgress || this.callState === 'connecting') {
+            console.log('[CallTrace] call:incoming duplicate ignored during accept/connect', {
+              from: data?.from || null,
+              callState: this.callState
+            });
+            return;
+          }
         }
 
         // Recover from stale non-idle states so incoming call can still ring.
         if (this.callState !== 'idle') {
+          console.log('[CallTrace] call:incoming cleanup stale state', { callState: this.callState });
           this.cleanup();
         }
 
@@ -1485,6 +1803,7 @@ class UnifiedCallManager {
         this.currentCallId = data.callId || null;
         this.currentContactId = data.from;
         this.currentContactInfo = data.caller;
+        this._currentIncomingSignalId = data.signalId || null;
         this._pendingOffer = data.offer;
 
         this.showIncomingCallScreen(data.caller);
@@ -1505,29 +1824,26 @@ class UnifiedCallManager {
 
     // DM: call answered by remote
     socket.on('call:answered', async (data) => {
-      if (this.callState !== 'ringing' || this.callDirection !== 'outgoing') return;
-
-      this.stopAllSounds();
-      if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
-
-      try {
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        await this._applyBufferedIceCandidates();
-        // Set state to connected — onconnectionstatechange will also fire
-        // but the guard (callState !== 'connected') prevents double-rebuild
-        this.callState = 'connected';
-        this._renderedScreenKey = null; // Force fresh active screen
-        this.showActiveCallScreen();
-        this.playConnectedTone();
-      } catch (err) {
-        console.error('Error handling answer:', err);
-        this.endCall();
+      const handled = await this._handleOutgoingAnswered(data, 'socket');
+      if (handled && this._pendingLocalRenegotiation) {
+        this._emitDmRenegotiation('post-answer');
       }
     });
 
     // DM: ICE candidate — buffer if peerConnection or remoteDescription not ready yet
     socket.on('call:ice-candidate', async (data) => {
       try {
+        if (
+          data?.answer &&
+          this.callDirection === 'outgoing' &&
+          (this.callState === 'ringing' || this.callState === 'connecting')
+        ) {
+          const handled = await this._handleOutgoingAnswered({ answer: data.answer, signalId: data.signalId || null }, 'socket-ice');
+          if (handled && this._pendingLocalRenegotiation) {
+            this._emitDmRenegotiation('post-answer');
+          }
+        }
+
         if (this.peerConnection && this.peerConnection.remoteDescription && data.candidate) {
           await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
         } else if (data.candidate) {
@@ -2207,12 +2523,36 @@ class UnifiedCallManager {
   async _apiPost(url, body) {
     try {
       const token = InnovateAPI.getToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+        headers,
         body: JSON.stringify(body)
       });
     } catch (_) {}
+  }
+
+  async _apiGet(url) {
+    try {
+      const token = InnovateAPI.getToken();
+      const headers = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (_) {
+      return null;
+    }
   }
 }
 // ========== E2E ENCRYPTION FOR DMs ==========
@@ -2229,8 +2569,8 @@ const DMEncryption = {
       if (typeof CryptoJS === 'undefined') return text;
       const key = this._deriveKey(userId1, userId2);
       return CryptoJS.AES.encrypt(text, key).toString();
-    } catch (e) {
-      console.error('DM encrypt error:', e);
+    } catch (err) {
+      console.error('Encryption failed:', err);
       return text;
     }
   },
