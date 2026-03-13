@@ -792,7 +792,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('call:reject', (data) => {
-    const { to, reason } = data || {};
+    const { to, reason, signalId } = data || {};
     // Ignore implicit/legacy auto-rejects from background/stale tabs.
     // Only explicit user declines should be forwarded to caller.
     if (reason !== 'declined') {
@@ -802,16 +802,18 @@ io.on('connection', (socket) => {
     console.log(`Call rejected, notifying user ${to}`);
     emitToUser(to, 'call:rejected', {
       from: socket.userId || null,
-      reason: 'declined'
+      reason: 'declined',
+      signalId: signalId || null
     });
   });
 
   socket.on('call:end', (data) => {
-    const { to, reason } = data || {};
+    const { to, reason, signalId } = data || {};
     console.log(`Call ended, notifying user ${to}`);
     emitToUser(to, 'call:ended', {
       from: socket.userId || null,
-      reason: reason || 'ended'
+      reason: reason || 'ended',
+      signalId: signalId || null
     });
   });
 

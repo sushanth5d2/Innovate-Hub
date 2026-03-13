@@ -79,6 +79,8 @@ class UnifiedCallManager {
       this._currentIncomingSignalId = null;
       this._currentOutgoingSignalId = null;
       this._outgoingAnswerPollTimer = null;
+      this._outgoingAnswerInProgress = false;
+      this._lastAppliedOutgoingAnswerSignalId = null;
       this._pendingCleanup = false;
     }
 
@@ -249,12 +251,29 @@ class UnifiedCallManager {
     if (this.callState !== 'ringing' && this.callState !== 'connecting') return false;
     if (!data?.answer || !this.peerConnection) return false;
 
+    if (data?.signalId && this._lastAppliedOutgoingAnswerSignalId === data.signalId) {
+      return true;
+    }
+    if (this._outgoingAnswerInProgress) {
+      return false;
+    }
+
+    // Already answered; duplicate event arrived through fallback path.
+    if (this.peerConnection.remoteDescription?.type === 'answer') {
+      this.callState = 'connected';
+      this._renderedScreenKey = null;
+      this.showActiveCallScreen();
+      return true;
+    }
+
     this.stopAllSounds();
     if (this.ringTimeout) { clearTimeout(this.ringTimeout); this.ringTimeout = null; }
+    this._outgoingAnswerInProgress = true;
 
     try {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
       await this._applyBufferedIceCandidates();
+      this._lastAppliedOutgoingAnswerSignalId = data?.signalId || this._lastAppliedOutgoingAnswerSignalId;
       this.callState = 'connected';
       this._renderedScreenKey = null;
       this.showActiveCallScreen();
@@ -262,9 +281,19 @@ class UnifiedCallManager {
       console.log('[CallTrace] outgoing call answered', { source, signalId: data?.signalId || null });
       return true;
     } catch (err) {
+      const alreadyAnswered = this.peerConnection?.remoteDescription?.type === 'answer';
+      const isStableDuplicate = String(err?.message || '').includes('Called in wrong state: stable');
+      if (alreadyAnswered || isStableDuplicate) {
+        this.callState = 'connected';
+        this._renderedScreenKey = null;
+        this.showActiveCallScreen();
+        return true;
+      }
       console.error('Error handling answer:', err, { source });
       this.endCall();
       return false;
+    } finally {
+      this._outgoingAnswerInProgress = false;
     }
   }
 
@@ -685,6 +714,8 @@ class UnifiedCallManager {
     const name = this.currentContactInfo?.username || 'User';
     const reasonText = reason || 'Call ended';
     const duration = this.callStartTime ? this._formatDuration(Math.floor((Date.now() - this.callStartTime) / 1000)) : '';
+    const autoplayBanner = document.getElementById('waAutoplayBanner');
+    if (autoplayBanner) autoplayBanner.remove();
     modal.innerHTML = `
       <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
         <h2 style="margin:0 0 8px;font-size:24px;">${name}</h2>
@@ -1348,7 +1379,11 @@ class UnifiedCallManager {
     }
     
     if (this.currentContactId && this.socket) {
-      this.socket.emit('call:reject', { to: this.currentContactId, reason: 'declined' });
+      this.socket.emit('call:reject', {
+        to: this.currentContactId,
+        reason: 'declined',
+        signalId: this._currentIncomingSignalId || null
+      });
     }
     this.showCallEndedScreen('Call declined');
     this.playCallEndTone();
@@ -1377,9 +1412,12 @@ class UnifiedCallManager {
     }
 
     const status = reason || (this.callState === 'connected' ? 'completed' : (this.callState === 'ringing' && this.callDirection === 'outgoing' ? 'cancelled' : 'ended'));
+    const signalIdForEnd = this.callDirection === 'outgoing'
+      ? (this._currentOutgoingSignalId || null)
+      : (this._currentIncomingSignalId || null);
 
     if (this.callMode === 'dm') {
-      this.socket.emit('call:end', { to: this.currentContactId, reason: status });
+      this.socket.emit('call:end', { to: this.currentContactId, reason: status, signalId: signalIdForEnd });
     } else if (this.callMode === 'group') {
       this.socket.emit('group-call:leave', { groupId: this.currentGroupId });
       this.peers.forEach((pc) => pc.close());
@@ -1446,6 +1484,8 @@ class UnifiedCallManager {
     this._acceptInProgress = false;
     this._currentIncomingSignalId = null;
     this._currentOutgoingSignalId = null;
+    this._outgoingAnswerInProgress = false;
+    this._lastAppliedOutgoingAnswerSignalId = null;
     this._pendingTransferData = null;
     this._pendingGroupCallData = null;
     this._pendingIceCandidates = [];
@@ -1517,6 +1557,7 @@ class UnifiedCallManager {
       }
       audioEl.play().catch(e => {
         console.warn('[Call] Audio play blocked:', e.message);
+        if (this.callState === 'idle') return;
         // Show tap-to-unmute banner as fallback
         if (!document.getElementById('waAutoplayBanner')) {
           const banner = document.createElement('div');
@@ -1525,6 +1566,10 @@ class UnifiedCallManager {
           banner.textContent = '\uD83D\uDD07 Tap here to enable call audio';
           banner.onclick = () => { audioEl.play().catch(() => {}); banner.remove(); };
           document.body.appendChild(banner);
+          setTimeout(() => {
+            const staleBanner = document.getElementById('waAutoplayBanner');
+            if (staleBanner && this.callState === 'idle') staleBanner.remove();
+          }, 4000);
         }
       });
 
@@ -1856,6 +1901,15 @@ class UnifiedCallManager {
 
     // DM: call rejected
     socket.on('call:rejected', (data) => {
+      if (this.callMode !== 'dm' || this.callDirection !== 'outgoing') return;
+      if (this.callState !== 'ringing' && this.callState !== 'connecting') return;
+      if (data?.signalId && this._currentOutgoingSignalId && data.signalId !== this._currentOutgoingSignalId) {
+        console.log('[CallTrace] call:rejected ignored for stale signalId', {
+          incoming: data.signalId,
+          current: this._currentOutgoingSignalId
+        });
+        return;
+      }
       this.stopAllSounds();
       const reason = data?.reason === 'declined' ? 'Call declined' : 'Call declined';
       this.showCallEndedScreen(reason);
@@ -1866,6 +1920,18 @@ class UnifiedCallManager {
 
     // DM: call ended by remote
     socket.on('call:ended', (data) => {
+      if (this.callMode !== 'dm') return;
+      const currentSignal = this.callDirection === 'outgoing'
+        ? this._currentOutgoingSignalId
+        : this._currentIncomingSignalId;
+      if (data?.signalId && currentSignal && data.signalId !== currentSignal) {
+        console.log('[CallTrace] call:ended ignored for stale signalId', {
+          incoming: data.signalId,
+          current: currentSignal
+        });
+        return;
+      }
+      if (this.callState === 'idle') return;
       this.stopAllSounds();
       const reason = data?.reason;
       const endedText = reason === 'cancelled' ? 'Call cancelled' :
